@@ -12,10 +12,12 @@ enum HostCommands {
   private static let logQueue = DispatchQueue(label: "app.reflect.host-log", qos: .utility)
 
   /// `openURL` hands a URL to the system and returns whether an app opened it.
-  static func all(openURL: @escaping @MainActor (URL) async -> Bool) -> [String: ShellCommand] {
+  static func all(openURL: @escaping @MainActor (URL) async -> Bool) -> [ShellCommandName:
+    ShellCommand]
+  {
     [
-      ShellCommandName.hostLog.rawValue: log,
-      ShellCommandName.hostOpenUrl.rawValue: { request in await open(request, with: openURL) },
+      .hostLog: log,
+      .hostOpenUrl: { request in await open(request, with: openURL) },
     ]
   }
 

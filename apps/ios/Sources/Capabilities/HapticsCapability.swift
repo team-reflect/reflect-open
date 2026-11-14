@@ -8,8 +8,8 @@ import WebHostKit
 enum HapticsCapability {
   private static let lightImpact = UIImpactFeedbackGenerator(style: .light)
 
-  static let commands: [String: ShellCommand] = [
-    ShellCommandName.hapticsImpactLight.rawValue: { _ in
+  static let commands: [ShellCommandName: ShellCommand] = [
+    .hapticsImpactLight: { _ in
       lightImpact.impactOccurred()
       return .null
     }

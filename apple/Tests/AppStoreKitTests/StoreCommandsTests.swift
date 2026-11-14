@@ -70,7 +70,8 @@ private func run(
   _ command: String, _ args: String = "{}", on client: FakeStoreClient
 ) async throws -> StoreReply {
   let commands = StoreCommands(client: client, emit: { _, _ in })
-  let handler = try #require(commands.commands[command])
+  let name = try #require(ShellCommandName(rawValue: command))
+  let handler = try #require(commands.commands[name])
   return await handler(Data(args.utf8))
 }
 

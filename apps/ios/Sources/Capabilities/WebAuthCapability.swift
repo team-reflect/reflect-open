@@ -13,8 +13,8 @@ final class WebAuthCapability {
     session = WebAuthSession(anchor: anchor)
   }
 
-  var commands: [String: ShellCommand] {
-    [ShellCommandName.webAuthStart.rawValue: { [self] request in await start(request) }]
+  var commands: [ShellCommandName: ShellCommand] {
+    [.webAuthStart: { [self] request in await start(request) }]
   }
 
   /// `start {payload: {url, callbackScheme, ephemeral}}`: opens `url` and

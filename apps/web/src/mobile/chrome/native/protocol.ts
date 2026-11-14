@@ -1,4 +1,4 @@
-import type { ChromeIntent, ChromeMessage, FormattingCommand } from '@reflect/types'
+import type { ChromeIntent, ChromeMessage, ChromeTab, FormattingCommand } from '@reflect/types'
 import { z } from 'zod'
 
 /**
@@ -42,9 +42,7 @@ export const FORMATTING_COMMANDS = [
   'dismiss',
 ] as const satisfies readonly FormattingCommand[]
 
-export type FormattingCommandId = (typeof FORMATTING_COMMANDS)[number]
-
-const tabSchema = z.enum(['daily', 'all', 'tasks'])
+const tabSchema = z.enum(['daily', 'all', 'tasks']) satisfies z.ZodType<ChromeTab>
 
 const fileSchema = z.object({ name: z.string(), type: z.string(), data: z.string() })
 

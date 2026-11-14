@@ -1,3 +1,4 @@
+import type { FormattingCommand, PlusCommand } from '@reflect/types'
 import {
   focusedEditorCommands,
   type FormattingToolbarCommands,
@@ -6,9 +7,7 @@ import type { ToastController } from '@/lib/use-toasts.ts'
 import { runChromeAction } from '@/mobile/chrome/chrome-action.ts'
 import type { ChromePlus, ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
 import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
-import type { FormattingCommandId, NativeIntent } from '@/mobile/chrome/native/protocol.ts'
-
-type PlusCommand = Extract<NativeIntent, { type: 'plus' }>['command']
+import type { NativeIntent } from '@/mobile/chrome/native/protocol.ts'
 
 /**
  * Inserts files into an editor after the inserts it was given before.
@@ -54,26 +53,24 @@ export interface IntentContext {
   moveHistory: (direction: 'back' | 'forward') => void
 }
 
-const FORMATTING_RUNNERS: Record<
-  FormattingCommandId,
-  (commands: FormattingToolbarCommands) => void
-> = {
-  slash: (commands) => commands.insertTrigger('/'),
-  list: (commands) => commands.cycleBulletOrderedList(),
-  todo: (commands) => commands.cycleCheckableList(),
-  link: (commands) => commands.insertTrigger('[['),
-  tag: (commands) => commands.insertTrigger('#'),
-  dedent: (commands) => commands.dedent(),
-  indent: (commands) => commands.indent(),
-  up: (commands) => commands.moveUp(),
-  down: (commands) => commands.moveDown(),
-  dismiss: (commands) => commands.dismissKeyboard(),
-}
+const FORMATTING_RUNNERS: Record<FormattingCommand, (commands: FormattingToolbarCommands) => void> =
+  {
+    slash: (commands) => commands.insertTrigger('/'),
+    list: (commands) => commands.cycleBulletOrderedList(),
+    todo: (commands) => commands.cycleCheckableList(),
+    link: (commands) => commands.insertTrigger('[['),
+    tag: (commands) => commands.insertTrigger('#'),
+    dedent: (commands) => commands.dedent(),
+    indent: (commands) => commands.indent(),
+    up: (commands) => commands.moveUp(),
+    down: (commands) => commands.moveDown(),
+    dismiss: (commands) => commands.dismissKeyboard(),
+  }
 
 /**
  * Run a formatting command on the focused editor.
  */
-function runFormattingCommand(id: FormattingCommandId): void {
+function runFormattingCommand(id: FormattingCommand): void {
   const commands = focusedEditorCommands()
   if (commands !== null) {
     FORMATTING_RUNNERS[id](commands)

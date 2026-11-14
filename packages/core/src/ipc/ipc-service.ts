@@ -86,6 +86,15 @@ export interface PluginSubscription {
 }
 
 /**
+ * The arguments of `asset_read_binary`. The command table holds JSON commands
+ * only, so this binary command is typed here.
+ */
+export type AssetReadBinaryArgs = {
+  readonly path: string
+  readonly generation: number
+}
+
+/**
  * The typed IPC boundary: the single place where an untyped native response
  * becomes a validated domain value. Every failure is an {@link AppError}: a
  * rejected command is coerced via {@link toAppError}; a response that doesn't
@@ -108,10 +117,10 @@ export interface IpcBridgeService {
     schema: ZodType<TOutput, unknown>,
   ): Promise<TOutput>
   /**
-   * Invoke a command whose reply is raw bytes (`asset_read_binary`). Rejects
-   * with a `parse` {@link AppError} when the reply is not an `ArrayBuffer`.
+   * Invoke `asset_read_binary`, whose reply is raw bytes. Rejects with a
+   * `parse` {@link AppError} when the reply is not an `ArrayBuffer`.
    */
-  callBytes(command: string, args: Readonly<Record<string, unknown>>): Promise<ArrayBuffer>
+  callBytes(command: 'asset_read_binary', args: AssetReadBinaryArgs): Promise<ArrayBuffer>
   /**
    * {@link call}'s binary sibling: the payload is a raw byte body with
    * per-call metadata in `headers`. Rejects with an `io` {@link AppError}
@@ -184,7 +193,7 @@ class IpcBridgeServiceImpl implements IpcBridgeService {
     return schema === undefined ? raw : parseResponse(command, raw, schema)
   }
 
-  async callBytes(command: string, args: Readonly<Record<string, unknown>>): Promise<ArrayBuffer> {
+  async callBytes(command: 'asset_read_binary', args: AssetReadBinaryArgs): Promise<ArrayBuffer> {
     const raw = await this.#invoke(command, args)
     if (!(raw instanceof ArrayBuffer)) {
       throw new AppError('parse', `"${command}" answered no bytes`)

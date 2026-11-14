@@ -4,6 +4,7 @@ import { AppError } from '../errors.ts'
 import type { ZodType } from 'zod'
 import {
   createIpcBridgeService,
+  type AssetReadBinaryArgs,
   type IpcBridge,
   type IpcBridgeService,
   type PluginSubscription,
@@ -165,7 +166,7 @@ class TestIpcBridgeServiceImpl implements TestIpcBridgeService {
     this.call = this.#inner.call.bind(this.#inner)
   }
 
-  callBytes(command: string, args: Readonly<Record<string, unknown>>): Promise<ArrayBuffer> {
+  callBytes(command: 'asset_read_binary', args: AssetReadBinaryArgs): Promise<ArrayBuffer> {
     return this.#inner.callBytes(command, args)
   }
 

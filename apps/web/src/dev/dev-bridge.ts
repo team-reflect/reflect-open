@@ -7,7 +7,6 @@ import {
   type IpcBridge,
 } from '@reflect/core'
 import { base64ToBytes, bytesToBase64 } from '@reflect/utils'
-import { z } from 'zod'
 import type { DevAssetStore } from '@/dev/dev-asset-store.ts'
 import type { DevFileStore } from '@/dev/dev-file-store.ts'
 import type { DevIndexDb } from '@/dev/dev-index-db.ts'
@@ -26,14 +25,6 @@ export interface DevBridgeBackend {
   readonly index: DevIndexDb
   readonly assets: DevAssetStore
 }
-
-const iapPayloadSchema = z.object({ productType: z.literal('subs') })
-const iapProductArgsSchema = z.object({
-  payload: iapPayloadSchema.extend({ productId: z.string() }),
-})
-const iapProductsArgsSchema = z.object({
-  payload: iapPayloadSchema.extend({ productIds: z.array(z.string()) }),
-})
 
 /**
  * The arguments of `command`, typed from the command table. The callers are
@@ -102,17 +93,17 @@ class DevBridgeImpl implements IpcBridge {
       case 'plugin:app-store|request_review':
         return null
       case 'plugin:iap|get_products': {
-        const { payload } = iapProductsArgsSchema.parse(args)
+        const { payload } = argsOf('plugin:iap|get_products', args)
         return {
           products: iapProducts.filter((product) => payload.productIds.includes(product.productId)),
         }
       }
       case 'plugin:iap|get_product_status': {
-        const { payload } = iapProductArgsSchema.parse(args)
+        const { payload } = argsOf('plugin:iap|get_product_status', args)
         return { productId: payload.productId, isOwned: payload.productId === this.#ownedProductId }
       }
       case 'plugin:iap|purchase': {
-        const { payload } = iapProductArgsSchema.parse(args)
+        const { payload } = argsOf('plugin:iap|purchase', args)
         if (!iapProducts.some((product) => product.productId === payload.productId)) {
           throw new AppError('notFound', `unknown preview product: ${payload.productId}`)
         }

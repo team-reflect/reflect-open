@@ -221,6 +221,9 @@ macro_rules! define_commands {
                 $( pub $arg: $ty, )*
             }
 
+            /// The command's result.
+            pub type Result = $ret;
+
             /// The command's arguments and result.
             #[cfg(feature = "codegen")]
             #[derive(specta::Type)]

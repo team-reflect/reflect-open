@@ -8,6 +8,8 @@
 mod calendar;
 mod capture;
 mod change;
+// Only TypeScript and Swift use the chrome protocol and the Swift shell types.
+#[cfg(feature = "codegen")]
 mod chrome;
 pub mod commands;
 mod contacts;
@@ -23,6 +25,7 @@ mod import;
 mod index;
 mod link_preview;
 mod settings;
+#[cfg(feature = "codegen")]
 mod shell;
 mod skill;
 
@@ -37,6 +40,7 @@ pub use capture::{
     SHARED_SCREENSHOT_MAX_BYTES, TextCaptureEnvelope, TextCaptureKind, TextCaptureSource,
 };
 pub use change::{ChangeKind, FileChange};
+#[cfg(feature = "codegen")]
 pub use chrome::*;
 pub use contacts::{ContactMatch, ContactsAuthorization};
 pub use embed::{EmbedProgress, EmbedStatus};
@@ -60,5 +64,6 @@ pub use index::{
 };
 pub use link_preview::LinkPreviewHtml;
 pub use settings::SettingsDoc;
+#[cfg(feature = "codegen")]
 pub use shell::*;
 pub use skill::{AgentSkillInstallState, AgentSkillStatus};

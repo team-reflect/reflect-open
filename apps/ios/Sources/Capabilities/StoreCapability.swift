@@ -30,12 +30,12 @@ final class StoreCapability {
     store.start()
   }
 
-  var commands: [String: ShellCommand] {
-    var commands: [String: ShellCommand] = [
-      ShellCommandName.appStorePresentOfferCodeRedeemSheet.rawValue: { [self] _ in
+  var commands: [ShellCommandName: ShellCommand] {
+    var commands: [ShellCommandName: ShellCommand] = [
+      .appStorePresentOfferCodeRedeemSheet: { [self] _ in
         await redeemOfferCode()
       },
-      ShellCommandName.appStoreRequestReview.rawValue: { [self] _ in requestReview() },
+      .appStoreRequestReview: { [self] _ in requestReview() },
     ]
     for (name, command) in store.commands {
       commands[name] = { request in CoreReply(await command(request.args)) }

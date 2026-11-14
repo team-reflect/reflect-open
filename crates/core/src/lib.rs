@@ -44,7 +44,7 @@ use std::sync::Arc;
 
 use reflect_graph_io::GraphState;
 use reflect_index::IndexSession;
-use reflect_types::*;
+use reflect_types::{AppError, AppResult};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
@@ -258,7 +258,7 @@ macro_rules! dispatch_table {
                 $( stringify!($method) => {
                     let reflect_types::commands::$method::Args { $( $arg ),* } =
                         parse_args(command, args_json)?;
-                    let value: $ret = method_result!(
+                    let value: reflect_types::commands::$method::Result = method_result!(
                         core.$method($( $arg ),*) $( . $await )? $( , $infallible )?
                     );
                     json_reply(&value)

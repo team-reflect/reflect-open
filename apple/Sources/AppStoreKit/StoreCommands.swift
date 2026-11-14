@@ -58,19 +58,19 @@ public final class StoreCommands {
   }
 
   /// The commands by name.
-  public var commands: [String: StoreCommand] {
+  public var commands: [ShellCommandName: StoreCommand] {
     [
-      ShellCommandName.iapGetProducts.rawValue: { [client] args in
+      .iapGetProducts: { [client] args in
         await Self.getProducts(client, args)
       },
-      ShellCommandName.iapPurchase.rawValue: { [client] args in await Self.purchase(client, args) },
-      ShellCommandName.iapGetProductStatus.rawValue: { [client] args in
+      .iapPurchase: { [client] args in await Self.purchase(client, args) },
+      .iapGetProductStatus: { [client] args in
         await Self.getProductStatus(client, args)
       },
-      ShellCommandName.appStoreGetEnvironment.rawValue: { [client] _ in
+      .appStoreGetEnvironment: { [client] _ in
         await Self.getEnvironment(client)
       },
-      ShellCommandName.appStoreSync.rawValue: { [client] _ in await Self.sync(client) },
+      .appStoreSync: { [client] _ in await Self.sync(client) },
     ]
   }
 

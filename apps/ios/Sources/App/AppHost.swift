@@ -45,7 +45,7 @@ final class AppHost {
     let recording = RecordingCapability(emit: emit)
     self.recording = recording
 
-    var shellCommands: [String: ShellCommand] = [:]
+    var shellCommands: [ShellCommandName: ShellCommand] = [:]
     for commands in [
       HostCommands.all { url in await UIApplication.shared.open(url) },
       HapticsCapability.commands, webAuth.commands, store.commands, recording.commands,

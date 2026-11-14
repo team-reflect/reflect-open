@@ -43,9 +43,9 @@ final class RecordingCapability {
     engine.queueAction("recordAudio")
   }
 
-  var commands: [String: ShellCommand] {
+  var commands: [ShellCommandName: ShellCommand] {
     [
-      ShellCommandName.recordingStart.rawValue: { [engine] request in
+      .recordingStart: { [engine] request in
         guard let args = request.decodeArgs(RecordingStartArgs.self)?.request else {
           return .error(
             .parse(.init(message: "start_recording takes {request: {segmentMs, reminderMs}}")))
@@ -54,10 +54,10 @@ final class RecordingCapability {
           engine.start(segmentMs: args.segmentMs, reminderMs: args.reminderMs, completion: $0)
         }
       },
-      ShellCommandName.recordingStop.rawValue: { [engine] _ in
+      .recordingStop: { [engine] _ in
         await Self.reply { engine.stop(completion: $0) }
       },
-      ShellCommandName.recordingCancel.rawValue: { [engine] _ in
+      .recordingCancel: { [engine] _ in
         let result = await withCheckedContinuation { continuation in
           engine.cancel { result in continuation.resume(returning: result) }
         }
@@ -66,8 +66,8 @@ final class RecordingCapability {
         }
         return .null
       },
-      ShellCommandName.recordingStatus.rawValue: { [engine] _ in .value(engine.status()) },
-      ShellCommandName.recordingListStaged.rawValue: { [engine] _ in
+      .recordingStatus: { [engine] _ in .value(engine.status()) },
+      .recordingListStaged: { [engine] _ in
         do {
           return .value(StagedRecordingList(files: try engine.listStaged()))
         } catch {
@@ -75,7 +75,7 @@ final class RecordingCapability {
             .io(.init(message: "listing staged recordings failed: \(error.localizedDescription)")))
         }
       },
-      ShellCommandName.recordingDeleteStaged.rawValue: { [engine] request in
+      .recordingDeleteStaged: { [engine] request in
         guard let path = request.decodeArgs(RecordingDeleteStagedArgs.self)?.request.path else {
           return .error(.parse(.init(message: "delete_staged takes {request: {path}}")))
         }
@@ -87,11 +87,11 @@ final class RecordingCapability {
             .io(.init(message: "deleting staged recording failed: \(error.localizedDescription)")))
         }
       },
-      ShellCommandName.recordingActionsReady.rawValue: { [engine] _ in
+      .recordingActionsReady: { [engine] _ in
         engine.actionsReady()
         return .null
       },
-      ShellCommandName.recordingActionPerformed.rawValue: { [engine] _ in
+      .recordingActionPerformed: { [engine] _ in
         engine.actionPerformed()
         return .null
       },
