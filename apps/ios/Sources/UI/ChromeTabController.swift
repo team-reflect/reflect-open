@@ -166,29 +166,50 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
         view.addSubview(standalone.bar)
       }
       view.bringSubviewToFront(standalone.bar)
-      let items = standalone.layout(in: view, leading: safe.left + 24)
+      let capsule = standalone.layout(in: view, leading: safe.left + 20)
       if !standalone.bar.isHidden {
         inset = max(0, bounds.maxY - standalone.bar.frame.minY - safe.bottom)
       }
+      // The `+` mirrors the capsule: the same height, center line and edge gap.
+      let gap = capsule.minX - safe.left
       plus.layout(
-        in: view, center: CGPoint(x: bounds.maxX - safe.right - 20 - 26, y: items.midY),
-        size: 52)
+        in: view,
+        center: CGPoint(x: bounds.maxX - safe.right - gap - capsule.height / 2, y: capsule.midY),
+        size: capsule.height)
     case .rail:
-      // The `+` sits above the system's tabs, wherever the rail puts them.
-      let items = tabs.compactMap { $0.frame(in: view) }.reduce(CGRect.null) { $0.union($1) }
-      if !items.isNull {
-        plus.layout(in: view, center: CGPoint(x: items.midX, y: items.minY - 16 - 22), size: 44)
+      // The `+` sits above the system's rail capsule, as wide as it.
+      let items = railItems()
+      // The system settles the rail after this pass; lay out again once it moves.
+      DispatchQueue.main.async { [weak self] in
+        guard let self, form == .rail, railItems() != items else { return }
+        view.setNeedsLayout()
+      }
+      if !items.isNull, view.bounds.contains(items) {
+        let capsule = items.insetBy(dx: -Self.railCapsuleInset, dy: -Self.railCapsuleInset)
+        plus.layout(
+          in: view,
+          center: CGPoint(x: capsule.midX, y: capsule.minY - 12 - capsule.width / 2),
+          size: capsule.width)
       }
     case .pad:
-      let area = bounds.inset(by: safe)
+      // Equal gaps to the right and bottom edges, clear of the safe area.
+      let margin = max(safe.right, safe.bottom) + 24
       plus.layout(
-        in: view, center: CGPoint(x: area.maxX - 24 - 28, y: area.maxY - 24 - 28), size: 56)
+        in: view, center: CGPoint(x: bounds.maxX - margin - 28, y: bounds.maxY - margin - 28),
+        size: 56)
     }
     for placeholder in placeholders.values
     where placeholder.additionalSafeAreaInsets.bottom != inset {
       placeholder.additionalSafeAreaInsets.bottom = inset
     }
   }
+
+  private func railItems() -> CGRect {
+    tabs.compactMap { $0.frame(in: view) }.reduce(CGRect.null) { $0.union($1) }
+  }
+
+  /// How far the system's rail capsule reaches past its tabs on every side.
+  private static let railCapsuleInset: CGFloat = 2
 
   /// The app's purple.
   static let accent = UIColor { traits in
