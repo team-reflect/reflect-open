@@ -3,9 +3,22 @@ import { linkOpacityToScroll } from '@/lib/scroll-linked-opacity.ts'
 import { watchScrollSettle } from '@/lib/scroll-settle.ts'
 
 /**
- * Scroll offset (px) at or under which the lower page counts as fully revealed.
+ * How far (px) past the screen edge the pop snap point leaves the current
+ * page. The slow end of the release deceleration then runs off screen, and the
+ * pop commits as soon as the page leaves the screen.
  */
-const REVEALED_PX = 1
+export const BACK_PAGER_OVERSHOOT_PX = 50
+
+/**
+ * Tolerance (px) for comparing scroll offsets, which can be fractional.
+ */
+const TOLERANCE_PX = 1
+
+/**
+ * Scroll offset (px) at or under which the current page is off screen and the
+ * lower page fully revealed.
+ */
+const REVEALED_PX = BACK_PAGER_OVERSHOOT_PX + TOLERANCE_PX
 
 export interface BackPagerOptions {
   /**
@@ -43,7 +56,14 @@ export interface BackPagerOptions {
  * Rests the scroller on its last page, the end of its scroll range.
  */
 function pinToLastPage(scroller: HTMLElement): void {
-  scroller.scrollLeft = scroller.scrollWidth - scroller.clientWidth
+  scroller.scrollLeft = restLeft(scroller)
+}
+
+/**
+ * The scroll offset of the last page, the end of the scroll range.
+ */
+function restLeft(scroller: HTMLElement): number {
+  return scroller.scrollWidth - scroller.clientWidth
 }
 
 /**
@@ -60,7 +80,9 @@ function revealBelow(scroller: HTMLElement): void {
  * current page with the finger and snaps it home or off, so the drag never
  * waits for the main thread. A mouse drag from the edge strip scrolls it the
  * same way. Between gestures the scroller rests on the last page; a user
- * swipe that settles on the first page commits the pop.
+ * swipe that leaves the current page off screen commits the pop. A scroll
+ * that stops between the two snap points (a touch that stops the snap does
+ * not snap again in WebKit) scrolls on to the nearer one.
  */
 export function useBackPager({
   scrollerRef,
@@ -102,12 +124,21 @@ export function useBackPager({
         if (popped) {
           return
         }
-        if (scroller.scrollLeft > REVEALED_PX) {
+        const rest = restLeft(scroller)
+        if (scroller.scrollLeft >= rest - TOLERANCE_PX) {
           gesturesAtRest = watch.gestures()
           if (swiping) {
             swiping = false
             reportSwipe('cancel')
           }
+          return
+        }
+        if (scroller.scrollLeft > REVEALED_PX) {
+          scroller.scrollTo({
+            // The midpoint of the part of the travel where the card shows.
+            left: scroller.scrollLeft < (BACK_PAGER_OVERSHOOT_PX + rest) / 2 ? 0 : rest,
+            behavior: 'smooth',
+          })
           return
         }
         if (watch.gestures() === gesturesAtRest) {
@@ -126,12 +157,12 @@ export function useBackPager({
     // A scroll off the last page that a gesture since the last rest made
     // starts a user swipe.
     const startSwipe = (): void => {
-      const rest = scroller.scrollWidth - scroller.clientWidth
+      const rest = restLeft(scroller)
       if (
         swiping ||
         popped ||
         watch.gestures() === gesturesAtRest ||
-        scroller.scrollLeft >= rest - REVEALED_PX
+        scroller.scrollLeft >= rest - TOLERANCE_PX
       ) {
         return
       }
@@ -142,7 +173,15 @@ export function useBackPager({
 
     const scrim = scrimRef.current
     if (scrim) {
-      linkOpacityToScroll({ target: scrim, scroller, axis: 'x', from: 0, to: 1, signal })
+      linkOpacityToScroll({
+        target: scrim,
+        scroller,
+        axis: 'x',
+        start: BACK_PAGER_OVERSHOOT_PX,
+        from: 0,
+        to: 1,
+        signal,
+      })
     }
 
     // A finger on the pager owns its position, even when the keyboard or the
