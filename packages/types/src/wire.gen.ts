@@ -1530,7 +1530,7 @@ export type IndexedNote = {
 	 *  Description text of referenced assets (Plan 20), folded into the FTS
 	 *  `body` only — never `preview` or anything AI-reachable.
 	 */
-	assetText: string,
+	assetText?: string | undefined,
 	/**  The All Notes row snippet, derived once here rather than per query. */
 	preview: string,
 	links: IndexedLink[],
@@ -1565,7 +1565,7 @@ export type IndexedTask = {
 	 *  The headings above the task, then its ancestor list items' first
 	 *  paragraphs, as Markdown, outermost first.
 	 */
-	breadcrumbs: string[],
+	breadcrumbs?: string[] | undefined,
 	checked: boolean,
 	/**  Explicit due date (first `[[YYYY-MM-DD]]` in the item), or None. */
 	dueDate: string | null,

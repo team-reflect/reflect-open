@@ -194,7 +194,7 @@ export function openDevIndexDb(sqlite3: Sqlite3Static): DevIndexDb {
             note.path,
             task.astPath,
             task.markdown,
-            encodeTaskBreadcrumbs(task.breadcrumbs),
+            encodeTaskBreadcrumbs(task.breadcrumbs ?? []),
             task.checked,
             task.dueDate,
           ],

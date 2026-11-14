@@ -2334,7 +2334,7 @@ public struct IndexedNote: Codable, Sendable, Equatable {
     public let fileHash: String
     public let mtime: Int64
     public let text: String
-    public let assetText: String
+    public let assetText: String?
     public let preview: String
     public let links: [IndexedLink]
     public let tags: [IndexedTag]
@@ -2372,7 +2372,7 @@ public struct IndexedNote: Codable, Sendable, Equatable {
         case tasks = "tasks"
     }
 
-    public init(path: String, id: String?, title: String, titleKey: String, pathKey: String, kind: NoteKind, dailyDate: String?, isPrivate: Bool, isPinned: Bool, pinnedOrder: Double?, hasContent: Bool, gistUrl: String?, gistStale: Bool, fileHash: String, mtime: Int64, text: String, assetText: String, preview: String, links: [IndexedLink], tags: [IndexedTag], aliases: [IndexedAlias], claims: [IndexedClaim], emails: [IndexedEmail], assets: [String], tasks: [IndexedTask]) {
+    public init(path: String, id: String?, title: String, titleKey: String, pathKey: String, kind: NoteKind, dailyDate: String?, isPrivate: Bool, isPinned: Bool, pinnedOrder: Double?, hasContent: Bool, gistUrl: String?, gistStale: Bool, fileHash: String, mtime: Int64, text: String, assetText: String?, preview: String, links: [IndexedLink], tags: [IndexedTag], aliases: [IndexedAlias], claims: [IndexedClaim], emails: [IndexedEmail], assets: [String], tasks: [IndexedTask]) {
         self.path = path
         self.id = id
         self.title = title
@@ -2418,7 +2418,7 @@ public struct IndexedNote: Codable, Sendable, Equatable {
         self.fileHash = try container.decode(String.self, forKey: .fileHash)
         self.mtime = try container.decode(Int64.self, forKey: .mtime)
         self.text = try container.decode(String.self, forKey: .text)
-        self.assetText = try container.decode(String.self, forKey: .assetText)
+        self.assetText = try container.decodeIfPresent(String.self, forKey: .assetText)
         self.preview = try container.decode(String.self, forKey: .preview)
         self.links = try container.decode([IndexedLink].self, forKey: .links)
         self.tags = try container.decode([IndexedTag].self, forKey: .tags)
@@ -2447,7 +2447,9 @@ public struct IndexedNote: Codable, Sendable, Equatable {
         try container.encode(fileHash, forKey: .fileHash)
         try container.encode(mtime, forKey: .mtime)
         try container.encode(text, forKey: .text)
-        try container.encode(assetText, forKey: .assetText)
+        if let assetText = assetText {
+            try container.encode(assetText, forKey: .assetText)
+        }
         try container.encode(preview, forKey: .preview)
         try container.encode(links, forKey: .links)
         try container.encode(tags, forKey: .tags)
@@ -2492,7 +2494,7 @@ public struct IndexedTag: Codable, Sendable, Equatable {
 public struct IndexedTask: Codable, Sendable, Equatable {
     public let astPath: String
     public let markdown: String
-    public let breadcrumbs: [String]
+    public let breadcrumbs: [String]?
     public let checked: Bool
     public let dueDate: String?
 
@@ -2504,7 +2506,7 @@ public struct IndexedTask: Codable, Sendable, Equatable {
         case dueDate = "dueDate"
     }
 
-    public init(astPath: String, markdown: String, breadcrumbs: [String], checked: Bool, dueDate: String?) {
+    public init(astPath: String, markdown: String, breadcrumbs: [String]?, checked: Bool, dueDate: String?) {
         self.astPath = astPath
         self.markdown = markdown
         self.breadcrumbs = breadcrumbs
@@ -2516,7 +2518,7 @@ public struct IndexedTask: Codable, Sendable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.astPath = try container.decode(String.self, forKey: .astPath)
         self.markdown = try container.decode(String.self, forKey: .markdown)
-        self.breadcrumbs = try container.decode([String].self, forKey: .breadcrumbs)
+        self.breadcrumbs = try container.decodeIfPresent([String].self, forKey: .breadcrumbs)
         self.checked = try container.decode(Bool.self, forKey: .checked)
         self.dueDate = try container.decodeIfPresent(String.self, forKey: .dueDate)
     }
@@ -2525,7 +2527,9 @@ public struct IndexedTask: Codable, Sendable, Equatable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(astPath, forKey: .astPath)
         try container.encode(markdown, forKey: .markdown)
-        try container.encode(breadcrumbs, forKey: .breadcrumbs)
+        if let breadcrumbs = breadcrumbs {
+            try container.encode(breadcrumbs, forKey: .breadcrumbs)
+        }
         try container.encode(checked, forKey: .checked)
         try container.encode(dueDate, forKey: .dueDate)
     }

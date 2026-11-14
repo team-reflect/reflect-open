@@ -88,6 +88,7 @@ pub struct IndexedNote {
     pub text: String,
     /// Description text of referenced assets (Plan 20), folded into the FTS
     /// `body` only — never `preview` or anything AI-reachable.
+    #[serde(default)]
     pub asset_text: String,
     /// The All Notes row snippet, derived once here rather than per query.
     pub preview: String,
@@ -210,6 +211,7 @@ pub struct IndexedTask {
     pub markdown: String,
     /// The headings above the task, then its ancestor list items' first
     /// paragraphs, as Markdown, outermost first.
+    #[serde(default)]
     pub breadcrumbs: Vec<String>,
     pub checked: bool,
     /// Explicit due date (first `[[YYYY-MM-DD]]` in the item), or None.
