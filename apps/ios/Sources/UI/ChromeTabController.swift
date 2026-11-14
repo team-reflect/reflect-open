@@ -166,37 +166,31 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
         view.addSubview(standalone.bar)
       }
       view.bringSubviewToFront(standalone.bar)
-      let capsule = standalone.layout(in: view, leading: safe.left + 20)
+      let capsule = standalone.layout(in: view, leading: safe.left + Self.capsuleEdgeGap)
       if !standalone.bar.isHidden {
         inset = max(0, bounds.maxY - standalone.bar.frame.minY - safe.bottom)
       }
-      // The `+` mirrors the capsule: the same height, center line and edge gap.
-      let gap = capsule.minX - safe.left
+      // The `+` mirrors the capsule: as tall, on its center line, as far from the edge.
       plus.layout(
         in: view,
-        center: CGPoint(x: bounds.maxX - safe.right - gap - capsule.height / 2, y: capsule.midY),
+        center: CGPoint(
+          x: bounds.maxX - safe.right - Self.capsuleEdgeGap - capsule.height / 2, y: capsule.midY),
         size: capsule.height)
     case .rail:
-      // The `+` sits above the system's rail capsule, as wide as it.
-      let items = railItems()
-      // The system settles the rail after this pass; lay out again once it moves.
-      DispatchQueue.main.async { [weak self] in
-        guard let self, form == .rail, railItems() != items else { return }
-        view.setNeedsLayout()
-      }
-      if !items.isNull, view.bounds.contains(items) {
-        let capsule = items.insetBy(dx: -Self.railCapsuleInset, dy: -Self.railCapsuleInset)
+      // The `+` sits above the rail's capsule, as wide as it.
+      if let capsule = railCapsule() {
         plus.layout(
-          in: view,
-          center: CGPoint(x: capsule.midX, y: capsule.minY - 12 - capsule.width / 2),
+          in: view, center: CGPoint(x: capsule.midX, y: capsule.minY - 12 - capsule.width / 2),
           size: capsule.width)
       }
     case .pad:
       // Equal gaps to the right and bottom edges, clear of the safe area.
+      let size: CGFloat = 56
       let margin = max(safe.right, safe.bottom) + 24
       plus.layout(
-        in: view, center: CGPoint(x: bounds.maxX - margin - 28, y: bounds.maxY - margin - 28),
-        size: 56)
+        in: view,
+        center: CGPoint(x: bounds.maxX - margin - size / 2, y: bounds.maxY - margin - size / 2),
+        size: size)
     }
     for placeholder in placeholders.values
     where placeholder.additionalSafeAreaInsets.bottom != inset {
@@ -204,12 +198,14 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     }
   }
 
-  private func railItems() -> CGRect {
-    tabs.compactMap { $0.frame(in: view) }.reduce(CGRect.null) { $0.union($1) }
-  }
+  /// The gap between the bottom capsule and the side of the safe area.
+  private static let capsuleEdgeGap: CGFloat = 20
 
-  /// How far the system's rail capsule reaches past its tabs on every side.
-  private static let railCapsuleInset: CGFloat = 2
+  /// The system rail's glass capsule, which reaches 2pt past its tabs.
+  private func railCapsule() -> CGRect? {
+    let items = tabs.compactMap { $0.frame(in: view) }.reduce(CGRect.null) { $0.union($1) }
+    return items.isNull ? nil : items.insetBy(dx: -2, dy: -2)
+  }
 
   /// The app's purple.
   static let accent = UIColor { traits in
@@ -413,7 +409,11 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     let hidden = hidesForState || (hidesForKeyboard && form == .bar)
     let systemHidden = hidden || form == .bar
     if systemHidden != isTabBarHidden {
+      // The rail's tabs reach their place only when the animation ends.
+      CATransaction.begin()
+      CATransaction.setCompletionBlock { [weak self] in self?.view.setNeedsLayout() }
       setTabBarHidden(systemHidden, animated: true)
+      CATransaction.commit()
     }
     let standaloneHidden = hidden || form != .bar
     if standaloneHidden != standalone.bar.isHidden {
