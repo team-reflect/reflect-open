@@ -57,6 +57,24 @@ describe('NavigationService', () => {
     expect(navigation.get().route).toEqual({ kind: 'note', path: 'notes/a.md' })
   })
 
+  it('replace onto a neighbor that shows the target merges into it', () => {
+    const navigation = createNavigationService()
+    navigation.navigate({ kind: 'daily', date: '2026-06-07' })
+    navigation.navigate({ kind: 'daily', date: '2026-06-08' })
+
+    navigation.navigate({ kind: 'daily', date: '2026-06-07' }, { replace: true })
+    navigation.back()
+    expect(navigation.get().route).toEqual({ kind: 'today' })
+    expect(navigation.get().canBack).toBe(false)
+
+    navigation.navigate({ kind: 'daily', date: '2026-06-09' })
+    navigation.back()
+    navigation.navigate({ kind: 'daily', date: '2026-06-09' }, { replace: true })
+    expect(navigation.get().route).toEqual({ kind: 'daily', date: '2026-06-09' })
+    expect(navigation.get().canForward).toBe(false)
+    expect(navigation.get().canBack).toBe(false)
+  })
+
   it('re-navigating to the current route is a no-op (no stack growth)', () => {
     const navigation = createNavigationService()
     navigation.navigate({ kind: 'daily', date: '2026-06-08' })
