@@ -1,69 +1,14 @@
 import { isIsoDate, type MaybePromise } from '@reflect/utils'
-import { z } from 'zod'
 import { errorMessage } from '../errors.ts'
 import { noteBasenameKey } from '../graph/note-reference.ts'
 import { dateFromDailyPath, foldGraphPath } from '../graph/paths.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 import type { DatabaseService } from './database-service.ts'
 
+import type { IndexTouch, ReconcileScan, ScanCandidate, ScanOrphan } from '@reflect/types'
 import type { IndexedNote } from './indexed-note.ts'
 
-const scanCandidateSchema = z.object({
-  path: z.string(),
-  modifiedMs: z.number(),
-  storedMtime: z.number().nullable(),
-  storedHash: z.string().nullable(),
-})
-
-const scanOrphanSchema = z.object({
-  path: z.string(),
-  storedMtime: z.number(),
-  storedHash: z.string(),
-})
-
-export const reconcileScanSchema = z.object({
-  total: z.number(),
-  candidates: z.array(scanCandidateSchema),
-  orphans: z.array(scanOrphanSchema),
-  /**
-   * Evicted files whose content the index lacks: no stored row, or a listed
-   * mtime differing from the stored row (a remote edit synced while
-   * evicted). Never candidates: they can't be read without forcing an
-   * on-demand download, so the reconcile surfaces them for a targeted
-   * `icloud_request_downloads`; the materialized files then arrive as
-   * ordinary watcher upserts.
-   */
-  stalePlaceholders: z.array(z.string()),
-})
-
-/**
- * One file the reconcile must read; see {@link IndexStoreService.reconcileScan}.
- */
-export type ScanCandidate = z.infer<typeof scanCandidateSchema>
-
-/**
- * A stored row whose file vanished from disk; see {@link IndexStoreService.reconcileScan}.
- */
-export type ScanOrphan = z.infer<typeof scanOrphanSchema>
-
-/**
- * The reconcile delta: what changed on disk relative to the index.
- */
-export type ReconcileScan = z.infer<typeof reconcileScanSchema>
-
-/**
- * One {@link IndexStoreService.touch} entry: re-stamp `path`'s stored mtime.
- */
-export interface IndexedNoteTouch {
-  /**
-   * Graph-relative markdown path.
-   */
-  readonly path: string
-  /**
-   * The file's listed on-disk mtime (epoch ms).
-   */
-  readonly mtime: number
-}
+export type { IndexTouch, ReconcileScan, ScanCandidate, ScanOrphan }
 
 /**
  * Notes per `index_apply_batch` transaction in the bulk passes (rebuild,
@@ -112,7 +57,7 @@ export interface MtimeTouchBatch {
   /**
    * Queue a re-stamp; flushes automatically at the transaction cap.
    */
-  add: (entry: IndexedNoteTouch) => Promise<void>
+  add: (entry: IndexTouch) => Promise<void>
   /**
    * Apply everything still queued. Safe to call repeatedly.
    */
@@ -168,7 +113,7 @@ export interface IndexStoreService {
    * Re-stamp stored mtimes for notes whose content already matches disk. One
    * Rust transaction per call; an empty batch never reaches the backend.
    */
-  touch(entries: readonly IndexedNoteTouch[], generation: number): MaybePromise<void>
+  touch(entries: readonly IndexTouch[], generation: number): MaybePromise<void>
   /**
    * Wipe all derived tables (precedes a full rebuild); `chat_*` and `index_meta` stay.
    */
@@ -294,7 +239,7 @@ export function createMtimeTouchBatchWriter(
   touch: IndexStoreService['touch'],
   generation: number,
 ): MtimeTouchBatch {
-  return new BatchWriter(async (entries: IndexedNoteTouch[]) => {
+  return new BatchWriter(async (entries: IndexTouch[]) => {
     await touch(entries, generation)
     return entries.length
   })
@@ -356,7 +301,7 @@ class IndexStoreServiceImpl implements IndexStoreService {
     return this.#deps.ipc.call('index_reconcile_scan', { generation })
   }
 
-  async touch(entries: readonly IndexedNoteTouch[], generation: number): Promise<void> {
+  async touch(entries: readonly IndexTouch[], generation: number): Promise<void> {
     if (entries.length === 0) {
       return
     }

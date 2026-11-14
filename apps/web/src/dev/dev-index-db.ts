@@ -36,32 +36,16 @@ export interface DevIndexDb {
   /** Upsert one `index_meta` key (`index_meta_set`). */
   setMeta: (key: string, value: string) => void
   /** Upsert one chat turn + its conversation row (`chat_message_save`). */
-  saveChatMessage: (conversation: DevChatConversation, message: DevChatMessageRow) => void
+  saveChatMessage: (
+    conversation: CommandArgs<'chat_message_save'>['conversation'],
+    message: CommandArgs<'chat_message_save'>['message'],
+  ) => void
   /** Delete a conversation; its messages cascade (`chat_conversation_delete`). */
   deleteChatConversation: (id: string) => void
   /**
    * Release the database.
    */
   close: () => void
-}
-
-/** Mirrors `chat_write.rs`'s `ChatConversation` (camelCased over IPC). */
-export interface DevChatConversation {
-  id: string
-  title: string
-  createdMs: number
-  updatedMs: number
-}
-
-/** Mirrors `chat_write.rs`'s `ChatMessageRow`: the JSON columns stay opaque strings. */
-export interface DevChatMessageRow {
-  id: string
-  conversationId: string
-  userText: string
-  attachments: string
-  parts: string
-  responseMessages: string
-  createdMs: number
 }
 
 // The real migrations, inlined at build time. This chunk only loads behind the

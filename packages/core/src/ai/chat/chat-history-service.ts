@@ -1,3 +1,4 @@
+import type { ChatConversation } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import { safeParseJson } from '@reflect/utils'
 import { z } from 'zod'
@@ -19,18 +20,7 @@ import type { AssistantPart, ChatTurn } from './transcript.ts'
  * history. Reads ride the ordinary read-only Kysely `db_query` bridge.
  */
 
-/**
- * One conversation's metadata row.
- */
-export interface ChatConversation {
-  id: string
-  /**
-   * First user message, truncated; fixed at creation.
-   */
-  title: string
-  createdMs: number
-  updatedMs: number
-}
+export type { ChatConversation }
 
 const hitSummarySchema = z.object({ path: z.string(), title: z.string() })
 
