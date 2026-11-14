@@ -24,6 +24,10 @@ const TABS = [
 interface TabCapsuleProps {
   tab: MobileTab
   onSelect: (tab: MobileTab) => void
+  /**
+   * `horizontal` shows each tab's label under its icon; `vertical` shows icons only.
+   */
+  orientation: 'horizontal' | 'vertical'
 }
 
 /**
@@ -32,11 +36,14 @@ interface TabCapsuleProps {
  * not a tab: it is a stacked screen reached from All, where asking sits next
  * to searching.
  */
-export function TabCapsule({ tab, onSelect }: TabCapsuleProps): ReactElement {
+export function TabCapsule({ tab, onSelect, orientation }: TabCapsuleProps): ReactElement {
   return (
     <nav
       aria-label="Sections"
-      className="flex rounded-full bg-surface p-1 shadow-lg ring-1 ring-border"
+      className={cn(
+        'flex rounded-full bg-surface p-1 shadow-lg ring-1 ring-border',
+        orientation === 'vertical' && 'flex-col',
+      )}
     >
       {TABS.map(({ id, label, Icon }) => (
         <TabButton
@@ -44,6 +51,7 @@ export function TabCapsule({ tab, onSelect }: TabCapsuleProps): ReactElement {
           label={label}
           icon={<Icon className="size-5" />}
           active={tab === id}
+          compact={orientation === 'vertical'}
           onClick={() => onSelect(id)}
         />
       ))}
@@ -55,11 +63,13 @@ function TabButton({
   label,
   icon,
   active,
+  compact,
   onClick,
 }: {
   label: string
   icon: ReactElement
   active: boolean
+  compact: boolean
   onClick: () => void
 }): ReactElement {
   const { haptics } = useMobileServices()
@@ -75,12 +85,13 @@ function TabButton({
         onClick()
       }}
       className={cn(
-        'flex h-14 w-16 flex-col items-center justify-center gap-0.5 rounded-full text-xs font-medium',
+        'flex flex-col items-center justify-center gap-0.5 rounded-full text-xs font-medium',
+        compact ? 'size-12' : 'h-14 w-16',
         active ? 'bg-muted text-primary' : 'text-text-muted',
       )}
     >
       {icon}
-      {label}
+      {compact ? null : label}
     </button>
   )
 }

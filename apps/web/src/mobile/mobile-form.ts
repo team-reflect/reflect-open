@@ -4,10 +4,11 @@ import { useStore } from '@/lib/use-store.ts'
 
 /**
  * Where the shell draws the tab capsule and the `+`: a capsule and `+` on one
- * line at the bottom (`bar`, every iPhone), or the capsule at the top and `+`
+ * line at the bottom (`bar`), a column at the trailing edge with `+` above a
+ * vertical capsule (`rail`, the iPhone Duo), or the capsule at the top and `+`
  * in the bottom-right corner (`pad`).
  */
-export type MobileForm = 'bar' | 'pad'
+export type MobileForm = 'bar' | 'rail' | 'pad'
 
 /**
  * A form that the Debug settings pin, or `auto` to follow the window width.
@@ -17,11 +18,12 @@ export type MobileFormOverride = MobileForm | 'auto'
 const PAD_QUERY = '(min-width: 768px)'
 
 /**
- * Reads `?mobile-form=bar|pad`.
+ * Reads `?mobile-form=bar|rail|pad`. A web page cannot tell an iPhone Duo
+ * from an iPhone, so the rail shows only when pinned.
  */
 function readUrlOverride(): MobileFormOverride {
   const value = new URLSearchParams(window.location.search).get('mobile-form')
-  return value === 'bar' || value === 'pad' ? value : 'auto'
+  return value === 'bar' || value === 'rail' || value === 'pad' ? value : 'auto'
 }
 
 const override = new WritableStore<MobileFormOverride>(readUrlOverride())

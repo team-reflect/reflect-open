@@ -7,21 +7,39 @@ import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar.tsx'
 import type { MobileForm } from '@/mobile/mobile-form.ts'
 import { TabCapsule } from '@/mobile/mobile-tab-bar.tsx'
 
+const RAIL_BOTTOM =
+  'calc(max(var(--twsa-safe-area-inset-bottom), var(--keyboard-height, 0px)) + var(--spacing) * 2)'
+
 /**
  * The shell's bottom chrome in each form. While the keyboard is up the
  * formatting toolbar takes the bottom of the shell root, which ends at the
- * keyboard's top. The pad's top capsule stays on screen with the keyboard.
+ * keyboard's top. The rail and the pad's top capsule stay on screen with the
+ * keyboard.
  */
 function WebShellBars({ form, tab, onSelectTab, keyboardVisible }: ShellBarsProps): ReactElement {
   const toolbar = keyboardVisible ? <MobileFormattingToolbar /> : null
   switch (form) {
     case 'bar':
       return toolbar ?? <BarRow tab={tab} onSelectTab={onSelectTab} />
+    case 'rail':
+      return (
+        <>
+          <aside
+            className="fixed right-safe-offset-2 z-30 flex flex-col items-center gap-3"
+            // Above the keyboard while it is up, so the tabs stay reachable.
+            style={{ bottom: RAIL_BOTTOM }}
+          >
+            <PlusSlot />
+            <TabCapsule tab={tab} onSelect={onSelectTab} orientation="vertical" />
+          </aside>
+          {toolbar}
+        </>
+      )
     case 'pad':
       return (
         <>
           <div className="pointer-events-none fixed inset-x-0 top-safe-offset-2 z-30 flex justify-center *:pointer-events-auto">
-            <TabCapsule tab={tab} onSelect={onSelectTab} />
+            <TabCapsule tab={tab} onSelect={onSelectTab} orientation="horizontal" />
           </div>
           <PlusSlot className="fixed right-safe-offset-6 bottom-safe-offset-6 z-30" />
           {toolbar}
@@ -63,21 +81,26 @@ function BarRow({ tab, onSelectTab }: Pick<ShellBarsProps, 'tab' | 'onSelectTab'
       ref={rowRef}
       className="flex shrink-0 items-center justify-between pt-2 pb-safe-offset-2 px-safe-offset-3"
     >
-      <TabCapsule tab={tab} onSelect={onSelectTab} />
+      <TabCapsule tab={tab} onSelect={onSelectTab} orientation="horizontal" />
       <PlusSlot />
     </div>
   )
 }
 
 /**
- * The bar row is in the shell's flow. The top capsule floats, so the shell
- * pads for it and the page clears the bottom safe area itself.
+ * The bar row is in the shell's flow. The rail and the top capsule float, so
+ * the shell pads for them and the page clears the bottom safe area itself.
  */
 function webShellStyle(form: MobileForm): CSSProperties {
   switch (form) {
     case 'bar':
       // The row pads the bottom safe area itself.
       return { '--chrome-safe-bottom': '0px' } as CSSProperties
+    case 'rail':
+      return {
+        '--chrome-safe-bottom': 'var(--twsa-safe-area-inset-bottom)',
+        paddingRight: 'calc(var(--spacing) * 16)',
+      } as CSSProperties
     case 'pad':
       return {
         '--chrome-safe-bottom': 'var(--twsa-safe-area-inset-bottom)',
