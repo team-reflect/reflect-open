@@ -48,7 +48,7 @@ export function ChromeTopBar({
     <>
       <header className="shrink-0 border-b border-border px-safe">
         {align === 'center' ? (
-          <div className="flex h-12 items-center px-1">
+          <div className="flex h-12 items-center gap-2 px-1">
             <div className="flex flex-1 basis-0 items-center justify-start gap-1">
               {corner('leading')}
             </div>

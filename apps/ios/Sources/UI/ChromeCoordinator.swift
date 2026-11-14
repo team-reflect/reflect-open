@@ -40,6 +40,7 @@ final class ChromeCoordinator {
     tabs.send = { [weak self] intent in self?.send(intent) }
     tabs.onCornersInHeaderRow = { [bridge] inHeaderRow in bridge.cornersInHeaderRow = inHeaderRow }
     tabs.onSidebarVisible = { [bridge] visible in bridge.sidebarVisible = visible }
+    tabs.onWindowControlsWidth = { [bridge] width in bridge.windowControlsWidth = width }
     menus.presenter = { [weak self] in self?.container }
     formatting.send = { [weak self] intent in self?.send(intent) }
     formatting.presenter = { [weak self] in self?.container }

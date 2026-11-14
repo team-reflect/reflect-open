@@ -40,6 +40,10 @@ export interface IntentContext {
    */
   setCornersInHeaderRow: (cornersInHeaderRow: boolean) => void
   /**
+   * Stores how far the window controls reach into the top row, in pixels.
+   */
+  setWindowControlsWidth: (width: number) => void
+  /**
    * Stores whether the iPad sidebar shows.
    */
   setSidebarVisible: (visible: boolean | null) => void
@@ -123,6 +127,9 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
     }
     case 'layout':
       context.setCornersInHeaderRow(intent.cornersInHeaderRow)
+      return
+    case 'windowControls':
+      context.setWindowControlsWidth(intent.width)
       return
     case 'sidebarVisible':
       context.setSidebarVisible(intent.visible)

@@ -44,6 +44,7 @@ final class ChromeBridgeTests: XCTestCase {
       .files(
         .init(files: [IntentFile(name: "Image.png", type: "image/png", bytes: Data([1, 2, 3]))])),
       .layout(.init(cornersInHeaderRow: false)),
+      .windowControls(.init(width: 88)),
       .plus(.init(entryId: 3, command: .note)),
       .sidebarVisible(.init(visible: true)),
       .sidebarVisible(.init(visible: nil)),
@@ -147,6 +148,24 @@ final class ChromeBridgeTests: XCTestCase {
     XCTAssertEqual(
       sent,
       [.layout(.init(cornersInHeaderRow: false)), .layout(.init(cornersInHeaderRow: true))])
+  }
+
+  func testSendsTheWindowControlsWidthWhenItChangesAndToANewPage() throws {
+    let bridge = ChromeBridge()
+    var sent: [Double] = []
+    bridge.send = { data in
+      let object = try! JSONSerialization.jsonObject(with: data) as! [String: Any]
+      sent.append(object["width"] as! Double)
+    }
+
+    bridge.windowControlsWidth = 88
+    bridge.receive(try message(["type": "chromeReady"]))
+    bridge.windowControlsWidth = 88
+    bridge.windowControlsWidth = 0
+    bridge.documentDidStart()
+    bridge.receive(try message(["type": "chromeReady"]))
+
+    XCTAssertEqual(sent, [88, 0])
   }
 
   func testSendsTheSidebarVisibilityWhenItChangesAndToANewPage() throws {
