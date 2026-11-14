@@ -77,6 +77,12 @@ class NativeChromeRenderer implements ChromeRenderer {
    * an iPad with the tab bar at the top, they sit in the tab bar's row.
    */
   readonly cornersInHeaderRow = new WritableStore(true)
+  /**
+   * How far the iPadOS window controls reach into the top row from its
+   * leading edge, in pixels. The shell moves its leading corner buttons past
+   * them; the page leaves the same space.
+   */
+  readonly windowControlsWidth = new WritableStore(0)
   readonly attachFiles = createAttachQueue()
 
   constructor(nativeChrome: NativeChromeService) {
@@ -163,6 +169,8 @@ function NativeTopBarCorner(props: TopBarCornerProps): ReactElement | null {
   const renderer = useNativeChromeRenderer()
   const cornersInHeaderRow = useStore(renderer.cornersInHeaderRow)
   const history = useStore(sidebarVisible) !== null && props.edge === 'leading'
+  const clearsWindowControls =
+    useStore(renderer.windowControlsWidth) > 0 && props.edge === 'leading'
   if (!cornersInHeaderRow) {
     return null
   }
@@ -170,6 +178,7 @@ function NativeTopBarCorner(props: TopBarCornerProps): ReactElement | null {
   const clearsBack = props.edge === 'leading' && props.align === 'start' && back !== undefined
   return (
     <div className="invisible contents" inert aria-hidden>
+      {clearsWindowControls ? <div className="w-window-controls shrink-0" /> : null}
       <WebTopBarCorner {...props} chrome={{ ...props.chrome, back }} />
       {clearsBack ? <div className="w-1 shrink-0" /> : null}
       {history ? <div className="w-13 shrink-0" /> : null}
@@ -187,6 +196,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
   const { back, forward } = useRouterActions()
   const showsSidebar = useStore(sidebarVisible) !== null
   const bars = useStore(renderer.bars)
+  const windowControlsWidth = useStore(renderer.windowControlsWidth)
   const modal = useStore(renderer.modal)
   const toolbar = useFormattingToolbar()
   const theme = useThemeSetting()
@@ -238,6 +248,13 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
     theme,
   ])
 
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      '--window-controls-width',
+      `${windowControlsWidth}px`,
+    )
+  }, [windowControlsWidth])
+
   // Kept while the photo picker holds focus, so the editor's toolbar is gone.
   const attachRef = useRef<{ commands: FormattingToolbarCommands; entryId: number } | null>(null)
   useLayoutEffect(() => {
@@ -273,6 +290,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
           attachFiles: renderer.attachFiles,
           toasts,
           setCornersInHeaderRow: (value) => renderer.cornersInHeaderRow.set(value),
+          setWindowControlsWidth: (value) => renderer.windowControlsWidth.set(value),
           setSidebarVisible: (value) => sidebarVisible.set(value),
         })
       }

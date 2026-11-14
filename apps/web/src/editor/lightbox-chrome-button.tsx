@@ -21,7 +21,7 @@ export function LightboxChromeButton({
       ref={wrapperRef}
       className={cn(
         'absolute top-safe-or-4 z-10',
-        side === 'left' ? 'left-safe-offset-4' : 'right-safe-offset-4',
+        side === 'left' ? 'left-window-controls-offset-4' : 'right-safe-offset-4',
       )}
       style={wrapperStyle}
     >

@@ -868,6 +868,7 @@ public enum ChromeIntent: Sendable, Equatable {
     case command(ChromeIntentCommandData)
     case files(ChromeIntentFilesData)
     case layout(ChromeIntentLayoutData)
+    case windowControls(ChromeIntentWindowcontrolsData)
     case plus(ChromeIntentPlusData)
     case sidebarVisible(ChromeIntentSidebarvisibleData)
     case sidebar(ChromeIntentSidebarData)
@@ -929,6 +930,14 @@ public struct ChromeIntentLayoutData: Codable, Sendable, Equatable {
 
     public init(cornersInHeaderRow: Bool) {
         self.cornersInHeaderRow = cornersInHeaderRow
+    }
+}
+
+public struct ChromeIntentWindowcontrolsData: Codable, Sendable, Equatable {
+    public let width: Double
+
+    public init(width: Double) {
+        self.width = width
     }
 }
 
@@ -995,6 +1004,9 @@ extension ChromeIntent: Codable {
         case "layout":
             let cornersInHeaderRowValue = try container.decode(Bool.self, forKey: CodingKeys("cornersInHeaderRow"))
             self = .layout(ChromeIntentLayoutData(cornersInHeaderRow: cornersInHeaderRowValue))
+        case "windowControls":
+            let widthValue = try container.decode(Double.self, forKey: CodingKeys("width"))
+            self = .windowControls(ChromeIntentWindowcontrolsData(width: widthValue))
         case "plus":
             let entryIdValue = try container.decode(Int.self, forKey: CodingKeys("entryId"))
             let commandValue = try container.decode(PlusCommand.self, forKey: CodingKeys("command"))
@@ -1036,6 +1048,9 @@ extension ChromeIntent: Codable {
         case .layout(let data):
             try container.encode("layout", forKey: CodingKeys("type"))
             try container.encode(data.cornersInHeaderRow, forKey: CodingKeys("cornersInHeaderRow"))
+        case .windowControls(let data):
+            try container.encode("windowControls", forKey: CodingKeys("type"))
+            try container.encode(data.width, forKey: CodingKeys("width"))
         case .plus(let data):
             try container.encode("plus", forKey: CodingKeys("type"))
             try container.encode(data.entryId, forKey: CodingKeys("entryId"))

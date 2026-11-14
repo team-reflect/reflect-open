@@ -48,6 +48,19 @@ Cascade layer order, low to high priority.
   );
 }
 
+/* The iOS shell's native chrome sets how far the iPadOS window controls reach
+   into the top row (`--window-controls-width`,
+   mobile/chrome/native/native-chrome-renderer.tsx). */
+@utility w-window-controls {
+  width: var(--window-controls-width, 0px);
+}
+@utility left-window-controls-offset-* {
+  left: calc(
+    env(safe-area-inset-left, 0px) + var(--spacing) * --value(integer) +
+      var(--window-controls-width, 0px)
+  );
+}
+
 /* Horizontal snap pager without a visible scrollbar. Each pager sets its own
    `overflow-x`. */
 @utility pager-x {

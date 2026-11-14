@@ -251,6 +251,11 @@ pub enum ChromeIntent {
     Layout {
         corners_in_header_row: bool,
     },
+    /// How far the window controls reach into the page's top row from its
+    /// leading edge, in points. Zero outside a window.
+    WindowControls {
+        width: f64,
+    },
     /// A tap on the `+` of the screen of `entry_id`.
     Plus {
         entry_id: isize,
