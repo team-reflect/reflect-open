@@ -8,7 +8,13 @@ import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
 import { lastChromeState, nativeChromeOptions } from '@/test-utils/native-chrome.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { scrollElement } from '@/test-utils/scroll.ts'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from './scroll-drawer.tsx'
+import {
+  Drawer,
+  DrawerBody,
+  DrawerContent,
+  DrawerTitle,
+  DRAWER_OVERSHOOT_PX,
+} from './scroll-drawer.tsx'
 
 /**
  * The native-scroll drawer: the scroller's position is the sheet position, a
@@ -94,24 +100,26 @@ describe('ScrollDrawer', () => {
   })
 
   it.each([
-    { stop: 0.75, open: true },
-    { stop: 0.25, open: false },
+    { shown: 0.6, open: true },
+    { shown: 0.4, open: false },
   ])(
-    'scrolls a sheet stopped at $stop of its range on to the nearer snap point',
-    async ({ stop, open }) => {
+    'scrolls a sheet stopped with $shown of it shown on to the nearer snap point',
+    async ({ shown, open }) => {
       const onOpenChange = vi.fn()
-      await renderInApp(<Harness onOpenChange={onOpenChange} rows={8} />)
+      // A short sheet, where the overshoot is a large part of the travel.
+      await renderInApp(<Harness onOpenChange={onOpenChange} rows={1} />)
       const scroller = await openScroller()
+      const top = openTop(scroller)
       // Stands in for a touch that stops the snap: WebKit then snaps no more.
       scroller.style.scrollSnapType = 'none'
       await scrollElement({
         element: scroller,
-        top: Math.round(openTop(scroller) * stop),
+        top: Math.round(DRAWER_OVERSHOOT_PX + (top - DRAWER_OVERSHOOT_PX) * shown),
         touch: true,
       })
 
       if (open) {
-        await vi.waitFor(() => expect(scroller.scrollTop).toBe(openTop(scroller)))
+        await vi.waitFor(() => expect(scroller.scrollTop).toBe(top))
         expect(onOpenChange).not.toHaveBeenCalled()
       } else {
         await vi.waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))

@@ -24,7 +24,7 @@ import './scroll-drawer.css'
  * The slow end of the release deceleration then runs off screen, and the
  * drawer closes as soon as the sheet leaves the screen.
  */
-const DRAWER_OVERSHOOT_PX = 50
+export const DRAWER_OVERSHOOT_PX = 50
 
 interface DrawerContextValue {
   open: boolean
@@ -309,13 +309,15 @@ function attachScrollDrawer({
     dragHandle: handle,
     onSettle: () => {
       if (!isClosed()) {
-        const top = openTop()
+        // `openTop` adds up rounded offsets; the scroll range bounds the real one.
+        const top = Math.min(openTop(), scroller.scrollHeight - scroller.clientHeight)
         if (scroller.scrollTop >= top - 1) {
           gesturesAtOpen = watch.gestures()
           return
         }
         scroller.scrollTo({
-          top: scroller.scrollTop < top / 2 ? 0 : top,
+          // The midpoint of the part of the travel where the sheet shows.
+          top: scroller.scrollTop < (DRAWER_OVERSHOOT_PX + top) / 2 ? 0 : top,
           behavior: 'smooth',
         })
         return

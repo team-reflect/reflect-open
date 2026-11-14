@@ -135,7 +135,8 @@ export function useBackPager({
         }
         if (scroller.scrollLeft > REVEALED_PX) {
           scroller.scrollTo({
-            left: scroller.scrollLeft < rest / 2 ? 0 : rest,
+            // The midpoint of the part of the travel where the card shows.
+            left: scroller.scrollLeft < (BACK_PAGER_OVERSHOOT_PX + rest) / 2 ? 0 : rest,
             behavior: 'smooth',
           })
           return
