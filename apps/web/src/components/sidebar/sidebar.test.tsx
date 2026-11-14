@@ -110,6 +110,7 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
     navigate,
     route: () => ({ kind: 'today' }),
     notePath: returnNull,
+    selectSection: (section, options) => appLayer.navigation.selectSection(section, options),
     back: vi.fn(),
     forward: vi.fn(),
     clearScrollState: vi.fn(),
@@ -170,17 +171,23 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
 }
 
 describe('Sidebar', () => {
-  it('section rows return to where their section was left', async () => {
-    const { view, navigate, navigation } = await renderSidebar(undefined, { kind: 'settings' })
+  it('section rows return to where their section was left, and light for it', async () => {
+    const { view, navigate, navigation } = await renderSidebar(undefined, { kind: 'tasks' })
+    const tasks = view.getByRole('button', { name: /tasks/i })
 
-    // Off the stream, Daily notes returns to the last viewed day without
-    // taking focus.
+    navigation.navigate({ kind: 'note', path: 'notes/meeting.md' })
+    await expect.element(tasks).toHaveAttribute('aria-current', 'page')
+
+    // Off the stream, Daily notes returns to its last day without focus.
     await view.getByRole('button', { name: /daily notes/i }).click()
     await vi.waitFor(() => expect(navigation.get().route).toEqual({ kind: 'today' }))
     expect(navigate).not.toHaveBeenCalled()
 
-    await view.getByRole('button', { name: /tasks/i }).click()
-    await vi.waitFor(() => expect(navigation.get().route).toEqual({ kind: 'tasks' }))
+    await tasks.click()
+    await vi.waitFor(() => {
+      expect(navigation.get().route).toEqual({ kind: 'note', path: 'notes/meeting.md' })
+    })
+    await expect.element(tasks).toHaveAttribute('aria-current', 'page')
 
     await view.getByRole('button', { name: /all notes/i }).click()
     await vi.waitFor(() => {
@@ -233,8 +240,9 @@ describe('Sidebar', () => {
       .not.toHaveAttribute('aria-current')
   })
 
-  it('All notes stays active while editing a slug-named note', async () => {
-    const { view } = await renderSidebar(undefined, { kind: 'note', path: 'notes/meeting.md' })
+  it('All notes stays active while editing a note opened from it', async () => {
+    const { view, navigation } = await renderSidebar(undefined, { kind: 'allNotes', tag: null })
+    navigation.navigate({ kind: 'note', path: 'notes/meeting.md' })
     await expect
       .element(view.getByRole('button', { name: /all notes/i }))
       .toHaveAttribute('aria-current', 'page')

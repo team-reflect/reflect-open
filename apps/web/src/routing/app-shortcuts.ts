@@ -50,7 +50,7 @@ export function useAppShortcuts(): CommandContext {
   const appServices = useAppServices()
   const { route } = useRouterState()
   const { clearScrollState } = useRouterHandlers()
-  const { navigate, back, forward } = useRouterActions()
+  const { navigate, selectSection, back, forward } = useRouterActions()
   const { platform, semanticSearch } = services
   const { commands, nativeMenu } = appServices
   const focusedDailyDate = useFocusedDailyDate()
@@ -144,6 +144,7 @@ export function useAppShortcuts(): CommandContext {
           await services.noteActions.togglePrivate(path)
         }
       },
+      selectSection,
       back,
       forward,
       clearScrollState,
@@ -184,6 +185,7 @@ export function useAppShortcuts(): CommandContext {
       services,
       appServices,
       navigate,
+      selectSection,
       back,
       forward,
       clearScrollState,
