@@ -10,7 +10,6 @@ import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import { useMobileForm } from '@/mobile/mobile-form.ts'
 import { useWakeToToday } from '@/mobile/use-wake-to-today.ts'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
-import { useChatIsSection } from '@/mobile/sidebar.ts'
 
 /**
  * The tabbed mobile shell (Plan 19, V1 parity): screens above, the
@@ -26,7 +25,6 @@ export function MobileShell(): ReactElement {
   const { navigate, selectSection } = useRouterActions()
   const [allQuery, setAllQuery] = useState('')
   const [allFilters, setAllFilters] = useState<AllNotesFilters>(EMPTY_ALL_NOTES_FILTERS)
-  const chatIsSection = useChatIsSection()
   const tab = mobileTabForSection(section)
   // A tab double-tap is a capture gesture (Daily focuses today's editor; the
   // list tabs focus their search inputs); a pending tap expires if the shown

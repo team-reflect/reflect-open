@@ -12,7 +12,7 @@ import { MobileScreen } from '@/mobile/mobile-screen.tsx'
 import { routesEqual, type AllNotesFilters, type Route } from '@reflect/app'
 import { ChromeLayerContext, useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import { useBackPager } from '@/mobile/use-back-pager.ts'
-import { useChatIsSection } from '@/mobile/sidebar.ts'
+import { useChatIsRoot } from '@/mobile/sidebar.ts'
 import { RouterFreeze, useRouterState, useRouterActions } from '@/routing/router.tsx'
 import './mobile-stack.css'
 
@@ -245,12 +245,10 @@ interface MobileStackProps {
  * remount it on a canceled swipe.
  */
 export function MobileStack(props: MobileStackProps): ReactElement {
-  const { route, entryId, backRoute, canBack, section } = useRouterState()
-  // A Chat entry of the Chat section is a root while Chat is a section
-  // (wide iPad). The screen below a card shares its section, so this one
-  // flag holds for every layer.
-  const chatIsSection = useChatIsSection()
-  const chatRoot = section === 'chat' && chatIsSection
+  const { route, entryId, backRoute, canBack } = useRouterState()
+  // The screen below a card shares its section, so one flag holds for every
+  // layer on screen.
+  const chatRoot = useChatIsRoot()
   const { back, navigate } = useRouterActions()
   const chromeRenderer = useChromeRenderer()
   const containerRef = useRef<HTMLDivElement>(null)
