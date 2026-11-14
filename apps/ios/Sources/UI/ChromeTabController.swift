@@ -21,6 +21,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// Called when the corner buttons move between the page's header row
   /// (`true`) and the row of the floating tab bar (`false`).
   var onCornersInHeaderRow: (Bool) -> Void = { _ in }
+  /// The last value sent to `onCornersInHeaderRow`.
+  private var cornersInHeaderRow = true
   /// Called when the iPad sidebar shows (`true`) or hides (`false`), and
   /// with `nil` when the window has no sidebar.
   var onSidebarVisible: (Bool?) -> Void = { _ in }
@@ -85,14 +87,15 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     delegate = self
     sidebar.delegate = self
     sidebar.bottomBarView = footer
-    tabs = makeSidebarTabs { [self] in
-      ChromeTab.allCases.map {
-        let tab = makeTab(identifier: $0.rawValue, title: $0.title, image: $0.image)
-        // A fixed tab leaves the sidebar without an Edit button.
-        tab.preferredPlacement = .fixed
-        return tab
-      }
+    let main = ChromeTab.allCases.map {
+      let tab = makeTab(identifier: $0.rawValue, title: $0.title, image: $0.image)
+      // A fixed tab leaves the sidebar without an Edit button.
+      tab.preferredPlacement = .fixed
+      return tab
     }
+    // A phone has no sidebar. The iPhone Duo's rail shows every tab, hidden
+    // or not, so a phone gets the three tabs alone.
+    tabs = UIDevice.current.userInterfaceIdiom == .pad ? makeSidebarTabs { main } : main
     view.tintColor = Self.accent
     stage.view.tintColor = Self.accent
     // The page scrolls inside its own elements, so the edge effect of the web
@@ -163,28 +166,45 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
         view.addSubview(standalone.bar)
       }
       view.bringSubviewToFront(standalone.bar)
-      let items = standalone.layout(in: view, leading: safe.left + 24)
+      let capsule = standalone.layout(in: view, leading: safe.left + Self.capsuleEdgeGap)
       if !standalone.bar.isHidden {
         inset = max(0, bounds.maxY - standalone.bar.frame.minY - safe.bottom)
       }
+      // The `+` mirrors the capsule: as tall, on its center line, as far from the edge.
       plus.layout(
-        in: view, center: CGPoint(x: bounds.maxX - safe.right - 20 - 26, y: items.midY),
-        size: 52)
+        in: view,
+        center: CGPoint(
+          x: bounds.maxX - safe.right - Self.capsuleEdgeGap - capsule.height / 2, y: capsule.midY),
+        size: capsule.height)
     case .rail:
-      // The `+` sits above the system's tabs, wherever the rail puts them.
-      let items = tabs.compactMap { $0.frame(in: view) }.reduce(CGRect.null) { $0.union($1) }
-      if !items.isNull {
-        plus.layout(in: view, center: CGPoint(x: items.midX, y: items.minY - 16 - 22), size: 44)
+      // The `+` sits above the rail's capsule, as wide as it.
+      if let capsule = railCapsule() {
+        plus.layout(
+          in: view, center: CGPoint(x: capsule.midX, y: capsule.minY - 12 - capsule.width / 2),
+          size: capsule.width)
       }
     case .pad:
-      let area = bounds.inset(by: safe)
+      // Equal gaps to the right and bottom edges, clear of the safe area.
+      let size: CGFloat = 56
+      let margin = max(safe.right, safe.bottom) + 24
       plus.layout(
-        in: view, center: CGPoint(x: area.maxX - 24 - 28, y: area.maxY - 24 - 28), size: 56)
+        in: view,
+        center: CGPoint(x: bounds.maxX - margin - size / 2, y: bounds.maxY - margin - size / 2),
+        size: size)
     }
     for placeholder in placeholders.values
     where placeholder.additionalSafeAreaInsets.bottom != inset {
       placeholder.additionalSafeAreaInsets.bottom = inset
     }
+  }
+
+  /// The gap between the bottom capsule and the side of the safe area.
+  private static let capsuleEdgeGap: CGFloat = 20
+
+  /// The system rail's glass capsule, which reaches 2pt past its tabs.
+  private func railCapsule() -> CGRect? {
+    let items = tabs.compactMap { $0.frame(in: view) }.reduce(CGRect.null) { $0.union($1) }
+    return items.isNull ? nil : items.insetBy(dx: -2, dy: -2)
   }
 
   /// The app's purple.
@@ -322,12 +342,20 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     // bar. The corner buttons share its row, as the bar buttons of a
     // navigation controller in the selected tab do.
     let windowTop = view.window?.safeAreaInsets.top ?? want.top
+    let inBarRow = want.top > windowTop + 1
+    // Beside a tiled sidebar they line up with its toggle, which UIKit puts
+    // right under the status bar too, and still share the page's header row.
+    let besideSidebar =
+      mode == .tabSidebar && !sidebar.isHidden && sidebar.preferredLayout == .tile
     let rowCenter: CGFloat? =
-      want.top > windowTop + 1
+      inBarRow || besideSidebar
       ? windowTop + WebPageController.buttonSize / 2 - frame.minY : nil
     if page.topRowCenter != rowCenter {
       page.topRowCenter = rowCenter
-      onCornersInHeaderRow(rowCenter == nil)
+    }
+    if cornersInHeaderRow != !inBarRow {
+      cornersInHeaderRow = !inBarRow
+      onCornersInHeaderRow(!inBarRow)
     }
     let extra = UIEdgeInsets(
       top: max(0, want.top - natural.top), left: max(0, want.left - natural.left),
@@ -381,7 +409,11 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     let hidden = hidesForState || (hidesForKeyboard && form == .bar)
     let systemHidden = hidden || form == .bar
     if systemHidden != isTabBarHidden {
+      // The rail's tabs reach their place only when the animation ends.
+      CATransaction.begin()
+      CATransaction.setCompletionBlock { [weak self] in self?.view.setNeedsLayout() }
       setTabBarHidden(systemHidden, animated: true)
+      CATransaction.commit()
     }
     let standaloneHidden = hidden || form != .bar
     if standaloneHidden != standalone.bar.isHidden {
@@ -397,10 +429,14 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   }
 
   /// Selects the tab the page shows, or, while the sidebar shows, the
-  /// sidebar row of its state.
+  /// sidebar row of its state. Chat is in the top tab bar too, so its row
+  /// is selected whenever the tab bar is on top.
   func follow(_ chromeTab: ChromeTab) {
     standalone.select(chromeTab)
-    let row = sidebarVisible ? sidebarState?.selection ?? chromeTab.rawValue : chromeTab.rawValue
+    let selection = sidebarState?.selection
+    let row =
+      sidebarVisible || (mode == .tabSidebar && selection == SidebarRow.chat)
+      ? selection ?? chromeTab.rawValue : chromeTab.rawValue
     if let tab = tab(for: row) ?? tab(for: chromeTab.rawValue), selectedTab !== tab {
       following = true
       selectedTab = tab
@@ -443,6 +479,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       // The page opens the row's screen; its state selects the row.
       if let intent = SidebarRow.intent(for: tab) {
         send(.sidebar(.init(command: intent)))
+        closeOverlappingSidebar()
       }
       return false
     }

@@ -98,7 +98,7 @@ export function CalendarStrip({
 
   const openSettings = (): void => {
     hapticImpactLight(haptics)
-    navigate({ kind: 'settings' })
+    navigate({ kind: 'settings', page: 'main' })
   }
 
   const pickMonth = (picked: string): void => {

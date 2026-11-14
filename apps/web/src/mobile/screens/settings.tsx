@@ -349,7 +349,7 @@ export function MobileSettings(): ReactElement {
               title={graph?.name ?? '—'}
               subtitle={storageLabel}
               media={<img src={appIcon} alt="" className="size-full object-cover" />}
-              onPress={() => navigate({ kind: 'graphs' })}
+              onPress={() => navigate({ kind: 'settings', page: 'graphs' })}
             />
           </SettingsGroup>
 
@@ -626,7 +626,7 @@ export function MobileSettings(): ReactElement {
             />
             <SettingsNavRow
               label="Open Source Licenses"
-              onPress={() => navigate({ kind: 'licenses' })}
+              onPress={() => navigate({ kind: 'settings', page: 'licenses' })}
             />
             <SettingsActionRow
               label="Privacy Policy"

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useEffectEvent, useMemo, useRef } from 'react'
 import type {
   ChatAttachment,
   ChatSession,
@@ -7,6 +7,7 @@ import type {
   ChatTurn,
 } from '@reflect/core'
 import { useSelector } from '@/lib/use-store.ts'
+import { useRouterActions, useRouterState } from '@/routing/router.tsx'
 import { useMaybeGraphServices } from '@/services/services-provider.tsx'
 
 /**
@@ -161,4 +162,50 @@ export function useChatModels(): ChatModels {
  */
 export function useActiveConversationId(): string {
   return useSelector(useChat(), selectActiveConversationId)
+}
+
+/**
+ * Keeps the chat route and the chat session on the same conversation. A
+ * chat entry with an id opens that conversation, so Back and Forward return
+ * to the conversation each entry showed. An entry without an id (the Chat
+ * button, ⌘J) takes the open conversation's id. When the session switches
+ * conversation (New chat, history, Ask), the entry takes the new id in place.
+ */
+export function useSyncChatRoute(): void {
+  const session = useChat()
+  const { route, entryId } = useRouterState()
+  const { navigate } = useRouterActions()
+  const activeId = useActiveConversationId()
+  const routeId = route.kind === 'chat' ? route.conversationId : undefined
+  const shownIdRef = useRef(activeId)
+
+  // Names the session's conversation in the chat entry `forEntry`.
+  const nameActive = useEffectEvent((forEntry: number): void => {
+    const id = session.get().activeConversationId
+    if (route.kind === 'chat' && entryId === forEntry && route.conversationId !== id) {
+      navigate({ kind: 'chat', conversationId: id }, { replace: true })
+    }
+  })
+
+  useEffect(() => {
+    if (shownIdRef.current !== activeId) {
+      shownIdRef.current = activeId
+      nameActive(entryId)
+    }
+  }, [activeId, entryId])
+
+  // The session keeps its conversation when the load fails or a send
+  // anchors it, and the entry then names the conversation on screen.
+  const arrive = useEffectEvent(async (id: string | null, forEntry: number): Promise<void> => {
+    if (id !== null && id !== session.get().activeConversationId) {
+      await session.openConversation(id)
+    }
+    nameActive(forEntry)
+  })
+
+  useEffect(() => {
+    if (routeId !== undefined) {
+      void arrive(routeId, entryId)
+    }
+  }, [routeId, entryId])
 }

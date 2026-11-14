@@ -23,11 +23,20 @@ import { MobileTaskGroup } from '@/mobile/task-group.tsx'
 import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import { MobileTopBarIconButton } from '@/mobile/top-bar.tsx'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
+import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { routeForPath } from '@reflect/app'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useStore } from '@/lib/use-store.ts'
+
+interface MobileTasksProps {
+  /**
+   * The live search text — lifted to the shell so it survives navigation.
+   */
+  query: string
+  onQueryChange: (query: string) => void
+}
 
 /**
  * The Tasks tab (V1 mobile's third tab over Plan 18's shipped data layer): every
@@ -44,7 +53,7 @@ import { useStore } from '@/lib/use-store.ts'
  * keeps the row struck (V1's middle state) until Archive hides this session's
  * completed tasks.
  */
-export function MobileTasks(): ReactElement {
+export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactElement {
   const { haptics } = useMobileServices()
   const { tasks: taskService } = useCoreServices()
   const graph = useGraphInfo()
@@ -52,7 +61,6 @@ export function MobileTasks(): ReactElement {
   const { navigate } = useRouterActions()
   const today = useToday()
   const { filters, toggle } = useTaskFilters()
-  const [query, setQuery] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
   // The one row whose swipe actions are showing (its getTaskKey), across all groups.
@@ -97,6 +105,10 @@ export function MobileTasks(): ReactElement {
     [open, completed, recentlyCompleted, filters, needle, today],
   )
 
+  // The task list scroller renders only while there are rows to show.
+  const listRef = useRef<HTMLDivElement>(null)
+  const { onScroll } = useScrollRestoration(listRef, !isError && groups.length > 0)
+
   // The sheet edits the task's *live* row, not the snapshot taken when it
   // opened: a mutation or reindex can rewrite the row (raw, checked) while
   // `editingTask` is set, and acting on the stale copy could flip a marker the
@@ -127,7 +139,7 @@ export function MobileTasks(): ReactElement {
   // so typing starts immediately.
   const onAdd = (target: InsertTaskTarget): void => {
     hapticImpactLight(haptics)
-    setQuery('')
+    onQueryChange('')
     void actions.insert(target).then((created) => {
       if (created !== null) {
         editTask(created, { autoFocus: true, haptic: false })
@@ -151,7 +163,7 @@ export function MobileTasks(): ReactElement {
               placeholder="Search tasks…"
               aria-label="Search tasks"
               value={query}
-              onValueChange={setQuery}
+              onValueChange={onQueryChange}
             />
             {recentlyCompleted.length > 0 ? (
               <MobileTopBarIconButton
@@ -200,7 +212,11 @@ export function MobileTasks(): ReactElement {
           // A stacking context, so WebKit composites the sticky headers and row
           // surfaces inside this scroller, below the iOS scroll indicator.
           className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-chrome-safe-offset-24"
-          onScroll={() => revealedRow.set(null)}
+          ref={listRef}
+          onScroll={(event) => {
+            revealedRow.set(null)
+            onScroll(event)
+          }}
         >
           {groups.map((group) => (
             <MobileTaskGroup

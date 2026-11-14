@@ -10,7 +10,14 @@ import {
 } from 'react'
 import { cn } from '@/lib/utils.ts'
 import { MobileScreen } from '@/mobile/mobile-screen.tsx'
-import { routesEqual, type AllNotesFilters, type Route } from '@reflect/app'
+import {
+  ROUTE_META,
+  routeMeta,
+  routesEqual,
+  type AllNotesFilters,
+  type Route,
+  type Section,
+} from '@reflect/app'
 import { ChromeLayerContext, useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import { BACK_PAGER_OVERSHOOT_PX, useBackPager } from '@/mobile/use-back-pager.ts'
 import { RouterFreeze, useRouterState, useRouterActions } from '@/routing/router.tsx'
@@ -33,19 +40,14 @@ interface StackLayer {
 }
 
 /**
- * Whether a route renders as a card pushed over a tab root. Note screens,
- * Chat (pushed over All) and the settings screens (Settings, its Graphs
- * sub-screen) stack; everything else (daily, All, search-as-All, Tasks) is a
- * root.
+ * Whether a route renders as a card pushed over a tab root: every route that
+ * is not the root of its entry's section. Notes and the settings screens
+ * have no section, and Chat is a card over All where Chat is no section.
+ *
+ * @param section The section of the route's history entry.
  */
-function isStacked(route: Route): boolean {
-  return (
-    route.kind === 'note' ||
-    route.kind === 'chat' ||
-    route.kind === 'settings' ||
-    route.kind === 'graphs' ||
-    route.kind === 'licenses'
-  )
+function isStacked(route: Route, section: Section): boolean {
+  return ROUTE_META[route.kind].section !== section
 }
 
 /**
@@ -61,13 +63,8 @@ function layerKey(route: Route): string {
     case 'chat':
       return 'chat'
     case 'settings':
-      return 'settings'
-    case 'graphs':
-      return 'graphs'
-    case 'licenses':
-      return 'licenses'
+      return `settings:${route.page}`
     case 'allNotes':
-    case 'search':
       return 'all'
     default:
       return 'daily'
@@ -88,12 +85,12 @@ function layerKey(route: Route): string {
  * @param below The screen the arriving route sits on (what its Back reveals).
  */
 function transitionFor(
-  from: { route: Route; entryId: number; below: Route },
-  to: { route: Route; entryId: number },
+  from: { route: Route; entryId: number; below: Route; section: Section },
+  to: { route: Route; entryId: number; section: Section },
   below: Route,
 ): StackTransition {
-  const fromStacked = isStacked(from.route)
-  const toStacked = isStacked(to.route)
+  const fromStacked = isStacked(from.route, from.section)
+  const toStacked = isStacked(to.route, to.section)
   const pop: StackTransition = {
     kind: 'pop',
     exiting: { key: layerKey(from.route), route: from.route },
@@ -121,8 +118,9 @@ function presentLayer(
   role: LayerRole,
   layerRoute: Route,
   transition: StackTransition,
+  section: Section,
 ): LayerPresentation {
-  const shadow = isStacked(layerRoute) ? CARD_SHADOW : undefined
+  const shadow = isStacked(layerRoute, section) ? CARD_SHADOW : undefined
   if (role === 'below') {
     return { style: { zIndex: 0 } }
   }
@@ -212,6 +210,11 @@ interface MobileStackProps {
   /** The All tab's badge filters (owned by the shell — survive navigation). */
   allFilters: AllNotesFilters
   onAllFiltersChange: (filters: AllNotesFilters) => void
+  /**
+   * The Tasks tab's search text (owned by the shell — survives navigation).
+   */
+  tasksQuery: string
+  onTasksQueryChange: (query: string) => void
 }
 
 /**
@@ -245,7 +248,7 @@ interface MobileStackProps {
  * remount it on a canceled swipe.
  */
 export function MobileStack(props: MobileStackProps): ReactElement {
-  const { route, entryId, backRoute, canBack } = useRouterState()
+  const { route, entryId, backRoute, canBack, section } = useRouterState()
   const { back, navigate } = useRouterActions()
   const chromeRenderer = useChromeRenderer()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -254,8 +257,8 @@ export function MobileStack(props: MobileStackProps): ReactElement {
   const edgeRef = useRef<HTMLDivElement>(null)
 
   const [transition, setTransition] = useState<StackTransition>({ kind: 'none' })
-  const below: Route = backRoute ?? { kind: 'today' }
-  const [arrival, setArrival] = useState({ route, entryId, below })
+  const below: Route = backRoute ?? routeMeta(route).parent(route)
+  const [arrival, setArrival] = useState({ route, entryId, below, section })
   // Set when a completed back-swipe commits its pop: the screen is already
   // offscreen, so the arrival it causes must not animate a second time.
   const [poppedByGesture, setPoppedByGesture] = useState(false)
@@ -263,15 +266,17 @@ export function MobileStack(props: MobileStackProps): ReactElement {
   // Transition detection happens during render (the mobile-shell `lastTab`
   // pattern) so the new screen's very first frame starts offscreen.
   if (entryId !== arrival.entryId) {
-    setArrival({ route, entryId, below })
+    setArrival({ route, entryId, below, section })
     setPoppedByGesture(false)
     setTransition(
-      poppedByGesture ? { kind: 'none' } : transitionFor(arrival, { route, entryId }, below),
+      poppedByGesture
+        ? { kind: 'none' }
+        : transitionFor(arrival, { route, entryId, section }, below),
     )
   } else if (route !== arrival.route) {
     // Same entry, new route object: a note move rewrote the history in
     // place. Track it so a later pop's exiting card shows the live path.
-    setArrival({ route, entryId, below })
+    setArrival({ route, entryId, below, section })
   }
 
   const popByGesture = useCallback((): void => {
@@ -279,9 +284,9 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     if (canBack) {
       back()
     } else {
-      navigate({ kind: 'today' })
+      navigate(below)
     }
-  }, [canBack, back, navigate])
+  }, [canBack, back, navigate, below])
 
   const reportSwipe = useCallback(
     (phase: 'start' | 'cancel'): void => {
@@ -329,9 +334,8 @@ export function MobileStack(props: MobileStackProps): ReactElement {
   }, [chromeRenderer, transition])
 
   const currentKey = layerKey(route)
-  // What the back gesture reveals. A cold note entry has no history below
-  // it, so it sits over today, where its back button lands too.
-  const belowRoute: Route | null = isStacked(route) ? (backRoute ?? { kind: 'today' }) : null
+  // What the back gesture reveals.
+  const belowRoute: Route | null = isStacked(route, section) ? below : null
   const belowKey = belowRoute === null ? null : layerKey(belowRoute)
 
   const layers: StackLayer[] = []
@@ -349,7 +353,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
 
   const hasBelow = layers.some((layer) => layer.role === 'below')
   const currentIndex = layers.findIndex((layer) => layer.role === 'current')
-  const swipeEnabled = isStacked(route) && transition.kind === 'none' && hasBelow
+  const swipeEnabled = isStacked(route, section) && transition.kind === 'none' && hasBelow
 
   useBackPager({
     scrollerRef: pagerRef,
@@ -373,7 +377,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
         )}
       >
         {layers.map((layer) => {
-          const { className, style } = presentLayer(layer.role, layer.route, transition)
+          const { className, style } = presentLayer(layer.role, layer.route, transition, section)
           const hidden = layer.role !== 'current'
           return (
             <Fragment key={layer.key}>
@@ -396,7 +400,12 @@ export function MobileStack(props: MobileStackProps): ReactElement {
                 aria-hidden={hidden || undefined}
                 inert={hidden}
               >
-                <div className={cn('h-full', isStacked(layer.route) && 'mobile-pager-content')}>
+                <div
+                  className={cn(
+                    'h-full',
+                    isStacked(layer.route, section) && 'mobile-pager-content',
+                  )}
+                >
                   {/* Background layers must not observe navigation: a push bumps
                     arrivalSeq, which the daily surface under the note would read
                     as a re-arrival and re-anchor its scroll while hidden. */}

@@ -1,7 +1,6 @@
 import { lazy, Suspense, type ReactElement } from 'react'
 import { DailyStream } from '@/components/daily-stream.tsx'
 import { LoadingScreen } from '@/components/loading-screen.tsx'
-import { SearchRoute } from '@/components/search-route.tsx'
 import { SingleNoteView } from '@/components/single-note-view.tsx'
 import { useRouterState } from '@/routing/router.tsx'
 
@@ -51,17 +50,10 @@ function RouteContentBody(): ReactElement {
       // Owns its scroll container (a grouped list with a fixed header), so no
       // ScrollRestored wrapper — same shape as All Notes.
       return <TasksScreen />
-    case 'search':
-      return <SearchRoute query={route.query} />
     case 'chat':
       // Owns its scroll container (the message list pins to the bottom while
       // streaming), so no ScrollRestored wrapper — same shape as All Notes.
       return <ChatScreen />
-    // The graph-switcher and licenses routes are mobile settings sub-screens.
-    // On desktop, graph switching lives in the sidebar footer and licenses
-    // open in a dialog, so both render as settings.
-    case 'graphs':
-    case 'licenses':
     case 'settings':
       return <SettingsRoute />
   }

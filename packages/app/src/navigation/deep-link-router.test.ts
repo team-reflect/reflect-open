@@ -24,6 +24,7 @@ function setup(overrides?: SetupOverrides) {
   const { indexQuery } = createTestCoreServices({ database: createNodeTestDatabaseService() })
   const resolveNoteTarget = vi.spyOn(indexQuery, 'resolveNoteTarget')
   const navigate = vi.fn<(route: Route) => void>()
+  const search = vi.fn<(query: string) => void>()
   const graphSession = createTestGraphSessionService({ graph: { generation: 3 } })
   const intake = createTestDeepLinkIntakeService({
     progress: operations,
@@ -32,7 +33,7 @@ function setup(overrides?: SetupOverrides) {
     graphSession,
   })
   const service = createDeepLinkRouter({ intake, logger, graphSession })
-  const handle = (url: string) => service.handle(url, { navigate })
+  const handle = (url: string) => service.handle(url, { navigate, search })
   return {
     service,
     intake,
@@ -41,6 +42,7 @@ function setup(overrides?: SetupOverrides) {
     logger,
     resolveNoteTarget,
     navigate,
+    search,
     graphSession,
     handle,
   }
@@ -53,6 +55,13 @@ describe('DeepLinkRouter.handle', () => {
     expect(navigate).toHaveBeenCalledWith({ kind: 'daily', date: '2026-07-01' })
     expect(resolveNoteTarget).not.toHaveBeenCalled()
     expect(operations.get()).toEqual([])
+  })
+
+  it('hands a search link to search, with no navigation', () => {
+    const { handle, navigate, search } = setup()
+    void handle('reflect://search?q=meeting%20notes')
+    expect(search).toHaveBeenCalledWith('meeting notes')
+    expect(navigate).not.toHaveBeenCalled()
   })
 
   it('resolves a note target and navigates to its route', async () => {
@@ -85,13 +94,14 @@ describe('DeepLinkRouter.handle', () => {
   })
 
   it('drops a resolution that finished after the link became stale', async () => {
-    const { service, navigate, resolveNoteTarget, operations } = setup()
+    const { service, navigate, search, resolveNoteTarget, operations } = setup()
     const pendingResolve = Promise.withResolvers<string>()
     resolveNoteTarget.mockReturnValue(pendingResolve.promise)
     let stale = false
 
     const pending = service.handle('reflect://note/Project%20X', {
       navigate,
+      search,
       isStale: () => stale,
     })
     stale = true
@@ -124,6 +134,7 @@ describe('DeepLinkRouter.serve', () => {
     const probes: { stale: boolean }[] = []
     const session: DeepLinkSession = {
       navigate: context.navigate,
+      search: context.search,
       beginNavigationIntent: () => {
         const probe = { stale: false }
         probes.push(probe)
@@ -155,6 +166,7 @@ describe('DeepLinkRouter.serve', () => {
 
     context.service.serve({
       navigate: context.navigate,
+      search: context.search,
       beginNavigationIntent: () => returnFalse,
     })
 

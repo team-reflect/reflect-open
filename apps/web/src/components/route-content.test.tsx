@@ -1,5 +1,5 @@
 import { page } from 'vitest/browser'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import type { ReactElement } from 'react'
 import { act } from '@/test-utils/act.ts'
 import {
@@ -124,13 +124,13 @@ describe('RouteContent', () => {
   })
 
   it('renders the settings screen for the settings route', async () => {
-    const view = await renderRoute({ kind: 'settings' })
+    const view = await renderRoute({ kind: 'settings', page: 'main' })
     await expect.element(page.getByTestId('settings-screen')).toBeInTheDocument()
     await view.unmount()
   })
 
   it('renders the chat screen for the chat route, not the stream', async () => {
-    const view = await renderRoute({ kind: 'chat' })
+    const view = await renderRoute({ kind: 'chat', conversationId: null })
     await expect.element(page.getByTestId('chat-screen')).toBeInTheDocument()
     await expect.element(page.getByTestId('daily-stream')).not.toBeInTheDocument()
     await view.unmount()
@@ -145,18 +145,6 @@ describe('RouteContent', () => {
     await expect.element(page.getByRole('button', { name: '#book' })).toBeVisible()
     await expect.element(page.getByText('Subject')).toBeVisible()
     await expect.element(page.getByText('No notes yet.')).toBeVisible()
-    await view.unmount()
-  })
-
-  it('arriving on a search route opens the palette pre-filled over the stream', async () => {
-    const view = await renderRoute({ kind: 'search', query: 'roadmap' })
-    await expect.element(page.getByTestId('daily-stream')).toBeInTheDocument()
-    await vi.waitFor(() => {
-      expect(JSON.parse(page.getByTestId('palette').element().textContent ?? '')).toEqual({
-        open: true,
-        query: 'roadmap',
-      })
-    })
     await view.unmount()
   })
 })

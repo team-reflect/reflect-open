@@ -15,6 +15,7 @@ import type {
   NavigationState,
   Route,
   ScrollPosition,
+  Section,
 } from '@reflect/app'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
@@ -42,7 +43,7 @@ interface RouterHandlers {
    * Discard the current view's saved scroll positions — the active history
    * entry's and, when the route belongs to a long-lived surface, the surface's
    * too — so the view re-anchors when revisited through **any** door (⌘[ back
-   * or a `restoreSurfaceScroll` nav-tab return alike).
+   * or a Daily section return alike).
    */
   clearScrollState: () => void
   /** The rendered entry's recorded position (present when revisited), or `null`. */
@@ -54,6 +55,7 @@ interface RouterHandlers {
  */
 interface RouterActions {
   navigate: RouterNavigate
+  selectSection: (section: Section, options?: NavigateOptions) => void
   back: () => void
   forward: () => void
 }
@@ -65,6 +67,8 @@ const RouterActionsContext = createContext<RouterActions | null>(null)
 interface RouterProviderProps {
   /** The launch route; defaults to today (the daily note is the spine). */
   initialRoute?: Route | undefined
+  /** The launch route's section; defaults to the one its route implies. */
+  initialSection?: Section | undefined
   children: ReactNode
 }
 
@@ -75,11 +79,12 @@ interface RouterProviderProps {
  */
 export function RouterProvider({
   initialRoute = { kind: 'today' },
+  initialSection,
   children,
 }: RouterProviderProps): ReactElement {
   const { navigation: appNavigation } = useAppServices()
   const [navigation] = useState(() => {
-    appNavigation.reset(initialRoute)
+    appNavigation.reset(initialRoute, initialSection)
     return appNavigation
   })
 
@@ -111,6 +116,15 @@ function RouterActionsProvider({ navigation, children }: NavigationProviderProps
     [navigation],
   )
 
+  const selectSection = useCallback(
+    (section: Section, options?: NavigateOptions): void => {
+      startTransition(() => {
+        navigation.selectSection(section, options)
+      })
+    },
+    [navigation],
+  )
+
   const back = useCallback((): void => {
     startTransition(() => {
       navigation.back()
@@ -124,8 +138,8 @@ function RouterActionsProvider({ navigation, children }: NavigationProviderProps
   }, [navigation])
 
   const routerActions = useMemo<RouterActions>(
-    () => ({ navigate, back, forward }),
-    [navigate, back, forward],
+    () => ({ navigate, selectSection, back, forward }),
+    [navigate, selectSection, back, forward],
   )
 
   return <RouterActionsContext value={routerActions}>{children}</RouterActionsContext>
@@ -135,7 +149,7 @@ function RouterActionsProvider({ navigation, children }: NavigationProviderProps
  * Provides the service's state as rendered by React.
  */
 function RouterStateProvider({ navigation, children }: NavigationProviderProps): ReactElement {
-  const { noteMove } = useCoreServices()
+  const { noteMove, noteRows } = useCoreServices()
   // React state rather than `useSyncExternalStore`: a store read through that
   // hook always updates synchronously, which would drop the transition and
   // flash the loading fallback of every lazily loaded screen.
@@ -154,6 +168,14 @@ function RouterStateProvider({ navigation, children }: NavigationProviderProps):
   useEffect(() => {
     return noteMove.onMoved((from, to) => navigation.noteMoved(from, to))
   }, [navigation, noteMove])
+
+  // A section never returns to a note trashed in the app.
+  useEffect(() => {
+    return noteRows.subscribe(() => {
+      const overlays = noteRows.get()
+      navigation.forgetNotes((path) => overlays.get(path)?.trashed === true)
+    })
+  }, [navigation, noteRows])
 
   return <RouterStateContext value={state}>{children}</RouterStateContext>
 }

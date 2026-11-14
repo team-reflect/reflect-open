@@ -7,7 +7,7 @@ import {
   type NavigationState,
   type ScrollPosition,
 } from '../navigation/navigation-service.ts'
-import type { Route } from '../navigation/route.ts'
+import type { Route, Section } from '../navigation/route.ts'
 
 export interface TestNavigationServiceOptions {
   /**
@@ -50,6 +50,10 @@ class TestNavigationServiceImpl implements TestNavigationService {
     this.#inner.navigate(route, navigateOptions)
   }
 
+  selectSection(section: Section, navigateOptions?: NavigateOptions): void {
+    this.#inner.selectSection(section, navigateOptions)
+  }
+
   back(): void {
     this.#inner.back()
   }
@@ -78,8 +82,16 @@ class TestNavigationServiceImpl implements TestNavigationService {
     this.#inner.noteMoved(from, to)
   }
 
-  reset(initialRoute?: Route): void {
-    this.#inner.reset(initialRoute)
+  forgetNotes(isGone: (path: string) => boolean): void {
+    this.#inner.forgetNotes(isGone)
+  }
+
+  reset(initialRoute?: Route, initialSection?: Section): void {
+    this.#inner.reset(initialRoute, initialSection)
+  }
+
+  setChatSection(section: Section): void {
+    this.#inner.setChatSection(section)
   }
 
   navigations(): readonly TestNavigateCall[] {

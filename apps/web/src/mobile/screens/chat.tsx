@@ -5,7 +5,12 @@ import { Button } from '@/components/ui/button.tsx'
 import { MobileChatComposer } from '@/mobile/chat-composer.tsx'
 import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import { ChatHistoryDrawer } from '@/mobile/chat-history-drawer.tsx'
-import { useChatActions, useChatProviders, useHasChatTurns } from '@/providers/chat-provider.tsx'
+import {
+  useChatActions,
+  useChatProviders,
+  useHasChatTurns,
+  useSyncChatRoute,
+} from '@/providers/chat-provider.tsx'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
 /**
@@ -21,9 +26,10 @@ import { useRouterState, useRouterActions } from '@/routing/router.tsx'
  */
 export function MobileChat(): ReactElement {
   const providers = useChatProviders()
+  useSyncChatRoute()
   const hasTurns = useHasChatTurns()
   const { newChat } = useChatActions()
-  const { canBack } = useRouterState()
+  const { canBack, section } = useRouterState()
   const { navigate, back } = useRouterActions()
   const [historyOpen, setHistoryOpen] = useState(false)
   const hasProvider = providers.length > 0
@@ -32,7 +38,7 @@ export function MobileChat(): ReactElement {
   return (
     <div className="flex h-full w-full flex-col pt-safe">
       <ChromeTopBar
-        back={goBack}
+        back={section === 'chat' ? undefined : goBack}
         trailing={
           hasProvider
             ? [
@@ -58,7 +64,7 @@ export function MobileChat(): ReactElement {
               Add an AI provider to start chatting. Reflect calls the provider directly with your
               own key — it stays in the device keychain, and private notes are never sent.
             </p>
-            <Button className="mt-5" onClick={() => navigate({ kind: 'settings' })}>
+            <Button className="mt-5" onClick={() => navigate({ kind: 'settings', page: 'main' })}>
               Add an AI provider
             </Button>
           </div>

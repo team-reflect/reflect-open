@@ -26,26 +26,43 @@ enum SidebarRow {
 }
 
 /// The iPad sidebar: Search above the tabs, then Chat, the pinned notes, and
-/// the graph and Settings at the bottom. The page sends what it shows and
-/// runs every tap.
+/// the graph and Settings at the bottom. Chat also shows in the top tab bar.
+/// The page sends what it shows and runs every tap.
 extension ChromeTabController: UITabBarController.Sidebar.Delegate {
-  /// The tabs from `main` with the sidebar-only rows around them.
+  /// The tabs from `main` with Search, Chat, and the pinned notes around them.
   func makeSidebarTabs(main: () -> [UITab]) -> [UITab] {
     let search = UISearchTab { _ in TabPlaceholder() }
     let chat = makeTab(
       identifier: SidebarRow.chat, title: "Chat", image: UIImage(systemName: "bubble.left"))
-    for tab in [search, chat, pinnedGroup] {
+    for tab in [search, pinnedGroup] {
       tab.preferredPlacement = .sidebarOnly
     }
+    // A fixed tab leaves the sidebar without an Edit button.
+    chat.preferredPlacement = .fixed
     pinnedGroup.isHidden = true
     footer.isHidden = true
     pinnedPlaceholder.onLayout = { [weak self] in
       guard let self, self.selectedTab?.parent === self.pinnedGroup else { return }
       self.placeStage()
     }
-    footer.onMenu = { [weak self] id in self?.send(.sidebar(.init(command: .menu(.init(id: id))))) }
-    footer.onSettings = { [weak self] in self?.send(.sidebar(.init(command: .settings))) }
+    footer.onMenu = { [weak self] id in
+      self?.send(.sidebar(.init(command: .menu(.init(id: id)))))
+      self?.closeOverlappingSidebar()
+    }
+    footer.onSettings = { [weak self] in
+      self?.send(.sidebar(.init(command: .settings)))
+      self?.closeOverlappingSidebar()
+    }
     return [search] + main() + [chat, pinnedGroup]
+  }
+
+  /// Closes an overlapping sidebar after a row or footer tap, as a tab tap
+  /// does, so the screen the tap opens is not under it.
+  func closeOverlappingSidebar() {
+    guard sidebar.preferredLayout == .overlap, !sidebar.isHidden else { return }
+    settingSidebar = true
+    sidebar.isHidden = true
+    settingSidebar = false
   }
 
   /// The row of a pinned note, which stays in the sidebar.
@@ -95,11 +112,15 @@ extension ChromeTabController: UITabBarController.Sidebar.Delegate {
 
   /// Shows the sidebar-only rows only in the sidebar: the tab bar keeps a
   /// search tab, and the last sidebar-only tab selected, whatever their
-  /// placement.
+  /// placement. Chat shows in the tab bar too, so only the bottom tab bar
+  /// hides it.
   func updateSidebarRows() {
     let hidden = mode != .tabSidebar || sidebar.isHidden
-    for tab in tabs where tab is UISearchTab || tab.identifier == SidebarRow.chat {
+    for tab in tabs where tab is UISearchTab {
       tab.isHidden = hidden
+    }
+    for tab in tabs where tab.identifier == SidebarRow.chat {
+      tab.isHidden = mode != .tabSidebar
     }
     pinnedGroup.isHidden = hidden || sidebarState?.pinned.isEmpty != false
     for tab in pinnedGroup.children {

@@ -34,6 +34,7 @@ async function renderPicker(): Promise<void> {
     notePath: returnNull,
     back: vi.fn(),
     forward: vi.fn(),
+    selectSection: vi.fn(),
     clearScrollState: vi.fn(),
     togglePin: vi.fn(noop),
     togglePrivate: vi.fn(noop),

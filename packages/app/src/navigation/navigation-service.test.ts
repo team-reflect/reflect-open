@@ -29,10 +29,61 @@ describe('NavigationService', () => {
     navigation.navigate({ kind: 'daily', date: '2026-06-08' })
     navigation.navigate({ kind: 'daily', date: '2026-06-07' })
     navigation.back()
-    navigation.navigate({ kind: 'search', query: 'x' })
+    navigation.navigate({ kind: 'tasks' })
     expect(navigation.get().canForward).toBe(false)
     navigation.back()
     expect(navigation.get().route).toEqual({ kind: 'daily', date: '2026-06-08' })
+  })
+
+  it('replace swaps the current entry and keeps forward entries', () => {
+    const navigation = createNavigationService()
+    navigation.navigate({ kind: 'tasks' })
+    navigation.navigate({ kind: 'daily', date: '2026-06-08' })
+    navigation.navigate({ kind: 'note', path: 'notes/a.md' })
+    navigation.back()
+    const before = navigation.get().entryId
+    navigation.saveScrollState(40)
+
+    navigation.navigate({ kind: 'daily', date: '2026-06-07' }, { replace: true })
+    expect(navigation.get().route).toEqual({ kind: 'daily', date: '2026-06-07' })
+    expect(navigation.get().entryId).not.toBe(before)
+    expect(navigation.savedScroll()).toBeNull()
+    expect(navigation.get().canForward).toBe(true)
+
+    navigation.back()
+    expect(navigation.get().route).toEqual({ kind: 'tasks' })
+    navigation.forward()
+    navigation.forward()
+    expect(navigation.get().route).toEqual({ kind: 'note', path: 'notes/a.md' })
+  })
+
+  it('replace onto a neighbor that shows the target merges into it', () => {
+    const navigation = createNavigationService()
+    navigation.navigate({ kind: 'daily', date: '2026-06-07' })
+    navigation.navigate({ kind: 'daily', date: '2026-06-08' })
+
+    navigation.navigate({ kind: 'daily', date: '2026-06-07' }, { replace: true })
+    navigation.back()
+    expect(navigation.get().route).toEqual({ kind: 'today' })
+    expect(navigation.get().canBack).toBe(false)
+
+    navigation.navigate({ kind: 'daily', date: '2026-06-09' })
+    navigation.back()
+    navigation.navigate({ kind: 'daily', date: '2026-06-09' }, { replace: true })
+    expect(navigation.get().route).toEqual({ kind: 'daily', date: '2026-06-09' })
+    expect(navigation.get().canForward).toBe(false)
+    expect(navigation.get().canBack).toBe(false)
+
+    // Both neighbors show the target: the entry and the forward copy go.
+    navigation.navigate({ kind: 'daily', date: '2026-06-07' })
+    navigation.navigate({ kind: 'daily', date: '2026-06-08' })
+    navigation.navigate({ kind: 'daily', date: '2026-06-07' })
+    navigation.back()
+    navigation.navigate({ kind: 'daily', date: '2026-06-07' }, { replace: true })
+    expect(navigation.get().route).toEqual({ kind: 'daily', date: '2026-06-07' })
+    expect(navigation.get().canForward).toBe(false)
+    navigation.back()
+    expect(navigation.get().route).toEqual({ kind: 'daily', date: '2026-06-09' })
   })
 
   it('re-navigating to the current route is a no-op (no stack growth)', () => {
@@ -126,7 +177,7 @@ describe('NavigationService', () => {
     const navigation = createNavigationService()
     navigation.saveScrollState(500) // user scrolled the daily stream
     navigation.navigate({ kind: 'note', path: 'notes/a.md' })
-    navigation.navigate({ kind: 'today' }, { restoreSurfaceScroll: true })
+    navigation.selectSection('daily')
 
     expect(navigation.get().route).toEqual({ kind: 'today' })
     expect(navigation.savedScroll()).toBe(500)
@@ -146,11 +197,11 @@ describe('NavigationService', () => {
       initialRoute: { kind: 'daily', date: '2026-06-08' },
     })
     navigation.saveScrollState(500) // scrolled the stream on a dated day
-    navigation.navigate({ kind: 'today' }, { restoreSurfaceScroll: true })
+    navigation.selectSection('daily')
     expect(navigation.savedScroll()).toBeNull() // Daily tab on-stream = ⌘D re-anchor
 
     navigation.saveScrollState(300)
-    navigation.navigate({ kind: 'today' }, { restoreSurfaceScroll: true })
+    navigation.selectSection('daily')
     expect(navigation.savedScroll()).toBeNull() // same while already on today
   })
 
@@ -159,7 +210,7 @@ describe('NavigationService', () => {
     navigation.saveScrollState(500) // user scrolled away on today
     navigation.navigate({ kind: 'today' }) // ⌘D re-anchors the stream
     navigation.navigate({ kind: 'note', path: 'notes/a.md' })
-    navigation.navigate({ kind: 'today' }, { restoreSurfaceScroll: true })
+    navigation.selectSection('daily')
 
     expect(navigation.savedScroll()).toBeNull() // the tab can't resurrect pre-⌘D scroll
   })
@@ -175,7 +226,7 @@ describe('NavigationService', () => {
 
     navigation.saveScrollState(120) // post-clear scrolling
     navigation.forward()
-    navigation.navigate({ kind: 'today' }, { restoreSurfaceScroll: true })
+    navigation.selectSection('daily')
     expect(navigation.savedScroll()).toBe(120) // the tab restores only the new offset
   })
 
@@ -256,9 +307,154 @@ describe('NavigationService', () => {
     navigation.saveScrollState(99)
     navigation.back()
     // Navigating from a back position truncates the branch holding notes/a.md.
-    navigation.navigate({ kind: 'search', query: 'x' })
+    navigation.navigate({ kind: 'tasks' })
     navigation.navigate({ kind: 'note', path: 'notes/a.md' })
     expect(navigation.savedScroll()).toBeNull() // a new entry, not the old one
+  })
+
+  describe('sections', () => {
+    it('puts a Chat navigation in the section set for Chat', () => {
+      const navigation = createNavigationService()
+      navigation.navigate({ kind: 'chat', conversationId: null })
+      expect(navigation.get().section).toBe('chat')
+      navigation.setChatSection('all')
+      navigation.navigate({ kind: 'tasks' })
+      navigation.navigate({ kind: 'chat', conversationId: null })
+      expect(navigation.get().section).toBe('all')
+    })
+
+    it('gives a root its own section and a note the current section', () => {
+      const navigation = createNavigationService()
+      expect(navigation.get().section).toBe('daily')
+      navigation.navigate({ kind: 'tasks' })
+      navigation.navigate({ kind: 'note', path: 'notes/a.md' })
+      expect(navigation.get().section).toBe('tasks')
+      navigation.navigate({ kind: 'chat', conversationId: null }, { section: 'all' })
+      expect(navigation.get().section).toBe('all')
+      navigation.back()
+      expect(navigation.get().section).toBe('tasks')
+    })
+
+    it('returns to the screen a section was left on, over its root', () => {
+      const navigation = createNavigationService()
+      navigation.navigate({ kind: 'tasks' })
+      navigation.navigate({ kind: 'note', path: 'notes/a.md' })
+      navigation.navigate({ kind: 'today' })
+
+      navigation.selectSection('tasks')
+
+      expect(navigation.get().route).toEqual({ kind: 'note', path: 'notes/a.md' })
+      expect(navigation.get().section).toBe('tasks')
+      expect(navigation.get().backRoute).toEqual({ kind: 'tasks' })
+    })
+
+    it('goes to the default root from within the section, and re-anchors there', () => {
+      const navigation = createNavigationService()
+      navigation.navigate({ kind: 'allNotes', tag: 'work' })
+      navigation.navigate({ kind: 'note', path: 'notes/a.md' })
+
+      navigation.selectSection('all')
+      expect(navigation.get().route).toEqual({ kind: 'allNotes', tag: null })
+
+      const arrivals = navigation.get().arrivalSeq
+      const entry = navigation.get().entryId
+      navigation.selectSection('all', { focusEditor: true })
+      expect(navigation.get().entryId).toBe(entry)
+      expect(navigation.get().arrivalSeq).toBe(arrivals + 1)
+      expect(navigation.get().arrivalFocusEditor).toBe(true)
+    })
+
+    it('puts the last root, tag filter included, under the restored screen', () => {
+      const navigation = createNavigationService()
+      navigation.navigate({ kind: 'allNotes', tag: 'work' })
+      navigation.navigate({ kind: 'note', path: 'notes/a.md' })
+      navigation.navigate({ kind: 'tasks' })
+
+      navigation.selectSection('all')
+      expect(navigation.get().backRoute).toEqual({ kind: 'allNotes', tag: 'work' })
+    })
+
+    it('pushes the current route again when a navigation moves it to another section', () => {
+      const navigation = createNavigationService()
+      navigation.navigate({ kind: 'chat', conversationId: null }, { section: 'all' })
+      navigation.navigate({ kind: 'chat', conversationId: null }, { section: 'chat' })
+      expect(navigation.get().section).toBe('chat')
+      navigation.navigate({ kind: 'chat', conversationId: null })
+      expect(navigation.get().section).toBe('chat')
+      navigation.back()
+      expect(navigation.get().section).toBe('all')
+    })
+
+    it('returns Daily to its last day, never to a note opened from it', () => {
+      const navigation = createNavigationService()
+      navigation.navigate({ kind: 'daily', date: '2026-06-08' })
+      navigation.saveScrollState({ date: '2026-06-08', offset: 40 })
+      navigation.navigate({ kind: 'note', path: 'notes/a.md' })
+      navigation.navigate({ kind: 'tasks' })
+
+      navigation.selectSection('daily')
+
+      expect(navigation.get().route).toEqual({ kind: 'daily', date: '2026-06-08' })
+      expect(navigation.savedScroll()).toEqual({ date: '2026-06-08', offset: 40 })
+    })
+
+    it('restores the Tasks list scroll when the section is selected again', () => {
+      const navigation = createNavigationService()
+      navigation.navigate({ kind: 'tasks' })
+      navigation.saveScrollState(300)
+      navigation.navigate({ kind: 'today' })
+
+      navigation.selectSection('tasks')
+
+      expect(navigation.get().route).toEqual({ kind: 'tasks' })
+      expect(navigation.savedScroll()).toBe(300)
+
+      // A tap within the section re-anchors, and a later return does too.
+      navigation.selectSection('tasks')
+      expect(navigation.savedScroll()).toBeNull()
+      navigation.navigate({ kind: 'today' })
+      navigation.selectSection('tasks')
+      expect(navigation.savedScroll()).toBeNull()
+    })
+
+    it('restores the All list scroll under the screen the section returns to', () => {
+      const navigation = createNavigationService()
+      navigation.navigate({ kind: 'allNotes', tag: 'work' })
+      navigation.saveScrollState(300)
+      navigation.navigate({ kind: 'note', path: 'notes/a.md' })
+      navigation.navigate({ kind: 'tasks' })
+
+      navigation.selectSection('all')
+      expect(navigation.get().route).toEqual({ kind: 'note', path: 'notes/a.md' })
+      expect(navigation.savedScroll()).toBeNull()
+
+      navigation.back()
+      expect(navigation.get().route).toEqual({ kind: 'allNotes', tag: 'work' })
+      expect(navigation.savedScroll()).toBe(300)
+    })
+
+    it('lands on the default root of a section it has not shown', () => {
+      const navigation = createNavigationService()
+      navigation.selectSection('all')
+      expect(navigation.get().route).toEqual({ kind: 'allNotes', tag: null })
+      expect(navigation.get().canBack).toBe(true)
+    })
+
+    it('follows note moves and forgets deleted notes', () => {
+      const navigation = createNavigationService()
+      navigation.navigate({ kind: 'tasks' })
+      navigation.navigate({ kind: 'note', path: 'notes/a.md' })
+      navigation.navigate({ kind: 'today' })
+
+      navigation.noteMoved('notes/a.md', 'notes/b.md')
+      navigation.selectSection('tasks')
+      expect(navigation.get().route).toEqual({ kind: 'note', path: 'notes/b.md' })
+
+      navigation.navigate({ kind: 'today' })
+      navigation.forgetNotes((path) => path === 'notes/b.md')
+      navigation.selectSection('tasks')
+      expect(navigation.get().route).toEqual({ kind: 'tasks' })
+    })
   })
 
   describe('note moves (Plan 17)', () => {
@@ -370,11 +566,18 @@ describe('NavigationService', () => {
         canBack: false,
         canForward: false,
         backRoute: null,
+        section: 'tasks',
       })
       expect(navigation.savedScroll()).toBeNull()
       // The old history's daily surface offset is gone too.
-      navigation.navigate({ kind: 'today' }, { restoreSurfaceScroll: true })
+      navigation.selectSection('daily')
       expect(navigation.savedScroll()).toBeNull()
+    })
+
+    it('starts in the given section', () => {
+      const navigation = createNavigationService()
+      navigation.reset({ kind: 'note', path: 'notes/a.md' }, 'tasks')
+      expect(navigation.get().section).toBe('tasks')
     })
 
     it('defaults to today and normalizes a malformed daily route', () => {

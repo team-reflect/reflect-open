@@ -46,7 +46,7 @@ async function mount(storage: MobileStorageInfo = STORAGE): Promise<void> {
     core,
     appServices,
     graph: { root: '/iCloud/Documents/Notes', name: 'Notes' },
-    route: { kind: 'graphs' },
+    route: { kind: 'settings', page: 'graphs' },
   })
 }
 

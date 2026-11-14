@@ -116,7 +116,7 @@ describe('RecordingDrawer', () => {
 
     await userEvent.click(view.getByRole('button', { name: 'Open Settings' }))
     expect(view.appServices.navigation.navigations()).toEqual([
-      { route: { kind: 'settings' }, options: undefined },
+      { route: { kind: 'settings', page: 'main' }, options: undefined },
     ])
     expect(actions.onDrawerOpenChange).toHaveBeenCalledWith(false)
   })

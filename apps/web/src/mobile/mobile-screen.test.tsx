@@ -32,6 +32,8 @@ import '@/test-utils/locator.ts'
 import { renderInApp, type RenderInAppOptions } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileAudioMemoProvider } from './audio-memo-provider.tsx'
+import { AllSearchProvider } from '@/mobile/all-search.tsx'
+import { quickOpenVisible } from '@/mobile/quick-open.tsx'
 import { MobileShell } from './mobile-shell.tsx'
 import { BACK_PAGER_OVERSHOOT_PX } from './use-back-pager.ts'
 import { noop, returnFalse, sleep } from '@ocavue/utils'
@@ -138,10 +140,12 @@ function mount(
   options?: { strict?: boolean; settings?: RenderInAppOptions['settings'] },
 ) {
   const tree = (
-    <MobileAudioMemoProvider graph={GRAPH}>
-      <MobileShell />
-      {probeRoute ? <NavProbe to={probeRoute} /> : null}
-    </MobileAudioMemoProvider>
+    <AllSearchProvider>
+      <MobileAudioMemoProvider graph={GRAPH}>
+        <MobileShell />
+        {probeRoute ? <NavProbe to={probeRoute} /> : null}
+      </MobileAudioMemoProvider>
+    </AllSearchProvider>
   )
   // The app runs under StrictMode (main.tsx); opt in where a test guards
   // against impure updaters (dev double-invocation caught a double-pop once).
@@ -682,24 +686,6 @@ describe('MobileShell', () => {
     await expect.element(view.getByRole('navigation', { name: 'Sections' })).toBeVisible()
   })
 
-  it('renders a search entry as the All tab with the query seeded', async () => {
-    const user = userEvent
-    const view = await mount({ kind: 'search', query: 'meeting' })
-
-    const box = view.getByRole('searchbox', { name: 'Search notes' })
-    await waitFor(() => {
-      expect((box.element() as HTMLInputElement).value).toBe('meeting')
-    })
-    expect(view.getByRole('button', { name: 'All' }).element().getAttribute('aria-current')).toBe(
-      'page',
-    )
-
-    await user.click(view.getByRole('button', { name: 'Clear search' }))
-
-    expect((box.element() as HTMLInputElement).value).toBe('')
-    expect(view.getByRole('button', { name: 'Clear search' }).query()).toBeNull()
-  })
-
   it('has three tabs: Daily, All and Tasks (Chat lives in All)', async () => {
     const view = await mount({ kind: 'today' })
 
@@ -746,6 +732,51 @@ describe('MobileShell', () => {
       expect(visibleLayer(view).querySelector('h1')?.textContent).toBe('Chat')
     })
   }
+
+  it('Quick Open shows the results over the screen and ⌘Return lands on All', async () => {
+    const view = await mount({ kind: 'today' })
+    await act(() => quickOpenVisible.set(true))
+    const input = view.getByRole('searchbox', { name: 'Quick Open' })
+    await userEvent.fill(input, 'meeting')
+    await expect.element(view.getByRole('button', { name: 'See all in All ⌘↩' })).toBeVisible()
+
+    await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
+
+    expect(view.getByRole('dialog', { name: 'Quick Open' }).query()).toBeNull()
+    const box = view.getByRole('searchbox', { name: 'Search notes' })
+    await waitFor(() => {
+      expect((box.element() as HTMLInputElement).value).toBe('meeting')
+    })
+    expect(view.getByRole('button', { name: 'All' }).element().getAttribute('aria-current')).toBe(
+      'page',
+    )
+  })
+
+  it('Quick Open closes on Escape and leaves the screen as it was', async () => {
+    const view = await mount({ kind: 'tasks' })
+    await act(() => quickOpenVisible.set(true))
+    await expect.element(view.getByRole('searchbox', { name: 'Quick Open' })).toHaveFocus()
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(view.getByRole('dialog', { name: 'Quick Open' }).query()).toBeNull()
+    expect(view.getByRole('button', { name: 'Tasks' }).element().getAttribute('aria-current')).toBe(
+      'page',
+    )
+  })
+
+  it('with no AI provider, the Ask row leads to Settings', async () => {
+    const view = await mount({ kind: 'allNotes', tag: null })
+    const box = view.getByRole('searchbox', { name: 'Search notes' })
+    await userEvent.fill(box, 'pricing')
+    await expect.element(view.getByText('Add an AI provider in Settings to ask')).toBeVisible()
+
+    await userEvent.click(view.getByRole('button', { name: /^Ask “pricing”/ }))
+
+    await waitFor(() => {
+      expect(visibleLayer(view).querySelector('h1')?.textContent).toBe('Settings')
+    })
+  })
 
   it('asks the search text from All: Chat opens over All, Back returns to the results', async () => {
     const user = userEvent
@@ -901,6 +932,71 @@ describe('MobileShell', () => {
 
     const box = view.getByRole('searchbox', { name: 'Search notes' })
     await waitFor(() => expect(visibleLayer(view).contains(box.element())).toBe(true))
+  })
+
+  it('tapping Tasks from another tab returns to the note it was left on, over the list', async () => {
+    const user = userEvent
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'tasks' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await user.click(view.getByRole('button', { name: 'probe-navigate' }))
+    await expect.element(view.getByRole('heading', { name: 'Edit note' })).toBeVisible()
+
+    await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
+    await waitFor(() => expect(shownMonth(view)).not.toBeNull())
+    await user.click(view.getByRole('button', { name: 'Tasks' }))
+
+    await waitFor(() => {
+      expect(
+        page.elementLocator(visibleLayer(view)).getByTestId('fake-editor').element().textContent,
+      ).toContain('agenda')
+    })
+    expect(view.getByRole('button', { name: 'Tasks' }).element().getAttribute('aria-current')).toBe(
+      'page',
+    )
+    // The task list sits underneath, so Back lands there.
+    await user.click(page.elementLocator(visibleLayer(view)).getByRole('button', { name: 'Back' }))
+    const box = view.getByRole('searchbox', { name: 'Search tasks' })
+    await waitFor(() => expect(visibleLayer(view).contains(box.element())).toBe(true))
+  })
+
+  it('keeps the Tasks search when switching tabs and back', async () => {
+    const user = userEvent
+    const view = await mount({ kind: 'tasks' })
+    await user.fill(view.getByRole('searchbox', { name: 'Search tasks' }), 'milk')
+
+    await user.click(view.getByRole('button', { name: 'All' }))
+    await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
+    await user.click(view.getByRole('button', { name: 'Tasks' }))
+
+    await expect.element(view.getByRole('searchbox', { name: 'Search tasks' })).toHaveValue('milk')
+  })
+
+  it('restores the All list scroll when switching tabs and back', async () => {
+    const user = userEvent
+    vi.spyOn(core.search, 'searchWithFilters').mockResolvedValue(
+      Array.from({ length: 40 }, (_, index) => ({
+        path: `notes/note-${index}.md`,
+        title: `Note ${index}`,
+        highlightedTitle: `Note ${index}`,
+        dailyDate: null,
+        snippet: null,
+        preview: '',
+        mtime: 0,
+        isPinned: false,
+      })),
+    )
+    const view = await mount({ kind: 'allNotes', tag: null })
+    const list = (): HTMLElement => {
+      return visibleLayer(view).querySelector<HTMLElement>('ul')!.parentElement!
+    }
+    await waitFor(() => expect(list().scrollHeight).toBeGreaterThan(list().clientHeight + 300))
+    await scrollElement({ element: list(), top: 300 })
+
+    await user.click(view.getByRole('button', { name: 'Tasks' }))
+    await expect.element(view.getByRole('searchbox', { name: 'Search tasks' })).toBeVisible()
+    await user.click(view.getByRole('button', { name: 'All' }))
+
+    await waitFor(() => expect(list().scrollTop).toBe(300))
   })
 
   it('back from a cold note entry lands on today', async () => {
@@ -1409,7 +1505,7 @@ describe('MobileStack transitions & back pager', () => {
   it.skipIf(server.browser !== 'chromium')(
     'pops on a finger drag from a settings row, not from its switch',
     async () => {
-      const view = await mount({ kind: 'settings' })
+      const view = await mount({ kind: 'settings', page: 'main' })
       const toggle = await waitFor(() => {
         return view.getByRole('switch', { name: 'Smooth caret animation' }).element()
       })
@@ -1510,5 +1606,15 @@ describe('MobileStack transitions & back pager', () => {
 
     await scrollElement({ element: pager(view), left: 0, touch: true })
     await waitFor(() => expect(shownMonth(view)).toBe(today()))
+  })
+
+  it('swipes a cold settings page back to Settings, where its Back lands', async () => {
+    const view = await mount({ kind: 'settings', page: 'licenses' })
+    await waitFor(() => expect(stackLayers(view)).toHaveLength(2))
+
+    await scrollElement({ element: pager(view), left: 0, touch: true })
+    await waitFor(() => {
+      expect(view.appServices.navigation.get().route).toEqual({ kind: 'settings', page: 'main' })
+    })
   })
 })

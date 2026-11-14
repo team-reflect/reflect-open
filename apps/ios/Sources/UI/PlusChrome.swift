@@ -30,9 +30,7 @@ final class PlusChrome {
     } else {
       config = .filled()
     }
-    config.image = UIImage(
-      systemName: "plus",
-      withConfiguration: UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold))
+    config.image = UIImage(systemName: "plus")
     config.cornerStyle = .capsule
     button = UIButton(configuration: config)
     noteItem = Self.makeItem("New note", symbol: "square.and.pencil")
@@ -157,7 +155,12 @@ final class PlusChrome {
     }
     scrim.frame = view.bounds
     scrim.isHidden = !menuOpen
-    button.bounds.size = CGSize(width: size, height: size)
+    if button.bounds.width != size {
+      button.bounds.size = CGSize(width: size, height: size)
+      // The symbol keeps its 20pt-in-52pt proportion.
+      button.configuration?.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(
+        pointSize: (size * 20 / 52).rounded(), weight: .semibold)
+    }
     button.center = center
     layoutItems()
   }
