@@ -447,6 +447,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       // The page opens the row's screen; its state selects the row.
       if let intent = SidebarRow.intent(for: tab) {
         send(.sidebar(.init(command: intent)))
+        closeOverlappingSidebar()
       }
       return false
     }

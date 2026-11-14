@@ -45,9 +45,24 @@ extension ChromeTabController: UITabBarController.Sidebar.Delegate {
       guard let self, self.selectedTab?.parent === self.pinnedGroup else { return }
       self.placeStage()
     }
-    footer.onMenu = { [weak self] id in self?.send(.sidebar(.init(command: .menu(.init(id: id))))) }
-    footer.onSettings = { [weak self] in self?.send(.sidebar(.init(command: .settings))) }
+    footer.onMenu = { [weak self] id in
+      self?.send(.sidebar(.init(command: .menu(.init(id: id)))))
+      self?.closeOverlappingSidebar()
+    }
+    footer.onSettings = { [weak self] in
+      self?.send(.sidebar(.init(command: .settings)))
+      self?.closeOverlappingSidebar()
+    }
     return [search] + main() + [chat, pinnedGroup]
+  }
+
+  /// Closes an overlapping sidebar after a row or footer tap, as a tab tap
+  /// does, so the screen the tap opens is not under it.
+  func closeOverlappingSidebar() {
+    guard sidebar.preferredLayout == .overlap, !sidebar.isHidden else { return }
+    settingSidebar = true
+    sidebar.isHidden = true
+    settingSidebar = false
   }
 
   /// The row of a pinned note, which stays in the sidebar.
