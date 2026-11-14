@@ -10,7 +10,7 @@ import { useToday } from '@/lib/use-today.ts'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { cn } from '@/lib/utils.ts'
 import { notePathForRoute } from '@reflect/app'
-import { useRouterState } from '@/routing/router.tsx'
+import { useRouterActions, useRouterState } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { GraphFooter } from './graph-footer.tsx'
 import { NavigateArrows } from './navigate-arrows.tsx'
@@ -27,15 +27,19 @@ interface SidebarProps {
 /**
  * The workspace sidebar, in the original app's shape: history arrows top
  * right, search, primary navigation with hover-revealed shortcut keycaps, the
- * Pinned shelf, and the graph switcher footer. Most nav rows run registered
- * commands so a binding and its behavior stay one definition; the Daily notes
- * row is a capture gesture like `Mod-D` — it asks the stream to focus today
- * with the caret at the end, ready to append. (Sidebar collapse stays on
+ * Pinned shelf, and the graph switcher footer. The Daily notes, All notes
+ * and Tasks rows return to where their section was left: the stream on its
+ * last day, the others on their last screen over their root. On the stream,
+ * Daily notes is a capture gesture like `Mod-D`: it focuses today with the
+ * caret at the end, ready to append. Other rows run registered commands so a
+ * binding and its behavior stay one definition. (Sidebar collapse stays on
  * `Mod-\` via the command registry.)
  */
 export function Sidebar({ graph, context }: SidebarProps): ReactElement {
   const { platform } = useCoreServices()
   const { route } = useRouterState()
+  const { selectSection } = useRouterActions()
+  const onDailySurface = route.kind === 'today' || route.kind === 'daily'
   const today = useToday()
   const pinned = usePinnedNotes()
   const currentNotePath = notePathForRoute(route, today)
@@ -73,7 +77,13 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             label="Daily notes"
             binding={keybindingFor('nav.today') ?? undefined}
             active={(route.kind === 'today' || route.kind === 'daily') && !hasActivePinnedNote}
-            onClick={() => void context.app.commands.run('nav.today', context)}
+            onClick={() => {
+              if (onDailySurface) {
+                void context.app.commands.run('nav.today', context)
+              } else {
+                selectSection('daily')
+              }
+            }}
           />
           <SidebarItem
             icon={
@@ -102,7 +112,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
               route.kind === 'allNotes' ||
               (route.kind === 'note' && !isUntitledNotePath(route.path) && !hasActivePinnedNote)
             }
-            onClick={() => void context.app.commands.run('nav.allNotes', context)}
+            onClick={() => selectSection('all')}
           />
           <SidebarItem
             icon={
@@ -113,7 +123,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             label="Tasks"
             binding={keybindingFor('nav.tasks') ?? undefined}
             active={route.kind === 'tasks'}
-            onClick={() => void context.app.commands.run('nav.tasks', context)}
+            onClick={() => selectSection('tasks')}
           />
           <SidebarItem
             icon={
