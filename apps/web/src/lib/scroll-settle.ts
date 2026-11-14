@@ -26,6 +26,11 @@ export interface ScrollSettleOptions {
    */
   onSettle: () => void
   /**
+   * Called when the last finger lifts from a touch that scrolled the element.
+   * A settle report always follows.
+   */
+  onRelease?: (() => void) | undefined
+  /**
    * Stops the watch and any mouse drag in progress.
    */
   signal: AbortSignal
@@ -72,6 +77,7 @@ export interface ScrollSettleWatch {
 export function watchScrollSettle({
   element,
   onSettle,
+  onRelease,
   signal,
   isSettled,
   dragHandle = element,
@@ -148,6 +154,9 @@ export function watchScrollSettle({
     }
     if (fingers.size === 0) {
       gesture.abort()
+      if (touchScrolled) {
+        onRelease?.()
+      }
     }
     if (isTouching()) {
       return

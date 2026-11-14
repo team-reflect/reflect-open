@@ -58,6 +58,13 @@
   }
 }
 
+/* From the release of a back swipe until the pager settles (use-back-pager.ts),
+   the pager and the layers in it take no hits: a touch on a decelerating
+   scroller stops it, and WebKit does not snap again after that. */
+.mobile-pager[data-releasing] {
+  pointer-events: none;
+}
+
 /* Under reduced motion no animation runs, so a transition finishes at once. */
 @media (prefers-reduced-motion: reduce) {
   .mobile-stack-slide-in,
