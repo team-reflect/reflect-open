@@ -116,7 +116,7 @@ export function useSidebar(): {
   run: (command: SidebarCommand) => void
 } {
   const { route, section } = useRouterState()
-  const { navigate } = useRouterActions()
+  const { navigate, selectSection } = useRouterActions()
   const { noteActions, logger } = useCoreServices()
   const { share } = useAppServices()
   const today = useToday()
@@ -138,7 +138,13 @@ export function useSidebar(): {
   const run = (command: SidebarCommand): void => {
     switch (command.kind) {
       case 'chat':
-        navigate({ kind: 'chat' })
+        // Chat returns to where it was left where it is a section, and opens
+        // as a card over All elsewhere.
+        if (sidebarVisible.get() === null) {
+          navigate({ kind: 'chat' })
+        } else {
+          selectSection('chat')
+        }
         return
       case 'search':
         // All lands with its search field focused.

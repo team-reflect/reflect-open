@@ -43,7 +43,8 @@ export interface NavigateOptions {
   focusEditor?: boolean
   /**
    * The section of a new history entry. Defaults to the section whose root
-   * screen the route shows, else the current entry's section.
+   * screen the route shows (for Chat, the one {@link NavigationService.setChatSection} set),
+   * else the current entry's section.
    */
   section?: Section | undefined
 }
