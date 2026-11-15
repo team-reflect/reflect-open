@@ -57,7 +57,7 @@ const enqueueRequestSchema = z.object({
 })
 
 export default defineBackground(() => {
-  registerXPostObserver()
+  registerXPostObserver(import.meta.env.FIREFOX ? 'firefox' : 'chromium')
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.id === browser.runtime.id) {
       const save = z
