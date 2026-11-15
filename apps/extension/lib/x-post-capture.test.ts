@@ -49,10 +49,19 @@ describe('getXPostKind', () => {
     { url: 'https://x.com.evil.test/i/api/graphql/hash/CreateBookmark' },
     { initiator: 'https://evil.test' },
     { initiator: undefined },
+    { initiator: undefined, originUrl: 'https://evil.test/x.com/home' },
+    { initiator: undefined, originUrl: 'not a url' },
+    { initiator: 'https://evil.test', originUrl: 'https://x.com/home' },
     { tabId: -1 },
     { url: 'invalid' },
   ])('ignores unrelated requests: %j', (patch) => {
     expect(getXPostKind({ ...request(), ...patch })).toBeUndefined()
+  })
+
+  it('accepts Firefox requests, which carry originUrl instead of initiator', () => {
+    expect(
+      getXPostKind({ ...request(), initiator: undefined, originUrl: 'https://x.com/home' }),
+    ).toBe('x-bookmark')
   })
 })
 

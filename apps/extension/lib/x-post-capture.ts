@@ -11,7 +11,10 @@ const MAX_REQUEST_BYTES = 65536
 export interface XPostRequest {
   url: string
   method: string
+  /** Chrome's requesting origin. */
   initiator?: string | undefined
+  /** Firefox's requesting document URL; Firefox never sets `initiator`. */
+  originUrl?: string | undefined
   tabId: number
   timeStamp: number
   requestBody?:
@@ -19,9 +22,19 @@ export interface XPostRequest {
     | undefined
 }
 
+function requestOrigin(details: XPostRequest): string | undefined {
+  if (details.initiator !== undefined) return details.initiator
+  if (details.originUrl === undefined) return undefined
+  try {
+    return new URL(details.originUrl).origin
+  } catch {
+    return undefined
+  }
+}
+
 /** Match only supported X save operations before examining the body. */
 export function getXPostKind(details: XPostRequest): XPostKind | undefined {
-  if (details.method !== 'POST' || details.tabId < 0 || details.initiator !== 'https://x.com')
+  if (details.method !== 'POST' || details.tabId < 0 || requestOrigin(details) !== 'https://x.com')
     return undefined
   try {
     const url = new URL(details.url)

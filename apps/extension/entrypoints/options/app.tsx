@@ -22,7 +22,9 @@ import { useStoredSetting } from './use-stored-setting.ts'
 
 const SITE_ACCESS_FALLBACK = import.meta.env.SAFARI
   ? 'Allow it for x.com in Safari Settings → Extensions.'
-  : 'Allow it under Site access in chrome://extensions.'
+  : import.meta.env.FIREFOX
+    ? 'Allow it under Permissions for Reflect Capture in about:addons.'
+    : 'Allow it under Site access in chrome://extensions.'
 
 function useXAccess(): [granted: boolean | null, request: () => Promise<boolean>] {
   const [granted, setGranted] = useState<boolean | null>(null)
