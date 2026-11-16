@@ -66,7 +66,7 @@ git2 = { version = "0.21.0", default-features = false, features = [
   "vendored-openssl",
 ] }
 hf-hub = { version = "0.5.0", default-features = false }
-http-range-header = "0.4.2"
+http-range-header = "1.0.0"
 ignore = "0.4.33"
 image = { version = "0.25.10", default-features = false }
 infer = "0.22.0"
@@ -88,9 +88,9 @@ reconcile-text = "0.14.1"
 regex = "1.13.1"
 # reqwest 0.12 rides the exact version tauri-plugin-http already compiles.
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
-rusqlite = { version = "0.40.2", features = ["bundled"] }
+rusqlite = { version = "0.41.0", features = ["bundled"] }
 rusqlite_migration = "2.6.0"
-saphyr = "0.2.2"
+saphyr = "0.3.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
