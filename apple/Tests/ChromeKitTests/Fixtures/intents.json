@@ -4,7 +4,6 @@
   { "type": "action", "entryId": 3, "id": "gear" },
   { "type": "command", "id": "indent" },
   { "type": "files", "files": [{ "name": "Image.png", "type": "image/png", "data": "AQID" }] },
-  { "type": "layout", "cornersInHeaderRow": false },
   { "type": "windowControls", "width": 88 },
   { "type": "plus", "entryId": 3, "command": "note" },
   { "type": "sidebarVisible", "visible": true },
@@ -17,5 +16,7 @@
   { "type": "sidebar", "command": { "kind": "openNote", "path": "reflect-v2.md" } },
   { "type": "sidebar", "command": { "kind": "unpin", "path": "reflect-v2.md" } },
   { "type": "sidebar", "command": { "kind": "share", "path": "reflect-v2.md" } },
-  { "type": "sidebar", "command": { "kind": "menu", "id": "graphs" } }
+  { "type": "sidebar", "command": { "kind": "menu", "id": "graphs" } },
+  { "type": "search", "entryId": 3, "text": "meet" },
+  { "type": "pickMonth", "entryId": 3, "month": "2026-08" }
 ]

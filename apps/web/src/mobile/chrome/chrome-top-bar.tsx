@@ -8,11 +8,6 @@ import type { ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
 
 interface ChromeTopBarProps extends ScreenChrome {
   /**
-   * The middle of the main row. A string shows as the screen's heading; a
-   * node, such as a search field with its controls, shows as it is.
-   */
-  title: ReactNode
-  /**
    * `center` puts the title at the center between equal corners.
    */
   align?: 'center' | 'start' | undefined
@@ -24,10 +19,10 @@ interface ChromeTopBarProps extends ScreenChrome {
 
 /**
  * The top bar of a mobile screen. It declares the screen's chrome; the
- * renderer draws the corners and the `+`, and the bar draws the title.
+ * renderer draws the main row and the `+`, and the bar draws the rows under
+ * the main row.
  */
 export function ChromeTopBar({
-  title,
   align = 'start',
   children,
   ...chrome
@@ -35,37 +30,17 @@ export function ChromeTopBar({
   const chromeRenderer = useChromeRenderer()
   const onTop = use(ChromeLayerContext)
   useScreenChrome(chrome)
-  const heading =
-    typeof title === 'string' ? (
-      <h1 className="min-w-0 truncate text-base font-semibold">{title}</h1>
-    ) : (
-      title
-    )
-  const corner = (edge: 'leading' | 'trailing'): ReactElement => (
-    <chromeRenderer.TopBarCorner edge={edge} align={align} chrome={chrome} />
-  )
+  const row = <chromeRenderer.TopBarRow align={align} chrome={chrome} />
   return (
     <>
-      <header className="shrink-0 border-b border-border px-safe">
-        {align === 'center' ? (
-          <div className="flex h-12 items-center gap-2 px-1">
-            <div className="flex flex-1 basis-0 items-center justify-start gap-1">
-              {corner('leading')}
-            </div>
-            <div className="min-w-0 text-center">{heading}</div>
-            <div className="flex flex-1 basis-0 items-center justify-end gap-1">
-              {corner('trailing')}
-            </div>
-          </div>
-        ) : (
-          <div className="flex h-12 items-center gap-1 px-4">
-            {corner('leading')}
-            <div className="flex min-w-0 flex-1 items-center gap-1">{heading}</div>
-            {corner('trailing')}
-          </div>
-        )}
-        {children}
-      </header>
+      {chromeRenderer.drawsTopBarRow || children !== undefined ? (
+        <header className="shrink-0 border-b border-border px-safe">
+          {row}
+          {children}
+        </header>
+      ) : (
+        row
+      )}
       {chrome.plus === undefined || !onTop ? null : <chromeRenderer.Plus plus={chrome.plus} />}
     </>
   )

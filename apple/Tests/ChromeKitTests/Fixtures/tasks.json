@@ -6,7 +6,13 @@
   "tab": "tasks",
   "canBack": false,
   "leading": [],
-  "trailing": [],
+  "trailing": [
+    {
+      "id": "filters",
+      "title": "Task filters",
+      "icon": "slider.horizontal.3"
+    }
+  ],
   "keyboardVisible": false,
   "modal": false,
   "toolbar": null,
@@ -16,6 +22,14 @@
   },
   "sidebar": null,
   "history": null,
+  "title": null,
+  "search": {
+    "placeholder": "Search tasks…",
+    "label": "Search tasks",
+    "text": "",
+    "revision": 0
+  },
+  "fullscreen": false,
   "theme": "system",
   "generation": 1
 }

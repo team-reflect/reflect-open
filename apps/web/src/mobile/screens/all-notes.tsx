@@ -20,12 +20,12 @@ import {
 import { queryKeys } from '@/lib/query-client.ts'
 import { newNoteRoute } from '@/lib/commands/app-commands.ts'
 import { MobileAskRow } from '@/mobile/ask-row.tsx'
-import { MobileChatButton } from '@/mobile/chat-button.tsx'
+import { useChatButton } from '@/mobile/chat-button.tsx'
 import { FilterBar } from '@/mobile/search-filters/filter-bar.tsx'
 import { NoteRowList } from '@/mobile/note-row-list.tsx'
-import { SearchInput } from '@/mobile/search-input.tsx'
 import type { NoteRowModel } from '@/mobile/swipeable-note-row.tsx'
 import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
+import type { Focusable } from '@/mobile/chrome/screen-chrome.ts'
 import { MobileTopBarScrollableRow } from '@/mobile/top-bar.tsx'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
@@ -103,8 +103,9 @@ export function MobileAllNotes({
 
   // The All-tab double-tap (`focusEditor` arrivals) lands in the search bar,
   // the tab's capture surface — the daily double-tap's All-flavored twin.
-  const searchInputRef = useRef<HTMLInputElement>(null)
+  const searchInputRef = useRef<Focusable>(null)
   useArrivalFocus({ arrivalSeq, arrivalFocusEditor, target: searchInputRef })
+  const chat = useChatButton()
 
   // Defer the query the index sees (desktop's search debounce): fast typing
   // coalesces while the input stays live, and a seeded query (a `search`
@@ -158,18 +159,19 @@ export function MobileAllNotes({
           label: 'New note',
           onTap: () => navigate(newNoteRoute(noteCreation)),
         }}
-        title={
-          <>
-            <SearchInput
-              ref={searchInputRef}
-              placeholder="Search or ask…"
-              aria-label="Search notes"
-              value={query}
-              onValueChange={onQueryChange}
-            />
-            <MobileChatButton />
-          </>
-        }
+        search={{
+          value: query,
+          placeholder: 'Search or ask…',
+          label: 'Search notes',
+          onChange: onQueryChange,
+          ref: searchInputRef,
+        }}
+        trailing={[chat.button]}
+        onAction={(id) => {
+          if (id === 'chat') {
+            chat.open()
+          }
+        }}
       >
         <MobileTopBarScrollableRow>
           {pending !== null ? (

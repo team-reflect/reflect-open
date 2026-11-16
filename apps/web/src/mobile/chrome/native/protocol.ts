@@ -12,11 +12,13 @@ export const NO_ENTRY = -1
  */
 export type {
   BarButton as NativeBarButton,
+  ChromeTitle as NativeChromeTitle,
   ChromeIntent as NativeIntent,
   ChromeMessage as NativeChromeMessage,
   MenuConfirm as NativeConfirm,
   MenuItem as NativeMenuItem,
   PlusState as NativePlusState,
+  SearchState as NativeSearchState,
   SidebarState as NativeSidebarState,
   ToolbarState as NativeToolbarState,
 } from '@reflect/types'
@@ -61,7 +63,6 @@ const intentSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('action'), entryId: z.number(), id: z.string() }),
   z.object({ type: z.literal('command'), id: formattingCommandSchema }),
   z.object({ type: z.literal('files'), files: z.array(fileSchema) }),
-  z.object({ type: z.literal('layout'), cornersInHeaderRow: z.boolean() }),
   z.object({ type: z.literal('windowControls'), width: z.number() }),
   z.object({
     type: z.literal('plus'),
@@ -69,6 +70,8 @@ const intentSchema = z.discriminatedUnion('type', [
     command: z.enum(['tap', 'note', 'task', 'audio']),
   }),
   z.object({ type: z.literal('sidebarVisible'), visible: z.boolean().nullable() }),
+  z.object({ type: z.literal('search'), entryId: z.number(), text: z.string() }),
+  z.object({ type: z.literal('pickMonth'), entryId: z.number(), month: z.string() }),
   z.object({
     type: z.literal('sidebar'),
     command: z.discriminatedUnion('kind', [

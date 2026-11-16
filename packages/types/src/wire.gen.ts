@@ -84,7 +84,7 @@ export type AudioPhase = "idle" | "requesting" | "recording" | "transcribing" | 
 export type BackSwipePhase = "start" | "cancel";
 
 /**
- *  A native button that floats in a top corner of the page. A tap opens
+ *  A button of the native top bar. A tap opens
  *  `menu` when it has one, and sends an `action` intent with `id` otherwise.
  */
 export type BarButton = {
@@ -263,11 +263,6 @@ export type ChromeIntent = { type: "back"; entryId: number } |
 /**  A move in the history, from the screen of `entry_id`. */
 { type: "history"; entryId: number; direction: HistoryDirection } | { type: "tab"; tab: ChromeTab } | { type: "action"; entryId: number; id: string } | { type: "command"; id: FormattingCommand } | { type: "files"; files: IntentFile[] } | 
 /**
- *  Whether the corner buttons sit in the page's header row, or in the row
- *  of the floating tab bar above it.
- */
-{ type: "layout"; cornersInHeaderRow: boolean } | 
-/**
  *  How far the window controls reach into the page's top row from its
  *  leading edge, in points. Zero outside a window.
  */
@@ -277,7 +272,11 @@ export type ChromeIntent = { type: "back"; entryId: number } |
 /**  Whether the iPad sidebar shows, or none without a sidebar. */
 { type: "sidebarVisible"; visible: boolean | null } | 
 /**  A tap in the iPad sidebar. */
-{ type: "sidebar"; command: SidebarIntent };
+{ type: "sidebar"; command: SidebarIntent } | 
+/**  The text of the search field of `entry_id` changed. */
+{ type: "search"; entryId: number; text: string } | 
+/**  The user picked `month` (`YYYY-MM`) in the title's month picker. */
+{ type: "pickMonth"; entryId: number; month: string };
 
 /**
  *  Whether the page shows its shell, or a full-screen page with no bars
@@ -305,9 +304,9 @@ routeKind: string | null;
 tab: ChromeTab; 
 /**  The shell shows a back button before the `leading` buttons. */
 canBack: boolean; 
-/**  The buttons in the top-left corner, after the back button. */
+/**  The leading buttons of the top bar, after the back button. */
 leading: BarButton[]; 
-/**  The buttons in the top-right corner. */
+/**  The trailing buttons of the top bar. */
 trailing: BarButton[]; keyboardVisible: boolean; 
 /**  A web drawer is open: the shell hides its bars. */
 modal: boolean; toolbar: ToolbarState | null; 
@@ -319,22 +318,42 @@ sidebar: SidebarState | null;
  *  Where the history can move, while the window has a sidebar. The shell
  *  then shows a back and a forward button in place of the back button.
  */
-history: HistoryState | null; theme: ChromeTheme } | 
-/**  A web push or pop slide starts or ends. */
-{ type: "transition"; phase: TransitionPhase } | 
+history: HistoryState | null; 
+/**  The middle of the top bar: a title, or a title that picks a month. */
+title: ChromeTitle | null; 
+/**  The search field of the top bar. */
+search: SearchState | null; 
+/**
+ *  A web surface covers the whole screen (the lightbox): the shell
+ *  hides its bars.
+ */
+fullscreen: boolean; theme: ChromeTheme } | 
 /**
  *  A user back swipe starts to move the page, or settles back without a
  *  pop.
  */
 { type: "backSwipe"; phase: BackSwipePhase } | 
 /**  The page listens for intents. */
-{ type: "chromeReady" };
+{ type: "chromeReady" } | 
+/**
+ *  Focuses the search field of the screen of `entry_id` and selects its
+ *  text.
+ */
+{ type: "focusSearch"; entryId: number };
 
 /**  A tab of the shell. */
 export type ChromeTab = "daily" | "all" | "tasks";
 
 /**  The theme preference of the page. */
 export type ChromeTheme = "system" | "light" | "dark";
+
+/**  The middle of the top bar. */
+export type ChromeTitle = { kind: "text"; text: string } | 
+/**
+ *  A title that opens a month picker. `text` is the label the page
+ *  formatted; `month` is the picker's start value, `YYYY-MM`.
+ */
+{ kind: "month"; text: string; month: string };
 
 /**
  *  Every command with its arguments and result. A Swift shell command
@@ -1946,6 +1965,20 @@ export type ScanOrphan = {
 	storedHash: string,
 };
 
+/**  The search field of the top bar. */
+export type SearchState = {
+	placeholder: string,
+	/**  The accessibility label. */
+	label: string,
+	text: string,
+	/**
+	 *  Grows only when the page itself changes `text`. The shell writes
+	 *  `text` into the field only when `revision` changes, so the echo of
+	 *  what the user typed never replaces newer typing.
+	 */
+	revision: number,
+};
+
 /**  A tap in the iPad sidebar. */
 export type SidebarIntent = { kind: "chat" } | { kind: "search" } | { kind: "settings" } | 
 /**  Opens a pinned note. */
@@ -2071,9 +2104,6 @@ export type ToolbarState = {
 	canMoveDown: boolean,
 	canAttachFiles: boolean,
 };
-
-/**  The phase of a web push or pop slide. */
-export type TransitionPhase = "start" | "end";
 
 export type Value = null | boolean | number | string | unknown[] | { [key in string]: unknown };
 

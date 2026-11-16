@@ -181,6 +181,13 @@ function stackLayers(view: BrowserView): HTMLElement[] {
 }
 
 /** The screen the user sees — the one stack layer not hidden as a11y-inert. */
+/**
+ * The dot icon of All's Chat button, shown while a conversation is in progress.
+ */
+function chatButtonDot(view: BrowserView): Element | null {
+  return view.container.querySelector('[aria-label="Chat"] .lucide-message-square-dot')
+}
+
 function visibleLayer(view: BrowserView): HTMLElement {
   const visible = stackLayers(view).find((layer) => layer.getAttribute('aria-hidden') !== 'true')
   if (!visible) {
@@ -810,8 +817,8 @@ describe('MobileShell', () => {
       expect((box.element() as HTMLInputElement).value).toBe('pricing')
       expect(visibleLayer(view).contains(box.element())).toBe(true)
     })
-    // The header's Chat button now resumes that conversation.
-    await expect.element(view.getByTestId('chat-in-progress')).toBeInTheDocument()
+    // The header's Chat button now resumes that conversation, marked with a dot.
+    await waitFor(() => expect(chatButtonDot(view)).not.toBeNull())
 
     // A second tap on the same Ask reopens that answer instead of paying for
     // the question twice.
@@ -824,7 +831,7 @@ describe('MobileShell', () => {
     const user = userEvent
     const { view } = await mountAllWithChatProvider('unused')
     // No conversation yet, so nothing to mark as in progress.
-    expect(view.getByTestId('chat-in-progress').query()).toBeNull()
+    expect(chatButtonDot(view)).toBeNull()
 
     await user.click(view.getByRole('button', { name: 'Chat', exact: true }))
 

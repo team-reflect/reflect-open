@@ -1,5 +1,4 @@
 import { useEffect, useRef, type ReactElement } from 'react'
-import { ChevronDown } from 'lucide-react'
 import { addDaysToIsoDate, getYearMonth } from '@reflect/utils'
 import { getUserWeekStart } from '@reflect/core'
 import { monthPickTarget, weekAtIndex } from '@reflect/app'
@@ -7,8 +6,6 @@ import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import type { ChromePlus } from '@/mobile/chrome/screen-chrome.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { MonthPicker } from '@/mobile/month-picker.tsx'
-import { MonthTitle } from '@/mobile/month-title.tsx'
 import { useDailyNoteDates } from '@/mobile/use-daily-note-dates.ts'
 import { useWeekStrip } from '@/mobile/use-week-strip.ts'
 import { WeekRow } from '@/mobile/week-row.tsx'
@@ -134,19 +131,13 @@ export function CalendarStrip({
       ]}
       onAction={runAction}
       plus={plus}
-      title={
-        <h1 className="text-base font-semibold">
-          <MonthPicker
-            month={getYearMonth(headerDate)}
-            selected={getYearMonth(date)}
-            today={getYearMonth(today)}
-            onPick={pickMonth}
-          >
-            <MonthTitle month={getYearMonth(headerDate)} />
-            <ChevronDown aria-hidden className="size-4 shrink-0 text-text-muted" />
-          </MonthPicker>
-        </h1>
-      }
+      title={{
+        kind: 'month',
+        month: getYearMonth(headerDate),
+        selected: getYearMonth(date),
+        today: getYearMonth(today),
+        onPick: pickMonth,
+      }}
     >
       <div className="px-2 pb-1">
         <div ref={scrollerRef} data-scroll-x className="pager-x flex overflow-x-auto">

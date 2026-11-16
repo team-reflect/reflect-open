@@ -1,9 +1,10 @@
-import type { ReactElement } from 'react'
+import { createRef, type ReactElement } from 'react'
 import { createTestNativeChromeHost } from '@reflect/app/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { useScreenChrome } from '@/mobile/chrome/chrome-renderer.ts'
 import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
-import { nativeChromeOptions } from '@/test-utils/native-chrome.tsx'
+import type { Focusable } from '@/mobile/chrome/screen-chrome.ts'
+import { lastChromeState, nativeChromeOptions } from '@/test-utils/native-chrome.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 
 function Screen({ id = 'more' }: { id?: string | undefined }): ReactElement {
@@ -49,51 +50,85 @@ describe('NativeChromeRenderer', () => {
     expect(postedTrailing(host).slice(before)).toEqual([['share']])
   })
 
-  it('keeps the corner space in the header row only while the shell draws the corners there', async () => {
+  it('leaves the main row to the shell', async () => {
     const host = createTestNativeChromeHost()
     const view = await renderInApp(
+      <ChromeTopBar back={vi.fn()} title="Tag" />,
+      nativeChromeOptions(host),
+    )
+    await vi.waitFor(() => {
+      expect(lastChromeState(host)?.title).toEqual({ kind: 'text', text: 'Tag' })
+    })
+    expect(view.container.querySelector('header')).toBeNull()
+  })
+
+  it("grows the search revision only for the screen's own changes", async () => {
+    const host = createTestNativeChromeHost()
+    const onChange = vi.fn()
+    const screen = (value: string): ReactElement => (
       <ChromeTopBar
-        back={vi.fn()}
-        trailing={[{ id: 'more', title: 'More', icon: 'ellipsis' }]}
-        title={<h1>Tag</h1>}
+        search={{ value, placeholder: 'Search tasks…', label: 'Search tasks', onChange }}
+      />
+    )
+    const view = await renderInApp(screen(''), nativeChromeOptions(host))
+    await vi.waitFor(() => {
+      expect(lastChromeState(host)?.search).toMatchObject({ text: '', revision: 0 })
+    })
+    const entryId = lastChromeState(host)?.entryId
+
+    // The shell's typing comes back as the screen's value: an echo.
+    host.sendIntent({ type: 'search', entryId, text: 'ab' })
+    expect(onChange).toHaveBeenCalledWith('ab')
+    await view.rerender(screen('ab'))
+    await vi.waitFor(() => {
+      expect(lastChromeState(host)?.search).toMatchObject({ text: 'ab', revision: 0 })
+    })
+
+    // The screen clears the field itself.
+    await view.rerender(screen(''))
+    await vi.waitFor(() => {
+      expect(lastChromeState(host)?.search).toMatchObject({ text: '', revision: 1 })
+    })
+
+    // The echo counts once: the screen setting the shell's old text again is
+    // its own change.
+    await view.rerender(screen('ab'))
+    await vi.waitFor(() => {
+      expect(lastChromeState(host)?.search).toMatchObject({ text: 'ab', revision: 2 })
+    })
+  })
+
+  it("focuses the shell's search field through the search ref", async () => {
+    const host = createTestNativeChromeHost()
+    const ref = createRef<Focusable>()
+    await renderInApp(
+      <ChromeTopBar
+        search={{ value: '', placeholder: 'Search', label: 'Search', onChange: vi.fn(), ref }}
       />,
       nativeChromeOptions(host),
     )
-    const back = (): Element | null => view.container.querySelector('[aria-label="Back"]')
     await vi.waitFor(() => {
-      expect(host.posted).toContainEqual({ type: 'chromeReady' })
+      expect(lastChromeState(host)?.search).not.toBeNull()
     })
-    expect(back()).not.toBeNull()
-
-    host.sendIntent({ type: 'layout', cornersInHeaderRow: false })
-    await vi.waitFor(() => {
-      expect(back()).toBeNull()
-    })
-    expect(view.container.querySelector('[aria-label="More"]')).toBeNull()
-
-    host.sendIntent({ type: 'layout', cornersInHeaderRow: true })
-    await vi.waitFor(() => {
-      expect(back()).not.toBeNull()
+    ref.current?.focus()
+    expect(host.posted).toContainEqual({
+      type: 'focusSearch',
+      entryId: lastChromeState(host)?.entryId,
     })
   })
-  it('moves the header row past the window controls', async () => {
+
+  it('publishes the width of the window controls', async () => {
     const host = createTestNativeChromeHost()
-    const view = await renderInApp(<ChromeTopBar title={<h1>Tag</h1>} />, nativeChromeOptions(host))
-    const left = (): number => view.container.querySelector('h1')!.getBoundingClientRect().left
+    await renderInApp(<ChromeTopBar title="Tag" />, nativeChromeOptions(host))
     await vi.waitFor(() => {
       expect(host.posted).toContainEqual({ type: 'chromeReady' })
     })
-    const start = left()
-
     host.sendIntent({ type: 'windowControls', width: 88 })
     await vi.waitFor(() => {
-      expect(left()).toBeGreaterThanOrEqual(start + 88)
+      expect(document.documentElement.style.getPropertyValue('--window-controls-width')).toBe(
+        '88px',
+      )
     })
-    expect(document.documentElement.style.getPropertyValue('--window-controls-width')).toBe('88px')
-
     host.sendIntent({ type: 'windowControls', width: 0 })
-    await vi.waitFor(() => {
-      expect(left()).toBe(start)
-    })
   })
 })

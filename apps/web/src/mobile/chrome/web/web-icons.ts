@@ -1,13 +1,17 @@
 import {
+  Archive,
   History,
   Lock,
   LockOpen,
+  MessageSquare,
+  MessageSquareDot,
   MoreHorizontal,
   Pin,
   PinOff,
   Plus,
   Settings,
   Share,
+  SlidersHorizontal,
   Trash2,
   type LucideIcon,
 } from 'lucide-react'
@@ -27,4 +31,8 @@ export const WEB_ICONS: Record<ChromeIcon, LucideIcon> = {
   'lock-open': LockOpen,
   share: Share,
   trash: Trash2,
+  chat: MessageSquare,
+  'chat-active': MessageSquareDot,
+  archive: Archive,
+  filters: SlidersHorizontal,
 }

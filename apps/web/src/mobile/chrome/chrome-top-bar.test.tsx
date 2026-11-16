@@ -1,11 +1,12 @@
 import type { ReactElement } from 'react'
 import { createTestNativeChromeHost } from '@reflect/app/testing'
 import { describe, expect, it, vi } from 'vitest'
+import { userEvent } from 'vitest/browser'
 import { ChromeLayerContext } from '@/mobile/chrome/chrome-renderer.ts'
 import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import type { NativeBarButton } from '@/mobile/chrome/native/protocol.ts'
 import { lastChromeState, nativeChromeOptions } from '@/test-utils/native-chrome.tsx'
-import { renderInApp, type RenderInAppOptions } from '@/test-utils/render-in-app.tsx'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
 
 function bar(handlers: { back?: () => void; onAction?: (id: string) => void } = {}): ReactElement {
   return (
@@ -14,7 +15,7 @@ function bar(handlers: { back?: () => void; onAction?: (id: string) => void } = 
       back={handlers.back ?? vi.fn()}
       trailing={[{ id: 'more', title: 'More actions', icon: 'ellipsis' }]}
       onAction={handlers.onAction ?? vi.fn()}
-      title={<h1>Roadmap</h1>}
+      title="Roadmap"
     />
   )
 }
@@ -26,12 +27,9 @@ function rectOf(element: Element | null): DOMRect {
   return element.getBoundingClientRect()
 }
 
-describe.each<[string, () => RenderInAppOptions]>([
-  ['web', () => ({})],
-  ['native', () => nativeChromeOptions(createTestNativeChromeHost())],
-])('ChromeTopBar with the %s renderer', (_renderer, options) => {
+describe('ChromeTopBar with the web renderer', () => {
   it('centers the title between balanced corners', async () => {
-    const view = await renderInApp(bar(), options())
+    const view = await renderInApp(bar())
 
     const header = rectOf(view.container.querySelector('header'))
     const title = rectOf(view.container.querySelector('h1'))
@@ -48,7 +46,7 @@ describe.each<[string, () => RenderInAppOptions]>([
   it('keeps the corners clear of an uneven side inset', async () => {
     document.documentElement.style.setProperty('--twsa-safe-area-inset-right', '84px')
     try {
-      const view = await renderInApp(bar(), options())
+      const view = await renderInApp(bar())
       const header = rectOf(view.container.querySelector('header'))
       const more = rectOf(view.container.querySelector('[aria-label="More actions"]'))
       expect(more.right).toBeLessThanOrEqual(header.right - 84)
@@ -83,13 +81,39 @@ describe('ChromeTopBar', () => {
           },
           { id: 'sort', title: 'Sort', menu: [{ type: 'action', id: 'newest', title: 'Newest' }] },
         ]}
-        title={<h1>Notes</h1>}
+        title="Notes"
       />,
     )
 
     expect(view.getByRole('button', { name: 'Gone' }).query()).toBeNull()
     await view.getByRole('button', { name: 'Sort' }).click()
     await expect.element(view.getByRole('button', { name: 'Newest' })).toBeVisible()
+  })
+
+  it('draws the search field and the month title with the web renderer', async () => {
+    const onChange = vi.fn()
+    const searchView = await renderInApp(
+      <ChromeTopBar
+        search={{ value: '', placeholder: 'Search tasks…', label: 'Search tasks', onChange }}
+      />,
+    )
+    await userEvent.fill(searchView.getByRole('searchbox', { name: 'Search tasks' }), 'a')
+    expect(onChange).toHaveBeenCalledWith('a')
+    await searchView.unmount()
+
+    const monthView = await renderInApp(
+      <ChromeTopBar
+        title={{
+          kind: 'month',
+          month: '2026-11',
+          selected: '2026-11',
+          today: '2026-11',
+          onPick: vi.fn(),
+        }}
+      />,
+    )
+    await expect.element(monthView.getByLabelText('Change month')).toBeInTheDocument()
+    await expect.element(monthView.getByText('November 2026')).toBeVisible()
   })
 
   it('leaves the corner buttons to the shell with the native renderer', async () => {
@@ -116,7 +140,7 @@ describe('ChromeTopBar', () => {
     // Three screens of one history entry: the later one owns its bar.
     const host = createTestNativeChromeHost()
     const header = (id: string): ReactElement => (
-      <ChromeTopBar back={vi.fn()} trailing={[{ id, title: id }]} title={<h1>{id}</h1>} />
+      <ChromeTopBar back={vi.fn()} trailing={[{ id, title: id }]} title={id} />
     )
     const screens = (withOlder: boolean): ReactElement => (
       <>

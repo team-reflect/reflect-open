@@ -1,13 +1,5 @@
 [
   {
-    "type": "transition",
-    "phase": "start"
-  },
-  {
-    "type": "transition",
-    "phase": "end"
-  },
-  {
     "type": "backSwipe",
     "phase": "start"
   },
@@ -17,5 +9,9 @@
   },
   {
     "type": "chromeReady"
+  },
+  {
+    "type": "focusSearch",
+    "entryId": 3
   }
 ]

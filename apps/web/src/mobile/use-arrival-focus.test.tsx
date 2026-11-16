@@ -4,12 +4,13 @@ import { useArrivalFocus, type ArrivalFocusOptions } from './use-arrival-focus.t
 
 async function mountFocus(initial: Omit<ArrivalFocusOptions, 'target'>) {
   const focus = vi.fn()
-  const target = { current: { focus } as unknown as HTMLElement }
+  const select = vi.fn()
+  const target = { current: { focus, select } }
   const hook = await renderHook(
     (props: Omit<ArrivalFocusOptions, 'target'> = initial) => useArrivalFocus({ ...props, target }),
     { initialProps: initial },
   )
-  return { hook, focus }
+  return { hook, focus, select }
 }
 
 afterEach(async () => {
@@ -54,5 +55,14 @@ describe('useArrivalFocus', () => {
     })
     await hook.rerender({ arrivalSeq: 2, arrivalFocusEditor: false })
     expect(focus).not.toHaveBeenCalled()
+  })
+
+  it('selects the text of a selectable target on a selecting arrival', async () => {
+    const { select } = await mountFocus({
+      arrivalSeq: 3,
+      arrivalFocusEditor: true,
+      selectText: true,
+    })
+    expect(select).toHaveBeenCalledTimes(1)
   })
 })

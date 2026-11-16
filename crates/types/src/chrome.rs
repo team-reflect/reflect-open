@@ -29,9 +29,9 @@ pub enum ChromeMessage {
         tab: ChromeTab,
         /// The shell shows a back button before the `leading` buttons.
         can_back: bool,
-        /// The buttons in the top-left corner, after the back button.
+        /// The leading buttons of the top bar, after the back button.
         leading: Vec<BarButton>,
-        /// The buttons in the top-right corner.
+        /// The trailing buttons of the top bar.
         trailing: Vec<BarButton>,
         keyboard_visible: bool,
         /// A web drawer is open: the shell hides its bars.
@@ -44,23 +44,51 @@ pub enum ChromeMessage {
         /// Where the history can move, while the window has a sidebar. The shell
         /// then shows a back and a forward button in place of the back button.
         history: Option<HistoryState>,
+        /// The middle of the top bar: a title, or a title that picks a month.
+        title: Option<ChromeTitle>,
+        /// The search field of the top bar.
+        search: Option<SearchState>,
+        /// A web surface covers the whole screen (the lightbox): the shell
+        /// hides its bars.
+        fullscreen: bool,
         theme: ChromeTheme,
     },
-    /// A web push or pop slide starts or ends.
-    Transition { phase: TransitionPhase },
     /// A user back swipe starts to move the page, or settles back without a
     /// pop.
     BackSwipe { phase: BackSwipePhase },
     /// The page listens for intents.
     ChromeReady,
+    /// Focuses the search field of the screen of `entry_id` and selects its
+    /// text.
+    FocusSearch { entry_id: isize },
 }
 
-/// The phase of a web push or pop slide.
+/// The middle of the top bar.
 #[derive(Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub enum TransitionPhase {
-    Start,
-    End,
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ChromeTitle {
+    Text {
+        text: String,
+    },
+    /// A title that opens a month picker. `text` is the label the page
+    /// formatted; `month` is the picker's start value, `YYYY-MM`.
+    Month {
+        text: String,
+        month: String,
+    },
+}
+
+/// The search field of the top bar.
+#[derive(Serialize, Deserialize, specta::Type)]
+pub struct SearchState {
+    pub placeholder: String,
+    /// The accessibility label.
+    pub label: String,
+    pub text: String,
+    /// Grows only when the page itself changes `text`. The shell writes
+    /// `text` into the field only when `revision` changes, so the echo of
+    /// what the user typed never replaces newer typing.
+    pub revision: isize,
 }
 
 /// The phase of a user back swipe.
@@ -191,7 +219,7 @@ pub struct MenuConfirm {
     pub action: String,
 }
 
-/// A native button that floats in a top corner of the page. A tap opens
+/// A button of the native top bar. A tap opens
 /// `menu` when it has one, and sends an `action` intent with `id` otherwise.
 #[derive(Serialize, Deserialize, specta::Type)]
 pub struct BarButton {
@@ -246,11 +274,6 @@ pub enum ChromeIntent {
     Files {
         files: Vec<IntentFile>,
     },
-    /// Whether the corner buttons sit in the page's header row, or in the row
-    /// of the floating tab bar above it.
-    Layout {
-        corners_in_header_row: bool,
-    },
     /// How far the window controls reach into the page's top row from its
     /// leading edge, in points. Zero outside a window.
     WindowControls {
@@ -268,6 +291,16 @@ pub enum ChromeIntent {
     /// A tap in the iPad sidebar.
     Sidebar {
         command: SidebarIntent,
+    },
+    /// The text of the search field of `entry_id` changed.
+    Search {
+        entry_id: isize,
+        text: String,
+    },
+    /// The user picked `month` (`YYYY-MM`) in the title's month picker.
+    PickMonth {
+        entry_id: isize,
+        month: String,
     },
 }
 

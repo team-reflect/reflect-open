@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, type CSSProperties, type ReactElement } from '
 import { noop, returnNull } from '@ocavue/utils'
 import type { ChromeRenderer, ShellBarsProps } from '@/mobile/chrome/chrome-renderer.ts'
 import { PlusSlot, WebPlus } from '@/mobile/chrome/web/web-plus.tsx'
-import { WebTopBarCorner } from '@/mobile/chrome/web/web-top-bar-corner.tsx'
+import { WebTopBarRow } from '@/mobile/chrome/web/web-top-bar-row.tsx'
 import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar.tsx'
 import type { MobileForm } from '@/mobile/mobile-form.ts'
 import { TabCapsule } from '@/mobile/mobile-tab-bar.tsx'
@@ -113,12 +113,14 @@ function webShellStyle(form: MobileForm): CSSProperties {
  * The chrome the web page draws itself.
  */
 export const WEB_CHROME_RENDERER: ChromeRenderer = {
-  TopBarCorner: WebTopBarCorner,
+  TopBarRow: WebTopBarRow,
+  drawsTopBarRow: true,
   ShellBars: WebShellBars,
   Plus: WebPlus,
   NoChrome: returnNull,
   shellStyle: webShellStyle,
   registerScreen: () => noop,
   openModal: () => noop,
+  openFullscreen: () => noop,
   reportStackMotion: noop,
 }

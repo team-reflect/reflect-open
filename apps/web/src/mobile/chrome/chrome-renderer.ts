@@ -13,8 +13,7 @@ import type { MobileForm } from '@/mobile/mobile-form.ts'
 import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 import { useRouterState } from '@/routing/router.tsx'
 
-export interface TopBarCornerProps {
-  edge: 'leading' | 'trailing'
+export interface TopBarRowProps {
   /**
    * The layout of the bar: corners of equal width around a centered title,
    * or corners at the edges of a title that fills the row.
@@ -31,11 +30,9 @@ export interface ShellBarsProps {
 }
 
 /**
- * A move of the mobile stack: a slide between screens, or a user back swipe.
+ * A user back swipe of the mobile stack.
  */
-export type StackMotion =
-  | { type: 'transition'; phase: 'start' | 'end' }
-  | { type: 'backSwipe'; phase: 'start' | 'cancel' }
+export type StackMotion = { type: 'backSwipe'; phase: 'start' | 'cancel' }
 
 /**
  * Draws the mobile chrome. The app picks one renderer at its root; screens
@@ -43,10 +40,14 @@ export type StackMotion =
  */
 export interface ChromeRenderer {
   /**
-   * One corner of a top bar: the back button (leading only) and the buttons,
-   * or the space they take when something else draws them.
+   * The main row of a top bar: corners, title and search, or nothing when
+   * the shell draws that row.
    */
-  readonly TopBarCorner: ComponentType<TopBarCornerProps>
+  readonly TopBarRow: ComponentType<TopBarRowProps>
+  /**
+   * Whether `TopBarRow` draws anything.
+   */
+  readonly drawsTopBarRow: boolean
   /**
    * The bars of the routed shell in `form`. While the keyboard is up the
    * formatting toolbar replaces the `bar` row; the rail and the pad's top
@@ -77,7 +78,11 @@ export interface ChromeRenderer {
    */
   openModal(): Unlisten
   /**
-   * Tell the renderer that the stack slides or a back swipe moves it.
+   * Count one surface that covers the whole screen; returns the release.
+   */
+  openFullscreen(): Unlisten
+  /**
+   * Tell the renderer that a back swipe moves the stack.
    */
   reportStackMotion(motion: StackMotion): void
 }
@@ -104,8 +109,9 @@ export function useChromeRenderer(): ChromeRenderer {
 
 /**
  * Declare this screen's chrome for the history entry it shows. `chrome` may
- * be a new object on every render: only a change of its buttons, of its `+`,
- * or of whether it has `back`, reaches the renderer.
+ * be a new object on every render: only a change of its buttons, its `+`,
+ * its title, the words of its search field, or whether it has `back`,
+ * reaches the renderer.
  */
 export function useScreenChrome(chrome: ScreenChrome): void {
   const renderer = useChromeRenderer()
@@ -115,12 +121,18 @@ export function useScreenChrome(chrome: ScreenChrome): void {
   useLayoutEffect(() => {
     chromeRef.current = chrome
   })
-  // `JSON.stringify` leaves out the `+` handlers.
+  // `JSON.stringify` leaves out the handlers. The search field's ref holds
+  // a focus handle, so only its words count.
+  const { title, search } = chrome
   const key = JSON.stringify([
     chrome.leading,
     chrome.trailing,
     chrome.back !== undefined,
     chrome.plus,
+    title,
+    search === undefined
+      ? null
+      : { value: search.value, placeholder: search.placeholder, label: search.label },
   ])
 
   // A layout effect, so the chrome is registered before the passive effects
@@ -140,6 +152,19 @@ export function useChromeModal(open: boolean): void {
   useEffect(() => {
     if (open) {
       return renderer.openModal()
+    }
+  }, [renderer, open])
+}
+
+/**
+ * Hide the shell's bars while `open` is true. Outside a chrome renderer (the
+ * desktop app) it does nothing.
+ */
+export function useChromeFullscreen(open: boolean): void {
+  const renderer = use(ChromeRendererContext)
+  useEffect(() => {
+    if (open && renderer !== null) {
+      return renderer.openFullscreen()
     }
   }, [renderer, open])
 }

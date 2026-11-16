@@ -13,6 +13,9 @@
   "plus": null,
   "sidebar": null,
   "history": null,
+  "title": null,
+  "search": null,
+  "fullscreen": false,
   "theme": "light",
   "generation": 1
 }

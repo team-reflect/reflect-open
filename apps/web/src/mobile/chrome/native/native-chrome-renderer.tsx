@@ -1,10 +1,10 @@
 import {
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useState,
   useRef,
   type CSSProperties,
-  type ReactElement,
 } from 'react'
 import { isDeepEqual, returnNull } from '@ocavue/utils'
 import type { NativeChromeService } from '@reflect/app'
@@ -20,10 +20,9 @@ import {
   type ChromeRenderer,
   type ShellBarsProps,
   type StackMotion,
-  type TopBarCornerProps,
+  type TopBarRowProps,
 } from '@/mobile/chrome/chrome-renderer.ts'
-import type { ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
-import { WebTopBarCorner } from '@/mobile/chrome/web/web-top-bar-corner.tsx'
+import type { ChromeSearch, ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
 import {
   createAttachQueue,
   runNativeIntent,
@@ -33,12 +32,14 @@ import {
   buildNoChromeState,
   buildShellChromeState,
   toWirePlus,
+  toWireTitle,
   type ScreenBar,
 } from '@/mobile/chrome/native/native-chrome-state.ts'
 import { toWireMenu } from '@/mobile/chrome/native/sf-symbols.ts'
 import {
   parseNativeIntent,
   type NativeChromeMessage,
+  type NativeSearchState,
   type NativeSidebarState,
 } from '@/mobile/chrome/native/protocol.ts'
 import { sidebarVisible, useSidebar } from '@/mobile/sidebar.ts'
@@ -57,7 +58,13 @@ class NativeChromeRenderer implements ChromeRenderer {
    * How many web drawers are open.
    */
   readonly #modalCount = new WritableStore(0)
-  readonly TopBarCorner = NativeTopBarCorner
+  /**
+   * How many surfaces cover the whole screen.
+   */
+  readonly #fullscreenCount = new WritableStore(0)
+  readonly TopBarRow = NativeTopBarRow
+  // The shell draws the main row in its navigation bar.
+  readonly drawsTopBarRow = false
   readonly ShellBars = NativeShellBars
   // The shell draws the `+` that `registerScreen` snapshots.
   readonly Plus = returnNull
@@ -73,17 +80,22 @@ class NativeChromeRenderer implements ChromeRenderer {
    */
   readonly modal = deriveStore(this.#modalCount, (count) => count > 0)
   /**
-   * Whether the shell draws the corner buttons in the page's header row. On
-   * an iPad with the tab bar at the top, they sit in the tab bar's row.
+   * Whether a surface covers the whole screen. The shell hides every bar
+   * while one does.
    */
-  readonly cornersInHeaderRow = new WritableStore(true)
+  readonly fullscreen = deriveStore(this.#fullscreenCount, (count) => count > 0)
   /**
    * How far the iPadOS window controls reach into the top row from its
-   * leading edge, in pixels. The shell moves its leading corner buttons past
-   * them; the page leaves the same space.
+   * leading edge, in pixels. A surface over the bars (the lightbox) leaves
+   * this space.
    */
   readonly windowControlsWidth = new WritableStore(0)
   readonly attachFiles = createAttachQueue()
+  /**
+   * The search text of every entry with a search field, its revision, and
+   * the last text the shell sent for it.
+   */
+  readonly #search = new Map<number, { text: string; revision: number; fromShell: string | null }>()
 
   constructor(nativeChrome: NativeChromeService) {
     this.#nativeChrome = nativeChrome
@@ -91,13 +103,15 @@ class NativeChromeRenderer implements ChromeRenderer {
 
   registerScreen(entryId: number, chrome: { readonly current: ScreenChrome }): Unlisten {
     this.#screens.set(entryId, chrome)
-    const { back, leading, trailing, plus } = chrome.current
+    const { back, leading, trailing, plus, title, search } = chrome.current
     // A copy, so an in-place change of the screen's buttons is a change.
     const bar = structuredClone({
       canBack: back !== undefined,
       leading: leading ?? [],
       trailing: trailing ?? [],
       plus: plus === undefined ? null : toWirePlus(plus),
+      title: title === undefined ? null : toWireTitle(title),
+      search: this.#wireSearch(entryId, search),
     })
     this.#updateBars((bars) => {
       bars.set(entryId, bar)
@@ -107,6 +121,13 @@ class NativeChromeRenderer implements ChromeRenderer {
         return
       }
       this.#screens.delete(entryId)
+      // A change of the screen's chrome registers again right after, and
+      // the revision must carry over: forget the search only if nothing did.
+      queueMicrotask(() => {
+        if (!this.#screens.has(entryId)) {
+          this.#search.delete(entryId)
+        }
+      })
       this.#updateBars((bars) => {
         bars.delete(entryId)
       })
@@ -125,10 +146,59 @@ class NativeChromeRenderer implements ChromeRenderer {
     return this.#screens.get(entryId)?.current
   }
 
+  /**
+   * The shell's search field of `entryId` changed to `text`. The screen's
+   * value that follows is an echo, so it keeps the revision.
+   */
+  noteShellSearch(entryId: number, text: string): void {
+    const entry = this.#search.get(entryId)
+    if (entry !== undefined) {
+      entry.fromShell = text
+    }
+  }
+
+  /**
+   * Ask the shell to focus the search field of `entryId`.
+   */
+  focusSearch(entryId: number): void {
+    this.#nativeChrome.post({ type: 'focusSearch', entryId } satisfies NativeChromeMessage)
+  }
+
+  /**
+   * The search field without its handlers. The revision grows only when the
+   * screen changes the text itself, so the shell never writes back an echo
+   * of what the user typed.
+   */
+  #wireSearch(entryId: number, search: ChromeSearch | undefined): NativeSearchState | null {
+    if (search === undefined) {
+      this.#search.delete(entryId)
+      return null
+    }
+    const entry = this.#search.get(entryId)
+    let next = { text: search.value, revision: 0, fromShell: null as string | null }
+    if (entry !== undefined && search.value === entry.text) {
+      next = entry
+    } else if (entry !== undefined) {
+      // The echo of the shell's last text counts once.
+      const echo = search.value === entry.fromShell
+      next.revision = echo ? entry.revision : entry.revision + 1
+    }
+    this.#search.set(entryId, next)
+    const { revision } = next
+    return { placeholder: search.placeholder, label: search.label, text: search.value, revision }
+  }
+
   openModal(): Unlisten {
     this.#modalCount.set(this.#modalCount.get() + 1)
     return () => {
       this.#modalCount.set(this.#modalCount.get() - 1)
+    }
+  }
+
+  openFullscreen(): Unlisten {
+    this.#fullscreenCount.set(this.#fullscreenCount.get() + 1)
+    return () => {
+      this.#fullscreenCount.set(this.#fullscreenCount.get() - 1)
     }
   }
 
@@ -159,31 +229,17 @@ function useNativeChromeRenderer(): NativeChromeRenderer {
 }
 
 /**
- * The space of the corner buttons and the back button that the shell draws
- * over the header row, or nothing when the shell draws them in another row.
- * The shell's back button is wider than the web one, so a spacer moves a
- * title that starts after it clear. Beside the sidebar, the shell draws a back
- * and a forward arrow on every screen, so the space holds both.
+ * The shell draws the main row. This only hands the screen's search ref the
+ * shell's search field.
  */
-function NativeTopBarCorner(props: TopBarCornerProps): ReactElement | null {
+function NativeTopBarRow({ chrome }: TopBarRowProps): null {
   const renderer = useNativeChromeRenderer()
-  const cornersInHeaderRow = useStore(renderer.cornersInHeaderRow)
-  const history = useStore(sidebarVisible) !== null && props.edge === 'leading'
-  const clearsWindowControls =
-    useStore(renderer.windowControlsWidth) > 0 && props.edge === 'leading'
-  if (!cornersInHeaderRow) {
-    return null
-  }
-  const back = history ? returnNull : props.chrome.back
-  const clearsBack = props.edge === 'leading' && props.align === 'start' && back !== undefined
-  return (
-    <div className="invisible contents" inert aria-hidden>
-      {clearsWindowControls ? <div className="w-window-controls shrink-0" /> : null}
-      <WebTopBarCorner {...props} chrome={{ ...props.chrome, back }} />
-      {clearsBack ? <div className="w-1 shrink-0" /> : null}
-      {history ? <div className="w-13 shrink-0" /> : null}
-    </div>
-  )
+  const { entryId } = useRouterState()
+  useImperativeHandle(chrome.search?.ref, () => ({ focus: () => renderer.focusSearch(entryId) }), [
+    renderer,
+    entryId,
+  ])
+  return null
 }
 
 /**
@@ -198,6 +254,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
   const bars = useStore(renderer.bars)
   const windowControlsWidth = useStore(renderer.windowControlsWidth)
   const modal = useStore(renderer.modal)
+  const fullscreen = useStore(renderer.fullscreen)
   const toolbar = useFormattingToolbar()
   const theme = useThemeSetting()
   const { nativeChrome } = useAppServices()
@@ -228,6 +285,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
         toolbar: toolbar?.capabilities ?? null,
         sidebar: sidebarState,
         history: showsSidebar ? { back: canBack, forward: canForward } : null,
+        fullscreen,
         theme,
       }),
     )
@@ -240,6 +298,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
     bars,
     keyboardVisible,
     modal,
+    fullscreen,
     toolbar,
     sidebarState,
     showsSidebar,
@@ -289,7 +348,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
           attachCommands: attach?.entryId === context.entryId ? attach.commands : null,
           attachFiles: renderer.attachFiles,
           toasts,
-          setCornersInHeaderRow: (value) => renderer.cornersInHeaderRow.set(value),
+          noteShellSearch: (id, text) => renderer.noteShellSearch(id, text),
           setWindowControlsWidth: (value) => renderer.windowControlsWidth.set(value),
           setSidebarVisible: (value) => sidebarVisible.set(value),
         })

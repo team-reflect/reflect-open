@@ -30,8 +30,8 @@ final class ChromeBridgeTests: XCTestCase {
     XCTAssertEqual(
       messages,
       [
-        .transition(.init(phase: .start)), .transition(.init(phase: .end)),
         .backSwipe(.init(phase: .start)), .backSwipe(.init(phase: .cancel)), .chromeReady,
+        .focusSearch(.init(entryId: 3)),
       ])
   }
 
@@ -43,7 +43,6 @@ final class ChromeBridgeTests: XCTestCase {
       .command(.init(id: .indent)),
       .files(
         .init(files: [IntentFile(name: "Image.png", type: "image/png", bytes: Data([1, 2, 3]))])),
-      .layout(.init(cornersInHeaderRow: false)),
       .windowControls(.init(width: 88)),
       .plus(.init(entryId: 3, command: .note)),
       .sidebarVisible(.init(visible: true)),
@@ -57,6 +56,8 @@ final class ChromeBridgeTests: XCTestCase {
       .sidebar(.init(command: .unpin(.init(path: "reflect-v2.md")))),
       .sidebar(.init(command: .share(.init(path: "reflect-v2.md")))),
       .sidebar(.init(command: .menu(.init(id: "graphs")))),
+      .search(.init(entryId: 3, text: "meet")),
+      .pickMonth(.init(entryId: 3, month: "2026-08")),
     ]
     let encoded = try JSONSerialization.jsonObject(with: try JSONEncoder().encode(intents))
     let expected = try JSONSerialization.jsonObject(with: try fixture("intents"))
@@ -70,6 +71,22 @@ final class ChromeBridgeTests: XCTestCase {
     XCTAssertEqual(state.history?.forward, false)
     XCTAssertEqual(state.leading.first?.icon, "gearshape")
     XCTAssertEqual(state.trailing.map(\.id), ["today"])
+    XCTAssertEqual(state.title, .month(.init(text: "November 2026", month: "2026-11")))
+  }
+
+  func testTasksFixtureCarriesTheSearchField() throws {
+    let state = try JSONDecoder().decode(ChromeState.self, from: try fixture("tasks"))
+    XCTAssertEqual(state.search?.placeholder, "Search tasks…")
+    XCTAssertEqual(state.search?.revision, 0)
+    XCTAssertEqual(state.trailing.map(\.icon), ["slider.horizontal.3"])
+  }
+
+  func testCallsFocusSearchWithTheEntry() throws {
+    let bridge = ChromeBridge()
+    var focused: [Int] = []
+    bridge.onFocusSearch = { focused.append($0) }
+    bridge.receive(try message(["type": "focusSearch", "entryId": 7]))
+    XCTAssertEqual(focused, [7])
   }
 
   func testFixturesCarryThePlusOfTheScreen() throws {
@@ -130,26 +147,6 @@ final class ChromeBridgeTests: XCTestCase {
     XCTAssertEqual(intent["id"] as? String, "pin")
   }
 
-  func testSendsTheLayoutWhenItChangesAndToANewPage() throws {
-    let bridge = ChromeBridge()
-    var sent: [ChromeIntent] = []
-    bridge.send = { data in
-      let object = try! JSONSerialization.jsonObject(with: data) as! [String: Any]
-      sent.append(.layout(.init(cornersInHeaderRow: object["cornersInHeaderRow"] as! Bool)))
-    }
-
-    bridge.cornersInHeaderRow = false
-    bridge.receive(try message(["type": "chromeReady"]))
-    bridge.cornersInHeaderRow = false
-    bridge.cornersInHeaderRow = true
-    bridge.documentDidStart()
-    bridge.receive(try message(["type": "chromeReady"]))
-
-    XCTAssertEqual(
-      sent,
-      [.layout(.init(cornersInHeaderRow: false)), .layout(.init(cornersInHeaderRow: true))])
-  }
-
   func testSendsTheWindowControlsWidthWhenItChangesAndToANewPage() throws {
     let bridge = ChromeBridge()
     var sent: [Double] = []
@@ -206,24 +203,13 @@ final class ChromeBridgeTests: XCTestCase {
 
   func testTakesAnObjectBodyOfTheScriptMessageHandler() {
     let bridge = ChromeBridge()
-    var transitions: [Bool] = []
-    bridge.onTransition = { transitions.append($0) }
+    var swipes: [Bool] = []
+    bridge.onBackSwipe = { swipes.append($0) }
 
-    bridge.receive(body: ["type": "transition", "phase": "start"])
-    bridge.receive(body: #"{"type":"transition","phase":"end"}"#)
+    bridge.receive(body: ["type": "backSwipe", "phase": "start"])
+    bridge.receive(body: #"{"type":"backSwipe","phase":"cancel"}"#)
 
-    XCTAssertEqual(transitions, [true, false])
-  }
-
-  func testReportsTransitions() throws {
-    let bridge = ChromeBridge()
-    var transitions: [Bool] = []
-    bridge.onTransition = { transitions.append($0) }
-
-    bridge.receive(try message(["type": "transition", "phase": "start"]))
-    bridge.receive(try message(["type": "transition", "phase": "end"]))
-
-    XCTAssertEqual(transitions, [true, false])
+    XCTAssertEqual(swipes, [true, false])
   }
 
   func testReportsBackSwipes() throws {

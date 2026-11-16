@@ -116,7 +116,7 @@ function NoteActions({ path, onDeleted }: { path: string; onDeleted: () => void 
         { id: 'note-actions', title: 'Note actions', icon: 'ellipsis', menu: actions.items },
       ]}
       onAction={actions.runAction}
-      title={<h1>Note</h1>}
+      title="Note"
     />
   )
 }

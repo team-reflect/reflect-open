@@ -35,11 +35,6 @@ export interface IntentContext {
    */
   toasts: ToastController
   /**
-   * Stores whether the shell draws the corner buttons in the page's header
-   * row.
-   */
-  setCornersInHeaderRow: (cornersInHeaderRow: boolean) => void
-  /**
    * Stores how far the window controls reach into the top row, in pixels.
    */
   setWindowControlsWidth: (width: number) => void
@@ -47,6 +42,10 @@ export interface IntentContext {
    * Stores whether the iPad sidebar shows.
    */
   setSidebarVisible: (visible: boolean | null) => void
+  /**
+   * Records the text the shell's search field of `entryId` sent.
+   */
+  noteShellSearch: (entryId: number, text: string) => void
   /**
    * Runs a tap in the iPad sidebar.
    */
@@ -125,9 +124,6 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
       }
       return
     }
-    case 'layout':
-      context.setCornersInHeaderRow(intent.cornersInHeaderRow)
-      return
     case 'windowControls':
       context.setWindowControlsWidth(intent.width)
       return
@@ -137,6 +133,19 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
     case 'sidebar':
       context.runSidebar(intent.command)
       return
+    case 'search':
+      if (intent.entryId === context.entryId) {
+        context.noteShellSearch(intent.entryId, intent.text)
+        context.screen?.search?.onChange(intent.text)
+      }
+      return
+    case 'pickMonth': {
+      const title = context.screen?.title
+      if (intent.entryId === context.entryId && typeof title === 'object') {
+        title.onPick(intent.month)
+      }
+      return
+    }
     case 'plus': {
       const plus = context.screen?.plus
       if (intent.entryId === context.entryId && plus !== undefined) {
