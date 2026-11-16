@@ -44,11 +44,15 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// Counts taps, so the timeout of an earlier tap does nothing.
   private var taps = 0
   /// The last state's reasons to hide the tab bar.
-  private var hidesForState = true
+  private var hidesForState = false
   private var hidesForKeyboard = false
   /// Whether the page shows its shell, so a tap on a tab moves to it. The
   /// iPad sidebar stays tappable while the tab bar is hidden.
   private var showsShell = false
+  /// Set until the first shell state. The bars hold their space from the
+  /// start, so the page loads with the safe area of the shell; the bottom
+  /// capsule stays transparent meanwhile.
+  private var launching = true
   /// The form of the bottom chrome, resolved on every layout.
   private var form: BottomForm = .bar
   /// The tab bar of the `bar` form. The system tab bar shows in the others.
@@ -83,8 +87,6 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     self.webView = webView
     stage = UINavigationController(rootViewController: page)
     super.init(nibName: nil, bundle: nil)
-    // No bar before the first state.
-    stage.setNavigationBarHidden(true, animated: false)
     delegate = self
     sidebar.delegate = self
     sidebar.bottomBarView = footer
@@ -104,11 +106,13 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     if #available(iOS 26, *) {
       webView.scrollView.topEdgeEffect.isHidden = true
     }
-    // The launch look: no bars before the first state.
-    isTabBarHidden = true
+    // The launch look is the shell's: the iPad tab bar shows at once. A phone
+    // shows the standalone capsule instead.
+    isTabBarHidden = UIDevice.current.userInterfaceIdiom != .pad
     page.attach(webView)
     plus.send = { [weak self] command in self?.sendPlus(command) }
     standalone.bar.isHidden = true
+    standalone.bar.alpha = 0
     registerForTraitChanges([UITraitHorizontalSizeClass.self]) {
       (self: Self, _: UITraitCollection) in
       self.updateTabBarHidden()
@@ -395,6 +399,10 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       follow(tab)
     }
     showsShell = state.chrome != .none
+    if launching, showsShell {
+      launching = false
+      UIView.animate(withDuration: 0.2) { self.standalone.bar.alpha = 1 }
+    }
     hidesForState = !showsShell || state.modal || state.fullscreen
     hidesForKeyboard = state.keyboardVisible
     plus.update(state.plus)
@@ -449,13 +457,14 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// A new document: back to the launch look.
   func reset() {
     tabFollow = TabFollow()
-    hidesForState = true
+    hidesForState = false
     hidesForKeyboard = false
     showsShell = false
     entryId = nil
     history = nil
-    setTabBarHidden(true, animated: false)
-    standalone.bar.isHidden = true
+    launching = true
+    standalone.bar.alpha = 0
+    updateTabBarHidden()
     plus.update(nil)
     updateSidebar(nil)
   }

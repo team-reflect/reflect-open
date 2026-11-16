@@ -343,7 +343,8 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
     }
   }
 
-  /// A new document: nothing of the old page stays in the bar.
+  /// A new document: nothing of the old page stays in the bar. The empty bar
+  /// stays, so the page loads with the safe area of the shell.
   func reset() {
     shown = nil
     entryId = -1
@@ -358,7 +359,7 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
     item.setRightBarButtonItems(nil, animated: false)
     setDimmed(false)
     setFaded(false, animated: false)
-    navigation.setNavigationBarHidden(true, animated: false)
+    navigation.setNavigationBarHidden(false, animated: false)
   }
 }
 
