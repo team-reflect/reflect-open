@@ -71,7 +71,7 @@ const MOBILE_IDLE_MS = 10_000
 const SECONDARY_CHANNEL_QUIET_MS = 5 * 60_000
 
 /**
- * How often a visible desktop window asks the remote for its branch tip.
+ * How often a visible window asks the remote for its branch tip.
  */
 const REMOTE_PROBE_MS = 90_000
 
@@ -290,7 +290,7 @@ class GitSyncServiceImpl implements GitSyncService {
       this.#adoptEngine(next)
 
       this.#resumeDisposers.push(activity.subscribeResume(() => void next.syncNow()))
-      if (isPrimaryChannel && !this.#mobile && platform.isNativeShell) {
+      if (isPrimaryChannel && platform.isNativeShell) {
         this.#armProbe(next, getCredential)
       }
 
