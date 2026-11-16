@@ -61,14 +61,27 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
     return label
   }()
 
-  private lazy var search: UISearchController = {
-    let search = UISearchController(searchResultsController: nil)
-    search.obscuresBackgroundDuringPresentation = false
-    search.hidesNavigationBarDuringPresentation = false
-    search.searchResultsUpdater = self
-    search.searchBar.delegate = self
+  /// The integrated search field.
+  private lazy var search = makeSearch()
+
+  /// The search field of a row with no title and no leading button, in the
+  /// title view: UIKit keeps the leading part of the row for a title, so the
+  /// integrated field would leave it empty. A field of its own, because the
+  /// integrated placement changes the look of its field.
+  private lazy var rowSearch: UISearchController = {
+    let search = makeSearch()
+    searchBox.addSubview(search.searchBar)
     return search
   }()
+
+  /// Holds the field of `rowSearch`: a search bar that is the title view
+  /// itself sits lower than the bar buttons. The box has the height of the
+  /// field, so every tap on the field lands in the box.
+  private let searchBox = SearchBox(frame: CGRect(x: 0, y: 0, width: 1000, height: 44))
+
+  /// Whether the bar shows `rowSearch` instead of `search`.
+  private var searchFillsRow = false
+  private var shownSearch: UISearchController { searchFillsRow ? rowSearch : search }
 
   init(navigation: UINavigationController, menus: MenuPresenter) {
     self.navigation = navigation
@@ -96,6 +109,20 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
       state.chrome == .none || state.fullscreen, animated: animated)
     let newEntry = state.entryId != entryId
     entryId = state.entryId
+    let next = Shown(state)
+    let fillsRow =
+      state.search != nil && state.title == nil && next.back == .none && next.leading.isEmpty
+    if newEntry || fillsRow != searchFillsRow {
+      endSearch()
+    }
+    if fillsRow != searchFillsRow {
+      // The other field has none of the text yet.
+      searchRevision = nil
+      searchFillsRow = fillsRow
+    }
+    if fillsRow {
+      item.searchController = nil
+    }
     // The title lays out before the buttons animate, so it does not move
     // in from the corner of its frame.
     var titleChanged = false
@@ -108,7 +135,7 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
       titleView.alpha = 0
       UIView.animate(withDuration: 0.25) { titleView.alpha = alpha }
     }
-    showButtons(Shown(state), newEntry: newEntry, animated: animated)
+    showButtons(next, newEntry: newEntry, animated: animated)
     showSearch(state.search, newEntry: newEntry)
     if let pendingFocus, pendingFocus == entryId {
       self.pendingFocus = nil
@@ -124,8 +151,8 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
     writingSearch = false
   }
 
-  /// Shows `title` in its title view. Returns whether the bar shows a
-  /// different title now.
+  /// Shows `title` in its title view, or the field of `rowSearch` when it
+  /// fills the row. Returns whether the bar shows a different title view now.
   private func showTitle(_ title: ChromeTitle?) -> Bool {
     let shownView = item.titleView
     let shownText = (shownView as? UILabel)?.text ?? monthTitle?.text
@@ -152,8 +179,9 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
       return shownView !== textTitle || shownText != text.text
     case nil:
       monthTitle = nil
-      item.titleView = nil
-      return shownView != nil
+      let view = searchFillsRow ? rowSearch.searchBar.superview : nil
+      item.titleView = view
+      return shownView !== view
     }
   }
 
@@ -234,27 +262,39 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
 
   private func showSearch(_ state: SearchState?, newEntry: Bool) {
     guard let state else {
-      if item.searchController != nil {
-        writeSearch { search.isActive = false }
-        item.searchController = nil
-      }
+      endSearch()
+      item.searchController = nil
       searchRevision = nil
       return
     }
-    if newEntry, search.isActive {
-      writeSearch { search.isActive = false }
-    }
-    if item.searchController !== search {
+    if !searchFillsRow, item.searchController !== search {
       item.searchController = search
     }
-    search.searchBar.placeholder = state.placeholder
-    search.searchBar.searchTextField.accessibilityLabel = state.label
+    let searchBar = shownSearch.searchBar
+    searchBar.placeholder = state.placeholder
+    searchBar.searchTextField.accessibilityLabel = state.label
     let revision = (entryId: entryId, revision: state.revision)
     if searchRevision?.entryId != revision.entryId || searchRevision?.revision != revision.revision
     {
       searchRevision = revision
       sentText = state.text
-      writeSearch { search.searchBar.text = state.text }
+      writeSearch { searchBar.text = state.text }
+    }
+  }
+
+  private func makeSearch() -> UISearchController {
+    let search = UISearchController(searchResultsController: nil)
+    search.obscuresBackgroundDuringPresentation = false
+    search.hidesNavigationBarDuringPresentation = false
+    search.searchResultsUpdater = self
+    search.searchBar.delegate = self
+    return search
+  }
+
+  /// Ends the search in the shown field and lowers its keyboard.
+  private func endSearch() {
+    if shownSearch.isActive {
+      writeSearch { shownSearch.isActive = false }
     }
   }
 
@@ -265,13 +305,14 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
       pendingFocus = entryId
       return
     }
-    guard item.searchController === search else { return }
-    let field = search.searchBar.searchTextField
+    guard item.searchController === search || item.titleView === searchBox else { return }
+    let field = shownSearch.searchBar.searchTextField
     field.becomeFirstResponder()
     field.selectAll(nil)
   }
 
   func updateSearchResults(for searchController: UISearchController) {
+    guard searchController === shownSearch else { return }
     let text = searchController.searchBar.text ?? ""
     guard !writingSearch, text != sentText else { return }
     sentText = text
@@ -309,7 +350,8 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
     searchRevision = nil
     sentText = nil
     pendingFocus = nil
-    writeSearch { search.isActive = false }
+    endSearch()
+    searchFillsRow = false
     item.searchController = nil
     item.titleView = nil
     item.setLeftBarButtonItems(nil, animated: false)
@@ -349,5 +391,16 @@ private struct Shown: Equatable {
       && zip(a, b).allSatisfy { a, b in
         a.id == b.id && a.title == b.title && a.icon == b.icon && (a.menu == nil) == (b.menu == nil)
       }
+  }
+}
+
+/// Keeps its subview at its own size. An active search controller lays its
+/// field out again at the width of the screen, so the box sets it back.
+private final class SearchBox: UIView {
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    for view in subviews {
+      view.frame = bounds
+    }
   }
 }
