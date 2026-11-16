@@ -42,22 +42,28 @@ function defineAppCommands<const Id extends string>(
   return commands
 }
 
-const GRAPH_SWITCH_COMMANDS = Array.from(
-  { length: 9 },
-  (_, index): AppCommand & { id: `graph.switch${number}` } => {
-    const position = index + 1
-    return {
-      id: `graph.switch${position}`,
-      title: `Switch to graph ${position}`,
-      keywords: ['graph', 'workspace', 'switch', 'recent'],
-      keybinding: `Mod-${position}`,
-      run: (context) => context.switchGraph(index),
-    }
-  },
-)
+function defineSwitchGraphCommand<T extends number>(
+  position: T,
+): AppCommand & { id: `graph.switch${T}` } {
+  return {
+    id: `graph.switch${position}`,
+    title: `Switch to graph ${position}`,
+    keywords: ['graph', 'workspace', 'switch', 'recent'],
+    keybinding: `Mod-${position}`,
+    run: (context) => context.switchGraph(position - 1),
+  }
+}
 
-const APP_COMMANDS = defineAppCommands([
-  ...GRAPH_SWITCH_COMMANDS,
+const APP_COMMANDS: Commands<AppCommandId, CommandContext> = [
+  defineSwitchGraphCommand<1>(1),
+  defineSwitchGraphCommand<2>(2),
+  defineSwitchGraphCommand(3),
+  defineSwitchGraphCommand(4),
+  defineSwitchGraphCommand(5),
+  defineSwitchGraphCommand(6),
+  defineSwitchGraphCommand(7),
+  defineSwitchGraphCommand(8),
+  defineSwitchGraphCommand(9),
   {
     id: 'nav.today',
     title: 'Go to today',
@@ -358,12 +364,12 @@ const APP_COMMANDS = defineAppCommands([
       }
     },
   },
-])
+]
 
 /**
  * The id of an app command.
  */
-export type AppCommandId = (typeof APP_COMMANDS)[number]['id']
+export type AppCommandId = (typeof APP_COMMANDS)[number]['id'] // FIXME: remove this
 
 /**
  * The registered keybinding for `commandId`, or `null` when the command has
@@ -380,7 +386,7 @@ const registeredIn = new WeakSet<object>()
 /**
  * Register the app commands in `registry`. Idempotent per registry.
  */
-export function registerAppCommands(registry: CommandService<CommandContext>): void {
+export function registerAppCommands(registry: CommandService<AppCommandId, CommandContext>): void {
   if (registeredIn.has(registry)) {
     return
   }

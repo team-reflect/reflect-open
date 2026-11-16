@@ -68,7 +68,16 @@ export interface CommandContext {
   enableSemanticSearch: () => void
 }
 
+type AppCommandId =
+  | 'graph.switch1'
+  | 'graph.switch2'
+  | 'graph.switch3'
+  | 'graph.switch4'
+  | 'graph.switch5'
+  | 'graph.switch6'
+  | 'nav.allNotes' // FIXME: list all commands explicitly
+
 /**
  * A command of this app: it runs with a {@link CommandContext}.
  */
-export type AppCommand = Command<CommandContext>
+export type AppCommand = Command<AppCommandId, CommandContext>

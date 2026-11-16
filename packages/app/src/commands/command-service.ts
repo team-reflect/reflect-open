@@ -8,11 +8,11 @@ import { normalizeBinding } from './keybindings.ts'
  * capabilities through `Context`, an object the app assembles, so the
  * registry stays testable and host-agnostic.
  */
-export interface Command<Context = unknown> {
+export interface Command<CommandId extends string, Context = unknown> {
   /**
    * Stable id — the deep-link/CLI name (e.g. `nav.today`).
    */
-  id: string
+  id: CommandId
   /**
    * Palette display title.
    */
@@ -44,19 +44,19 @@ export interface CommandKeyEvent {
 /**
  * A flat, collision-checked id → command map.
  */
-export interface CommandService<Context = unknown> {
+export interface CommandService<CommandId extends string, Context = unknown> {
   /**
    * Register commands; duplicate or blank ids/titles are programmer errors.
    */
-  register(definitions: readonly Command<Context>[]): void
+  register(definitions: readonly Command<CommandId, Context>[]): void
   /**
    * Every registered command, in registration order.
    */
-  list(): Command<Context>[]
+  list(): Command<CommandId, Context>[]
   /**
    * Run a command by id; unknown ids are a loud no-op (deep links may dangle).
    */
-  run(id: string, context: Context): Promise<void>
+  run(id: CommandId, context: Context): Promise<void>
   /**
    * The id of the command whose keybinding `event` types, or `null`. Only
    * chords with ⌘ or Ctrl match, and a held key (`repeat`) never does.
