@@ -28,7 +28,7 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
     {
       id: 'claude-fable-5-2',
       title: 'New AI models',
-      body: 'You can now choose Claude Fable 5.2, Gemini 4 Hydrogen, and Gemini 4 Carbon as your AI model.',
+      body: 'New AI models: Claude Fable 5.2, Gemini 4 Hydrogen, and Gemini 4 Carbon.',
       platforms: ALL_PLATFORMS,
     },
   ],
