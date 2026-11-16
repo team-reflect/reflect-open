@@ -3203,7 +3203,7 @@
       "name": "http-range-header",
       "ecosystem": "cargo",
       "license": "MIT",
-      "url": "https://github.com/MarcusGrass/parse-range-headers",
+      "url": "https://github.com/MarcusGrass/http-range-header",
       "texts": [
         "4wzQ"
       ]
