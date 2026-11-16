@@ -51,7 +51,7 @@ type GoogleModelId = KnownId<Parameters<GoogleProvider>[0]>
 type OpenAIModelId = KnownId<Parameters<OpenAIProvider>[0]>
 
 // https://developers.openai.com/api/docs/models/all
-// https://github.com/vercel/ai/blob/ai@7.0.153/packages/openai/src/responses/openai-responses-language-model-options.ts#L92
+// https://github.com/vercel/ai/blob/ai@7.0.173/packages/openai/src/openai-model-catalog.ts#L128
 const OPENAI_MODELS: NonEmptyArray<AiModelOption<OpenAIModelId>> = [
   { id: 'gpt-6-astra', label: 'GPT-6 Astra', contextWindow: 1_000_000 },
   { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', contextWindow: 1_000_000 },
@@ -66,8 +66,9 @@ const OPENAI_MODELS: NonEmptyArray<AiModelOption<OpenAIModelId>> = [
 ]
 
 // https://platform.claude.com/docs/en/models/overview
-// https://github.com/vercel/ai/blob/ai@7.0.153/packages/anthropic/src/anthropic-language-model-options.ts#L9
+// https://github.com/vercel/ai/blob/ai@7.0.173/packages/anthropic/src/anthropic-model-catalog.ts#L251
 const ANTHROPIC_MODELS: NonEmptyArray<AiModelOption<AnthropicModelId>> = [
+  { id: 'claude-fable-5-2', label: 'Claude Fable 5.2', contextWindow: 1_000_000 },
   { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', contextWindow: 1_000_000 },
   { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', contextWindow: 1_000_000 },
   { id: 'claude-fable-5', label: 'Claude Fable 5', contextWindow: 1_000_000 },
@@ -79,10 +80,12 @@ const ANTHROPIC_MODELS: NonEmptyArray<AiModelOption<AnthropicModelId>> = [
   { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', contextWindow: 200_000 },
 ]
 
-// https://github.com/vercel/ai/blob/ai@7.0.153/packages/google/src/google-language-model-options.ts#L8
+// https://github.com/vercel/ai/blob/ai@7.0.173/packages/google/src/google-model-catalog.ts#L112
 const GOOGLE_MODELS: NonEmptyArray<AiModelOption<GoogleModelId>> = [
   { id: 'gemini-pro-latest', label: 'Gemini Pro Latest', contextWindow: 1_000_000 },
+  { id: 'gemini-4-hydrogen', label: 'Gemini 4 Hydrogen', contextWindow: 1_000_000 },
   { id: 'gemini-4-argon', label: 'Gemini 4 Argon', contextWindow: 1_000_000 },
+  { id: 'gemini-4-carbon', label: 'Gemini 4 Carbon', contextWindow: 1_000_000 },
   { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview', contextWindow: 1_000_000 },
   { id: 'gemini-flash-latest', label: 'Gemini Flash Latest', contextWindow: 1_000_000 },
   { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', contextWindow: 1_000_000 },
