@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ReactElement } from 'react'
+import type { TestPlatformOptions } from '@reflect/core/testing'
 import { useStore } from '@/lib/use-store.ts'
 import { quickOpenVisible } from '@/mobile/quick-open.tsx'
 import { useRouterState } from '@/routing/router.tsx'
@@ -20,31 +21,43 @@ function Probe(): ReactElement {
   )
 }
 
-async function press(
-  target: EventTarget,
-  key: string,
-  mods: { shiftKey?: boolean } = {},
-): Promise<KeyboardEvent> {
-  const event = new KeyboardEvent('keydown', {
-    key,
-    bubbles: true,
-    cancelable: true,
-    // iOS is an Apple platform, so `Mod` is ⌘ whatever the host OS of the test.
-    metaKey: true,
-    ...mods,
-  })
-  await act(() => {
-    target.dispatchEvent(event)
-  })
-  return event
-}
+/**
+ * The mobile platforms and the modifier of their `Mod` key.
+ */
+const PLATFORMS: {
+  name: string
+  platform: TestPlatformOptions
+  mod: { metaKey?: boolean; ctrlKey?: boolean }
+}[] = [
+  { name: 'iOS', platform: MOBILE_PLATFORM, mod: { metaKey: true } },
+  {
+    name: 'Android',
+    platform: { ...MOBILE_PLATFORM, appPlatform: 'android', isApplePlatform: false },
+    mod: { ctrlKey: true },
+  },
+]
 
-describe('useMobileShortcuts', () => {
-  it('goes to today on ⌘D', async () => {
-    const view = await renderInApp(<Probe />, {
-      route: { kind: 'tasks' },
-      platform: MOBILE_PLATFORM,
+describe.each(PLATFORMS)('useMobileShortcuts on $name', ({ platform, mod }) => {
+  async function press(
+    target: EventTarget,
+    key: string,
+    mods: { shiftKey?: boolean } = {},
+  ): Promise<KeyboardEvent> {
+    const event = new KeyboardEvent('keydown', {
+      key,
+      bubbles: true,
+      cancelable: true,
+      ...mod,
+      ...mods,
     })
+    await act(() => {
+      target.dispatchEvent(event)
+    })
+    return event
+  }
+
+  it('goes to today on Mod-d', async () => {
+    const view = await renderInApp(<Probe />, { route: { kind: 'tasks' }, platform })
     await expect.element(view.getByRole('status')).toMatchTextContent('tasks')
 
     const event = await press(document.body, 'd')
@@ -53,11 +66,8 @@ describe('useMobileShortcuts', () => {
     expect(event.defaultPrevented).toBe(true)
   })
 
-  it('opens All notes on ⌘⇧A and Tasks on ⌘T', async () => {
-    const view = await renderInApp(<Probe />, {
-      route: { kind: 'today' },
-      platform: MOBILE_PLATFORM,
-    })
+  it('opens All notes on Mod-Shift-a and Tasks on Mod-t', async () => {
+    const view = await renderInApp(<Probe />, { route: { kind: 'today' }, platform })
 
     await press(document.body, 'a', { shiftKey: true })
     await expect.element(view.getByRole('status')).toMatchTextContent('allNotes')
@@ -66,12 +76,9 @@ describe('useMobileShortcuts', () => {
     await expect.element(view.getByRole('status')).toMatchTextContent('tasks')
   })
 
-  it('opens Quick Open on ⌘K, unless the editor took the key', async () => {
+  it('opens Quick Open on Mod-k, unless the editor took the key', async () => {
     quickOpenVisible.set(false)
-    const view = await renderInApp(<Probe />, {
-      route: { kind: 'today' },
-      platform: MOBILE_PLATFORM,
-    })
+    const view = await renderInApp(<Probe />, { route: { kind: 'today' }, platform })
 
     await press(view.getByTestId('editor').element(), 'k')
     await expect.element(view.getByText('closed')).toBeInTheDocument()

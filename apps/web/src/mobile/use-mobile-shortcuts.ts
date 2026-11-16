@@ -10,10 +10,9 @@ import { useAppServices, useCoreServices } from '@/services/services-provider.ts
 const HISTORY_COMMAND_IDS = new Set<AppCommandId>(['history.back', 'history.forward'])
 
 /**
- * Runs the app commands of a hardware keyboard on mobile (an iPad with a
- * Magic Keyboard). The keys come from the command registry, as on desktop;
- * each command here runs its mobile counterpart. A command without one does
- * nothing.
+ * Runs the app commands of a hardware keyboard on mobile (iOS and Android).
+ * The keys come from the command registry, as on desktop; each command here
+ * runs its mobile counterpart. A command without one does nothing.
  */
 export function useMobileShortcuts(): void {
   const { commands } = useAppServices()
