@@ -386,7 +386,7 @@ impl IndexSession {
         sql: &str,
         params: &[Value],
     ) -> AppResult<Vec<Map<String, Value>>> {
-        let reader = self.lock_reader()?;
+        let mut reader = self.lock_reader()?;
         if reader.generation != requested {
             return Err(AppError::io("index reopened during query"));
         }
@@ -394,14 +394,14 @@ impl IndexSession {
             // Single-connection hosts: release the reader lock first, because
             // the lock order is writer then reader.
             drop(reader);
-            let writer = self.lock_writer()?;
+            let mut writer = self.lock_writer()?;
             if writer.generation != requested {
                 return Err(AppError::io("index reopened during query"));
             }
-            let conn = writer.conn.as_ref().ok_or_else(AppError::no_graph)?;
+            let conn = writer.conn.as_mut().ok_or_else(AppError::no_graph)?;
             return query::run_query(conn, sql, params);
         }
-        let conn = reader.conn.as_ref().ok_or_else(AppError::no_graph)?;
+        let conn = reader.conn.as_mut().ok_or_else(AppError::no_graph)?;
         query::run_query(conn, sql, params)
     }
 }

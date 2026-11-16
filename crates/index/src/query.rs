@@ -5,6 +5,9 @@
 //! but never write it — writes go through the transactional path in
 //! [`super::write`].
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use rusqlite::hooks::{AuthAction, AuthContext, Authorization};
 use rusqlite::{Connection, params_from_iter};
 use serde_json::{Map, Value};
@@ -62,26 +65,46 @@ fn column_to_json(row: &rusqlite::Row, index: usize) -> AppResult<Value> {
 
 /// Execute a read query the frontend compiled with Kysely; rows as JSON objects.
 pub(super) fn run_query(
-    conn: &Connection,
+    conn: &mut Connection,
     sql: &str,
     params: &[Value],
 ) -> AppResult<Vec<Map<String, Value>>> {
     // This bridge is reachable from the (untrusted) webview, so it must run only
-    // reads of our projection. Install the authorizer (denies ATTACH/DETACH/
-    // PRAGMA — see `read_only_authorization`) around `prepare`, where SQLite
-    // evaluates it, then clear it. The guard is scoped to this call: the write
-    // path doesn't prepare here, so its legitimate `PRAGMA defer_foreign_keys`
-    // is never affected. `prepare` returns `SQLITE_AUTH` for a denied statement.
-    conn.authorizer(Some(read_only_authorization))?;
-    let prepared = conn.prepare(sql);
+    // reads of our projection. The authorizer (denies ATTACH/DETACH/PRAGMA, see
+    // `read_only_authorization`) checks only while `prepare` runs: FTS5 issues
+    // its own PRAGMAs when the statement steps. The guard is scoped to this
+    // call, so the write path's legitimate `PRAGMA defer_foreign_keys` is never
+    // affected. A denied statement fails with `SQLITE_AUTH`.
+    let preparing = Arc::new(AtomicBool::new(true));
+    let guard = Arc::clone(&preparing);
+    conn.authorizer(Some(move |context: AuthContext<'_>| {
+        if guard.load(Ordering::Relaxed) {
+            read_only_authorization(context)
+        } else {
+            Authorization::Allow
+        }
+    }))?;
+    let rows = read_rows(conn, sql, params, &preparing);
     conn.authorizer(None::<fn(AuthContext<'_>) -> Authorization>)?;
+    rows
+}
+
+/// Prepare one statement, clear `preparing`, and run it if it only reads.
+fn read_rows(
+    conn: &Connection,
+    sql: &str,
+    params: &[Value],
+    preparing: &AtomicBool,
+) -> AppResult<Vec<Map<String, Value>>> {
+    let prepared = conn.prepare(sql);
+    preparing.store(false, Ordering::Relaxed);
     let mut stmt = prepared?;
     // `Statement::readonly()` rejects any remaining mutating statement so a
     // compromised/buggy caller can't write through the read bridge.
     if !stmt.readonly() {
         return Err(AppError::io("db_query only executes read-only statements"));
     }
-    let columns: Vec<String> = stmt.column_names().iter().map(|c| c.to_string()).collect();
+    let columns: Vec<String> = stmt.column_names().map(str::to_owned).collect();
     let bound: Vec<rusqlite::types::Value> = params.iter().map(json_to_sql).collect();
     let mut rows = stmt.query(params_from_iter(bound))?;
     let mut out = Vec::new();
