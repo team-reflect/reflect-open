@@ -121,5 +121,6 @@ export const WEB_CHROME_RENDERER: ChromeRenderer = {
   shellStyle: webShellStyle,
   registerScreen: () => noop,
   openModal: () => noop,
+  openFullscreen: () => noop,
   reportStackMotion: noop,
 }

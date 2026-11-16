@@ -80,6 +80,10 @@ export interface ChromeRenderer {
    */
   openModal(): Unlisten
   /**
+   * Count one surface that covers the whole screen; returns the release.
+   */
+  openFullscreen(): Unlisten
+  /**
    * Tell the renderer that the stack slides or a back swipe moves it.
    */
   reportStackMotion(motion: StackMotion): void
@@ -149,6 +153,19 @@ export function useChromeModal(open: boolean): void {
   useEffect(() => {
     if (open) {
       return renderer.openModal()
+    }
+  }, [renderer, open])
+}
+
+/**
+ * Hide the shell's bars while `open` is true. Outside a chrome renderer (the
+ * desktop app) it does nothing.
+ */
+export function useChromeFullscreen(open: boolean): void {
+  const renderer = use(ChromeRendererContext)
+  useEffect(() => {
+    if (open && renderer !== null) {
+      return renderer.openFullscreen()
     }
   }, [renderer, open])
 }

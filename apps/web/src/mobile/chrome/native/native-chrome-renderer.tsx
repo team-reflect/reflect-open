@@ -58,6 +58,10 @@ class NativeChromeRenderer implements ChromeRenderer {
    * How many web drawers are open.
    */
   readonly #modalCount = new WritableStore(0)
+  /**
+   * How many surfaces cover the whole screen.
+   */
+  readonly #fullscreenCount = new WritableStore(0)
   readonly TopBarRow = NativeTopBarRow
   // The shell draws the main row in its navigation bar.
   readonly drawsTopBarRow = false
@@ -75,6 +79,11 @@ class NativeChromeRenderer implements ChromeRenderer {
    * Whether a web drawer is open. The shell hides its bars while one is.
    */
   readonly modal = deriveStore(this.#modalCount, (count) => count > 0)
+  /**
+   * Whether a surface covers the whole screen. The shell hides every bar
+   * while one does.
+   */
+  readonly fullscreen = deriveStore(this.#fullscreenCount, (count) => count > 0)
   /**
    * Whether the shell draws the corner buttons in the page's header row. On
    * an iPad with the tab bar at the top, they sit in the tab bar's row.
@@ -183,6 +192,13 @@ class NativeChromeRenderer implements ChromeRenderer {
     }
   }
 
+  openFullscreen(): Unlisten {
+    this.#fullscreenCount.set(this.#fullscreenCount.get() + 1)
+    return () => {
+      this.#fullscreenCount.set(this.#fullscreenCount.get() - 1)
+    }
+  }
+
   reportStackMotion(motion: StackMotion): void {
     this.#nativeChrome.post(motion satisfies NativeChromeMessage)
   }
@@ -235,6 +251,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
   const bars = useStore(renderer.bars)
   const windowControlsWidth = useStore(renderer.windowControlsWidth)
   const modal = useStore(renderer.modal)
+  const fullscreen = useStore(renderer.fullscreen)
   const toolbar = useFormattingToolbar()
   const theme = useThemeSetting()
   const { nativeChrome } = useAppServices()
@@ -265,7 +282,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
         toolbar: toolbar?.capabilities ?? null,
         sidebar: sidebarState,
         history: showsSidebar ? { back: canBack, forward: canForward } : null,
-        fullscreen: false,
+        fullscreen,
         theme,
       }),
     )
@@ -278,6 +295,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
     bars,
     keyboardVisible,
     modal,
+    fullscreen,
     toolbar,
     sidebarState,
     showsSidebar,
