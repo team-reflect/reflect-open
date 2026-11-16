@@ -164,7 +164,13 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
         }}
         trailing={[
           ...(recentlyCompleted.length > 0
-            ? [{ id: 'archive', title: 'Archive completed', icon: 'archive' } as const]
+            ? [
+                {
+                  id: 'archive',
+                  title: `Archive ${recentlyCompleted.length} completed`,
+                  icon: 'archive',
+                } as const,
+              ]
             : []),
           { id: 'filters', title: 'Task filters', icon: 'filters' },
         ]}

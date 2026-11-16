@@ -121,8 +121,13 @@ class NativeChromeRenderer implements ChromeRenderer {
         return
       }
       this.#screens.delete(entryId)
-      // `#search` keeps the entry: a change of the screen's chrome
-      // registers again right after, and the revision must carry over.
+      // A change of the screen's chrome registers again right after, and
+      // the revision must carry over: forget the search only if nothing did.
+      queueMicrotask(() => {
+        if (!this.#screens.has(entryId)) {
+          this.#search.delete(entryId)
+        }
+      })
       this.#updateBars((bars) => {
         bars.delete(entryId)
       })
@@ -170,13 +175,16 @@ class NativeChromeRenderer implements ChromeRenderer {
       return null
     }
     const entry = this.#search.get(entryId)
-    const revision =
-      entry === undefined
-        ? 0
-        : search.value === entry.text || search.value === entry.fromShell
-          ? entry.revision
-          : entry.revision + 1
-    this.#search.set(entryId, { text: search.value, revision, fromShell: entry?.fromShell ?? null })
+    let next = { text: search.value, revision: 0, fromShell: null as string | null }
+    if (entry !== undefined && search.value === entry.text) {
+      next = entry
+    } else if (entry !== undefined) {
+      // The echo of the shell's last text counts once.
+      const echo = search.value === entry.fromShell
+      next.revision = echo ? entry.revision : entry.revision + 1
+    }
+    this.#search.set(entryId, next)
+    const { revision } = next
     return { placeholder: search.placeholder, label: search.label, text: search.value, revision }
   }
 

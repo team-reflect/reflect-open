@@ -129,7 +129,7 @@ export interface ChromeButton {
 }
 
 /**
- * The corners of one screen's top bar.
+ * The top bar of one screen: its corners, title and search field.
  */
 export interface ScreenChrome {
   /**

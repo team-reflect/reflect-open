@@ -14,7 +14,7 @@ import {
 import type { ChromeButton, ChromePlus, ChromeTitle } from '@/mobile/chrome/screen-chrome.ts'
 
 /**
- * The corners of one screen without its handlers.
+ * The top bar of one screen without its handlers.
  */
 export interface ScreenBar {
   canBack: boolean

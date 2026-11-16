@@ -345,7 +345,7 @@ describe('MobileTasks', () => {
     await view.findByRole('button', { name: 'Reopen: buy milk' })
 
     // Archive hides this session's completed rows.
-    await user.click(view.getByRole('button', { name: 'Archive completed' }))
+    await user.click(view.getByRole('button', { name: 'Archive 1 completed' }))
     expect(haptics.impacts()).toBe(2)
     await waitFor(() => expect(view.queryByText('buy milk')).toBeNull())
     await view.unmount()

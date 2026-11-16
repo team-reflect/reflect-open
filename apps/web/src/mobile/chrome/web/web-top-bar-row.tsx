@@ -1,10 +1,4 @@
-import {
-  useImperativeHandle,
-  useRef,
-  type ComponentProps,
-  type ComponentType,
-  type ReactElement,
-} from 'react'
+import { useImperativeHandle, useRef, type ComponentProps, type ReactElement } from 'react'
 import { ChevronDown, ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import { useToastController } from '@/lib/use-toasts.ts'
@@ -19,38 +13,34 @@ import { MonthTitle } from '@/mobile/month-title.tsx'
 import { SearchInput } from '@/mobile/search-input.tsx'
 import { MobileTopBarIconButton } from '@/mobile/top-bar.tsx'
 
-export interface TopBarCornerProps extends TopBarRowProps {
+interface TopBarCornerProps extends TopBarRowProps {
   edge: 'leading' | 'trailing'
 }
 
 /**
  * The main row of a top bar as web elements: the corners around the search
- * field or the title. `Corner` draws each corner.
+ * field or the title.
  */
-export function WebTopBarRow({
-  align,
-  chrome,
-  Corner = WebTopBarCorner,
-}: TopBarRowProps & { Corner?: ComponentType<TopBarCornerProps> | undefined }): ReactElement {
+export function WebTopBarRow({ align, chrome }: TopBarRowProps): ReactElement {
   const middle = <WebTopBarMiddle chrome={chrome} />
   if (align === 'center') {
     return (
       <div className="flex h-12 items-center gap-2 px-1">
         <div className="flex flex-1 basis-0 items-center justify-start gap-1">
-          <Corner edge="leading" align={align} chrome={chrome} />
+          <WebTopBarCorner edge="leading" align={align} chrome={chrome} />
         </div>
         <div className="min-w-0 text-center">{middle}</div>
         <div className="flex flex-1 basis-0 items-center justify-end gap-1">
-          <Corner edge="trailing" align={align} chrome={chrome} />
+          <WebTopBarCorner edge="trailing" align={align} chrome={chrome} />
         </div>
       </div>
     )
   }
   return (
     <div className="flex h-12 items-center gap-1 px-4">
-      <Corner edge="leading" align={align} chrome={chrome} />
+      <WebTopBarCorner edge="leading" align={align} chrome={chrome} />
       <div className="flex min-w-0 flex-1 items-center gap-1">{middle}</div>
-      <Corner edge="trailing" align={align} chrome={chrome} />
+      <WebTopBarCorner edge="trailing" align={align} chrome={chrome} />
     </div>
   )
 }
@@ -113,7 +103,7 @@ function WebSearchField({ search }: { search: ChromeSearch }): ReactElement {
  * buttons reach into the row's padding, so their icons line up with the
  * screen's content.
  */
-export function WebTopBarCorner({ edge, align, chrome }: TopBarCornerProps): ReactElement | null {
+function WebTopBarCorner({ edge, align, chrome }: TopBarCornerProps): ReactElement | null {
   const back = edge === 'leading' ? chrome.back : undefined
   const buttons = (edge === 'leading' ? chrome.leading : chrome.trailing) ?? []
   if (back === undefined && buttons.length === 0) {

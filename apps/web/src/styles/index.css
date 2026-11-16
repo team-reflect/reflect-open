@@ -51,9 +51,6 @@ Cascade layer order, low to high priority.
 /* The iOS shell's native chrome sets how far the iPadOS window controls reach
    into the top row (`--window-controls-width`,
    mobile/chrome/native/native-chrome-renderer.tsx). */
-@utility w-window-controls {
-  width: var(--window-controls-width, 0px);
-}
 @utility left-window-controls-offset-* {
   left: calc(
     var(--twsa-safe-area-inset-left) + var(--spacing) * --value(integer) +

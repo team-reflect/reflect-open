@@ -89,6 +89,13 @@ describe('NativeChromeRenderer', () => {
     await vi.waitFor(() => {
       expect(lastChromeState(host)?.search).toMatchObject({ text: '', revision: 1 })
     })
+
+    // The echo counts once: the screen setting the shell's old text again is
+    // its own change.
+    await view.rerender(screen('ab'))
+    await vi.waitFor(() => {
+      expect(lastChromeState(host)?.search).toMatchObject({ text: 'ab', revision: 2 })
+    })
   })
 
   it("focuses the shell's search field through the search ref", async () => {
