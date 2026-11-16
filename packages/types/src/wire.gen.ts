@@ -84,7 +84,7 @@ export type AudioPhase = "idle" | "requesting" | "recording" | "transcribing" | 
 export type BackSwipePhase = "start" | "cancel";
 
 /**
- *  A native button that floats in a top corner of the page. A tap opens
+ *  A button of the native top bar. A tap opens
  *  `menu` when it has one, and sends an `action` intent with `id` otherwise.
  */
 export type BarButton = {
@@ -263,11 +263,6 @@ export type ChromeIntent = { type: "back"; entryId: number } |
 /**  A move in the history, from the screen of `entry_id`. */
 { type: "history"; entryId: number; direction: HistoryDirection } | { type: "tab"; tab: ChromeTab } | { type: "action"; entryId: number; id: string } | { type: "command"; id: FormattingCommand } | { type: "files"; files: IntentFile[] } | 
 /**
- *  Whether the corner buttons sit in the page's header row, or in the row
- *  of the floating tab bar above it.
- */
-{ type: "layout"; cornersInHeaderRow: boolean } | 
-/**
  *  How far the window controls reach into the page's top row from its
  *  leading edge, in points. Zero outside a window.
  */
@@ -309,9 +304,9 @@ routeKind: string | null;
 tab: ChromeTab; 
 /**  The shell shows a back button before the `leading` buttons. */
 canBack: boolean; 
-/**  The buttons in the top-left corner, after the back button. */
+/**  The leading buttons of the top bar, after the back button. */
 leading: BarButton[]; 
-/**  The buttons in the top-right corner. */
+/**  The trailing buttons of the top bar. */
 trailing: BarButton[]; keyboardVisible: boolean; 
 /**  A web drawer is open: the shell hides its bars. */
 modal: boolean; toolbar: ToolbarState | null; 
@@ -333,8 +328,6 @@ search: SearchState | null;
  *  hides its bars.
  */
 fullscreen: boolean; theme: ChromeTheme } | 
-/**  A web push or pop slide starts or ends. */
-{ type: "transition"; phase: TransitionPhase } | 
 /**
  *  A user back swipe starts to move the page, or settles back without a
  *  pop.
@@ -2111,9 +2104,6 @@ export type ToolbarState = {
 	canMoveDown: boolean,
 	canAttachFiles: boolean,
 };
-
-/**  The phase of a web push or pop slide. */
-export type TransitionPhase = "start" | "end";
 
 export type Value = null | boolean | number | string | unknown[] | { [key in string]: unknown };
 

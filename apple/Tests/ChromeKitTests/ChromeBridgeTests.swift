@@ -30,7 +30,6 @@ final class ChromeBridgeTests: XCTestCase {
     XCTAssertEqual(
       messages,
       [
-        .transition(.init(phase: .start)), .transition(.init(phase: .end)),
         .backSwipe(.init(phase: .start)), .backSwipe(.init(phase: .cancel)), .chromeReady,
         .focusSearch(.init(entryId: 3)),
       ])
@@ -44,7 +43,6 @@ final class ChromeBridgeTests: XCTestCase {
       .command(.init(id: .indent)),
       .files(
         .init(files: [IntentFile(name: "Image.png", type: "image/png", bytes: Data([1, 2, 3]))])),
-      .layout(.init(cornersInHeaderRow: false)),
       .windowControls(.init(width: 88)),
       .plus(.init(entryId: 3, command: .note)),
       .sidebarVisible(.init(visible: true)),
@@ -149,26 +147,6 @@ final class ChromeBridgeTests: XCTestCase {
     XCTAssertEqual(intent["id"] as? String, "pin")
   }
 
-  func testSendsTheLayoutWhenItChangesAndToANewPage() throws {
-    let bridge = ChromeBridge()
-    var sent: [ChromeIntent] = []
-    bridge.send = { data in
-      let object = try! JSONSerialization.jsonObject(with: data) as! [String: Any]
-      sent.append(.layout(.init(cornersInHeaderRow: object["cornersInHeaderRow"] as! Bool)))
-    }
-
-    bridge.cornersInHeaderRow = false
-    bridge.receive(try message(["type": "chromeReady"]))
-    bridge.cornersInHeaderRow = false
-    bridge.cornersInHeaderRow = true
-    bridge.documentDidStart()
-    bridge.receive(try message(["type": "chromeReady"]))
-
-    XCTAssertEqual(
-      sent,
-      [.layout(.init(cornersInHeaderRow: false)), .layout(.init(cornersInHeaderRow: true))])
-  }
-
   func testSendsTheWindowControlsWidthWhenItChangesAndToANewPage() throws {
     let bridge = ChromeBridge()
     var sent: [Double] = []
@@ -225,24 +203,13 @@ final class ChromeBridgeTests: XCTestCase {
 
   func testTakesAnObjectBodyOfTheScriptMessageHandler() {
     let bridge = ChromeBridge()
-    var transitions: [Bool] = []
-    bridge.onTransition = { transitions.append($0) }
+    var swipes: [Bool] = []
+    bridge.onBackSwipe = { swipes.append($0) }
 
-    bridge.receive(body: ["type": "transition", "phase": "start"])
-    bridge.receive(body: #"{"type":"transition","phase":"end"}"#)
+    bridge.receive(body: ["type": "backSwipe", "phase": "start"])
+    bridge.receive(body: #"{"type":"backSwipe","phase":"cancel"}"#)
 
-    XCTAssertEqual(transitions, [true, false])
-  }
-
-  func testReportsTransitions() throws {
-    let bridge = ChromeBridge()
-    var transitions: [Bool] = []
-    bridge.onTransition = { transitions.append($0) }
-
-    bridge.receive(try message(["type": "transition", "phase": "start"]))
-    bridge.receive(try message(["type": "transition", "phase": "end"]))
-
-    XCTAssertEqual(transitions, [true, false])
+    XCTAssertEqual(swipes, [true, false])
   }
 
   func testReportsBackSwipes() throws {

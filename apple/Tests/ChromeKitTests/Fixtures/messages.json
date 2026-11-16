@@ -1,13 +1,5 @@
 [
   {
-    "type": "transition",
-    "phase": "start"
-  },
-  {
-    "type": "transition",
-    "phase": "end"
-  },
-  {
     "type": "backSwipe",
     "phase": "start"
   },

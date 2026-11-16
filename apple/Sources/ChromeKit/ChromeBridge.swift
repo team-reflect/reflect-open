@@ -15,8 +15,6 @@ public final class ChromeBridge {
   public var send: (Data) -> Void = { _ in }
   /// Called with every state newer than the last one.
   public var onState: (ChromeState) -> Void = { _ in }
-  /// Called when a web push or pop slide starts (`true`) or ends (`false`).
-  public var onTransition: (Bool) -> Void = { _ in }
   /// Called when a user back swipe starts to move the page (`true`), or
   /// settles back without a pop (`false`).
   public var onBackSwipe: (Bool) -> Void = { _ in }
@@ -31,17 +29,6 @@ public final class ChromeBridge {
   public private(set) var state: ChromeState?
   /// Whether the current document listens for intents.
   public private(set) var isReady = false
-  /// Whether the corner buttons sit in the page's header row. The page starts
-  /// with `true`; the bridge sends a `layout` intent when the value changes,
-  /// and when a page with that start value gets ready.
-  public var cornersInHeaderRow = true {
-    didSet {
-      if cornersInHeaderRow != oldValue {
-        send(.layout(.init(cornersInHeaderRow: cornersInHeaderRow)))
-      }
-    }
-  }
-
   /// How far the window controls reach into the page's top row, in points.
   /// The page starts with `0`; the bridge sends a `windowControls` intent
   /// when the value changes, and when a page gets ready while it is not `0`.
@@ -78,15 +65,10 @@ public final class ChromeBridge {
       if let state, next.generation <= state.generation { return }
       state = next
       onState(next)
-    case .transition(let transition):
-      onTransition(transition.phase == .start)
     case .backSwipe(let swipe):
       onBackSwipe(swipe.phase == .start)
     case .chromeReady:
       isReady = true
-      if !cornersInHeaderRow {
-        send(.layout(.init(cornersInHeaderRow: false)))
-      }
       if windowControlsWidth != 0 {
         send(.windowControls(.init(width: windowControlsWidth)))
       }

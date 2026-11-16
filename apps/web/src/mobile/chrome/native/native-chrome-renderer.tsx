@@ -85,14 +85,9 @@ class NativeChromeRenderer implements ChromeRenderer {
    */
   readonly fullscreen = deriveStore(this.#fullscreenCount, (count) => count > 0)
   /**
-   * Whether the shell draws the corner buttons in the page's header row. On
-   * an iPad with the tab bar at the top, they sit in the tab bar's row.
-   */
-  readonly cornersInHeaderRow = new WritableStore(true)
-  /**
    * How far the iPadOS window controls reach into the top row from its
-   * leading edge, in pixels. The shell moves its leading corner buttons past
-   * them; the page leaves the same space.
+   * leading edge, in pixels. A surface over the bars (the lightbox) leaves
+   * this space.
    */
   readonly windowControlsWidth = new WritableStore(0)
   readonly attachFiles = createAttachQueue()
@@ -345,7 +340,6 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
           attachCommands: attach?.entryId === context.entryId ? attach.commands : null,
           attachFiles: renderer.attachFiles,
           toasts,
-          setCornersInHeaderRow: (value) => renderer.cornersInHeaderRow.set(value),
           noteShellSearch: (id, text) => renderer.noteShellSearch(id, text),
           setWindowControlsWidth: (value) => renderer.windowControlsWidth.set(value),
           setSidebarVisible: (value) => sidebarVisible.set(value),

@@ -342,7 +342,7 @@ public enum BackSwipePhase: String, Codable, Sendable, Equatable, CaseIterable {
     case cancel = "cancel"
 }
 
-/// A native button that floats in a top corner of the page. A tap opens
+/// A button of the native top bar. A tap opens
 /// `menu` when it has one, and sends an `action` intent with `id` otherwise.
 public struct BarButton: Codable, Sendable, Equatable {
     public let id: String
@@ -867,7 +867,6 @@ public enum ChromeIntent: Sendable, Equatable {
     case action(ChromeIntentActionData)
     case command(ChromeIntentCommandData)
     case files(ChromeIntentFilesData)
-    case layout(ChromeIntentLayoutData)
     case windowControls(ChromeIntentWindowcontrolsData)
     case plus(ChromeIntentPlusData)
     case sidebarVisible(ChromeIntentSidebarvisibleData)
@@ -924,14 +923,6 @@ public struct ChromeIntentFilesData: Codable, Sendable, Equatable {
 
     public init(files: [IntentFile]) {
         self.files = files
-    }
-}
-
-public struct ChromeIntentLayoutData: Codable, Sendable, Equatable {
-    public let cornersInHeaderRow: Bool
-
-    public init(cornersInHeaderRow: Bool) {
-        self.cornersInHeaderRow = cornersInHeaderRow
     }
 }
 
@@ -1023,9 +1014,6 @@ extension ChromeIntent: Codable {
         case "files":
             let filesValue = try container.decode([IntentFile].self, forKey: CodingKeys("files"))
             self = .files(ChromeIntentFilesData(files: filesValue))
-        case "layout":
-            let cornersInHeaderRowValue = try container.decode(Bool.self, forKey: CodingKeys("cornersInHeaderRow"))
-            self = .layout(ChromeIntentLayoutData(cornersInHeaderRow: cornersInHeaderRowValue))
         case "windowControls":
             let widthValue = try container.decode(Double.self, forKey: CodingKeys("width"))
             self = .windowControls(ChromeIntentWindowcontrolsData(width: widthValue))
@@ -1075,9 +1063,6 @@ extension ChromeIntent: Codable {
         case .files(let data):
             try container.encode("files", forKey: CodingKeys("type"))
             try container.encode(data.files, forKey: CodingKeys("files"))
-        case .layout(let data):
-            try container.encode("layout", forKey: CodingKeys("type"))
-            try container.encode(data.cornersInHeaderRow, forKey: CodingKeys("cornersInHeaderRow"))
         case .windowControls(let data):
             try container.encode("windowControls", forKey: CodingKeys("type"))
             try container.encode(data.width, forKey: CodingKeys("width"))
@@ -1114,7 +1099,6 @@ public enum ChromeKind: String, Codable, Sendable, Equatable, CaseIterable {
 /// A message the page posts to the shell.
 public enum ChromeMessage: Sendable, Equatable {
     case state(ChromeMessageStateData)
-    case transition(ChromeMessageTransitionData)
     case backSwipe(ChromeMessageBackswipeData)
     case chromeReady
     case focusSearch(ChromeMessageFocussearchData)
@@ -1158,14 +1142,6 @@ public struct ChromeMessageStateData: Codable, Sendable, Equatable {
         self.search = search
         self.fullscreen = fullscreen
         self.theme = theme
-    }
-}
-
-public struct ChromeMessageTransitionData: Codable, Sendable, Equatable {
-    public let phase: TransitionPhase
-
-    public init(phase: TransitionPhase) {
-        self.phase = phase
     }
 }
 
@@ -1219,9 +1195,6 @@ extension ChromeMessage: Codable {
             let fullscreenValue = try container.decode(Bool.self, forKey: CodingKeys("fullscreen"))
             let themeValue = try container.decode(ChromeTheme.self, forKey: CodingKeys("theme"))
             self = .state(ChromeMessageStateData(generation: generationValue, entryId: entryIdValue, chrome: chromeValue, routeKind: routeKindValue, tab: tabValue, canBack: canBackValue, leading: leadingValue, trailing: trailingValue, keyboardVisible: keyboardVisibleValue, modal: modalValue, toolbar: toolbarValue, plus: plusValue, sidebar: sidebarValue, history: historyValue, title: titleValue, search: searchValue, fullscreen: fullscreenValue, theme: themeValue))
-        case "transition":
-            let phaseValue = try container.decode(TransitionPhase.self, forKey: CodingKeys("phase"))
-            self = .transition(ChromeMessageTransitionData(phase: phaseValue))
         case "backSwipe":
             let phaseValue = try container.decode(BackSwipePhase.self, forKey: CodingKeys("phase"))
             self = .backSwipe(ChromeMessageBackswipeData(phase: phaseValue))
@@ -1258,9 +1231,6 @@ extension ChromeMessage: Codable {
             try container.encode(data.search, forKey: CodingKeys("search"))
             try container.encode(data.fullscreen, forKey: CodingKeys("fullscreen"))
             try container.encode(data.theme, forKey: CodingKeys("theme"))
-        case .transition(let data):
-            try container.encode("transition", forKey: CodingKeys("type"))
-            try container.encode(data.phase, forKey: CodingKeys("phase"))
         case .backSwipe(let data):
             try container.encode("backSwipe", forKey: CodingKeys("type"))
             try container.encode(data.phase, forKey: CodingKeys("phase"))
@@ -4345,12 +4315,6 @@ public struct ToolbarState: Codable, Sendable, Equatable {
         try container.encode(canMoveDown, forKey: .canMoveDown)
         try container.encode(canAttachFiles, forKey: .canAttachFiles)
     }
-}
-
-/// The phase of a web push or pop slide.
-public enum TransitionPhase: String, Codable, Sendable, Equatable, CaseIterable {
-    case start = "start"
-    case end = "end"
 }
 
 

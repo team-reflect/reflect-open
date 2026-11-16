@@ -63,7 +63,6 @@ const intentSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('action'), entryId: z.number(), id: z.string() }),
   z.object({ type: z.literal('command'), id: formattingCommandSchema }),
   z.object({ type: z.literal('files'), files: z.array(fileSchema) }),
-  z.object({ type: z.literal('layout'), cornersInHeaderRow: z.boolean() }),
   z.object({ type: z.literal('windowControls'), width: z.number() }),
   z.object({
     type: z.literal('plus'),

@@ -29,9 +29,9 @@ pub enum ChromeMessage {
         tab: ChromeTab,
         /// The shell shows a back button before the `leading` buttons.
         can_back: bool,
-        /// The buttons in the top-left corner, after the back button.
+        /// The leading buttons of the top bar, after the back button.
         leading: Vec<BarButton>,
-        /// The buttons in the top-right corner.
+        /// The trailing buttons of the top bar.
         trailing: Vec<BarButton>,
         keyboard_visible: bool,
         /// A web drawer is open: the shell hides its bars.
@@ -53,8 +53,6 @@ pub enum ChromeMessage {
         fullscreen: bool,
         theme: ChromeTheme,
     },
-    /// A web push or pop slide starts or ends.
-    Transition { phase: TransitionPhase },
     /// A user back swipe starts to move the page, or settles back without a
     /// pop.
     BackSwipe { phase: BackSwipePhase },
@@ -91,14 +89,6 @@ pub struct SearchState {
     /// `text` into the field only when `revision` changes, so the echo of
     /// what the user typed never replaces newer typing.
     pub revision: isize,
-}
-
-/// The phase of a web push or pop slide.
-#[derive(Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub enum TransitionPhase {
-    Start,
-    End,
 }
 
 /// The phase of a user back swipe.
@@ -229,7 +219,7 @@ pub struct MenuConfirm {
     pub action: String,
 }
 
-/// A native button that floats in a top corner of the page. A tap opens
+/// A button of the native top bar. A tap opens
 /// `menu` when it has one, and sends an `action` intent with `id` otherwise.
 #[derive(Serialize, Deserialize, specta::Type)]
 pub struct BarButton {
@@ -283,11 +273,6 @@ pub enum ChromeIntent {
     },
     Files {
         files: Vec<IntentFile>,
-    },
-    /// Whether the corner buttons sit in the page's header row, or in the row
-    /// of the floating tab bar above it.
-    Layout {
-        corners_in_header_row: bool,
     },
     /// How far the window controls reach into the page's top row from its
     /// leading edge, in points. Zero outside a window.

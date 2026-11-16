@@ -30,11 +30,9 @@ export interface ShellBarsProps {
 }
 
 /**
- * A move of the mobile stack: a slide between screens, or a user back swipe.
+ * A user back swipe of the mobile stack.
  */
-export type StackMotion =
-  | { type: 'transition'; phase: 'start' | 'end' }
-  | { type: 'backSwipe'; phase: 'start' | 'cancel' }
+export type StackMotion = { type: 'backSwipe'; phase: 'start' | 'cancel' }
 
 /**
  * Draws the mobile chrome. The app picks one renderer at its root; screens

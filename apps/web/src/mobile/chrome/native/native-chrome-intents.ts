@@ -35,11 +35,6 @@ export interface IntentContext {
    */
   toasts: ToastController
   /**
-   * Stores whether the shell draws the corner buttons in the page's header
-   * row.
-   */
-  setCornersInHeaderRow: (cornersInHeaderRow: boolean) => void
-  /**
    * Stores how far the window controls reach into the top row, in pixels.
    */
   setWindowControlsWidth: (width: number) => void
@@ -129,9 +124,6 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
       }
       return
     }
-    case 'layout':
-      context.setCornersInHeaderRow(intent.cornersInHeaderRow)
-      return
     case 'windowControls':
       context.setWindowControlsWidth(intent.width)
       return

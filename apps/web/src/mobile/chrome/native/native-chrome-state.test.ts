@@ -179,8 +179,6 @@ describe('buildNoChromeState', () => {
 describe('page messages', () => {
   it('matches the messages the Swift shell decodes', () => {
     const messages: NativeChromeMessage[] = [
-      { type: 'transition', phase: 'start' },
-      { type: 'transition', phase: 'end' },
       { type: 'backSwipe', phase: 'start' },
       { type: 'backSwipe', phase: 'cancel' },
       { type: 'chromeReady' },

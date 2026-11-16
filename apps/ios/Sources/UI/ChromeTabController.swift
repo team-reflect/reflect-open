@@ -4,9 +4,9 @@ import UIKit
 import WebKit
 
 /// The native tab bar. Each tab holds an empty placeholder; one stage (a
-/// navigation controller with a hidden bar, whose root page holds the web
-/// view) sits over the
-/// selected placeholder, under the tab bar and the sidebar. A tab tap only
+/// navigation controller whose bar shows the page's top bar, and whose root
+/// page holds the web view) sits over the selected placeholder, under the
+/// tab bar and the sidebar. A tab tap only
 /// moves the selection and sends a `tab` intent: the web view never moves,
 /// and the page draws the new tab in place. The selection follows the tab of
 /// each state.

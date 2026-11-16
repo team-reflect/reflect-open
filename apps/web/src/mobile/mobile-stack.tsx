@@ -326,16 +326,6 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     return () => controller.abort()
   }, [transition, finishTransition])
 
-  // A layout effect, so the start reaches the chrome before the state of the
-  // new page, which the shell bars post from a passive effect. Each new slide
-  // reports its own start.
-  useLayoutEffect(() => {
-    chromeRenderer.reportStackMotion({
-      type: 'transition',
-      phase: transition.kind === 'none' ? 'end' : 'start',
-    })
-  }, [chromeRenderer, transition])
-
   const currentKey = layerKey(route)
   // What the back gesture reveals.
   const belowRoute: Route | null = isStacked(route, section) ? below : null
