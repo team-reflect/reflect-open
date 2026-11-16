@@ -1334,7 +1334,7 @@ describe('MobileStack transitions & back pager', () => {
     await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
   })
 
-  it('pops once the card is off screen, short of the snap point', async () => {
+  it('pops a pager stopped off screen, short of the snap point', async () => {
     core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
     await pushProbeNote(view)
