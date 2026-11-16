@@ -36,6 +36,7 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
     configuration.imagePadding = 4
     configuration.preferredSymbolConfigurationForImage = .init(textStyle: .footnote, scale: .small)
     configuration.baseForegroundColor = .label
+    configuration.titleLineBreakMode = .byTruncatingTail
     let button = UIButton(configuration: configuration)
     button.accessibilityHint = "Change month"
     button.addAction(
@@ -95,6 +96,8 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
           month.text,
           attributes: AttributeContainer([.font: UIFont.preferredFont(forTextStyle: .headline)]))
         titleButton.accessibilityLabel = month.text
+        // The bar keeps a title view's frame: a longer month needs a wider one.
+        titleButton.sizeToFit()
       }
       item.title = nil
       item.titleView = titleButton
