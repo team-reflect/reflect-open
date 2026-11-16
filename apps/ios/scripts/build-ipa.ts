@@ -6,6 +6,11 @@
 //   --build-number=<digits>   Required
 //   --flavor=beta|stable      Required
 //   --no-sign                 Unsigned archive without credentials and without an IPA
+//
+// `IOS_CERTIFICATE` (base64 `.p12`) and `IOS_CERTIFICATE_PASSWORD` give an
+// Apple Development certificate for the archive. Without them, Xcode looks in
+// the login keychain, and `-allowProvisioningUpdates` creates a new
+// certificate when it finds none.
 
 import { rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -18,6 +23,7 @@ import {
   INHERIT,
   log,
   resolveApiKey,
+  runWithSigningKeychain,
   runWithTempDir,
 } from '../../../scripts/release.ts'
 import { ARCHIVE_PATH, assertIpa, BUILD_DIR, IOS_DIR, IPA_PATH } from './helpers.ts'
@@ -89,48 +95,60 @@ async function main(): Promise<void> {
         ]
       : []
 
-    const archive = [
-      'archive',
-      '-project',
-      join(IOS_DIR, 'Reflect.xcodeproj'),
-      '-scheme',
-      'Reflect',
-      '-configuration',
-      flavor.configuration,
-      '-destination',
-      'generic/platform=iOS',
-      '-archivePath',
-      ARCHIVE_PATH,
-      // The marketing version has no prerelease tag: Apple takes three integers.
-      `REFLECT_MARKETING_VERSION=${packageJson.version.split('-')[0]}`,
-      `REFLECT_BUILD_NUMBER=${buildNumber}`,
-      `REFLECT_SENTRY_DSN=${(process.env.VITE_SENTRY_DSN ?? '').trim()}`,
-      ...(noSign ? ['CODE_SIGNING_ALLOWED=NO'] : signing),
-    ]
-    await exec('xcodebuild', archive, {
-      throwOnError: true,
-      nodeOptions: {
-        // Without line tables the dSYM cannot symbolicate Rust frames.
-        env: { CARGO_PROFILE_RELEASE_DEBUG: 'line-tables-only' },
-        stdio: 'inherit',
-      },
-    })
-
-    if (apiKey) {
-      const exportOptions = join(tempDir, 'ExportOptions.plist')
-      writeFileSync(exportOptions, EXPORT_OPTIONS)
-      const exportArchive = [
-        '-exportArchive',
+    const build = async (keychain: string | null): Promise<void> => {
+      const archive = [
+        'archive',
+        '-project',
+        join(IOS_DIR, 'Reflect.xcodeproj'),
+        '-scheme',
+        'Reflect',
+        '-configuration',
+        flavor.configuration,
+        '-destination',
+        'generic/platform=iOS',
         '-archivePath',
         ARCHIVE_PATH,
-        '-exportPath',
-        BUILD_DIR,
-        '-exportOptionsPlist',
-        exportOptions,
-        ...signing,
+        // The marketing version has no prerelease tag: Apple takes three integers.
+        `REFLECT_MARKETING_VERSION=${packageJson.version.split('-')[0]}`,
+        `REFLECT_BUILD_NUMBER=${buildNumber}`,
+        `REFLECT_SENTRY_DSN=${(process.env.VITE_SENTRY_DSN ?? '').trim()}`,
+        ...(noSign ? ['CODE_SIGNING_ALLOWED=NO'] : signing),
+        ...(keychain ? [`OTHER_CODE_SIGN_FLAGS=--keychain ${keychain}`] : []),
       ]
-      await exec('xcodebuild', exportArchive, INHERIT)
-      await assertIpa(IPA_PATH, flavor)
+      await exec('xcodebuild', archive, {
+        throwOnError: true,
+        nodeOptions: {
+          // Without line tables the dSYM cannot symbolicate Rust frames.
+          env: { CARGO_PROFILE_RELEASE_DEBUG: 'line-tables-only' },
+          stdio: 'inherit',
+        },
+      })
+
+      if (apiKey) {
+        const exportOptions = join(tempDir, 'ExportOptions.plist')
+        writeFileSync(exportOptions, EXPORT_OPTIONS)
+        const exportArchive = [
+          '-exportArchive',
+          '-archivePath',
+          ARCHIVE_PATH,
+          '-exportPath',
+          BUILD_DIR,
+          '-exportOptionsPlist',
+          exportOptions,
+          ...signing,
+        ]
+        await exec('xcodebuild', exportArchive, INHERIT)
+        await assertIpa(IPA_PATH, flavor)
+      }
+    }
+    if (noSign) {
+      await build(null)
+    } else {
+      const certificate = {
+        content: process.env.IOS_CERTIFICATE,
+        password: process.env.IOS_CERTIFICATE_PASSWORD,
+      }
+      await runWithSigningKeychain(tempDir, certificate, build)
     }
   })
 

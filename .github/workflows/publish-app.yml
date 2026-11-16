@@ -24,6 +24,10 @@ on:
         required: true
       APPLE_API_KEY_CONTENT:
         required: true
+      IOS_CERTIFICATE:
+        required: true
+      IOS_CERTIFICATE_PASSWORD:
+        required: true
       SENTRY_AUTH_TOKEN:
         required: true
       SENTRY_DSN:
@@ -80,6 +84,8 @@ jobs:
       APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
       APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
       APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+      IOS_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE }}
+      IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
 

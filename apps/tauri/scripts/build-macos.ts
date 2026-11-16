@@ -9,7 +9,6 @@
 //   --no-notarize           Signed-only build, for local runs without Apple credentials
 //   --no-sign               Unsigned app only, to check that it compiles and bundles
 
-import { randomBytes } from 'node:crypto'
 import {
   copyFileSync,
   existsSync,
@@ -33,6 +32,7 @@ import {
   INHERIT,
   log,
   resolveApiKey,
+  runWithSigningKeychain,
   runWithTempDir,
 } from '../../../scripts/release.ts'
 import {
@@ -222,65 +222,6 @@ async function buildApp(bundle: Bundle): Promise<void> {
     )
   }
   await embedSafariExtension(bundle.app, bundle.appGroup)
-}
-
-/**
- * Imports `APPLE_CERTIFICATE` into a temporary keychain for the signing steps
- * that run after Tauri has removed its own. Without the variable, the login
- * keychain is used.
- */
-async function runWithSigningKeychain(
-  tempDir: string,
-  action: (keychain: string | null) => Promise<void>,
-): Promise<void> {
-  const { APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD } = process.env
-  if (!APPLE_CERTIFICATE || !APPLE_CERTIFICATE_PASSWORD) {
-    return await action(null)
-  }
-
-  const certificate = join(tempDir, 'certificate.p12')
-  const keychain = join(tempDir, 'signing.keychain-db')
-  const password = randomBytes(24).toString('hex')
-  const searchList = await exec('security', ['list-keychains', '-d', 'user'], {
-    throwOnError: true,
-  })
-  const previous = [...searchList.stdout.matchAll(/"([^"]+)"/g)].flatMap((match) => match[1] ?? [])
-  writeFileSync(certificate, Buffer.from(APPLE_CERTIFICATE, 'base64'), { mode: 0o600 })
-  const steps = [
-    ['create-keychain', '-p', password, keychain],
-    // Notarization can outlast the default five-minute auto-lock.
-    ['set-keychain-settings', '-lut', '21600', keychain],
-    ['unlock-keychain', '-p', password, keychain],
-    ['list-keychains', '-d', 'user', '-s', keychain, ...previous],
-    [
-      'import',
-      certificate,
-      '-k',
-      keychain,
-      '-P',
-      APPLE_CERTIFICATE_PASSWORD,
-      '-T',
-      '/usr/bin/codesign',
-    ],
-    [
-      'set-key-partition-list',
-      '-S',
-      'apple-tool:,apple:,codesign:',
-      '-s',
-      '-k',
-      password,
-      keychain,
-    ],
-  ]
-  try {
-    for (const step of steps) {
-      await exec('security', step, { throwOnError: true })
-    }
-    await action(keychain)
-  } finally {
-    await exec('security', ['list-keychains', '-d', 'user', '-s', ...previous])
-    await exec('security', ['delete-keychain', keychain])
-  }
 }
 
 async function runCodesign(signer: Signer, args: readonly string[]): Promise<void> {
@@ -632,7 +573,11 @@ async function main(): Promise<void> {
   await runWithTempDir(async (tempDir) => {
     const notaryArgs = values['no-notarize'] ? null : resolveNotaryArgs(identity, tempDir)
     await buildApp(bundle)
-    await runWithSigningKeychain(tempDir, async (keychain) => {
+    const certificate = {
+      content: process.env.APPLE_CERTIFICATE,
+      password: process.env.APPLE_CERTIFICATE_PASSWORD,
+    }
+    await runWithSigningKeychain(tempDir, certificate, async (keychain) => {
       const signer = { identity, keychain }
       await resignApp(bundle, signer, tempDir)
       if (notaryArgs) {
