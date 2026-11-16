@@ -18,22 +18,21 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
 
   /// Sends an intent to the page.
   var send: (ChromeIntent) -> Void = { _ in }
-  /// Called when the corner buttons move between the page's header row
-  /// (`true`) and the row of the floating tab bar (`false`).
-  var onCornersInHeaderRow: (Bool) -> Void = { _ in }
   /// Called when the window controls' reach into the page's top row changes.
   var onWindowControlsWidth: (CGFloat) -> Void = { _ in }
-  /// The last value sent to `onCornersInHeaderRow`.
-  private var cornersInHeaderRow = true
   /// Called when the iPad sidebar shows (`true`) or hides (`false`), and
   /// with `nil` when the window has no sidebar.
   var onSidebarVisible: (Bool?) -> Void = { _ in }
 
   private let webView: WKWebView
   /// The one page: it holds the web view for every tab.
-  private let page = WebPageController(tab: .daily)
+  private let page = WebPageController()
   /// The navigation controller of the page. It stays in place for every tab.
   private let stage: UINavigationController
+  /// The navigation controller whose bar shows the page's top bar.
+  var navigation: UINavigationController { stage }
+  /// The last value sent to `onWindowControlsWidth`.
+  private var windowControlsWidth: CGFloat = 0
   /// The placeholder of every tab, by tab identifier.
   var placeholders: [String: TabPlaceholder] = [:]
   private var stagePins: [NSLayoutConstraint] = []
@@ -84,7 +83,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     self.webView = webView
     stage = UINavigationController(rootViewController: page)
     super.init(nibName: nil, bundle: nil)
-    // The page draws its own top row, under the native corner buttons.
+    // No bar before the first state.
     stage.setNavigationBarHidden(true, animated: false)
     delegate = self
     sidebar.delegate = self
@@ -109,7 +108,6 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     isTabBarHidden = true
     page.attach(webView)
     plus.send = { [weak self] command in self?.sendPlus(command) }
-    page.onWindowControlsWidth = { [weak self] width in self?.onWindowControlsWidth(width) }
     standalone.bar.isHidden = true
     registerForTraitChanges([UITraitHorizontalSizeClass.self]) {
       (self: Self, _: UITraitCollection) in
@@ -155,6 +153,25 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     }
     layoutBottomChrome()
     placeStage()
+    let width = measureWindowControls()
+    if width != windowControlsWidth {
+      windowControlsWidth = width
+      onWindowControlsWidth(width)
+    }
+  }
+
+  /// How far a window's controls reach past the leading safe area of the
+  /// page. The safe area leaves the controls out. A window as large as the
+  /// screen has no controls; its corner insets come from the display's round
+  /// corners.
+  private func measureWindowControls() -> CGFloat {
+    guard #available(iOS 26, *), let window = view.window,
+      window.bounds.size != window.screen.bounds.size
+    else { return 0 }
+    let page: UIView = stage.view
+    let controls = window.edgeInsets(for: .safeArea(cornerAdaptation: .horizontal)).left
+    let start = page.convert(CGPoint.zero, to: window).x + page.safeAreaInsets.left
+    return max(0, controls - start)
   }
 
   /// Places the standalone tab bar and the `+` for the form, and gives the
@@ -294,11 +311,6 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     }
   }
 
-  /// The page of `tab`: the one page holds every tab.
-  func page(for tab: ChromeTab) -> WebPageController? {
-    page
-  }
-
   private var selectedPlaceholder: TabPlaceholder? {
     selectedTab?.parent === pinnedGroup
       ? pinnedPlaceholder : selectedTab?.viewController as? TabPlaceholder
@@ -346,25 +358,6 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       top: max(0, safe.minY - frame.minY), left: max(0, safe.minX - frame.minX),
       bottom: max(0, frame.maxY - safe.maxY), right: max(0, frame.maxX - safe.maxX))
     let want = placeholder.view.safeAreaInsets
-    // On iPad the floating tab bar sits at the top, right under the status
-    // bar. The corner buttons share its row, as the bar buttons of a
-    // navigation controller in the selected tab do.
-    let windowTop = view.window?.safeAreaInsets.top ?? want.top
-    let inBarRow = want.top > windowTop + 1
-    // Beside a tiled sidebar they line up with its toggle, which UIKit puts
-    // right under the status bar too, and still share the page's header row.
-    let besideSidebar =
-      mode == .tabSidebar && !sidebar.isHidden && sidebar.preferredLayout == .tile
-    let rowCenter: CGFloat? =
-      inBarRow || besideSidebar
-      ? windowTop + WebPageController.buttonSize / 2 - frame.minY : nil
-    if page.topRowCenter != rowCenter {
-      page.topRowCenter = rowCenter
-    }
-    if cornersInHeaderRow != !inBarRow {
-      cornersInHeaderRow = !inBarRow
-      onCornersInHeaderRow(!inBarRow)
-    }
     let extra = UIEdgeInsets(
       top: max(0, want.top - natural.top), left: max(0, want.left - natural.left),
       bottom: max(0, want.bottom - natural.bottom), right: max(0, want.right - natural.right))
@@ -402,7 +395,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       follow(tab)
     }
     showsShell = state.chrome != .none
-    hidesForState = !showsShell || state.modal
+    hidesForState = !showsShell || state.modal || state.fullscreen
     hidesForKeyboard = state.keyboardVisible
     plus.update(state.plus)
     entryId = state.entryId
@@ -461,7 +454,6 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     showsShell = false
     entryId = nil
     history = nil
-    page.clearBar()
     setTabBarHidden(true, animated: false)
     standalone.bar.isHidden = true
     plus.update(nil)
