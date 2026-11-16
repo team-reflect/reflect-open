@@ -27,6 +27,7 @@ describe('AI_PROVIDERS', () => {
       {
         id: 'anthropic',
         models: [
+          'claude-fable-5-2',
           'claude-fable-5-1',
           'claude-opus-5-5',
           'claude-fable-5',
@@ -42,7 +43,9 @@ describe('AI_PROVIDERS', () => {
         id: 'google',
         models: [
           'gemini-pro-latest',
+          'gemini-4-hydrogen',
           'gemini-4-argon',
+          'gemini-4-carbon',
           'gemini-3.1-pro-preview',
           'gemini-flash-latest',
           'gemini-3.8-flash',

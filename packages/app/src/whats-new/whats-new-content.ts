@@ -24,6 +24,14 @@ const MENUS_BODY =
  * marketing version's list, and each update shows only the items not seen yet.
  */
 export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
+  '0.19.0': [
+    {
+      id: 'claude-fable-5-2',
+      title: 'New AI models',
+      body: 'You can now choose Claude Fable 5.2, Gemini 4 Hydrogen, and Gemini 4 Carbon as your AI model.',
+      platforms: ALL_PLATFORMS,
+    },
+  ],
   '0.18.0': [
     {
       id: 'smoother-gestures',
