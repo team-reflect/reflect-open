@@ -212,7 +212,7 @@ fn tag_search_indexes_are_created() {
 
 #[test]
 fn preview_and_tag_keys_round_trip() {
-    let conn = migrated();
+    let mut conn = migrated();
     let mut tagged = note("notes/a.md", "A", vec![]);
     tagged.preview = "first body line".to_string();
     tagged.tags = vec![IndexedTag {
@@ -221,19 +221,19 @@ fn preview_and_tag_keys_round_trip() {
     }];
     apply_note(&conn, &tagged).unwrap();
 
-    let notes = run_query(&conn, "SELECT preview FROM notes", &[]).unwrap();
+    let notes = run_query(&mut conn, "SELECT preview FROM notes", &[]).unwrap();
     assert_eq!(notes[0]["preview"], Value::from("first body line"));
 
     // Display casing and the TS-folded key are stored side by side — matching
     // happens on tag_key (SQLite's lower() couldn't fold the É).
-    let tags = run_query(&conn, "SELECT tag, tag_key FROM tags", &[]).unwrap();
+    let tags = run_query(&mut conn, "SELECT tag, tag_key FROM tags", &[]).unwrap();
     assert_eq!(tags[0]["tag"], Value::from("Café"));
     assert_eq!(tags[0]["tag_key"], Value::from("café"));
 }
 
 #[test]
 fn note_emails_apply_move_and_cascade() {
-    let conn = migrated();
+    let mut conn = migrated();
     let mut person = note("notes/jane-doe.md", "Jane Doe", vec![]);
     person.emails = vec![IndexedEmail {
         email: "Jane@Corp.com".to_string(),
@@ -243,7 +243,7 @@ fn note_emails_apply_move_and_cascade() {
 
     // Display casing and the folded match key are stored side by side, like tags.
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT note_path, email, email_key FROM note_emails",
         &[],
     )
@@ -264,24 +264,24 @@ fn note_emails_apply_move_and_cascade() {
     )
     .unwrap();
     conn.execute_batch("COMMIT;").unwrap();
-    let moved = run_query(&conn, "SELECT note_path FROM note_emails", &[]).unwrap();
+    let moved = run_query(&mut conn, "SELECT note_path FROM note_emails", &[]).unwrap();
     assert_eq!(moved[0]["note_path"], Value::from("notes/jane.md"));
 
     // Re-applying with no emails replaces the rows rather than accreting.
     let mut renamed = note("notes/jane.md", "Jane Doe", vec![]);
     renamed.emails = vec![];
     apply_note(&conn, &renamed).unwrap();
-    let cleared = run_query(&conn, "SELECT note_path FROM note_emails", &[]).unwrap();
+    let cleared = run_query(&mut conn, "SELECT note_path FROM note_emails", &[]).unwrap();
     assert!(cleared.is_empty());
 }
 
 #[test]
 fn backlinks_resolve_by_title_at_query_time() {
-    let conn = migrated();
+    let mut conn = migrated();
     // Source links to "Target" before the target note even exists.
     apply_note(&conn, &note("notes/a.md", "A", vec![wiki("Target")])).unwrap();
     let none = run_query(
-        &conn,
+        &mut conn,
         "SELECT source_path FROM backlinks WHERE target_path = ?1",
         &[Value::from("notes/target.md")],
     )
@@ -291,7 +291,7 @@ fn backlinks_resolve_by_title_at_query_time() {
     // Creating the target immediately resolves the inbound link (join, no reindex).
     apply_note(&conn, &note("notes/target.md", "Target", vec![])).unwrap();
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT source_path FROM backlinks WHERE target_path = ?1",
         &[Value::from("notes/target.md")],
     )
@@ -302,7 +302,7 @@ fn backlinks_resolve_by_title_at_query_time() {
 
 #[test]
 fn backlinks_resolve_by_alias_when_the_key_has_no_stronger_claimant() {
-    let conn = migrated();
+    let mut conn = migrated();
     apply_note(
         &conn,
         &aliased_note("notes/tim-maccaw-dad.md", "Tim MacCaw // Dad", "Dad"),
@@ -311,7 +311,7 @@ fn backlinks_resolve_by_alias_when_the_key_has_no_stronger_claimant() {
     apply_note(&conn, &note("notes/source.md", "Source", vec![wiki("Dad")])).unwrap();
 
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT target_path FROM backlinks WHERE source_path = 'notes/source.md'",
         &[],
     )
@@ -325,7 +325,7 @@ fn backlinks_resolve_by_alias_when_the_key_has_no_stronger_claimant() {
 
 #[test]
 fn backlink_resolution_uses_daily_then_title_then_alias_precedence() {
-    let conn = migrated();
+    let mut conn = migrated();
     apply_note(
         &conn,
         &aliased_note("notes/aliased-date.md", "Release Day", "2026-07-10"),
@@ -356,7 +356,7 @@ fn backlink_resolution_uses_daily_then_title_then_alias_precedence() {
     .unwrap();
 
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT source_path, target_path FROM backlinks ORDER BY source_path",
         &[],
     )
@@ -418,7 +418,7 @@ fn note_addressing_migrations_preserve_rows_and_reproject_resolution() {
     // not have: links stay unresolved until the projection-version bump
     // rebuilds them on the next open.
     let stale = run_query(
-        &conn,
+        &mut conn,
         "SELECT target_path FROM backlinks WHERE source_path = 'notes/source.md'",
         &[],
     )
@@ -429,7 +429,7 @@ fn note_addressing_migrations_preserve_rows_and_reproject_resolution() {
     apply_note(&conn, &note("notes/dad.md", "Dad", vec![])).unwrap();
     apply_note(&conn, &note("notes/source.md", "Source", vec![wiki("Dad")])).unwrap();
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT target_path FROM backlinks WHERE source_path = 'notes/source.md'",
         &[],
     )
@@ -440,7 +440,7 @@ fn note_addressing_migrations_preserve_rows_and_reproject_resolution() {
 
 #[test]
 fn alias_collisions_choose_the_first_path_for_backlinks() {
-    let conn = migrated();
+    let mut conn = migrated();
     apply_note(&conn, &aliased_note("notes/zeta.md", "Zeta", "Shared Name")).unwrap();
     apply_note(
         &conn,
@@ -459,7 +459,7 @@ fn alias_collisions_choose_the_first_path_for_backlinks() {
     .unwrap();
 
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT target_path FROM backlinks WHERE source_path = 'notes/source.md'",
         &[],
     )
@@ -468,7 +468,7 @@ fn alias_collisions_choose_the_first_path_for_backlinks() {
     assert_eq!(rows[0]["target_path"], Value::from("notes/alpha.md"));
 
     let keys = run_query(
-        &conn,
+        &mut conn,
         "SELECT note_path, claim_count FROM note_keys WHERE key = 'shared name'",
         &[],
     )
@@ -480,7 +480,7 @@ fn alias_collisions_choose_the_first_path_for_backlinks() {
     conn.execute("DELETE FROM notes WHERE path = ?1", ["notes/alpha.md"])
         .unwrap();
     let fallback = run_query(
-        &conn,
+        &mut conn,
         "SELECT target_path FROM backlinks WHERE source_path = 'notes/source.md'",
         &[],
     )
@@ -488,7 +488,7 @@ fn alias_collisions_choose_the_first_path_for_backlinks() {
     assert_eq!(fallback.len(), 1);
     assert_eq!(fallback[0]["target_path"], Value::from("notes/zeta.md"));
     let fallback_key = run_query(
-        &conn,
+        &mut conn,
         "SELECT note_path, claim_count FROM note_keys WHERE key = 'shared name'",
         &[],
     )
@@ -499,7 +499,7 @@ fn alias_collisions_choose_the_first_path_for_backlinks() {
 
 #[test]
 fn templates_are_invisible_to_backlink_resolution() {
-    let conn = migrated();
+    let mut conn = migrated();
     let mut template = note("templates/journal.md", "Journal", vec![wiki("Target")]);
     template.kind = NoteKind::Template;
     template.claims = vec![];
@@ -509,7 +509,7 @@ fn templates_are_invisible_to_backlink_resolution() {
 
     // A note linking [[Journal]] must not resolve to the template's title…
     let to_template = run_query(
-        &conn,
+        &mut conn,
         "SELECT source_path FROM backlinks WHERE target_path = ?1",
         &[Value::from("templates/journal.md")],
     )
@@ -518,7 +518,7 @@ fn templates_are_invisible_to_backlink_resolution() {
 
     // …and the template's boilerplate [[Target]] link is not a graph edge.
     let from_template = run_query(
-        &conn,
+        &mut conn,
         "SELECT source_path FROM backlinks WHERE target_path = ?1",
         &[Value::from("notes/target.md")],
     )
@@ -528,7 +528,7 @@ fn templates_are_invisible_to_backlink_resolution() {
 
 #[test]
 fn asset_description_text_is_searchable_but_stays_out_of_the_preview() {
-    let conn = migrated();
+    let mut conn = migrated();
     // The note body says nothing about a waterfall; only the asset description
     // (folded into the FTS body, Plan 20) does.
     let mut sample = note("notes/a.md", "Trip", vec![]);
@@ -539,7 +539,7 @@ fn asset_description_text_is_searchable_but_stays_out_of_the_preview() {
 
     // A query that appears only in the asset description surfaces the note.
     let hits = run_query(
-        &conn,
+        &mut conn,
         "SELECT path FROM search_fts WHERE search_fts MATCH ?1",
         &[Value::from("waterfall")],
     )
@@ -549,7 +549,7 @@ fn asset_description_text_is_searchable_but_stays_out_of_the_preview() {
 
     // The note body is still searchable alongside it.
     let body_hits = run_query(
-        &conn,
+        &mut conn,
         "SELECT path FROM search_fts WHERE search_fts MATCH ?1",
         &[Value::from("planning")],
     )
@@ -604,14 +604,14 @@ fn pinned_migration_drops_stale_note_rows_for_reindex() {
 
 #[test]
 fn pinned_flag_and_order_round_trip_into_the_notes_row() {
-    let conn = migrated();
+    let mut conn = migrated();
     let mut pinned = note("notes/p.md", "P", vec![]);
     pinned.is_pinned = true;
     pinned.pinned_order = Some(1.5);
     apply_note(&conn, &pinned).unwrap();
     apply_note(&conn, &note("notes/q.md", "Q", vec![])).unwrap();
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT path, pinned_order FROM notes WHERE is_pinned = 1",
         &[],
     )
@@ -623,14 +623,14 @@ fn pinned_flag_and_order_round_trip_into_the_notes_row() {
 
 #[test]
 fn gist_columns_round_trip_into_the_notes_row() {
-    let conn = migrated();
+    let mut conn = migrated();
     let mut published = note("notes/g.md", "G", vec![]);
     published.gist_url = Some("https://gist.github.com/alex/abc123".to_string());
     published.gist_stale = true;
     apply_note(&conn, &published).unwrap();
     apply_note(&conn, &note("notes/plain.md", "Plain", vec![])).unwrap();
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT path, gist_url FROM notes WHERE gist_stale = 1",
         &[],
     )
@@ -645,23 +645,28 @@ fn gist_columns_round_trip_into_the_notes_row() {
     // Re-indexing after a republish (matching hash again) clears the flag.
     published.gist_stale = false;
     apply_note(&conn, &published).unwrap();
-    let rows = run_query(&conn, "SELECT path FROM notes WHERE gist_stale = 1", &[]).unwrap();
+    let rows = run_query(
+        &mut conn,
+        "SELECT path FROM notes WHERE gist_stale = 1",
+        &[],
+    )
+    .unwrap();
     assert!(rows.is_empty());
 }
 
 #[test]
 fn reapplying_a_note_replaces_its_rows() {
-    let conn = migrated();
+    let mut conn = migrated();
     apply_note(&conn, &note("notes/a.md", "A", vec![wiki("X"), wiki("Y")])).unwrap();
     apply_note(&conn, &note("notes/a.md", "A", vec![wiki("Z")])).unwrap();
-    let rows = run_query(&conn, "SELECT target_key FROM links", &[]).unwrap();
+    let rows = run_query(&mut conn, "SELECT target_key FROM links", &[]).unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["target_key"], Value::from("z"));
 }
 
 #[test]
 fn has_content_lands_on_the_notes_row_and_is_queryable() {
-    let conn = migrated();
+    let mut conn = migrated();
     let mut blank = note("daily/2026-06-02.md", "2026-06-02", vec![]);
     blank.kind = NoteKind::Daily;
     blank.daily_date = Some("2026-06-02".to_string());
@@ -673,7 +678,7 @@ fn has_content_lands_on_the_notes_row_and_is_queryable() {
     apply_note(&conn, &written).unwrap();
 
     let dotted = run_query(
-        &conn,
+        &mut conn,
         "SELECT daily_date FROM notes WHERE daily_date IS NOT NULL AND has_content = 1
          ORDER BY daily_date",
         &[],
@@ -753,12 +758,12 @@ fn reconcile_scan_classifies_candidates_orphans_and_skips() {
 
 #[test]
 fn touch_note_restamps_mtime_and_updated_at_without_creating_rows() {
-    let conn = migrated();
+    let mut conn = migrated();
     apply_note(&conn, &note("notes/a.md", "A", vec![])).unwrap();
 
     touch_note(&conn, "notes/a.md", 4_200).unwrap();
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT mtime, updated_at FROM notes WHERE path = ?1",
         &[Value::from("notes/a.md")],
     )
@@ -769,16 +774,16 @@ fn touch_note_restamps_mtime_and_updated_at_without_creating_rows() {
     // A path with no row updates nothing — a touch must never resurrect a
     // removed note.
     touch_note(&conn, "notes/gone.md", 4_200).unwrap();
-    let count = run_query(&conn, "SELECT COUNT(*) AS n FROM notes", &[]).unwrap();
+    let count = run_query(&mut conn, "SELECT COUNT(*) AS n FROM notes", &[]).unwrap();
     assert_eq!(count[0]["n"], Value::from(1));
 }
 
 #[test]
 fn fts_matches_indexed_body() {
-    let conn = migrated();
+    let mut conn = migrated();
     apply_note(&conn, &note("notes/a.md", "Quick", vec![])).unwrap();
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT path FROM search_fts WHERE search_fts MATCH ?1",
         &[Value::from("quick")],
     )
@@ -788,9 +793,9 @@ fn fts_matches_indexed_body() {
 
 #[test]
 fn db_query_rejects_mutating_statements() {
-    let conn = migrated();
-    assert!(run_query(&conn, "DELETE FROM notes", &[]).is_err());
-    assert!(run_query(&conn, "SELECT count(*) FROM notes", &[]).is_ok());
+    let mut conn = migrated();
+    assert!(run_query(&mut conn, "DELETE FROM notes", &[]).is_err());
+    assert!(run_query(&mut conn, "SELECT count(*) FROM notes", &[]).is_ok());
 }
 
 #[test]
@@ -801,7 +806,7 @@ fn read_bridge_refuses_attach_and_pragma() {
     // (exfiltration), and `PRAGMA foreign_keys = OFF` would disable the cascades
     // the write path depends on. The read bridge's authorizer denies both at
     // prepare time (see `query::read_only_authorization`).
-    let conn = migrated();
+    let mut conn = migrated();
     let secret = tempfile::tempdir().expect("tempdir");
     let secret_db = secret.path().join("secret.sqlite");
     {
@@ -812,11 +817,11 @@ fn read_bridge_refuses_attach_and_pragma() {
     }
     let attach = format!("ATTACH DATABASE '{}' AS evil", secret_db.display());
     assert!(
-        run_query(&conn, &attach, &[]).is_err(),
+        run_query(&mut conn, &attach, &[]).is_err(),
         "read bridge must refuse ATTACH"
     );
     assert!(
-        run_query(&conn, "PRAGMA foreign_keys = OFF", &[]).is_err(),
+        run_query(&mut conn, "PRAGMA foreign_keys = OFF", &[]).is_err(),
         "read bridge must refuse PRAGMA"
     );
 
@@ -824,7 +829,7 @@ fn read_bridge_refuses_attach_and_pragma() {
     // a note and reading it back (incl. an FTS MATCH) still works afterwards.
     apply_note(&conn, &note("notes/a.md", "Quick", vec![])).unwrap();
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT path FROM search_fts WHERE search_fts MATCH ?1",
         &[Value::from("quick")],
     )
@@ -834,7 +839,7 @@ fn read_bridge_refuses_attach_and_pragma() {
 
 #[test]
 fn clear_cascades_to_child_tables() {
-    let conn = migrated();
+    let mut conn = migrated();
     let mut seeded = note("notes/a.md", "A", vec![wiki("X")]);
     seeded.tasks = vec![task(0, "buy milk", false)];
     apply_note(&conn, &seeded).unwrap();
@@ -849,25 +854,30 @@ fn clear_cascades_to_child_tables() {
         "tasks",
         "search_fts",
     ] {
-        let rows = run_query(&conn, &format!("SELECT count(*) AS n FROM {table}"), &[]).unwrap();
+        let rows = run_query(
+            &mut conn,
+            &format!("SELECT count(*) AS n FROM {table}"),
+            &[],
+        )
+        .unwrap();
         assert_eq!(rows[0]["n"], Value::from(0), "{table} should be empty");
     }
 }
 
 #[test]
 fn reapplying_a_note_cascades_away_stale_children() {
-    let conn = migrated();
+    let mut conn = migrated();
     apply_note(&conn, &note("notes/a.md", "A", vec![wiki("X"), wiki("Y")])).unwrap();
     // Re-applying clears the note (cascade) before reinserting, so the old
     // tags/links don't linger even though apply_note lists no explicit deletes.
     apply_note(&conn, &note("notes/a.md", "A", vec![])).unwrap();
-    let rows = run_query(&conn, "SELECT count(*) AS n FROM links", &[]).unwrap();
+    let rows = run_query(&mut conn, "SELECT count(*) AS n FROM links", &[]).unwrap();
     assert_eq!(rows[0]["n"], Value::from(0));
 }
 
 #[test]
 fn apply_note_inserts_tasks_and_replace_clears_them() {
-    let conn = migrated();
+    let mut conn = migrated();
     let mut seeded = note("notes/a.md", "A", vec![]);
     let mut due = task(4, "buy milk", false);
     due.due_date = Some("2026-07-01".to_string());
@@ -875,7 +885,7 @@ fn apply_note_inserts_tasks_and_replace_clears_them() {
     apply_note(&conn, &seeded).unwrap();
 
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT ast_path, markdown, breadcrumbs, checked, due_date FROM tasks WHERE note_path = 'notes/a.md' ORDER BY rowid",
         &[],
     )
@@ -891,13 +901,13 @@ fn apply_note_inserts_tasks_and_replace_clears_them() {
 
     // Re-applying with no tasks cascades the old rows away (no explicit delete).
     apply_note(&conn, &note("notes/a.md", "A", vec![])).unwrap();
-    let after = run_query(&conn, "SELECT count(*) AS n FROM tasks", &[]).unwrap();
+    let after = run_query(&mut conn, "SELECT count(*) AS n FROM tasks", &[]).unwrap();
     assert_eq!(after[0]["n"], Value::from(0));
 }
 
 #[test]
 fn apply_note_serializes_task_breadcrumbs() {
-    let conn = migrated();
+    let mut conn = migrated();
     let mut seeded = note("notes/a.md", "A", vec![]);
     let mut with_context = task(4, "ship it", false);
     with_context.breadcrumbs = vec!["Project".to_string(), "Phase one".to_string()];
@@ -905,7 +915,7 @@ fn apply_note_serializes_task_breadcrumbs() {
     apply_note(&conn, &seeded).unwrap();
 
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT breadcrumbs FROM tasks WHERE note_path = 'notes/a.md'",
         &[],
     )
@@ -921,7 +931,7 @@ fn open_tasks_read_includes_private_notes_and_excludes_completed() {
     // The semantics `getOpenTasks` (queries.ts) relies on: open checkboxes joined
     // to note context, completed tasks excluded, and `private: true` notes' tasks
     // INCLUDED (the Tasks view is a local-only surface, like local search).
-    let conn = migrated();
+    let mut conn = migrated();
     let mut public = note("daily/2026-06-10.md", "A", vec![]);
     public.kind = NoteKind::Daily;
     public.daily_date = Some("2026-06-10".to_string());
@@ -934,7 +944,7 @@ fn open_tasks_read_includes_private_notes_and_excludes_completed() {
     apply_note(&conn, &private).unwrap();
 
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT tasks.note_path, tasks.markdown AS text, notes.title AS note_title, notes.daily_date \
          FROM tasks INNER JOIN notes ON notes.path = tasks.note_path \
          WHERE tasks.checked = 0 ORDER BY tasks.note_path, tasks.rowid",
@@ -1116,8 +1126,8 @@ fn open_index_at_creates_migrates_and_reopens() {
     let conn = open_index_at(root).expect("first open");
     apply_note(&conn, &note("notes/a.md", "A", vec![])).unwrap();
     drop(conn);
-    let conn = open_index_at(root).expect("reopen");
-    let rows = run_query(&conn, "SELECT count(*) AS n FROM notes", &[]).unwrap();
+    let mut conn = open_index_at(root).expect("reopen");
+    let rows = run_query(&mut conn, "SELECT count(*) AS n FROM notes", &[]).unwrap();
     assert_eq!(rows[0]["n"], Value::from(1));
 }
 
@@ -1292,7 +1302,7 @@ fn clear_index_wipes_embeddings_too() {
 
 #[test]
 fn knn_query_returns_nearest_chunk_first() {
-    let conn = migrated();
+    let mut conn = migrated();
     index_note(&conn, "notes/near.md");
     index_note(&conn, "notes/far.md");
     let mut near = vec384(0.0);
@@ -1314,7 +1324,7 @@ fn knn_query_returns_nearest_chunk_first() {
     );
     // The same shape the frontend uses through read-only db_query.
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT c.note_path FROM embedding_vectors v
          JOIN embedding_chunks c ON c.id = v.rowid
          WHERE v.embedding MATCH ?1 AND k = 2
@@ -1352,7 +1362,7 @@ fn embedding_vectors_use_cosine_distance() {
     // A probe pointing the same direction as a stored vector but at half its
     // magnitude: cosine distance 0, L2 distance 0.5 — this test discriminates
     // the metric (retrieve.ts thresholds raw distances as cosine).
-    let conn = migrated();
+    let mut conn = migrated();
     index_note(&conn, "notes/a.md");
     let mut stored = vec384(0.0);
     stored[0] = 1.0;
@@ -1369,7 +1379,7 @@ fn embedding_vectors_use_cosine_distance() {
             .join(",")
     );
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT v.distance FROM embedding_vectors v
          WHERE v.embedding MATCH ?1 AND k = 1 ORDER BY v.distance",
         &[Value::String(probe_json)],
@@ -1403,7 +1413,7 @@ fn cosine_migration_preserves_stored_vectors() {
     assert_eq!(vector_count(&conn), 1);
 
     let vec_json = run_query(
-        &conn,
+        &mut conn,
         "SELECT vec_to_json(v.embedding) AS vec FROM embedding_vectors v",
         &[],
     )
@@ -1414,7 +1424,7 @@ fn cosine_migration_preserves_stored_vectors() {
         .unwrap()
         .to_string();
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT c.note_path, v.distance FROM embedding_vectors v
          JOIN embedding_chunks c ON c.id = v.rowid
          WHERE v.embedding MATCH ?1 AND k = 1 ORDER BY v.distance",
@@ -1436,11 +1446,11 @@ fn cosine_migration_preserves_stored_vectors() {
 fn stored_vectors_round_trip_through_vec_to_json() {
     // relatedNotes (TS) seeds KNN with `vec_to_json(embedding)` via db_query;
     // pin the function name + shape against the real extension.
-    let conn = migrated();
+    let mut conn = migrated();
     index_note(&conn, "notes/a.md");
     apply_chunks(&conn, "notes/a.md", &[chunk("a1", Some(vec384(0.25)))]).unwrap();
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT vec_to_json(v.embedding) AS vec
          FROM embedding_chunks c JOIN embedding_vectors v ON v.rowid = c.id
          WHERE c.note_path = ?1 ORDER BY c.pos_from LIMIT 1",
@@ -1451,7 +1461,7 @@ fn stored_vectors_round_trip_through_vec_to_json() {
     assert!(vec.starts_with('['));
     // And the JSON form is MATCH-able right back (the second relatedNotes query).
     let knn = run_query(
-        &conn,
+        &mut conn,
         "SELECT c.note_path FROM embedding_vectors v
          JOIN embedding_chunks c ON c.id = v.rowid
          WHERE v.embedding MATCH ?1 AND k = 1 ORDER BY v.distance",
@@ -1505,7 +1515,7 @@ fn move_note_migrates_every_row_and_preserves_derived_state() {
 
     // The notes row moved — same derived state, nothing re-created.
     let row = run_query(
-        &conn,
+        &mut conn,
         "SELECT path, is_pinned, pinned_order FROM notes WHERE path = ?1",
         &[Value::String("notes/kept-title.md".to_string())],
     )
@@ -1513,7 +1523,7 @@ fn move_note_migrates_every_row_and_preserves_derived_state() {
     assert_eq!(row.len(), 1);
     assert_eq!(row[0].get("is_pinned").unwrap().as_i64().unwrap(), 1);
     let gone = run_query(
-        &conn,
+        &mut conn,
         "SELECT path FROM notes WHERE path = ?1",
         &[Value::String("notes/old.md".to_string())],
     )
@@ -1547,7 +1557,7 @@ fn move_note_migrates_every_row_and_preserves_derived_state() {
             0,
         ),
     ] {
-        let rows = run_query(&conn, sql, &[]).unwrap();
+        let rows = run_query(&mut conn, sql, &[]).unwrap();
         assert_eq!(
             rows[0].get("n").unwrap().as_i64().unwrap(),
             expected,
@@ -1558,7 +1568,7 @@ fn move_note_migrates_every_row_and_preserves_derived_state() {
 
     // Inbound links resolve by title key, so the backlink follows the move.
     let backlinks = run_query(
-        &conn,
+        &mut conn,
         "SELECT source_path FROM backlinks WHERE target_path = 'notes/kept-title.md'",
         &[],
     )
@@ -1581,7 +1591,7 @@ fn move_note_refuses_an_occupied_destination() {
     // Nothing changed: both rows intact (the transaction rolled back).
     for path in ["notes/a.md", "notes/b.md"] {
         let rows = run_query(
-            &conn,
+            &mut conn,
             "SELECT title FROM notes WHERE path = ?1",
             &[Value::String(path.to_string())],
         )
@@ -1595,7 +1605,7 @@ fn move_note_without_a_source_row_is_a_no_op_success() {
     // An unindexed file can still be renamed; the watcher indexes it at `to`.
     let mut conn = migrated();
     move_in_txn(&mut conn, "notes/ghost.md", "notes/ghost-2.md").unwrap();
-    let rows = run_query(&conn, "SELECT count(*) AS n FROM notes", &[]).unwrap();
+    let rows = run_query(&mut conn, "SELECT count(*) AS n FROM notes", &[]).unwrap();
     assert_eq!(rows[0].get("n").unwrap().as_i64().unwrap(), 0);
 }
 
@@ -1620,7 +1630,7 @@ fn watcher_echo_after_a_move_is_benign_and_vectors_survive() {
     apply_note(&conn, &echoed).unwrap();
 
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT is_pinned FROM notes WHERE path = 'notes/kept-title.md'",
         &[],
     )
@@ -1658,11 +1668,11 @@ fn chat_message(id: &str, conversation_id: &str) -> ChatMessageRow {
 
 #[test]
 fn chat_message_save_round_trips_and_upserts_the_conversation() {
-    let conn = migrated();
+    let mut conn = migrated();
     save_message(&conn, &conversation("c1"), &chat_message("m1", "c1")).unwrap();
 
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT title, created_ms, updated_ms FROM chat_conversations WHERE id = 'c1'",
         &[],
     )
@@ -1681,7 +1691,7 @@ fn chat_message_save_round_trips_and_upserts_the_conversation() {
     later.updated_ms = 9_000;
     save_message(&conn, &later, &chat_message("m2", "c1")).unwrap();
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT title, created_ms, updated_ms FROM chat_conversations WHERE id = 'c1'",
         &[],
     )
@@ -1697,7 +1707,7 @@ fn chat_message_save_round_trips_and_upserts_the_conversation() {
 #[test]
 fn chat_message_resave_updates_by_id() {
     // The settle-time save re-sends the same row id with the streamed result.
-    let conn = migrated();
+    let mut conn = migrated();
     save_message(&conn, &conversation("c1"), &chat_message("m1", "c1")).unwrap();
     let mut settled = chat_message("m1", "c1");
     settled.parts = r#"[{"kind":"text","text":"You wrote three notes."}]"#.to_string();
@@ -1706,7 +1716,7 @@ fn chat_message_resave_updates_by_id() {
     save_message(&conn, &conversation("c1"), &settled).unwrap();
 
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT parts FROM chat_messages WHERE id = 'm1'",
         &[],
     )
@@ -1725,14 +1735,14 @@ fn chat_message_seq_is_assigned_per_conversation() {
     // path drops rows it cannot parse), so a TS-derived counter could collide
     // with a row it never saw. Counters are independent per conversation, a
     // re-save keeps its slot, and the unique index stays on as a backstop.
-    let conn = migrated();
+    let mut conn = migrated();
     save_message(&conn, &conversation("c1"), &chat_message("m1", "c1")).unwrap();
     save_message(&conn, &conversation("c1"), &chat_message("m2", "c1")).unwrap();
     save_message(&conn, &conversation("c2"), &chat_message("m3", "c2")).unwrap();
     save_message(&conn, &conversation("c1"), &chat_message("m2", "c1")).unwrap();
 
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT id, seq FROM chat_messages ORDER BY conversation_id, seq",
         &[],
     )
@@ -1758,15 +1768,15 @@ fn chat_message_seq_is_assigned_per_conversation() {
 
 #[test]
 fn chat_conversation_delete_cascades_to_messages() {
-    let conn = migrated();
+    let mut conn = migrated();
     save_message(&conn, &conversation("c1"), &chat_message("m1", "c1")).unwrap();
     save_message(&conn, &conversation("c2"), &chat_message("m2", "c2")).unwrap();
     delete_conversation(&conn, "c1").unwrap();
 
-    let conversations = run_query(&conn, "SELECT id FROM chat_conversations", &[]).unwrap();
+    let conversations = run_query(&mut conn, "SELECT id FROM chat_conversations", &[]).unwrap();
     assert_eq!(conversations.len(), 1);
     assert_eq!(conversations[0]["id"], Value::from("c2"));
-    let messages = run_query(&conn, "SELECT id FROM chat_messages", &[]).unwrap();
+    let messages = run_query(&mut conn, "SELECT id FROM chat_messages", &[]).unwrap();
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0]["id"], Value::from("m2"));
 }
@@ -1775,14 +1785,14 @@ fn chat_conversation_delete_cascades_to_messages() {
 fn clear_index_preserves_chat_history() {
     // Chat rows are durable, not a rebuildable projection — the full-rebuild
     // wipe must leave them alone.
-    let conn = migrated();
+    let mut conn = migrated();
     apply_note(&conn, &note("notes/a.md", "A", vec![])).unwrap();
     save_message(&conn, &conversation("c1"), &chat_message("m1", "c1")).unwrap();
     clear_index(&conn).unwrap();
 
-    let notes = run_query(&conn, "SELECT count(*) AS n FROM notes", &[]).unwrap();
+    let notes = run_query(&mut conn, "SELECT count(*) AS n FROM notes", &[]).unwrap();
     assert_eq!(notes[0]["n"], Value::from(0));
-    let messages = run_query(&conn, "SELECT count(*) AS n FROM chat_messages", &[]).unwrap();
+    let messages = run_query(&mut conn, "SELECT count(*) AS n FROM chat_messages", &[]).unwrap();
     assert_eq!(messages[0]["n"], Value::from(1));
 }
 
@@ -1790,10 +1800,10 @@ fn clear_index_preserves_chat_history() {
 
 #[test]
 fn a_filename_stem_resolves_a_note_whose_authored_title_differs() {
-    let conn = migrated();
+    let mut conn = migrated();
     apply_note(&conn, &note("Projects/Plan.md", "Weekly Planning", vec![])).unwrap();
     let keys = run_query(
-        &conn,
+        &mut conn,
         "SELECT note_path FROM note_keys WHERE key = 'plan'",
         &[],
     )
@@ -1804,11 +1814,11 @@ fn a_filename_stem_resolves_a_note_whose_authored_title_differs() {
 
 #[test]
 fn a_title_outranks_a_filename_stem_claiming_the_same_key() {
-    let conn = migrated();
+    let mut conn = migrated();
     apply_note(&conn, &note("Archive/old.md", "Plan", vec![])).unwrap();
     apply_note(&conn, &note("Projects/Plan.md", "Weekly", vec![])).unwrap();
     let keys = run_query(
-        &conn,
+        &mut conn,
         "SELECT note_path, claim_count FROM note_keys WHERE key = 'plan'",
         &[],
     )
@@ -1821,11 +1831,11 @@ fn a_title_outranks_a_filename_stem_claiming_the_same_key() {
 
 #[test]
 fn an_alias_outranks_a_filename_stem_but_loses_to_a_title() {
-    let conn = migrated();
+    let mut conn = migrated();
     apply_note(&conn, &aliased_note("notes/a.md", "Alpha", "Plan")).unwrap();
     apply_note(&conn, &note("archive/Plan.md", "Beta", vec![])).unwrap();
     let via_alias = run_query(
-        &conn,
+        &mut conn,
         "SELECT note_path FROM note_keys WHERE key = 'plan'",
         &[],
     )
@@ -1834,7 +1844,7 @@ fn an_alias_outranks_a_filename_stem_but_loses_to_a_title() {
 
     apply_note(&conn, &note("notes/c.md", "Plan", vec![])).unwrap();
     let via_title = run_query(
-        &conn,
+        &mut conn,
         "SELECT note_path FROM note_keys WHERE key = 'plan'",
         &[],
     )
@@ -1844,12 +1854,12 @@ fn an_alias_outranks_a_filename_stem_but_loses_to_a_title() {
 
 #[test]
 fn two_files_with_one_stem_report_the_ambiguity_without_fanning_out() {
-    let conn = migrated();
+    let mut conn = migrated();
     apply_note(&conn, &note("b/Plan.md", "One Thing", vec![])).unwrap();
     apply_note(&conn, &note("a/Plan.md", "Another Thing", vec![])).unwrap();
     apply_note(&conn, &note("notes/src.md", "Src", vec![wiki("Plan")])).unwrap();
     let keys = run_query(
-        &conn,
+        &mut conn,
         "SELECT note_path, claim_count FROM note_keys WHERE key = 'plan'",
         &[],
     )
@@ -1859,7 +1869,7 @@ fn two_files_with_one_stem_report_the_ambiguity_without_fanning_out() {
     assert_eq!(keys[0]["claim_count"], Value::from(2));
     // Exactly one backlink row: the deterministic winner, never both.
     let backlinks = run_query(
-        &conn,
+        &mut conn,
         "SELECT target_path FROM backlinks WHERE source_path = 'notes/src.md'",
         &[],
     )
@@ -1870,7 +1880,7 @@ fn two_files_with_one_stem_report_the_ambiguity_without_fanning_out() {
 
 #[test]
 fn a_path_link_backlinks_to_exactly_that_file() {
-    let conn = migrated();
+    let mut conn = migrated();
     apply_note(&conn, &note("Projects/Plan.md", "Weekly", vec![])).unwrap();
     apply_note(&conn, &note("notes/Plan.md", "Other", vec![])).unwrap();
     apply_note(
@@ -1887,7 +1897,7 @@ fn a_path_link_backlinks_to_exactly_that_file() {
     )
     .unwrap();
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT target_path FROM backlinks WHERE source_path = 'Journal.md'",
         &[],
     )
@@ -1898,7 +1908,7 @@ fn a_path_link_backlinks_to_exactly_that_file() {
 
 #[test]
 fn a_markdown_link_backlinks_through_its_path_key() {
-    let conn = migrated();
+    let mut conn = migrated();
     apply_note(&conn, &note("Projects/Plan.md", "Weekly", vec![])).unwrap();
     apply_note(
         &conn,
@@ -1910,7 +1920,7 @@ fn a_markdown_link_backlinks_through_its_path_key() {
     )
     .unwrap();
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT target_path, kind FROM backlinks WHERE source_path = 'Projects/Journal.md'",
         &[],
     )
@@ -1922,7 +1932,7 @@ fn a_markdown_link_backlinks_through_its_path_key() {
 
 #[test]
 fn a_path_link_to_a_missing_file_produces_no_backlink() {
-    let conn = migrated();
+    let mut conn = migrated();
     apply_note(
         &conn,
         &note(
@@ -1933,7 +1943,7 @@ fn a_path_link_to_a_missing_file_produces_no_backlink() {
     )
     .unwrap();
     let rows = run_query(
-        &conn,
+        &mut conn,
         "SELECT target_path FROM backlinks WHERE source_path = 'Journal.md'",
         &[],
     )
@@ -1948,7 +1958,7 @@ fn a_move_restates_the_path_derived_claims() {
     move_in_txn(&mut conn, "notes/old-name.md", "notes/new-name.md").unwrap();
 
     let claims = run_query(
-        &conn,
+        &mut conn,
         "SELECT key, tier FROM note_claims WHERE note_path = 'notes/new-name.md' ORDER BY tier",
         &[],
     )
@@ -1960,7 +1970,7 @@ fn a_move_restates_the_path_derived_claims() {
     assert_eq!(claims[1]["tier"], Value::from(claim_tier::BASENAME));
 
     let path_key = run_query(
-        &conn,
+        &mut conn,
         "SELECT path_key FROM notes WHERE path = 'notes/new-name.md'",
         &[],
     )
