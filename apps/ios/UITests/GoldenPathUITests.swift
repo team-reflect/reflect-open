@@ -38,11 +38,27 @@ final class GoldenPathUITests: XCTestCase {
     // A URL starts the app: the page gets the URL when it is ready.
     app.open(try XCTUnwrap(URL(string: "reflect://tasks")))
     XCTAssertTrue(
-      app.webViews.searchFields["Search tasks"].waitForExistence(
+      app.navigationBars.searchFields["Search tasks"].waitForExistence(
         timeout: XCUIApplication.patience))
 
     // A URL reaches the running app: today's note has the text from before.
     app.open(try XCTUnwrap(URL(string: "reflect://today")))
     waitForText(token, in: app.waitForDailyNote())
+  }
+
+  /// The search field of the native bar filters the web list as the user
+  /// types, and the clear button shows every task again.
+  func testSearchingTasksFromTheNavigationBar() throws {
+    app.launch()
+    _ = app.waitForDailyNote()
+    app.open(try XCTUnwrap(URL(string: "reflect://tasks")))
+    let field = app.navigationBars.searchFields["Search tasks"]
+    XCTAssertTrue(field.waitForExistence(timeout: XCUIApplication.patience))
+    field.tap()
+    field.typeText("zzzz-no-such-task")
+    let empty = app.webViews.staticTexts["No matching tasks"]
+    XCTAssertTrue(empty.waitForExistence(timeout: XCUIApplication.patience))
+    field.buttons["Clear text"].tap()
+    XCTAssertTrue(empty.waitForNonExistence(timeout: XCUIApplication.patience))
   }
 }
