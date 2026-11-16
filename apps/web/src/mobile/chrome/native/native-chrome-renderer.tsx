@@ -1,10 +1,10 @@
 import {
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useState,
   useRef,
   type CSSProperties,
-  type ReactElement,
 } from 'react'
 import { isDeepEqual, returnNull } from '@ocavue/utils'
 import type { NativeChromeService } from '@reflect/app'
@@ -22,12 +22,7 @@ import {
   type StackMotion,
   type TopBarRowProps,
 } from '@/mobile/chrome/chrome-renderer.ts'
-import type { ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
-import {
-  WebTopBarCorner,
-  WebTopBarRow,
-  type TopBarCornerProps,
-} from '@/mobile/chrome/web/web-top-bar-row.tsx'
+import type { ChromeSearch, ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
 import {
   createAttachQueue,
   runNativeIntent,
@@ -37,12 +32,14 @@ import {
   buildNoChromeState,
   buildShellChromeState,
   toWirePlus,
+  toWireTitle,
   type ScreenBar,
 } from '@/mobile/chrome/native/native-chrome-state.ts'
 import { toWireMenu } from '@/mobile/chrome/native/sf-symbols.ts'
 import {
   parseNativeIntent,
   type NativeChromeMessage,
+  type NativeSearchState,
   type NativeSidebarState,
 } from '@/mobile/chrome/native/protocol.ts'
 import { sidebarVisible, useSidebar } from '@/mobile/sidebar.ts'
@@ -62,7 +59,8 @@ class NativeChromeRenderer implements ChromeRenderer {
    */
   readonly #modalCount = new WritableStore(0)
   readonly TopBarRow = NativeTopBarRow
-  readonly drawsTopBarRow = true
+  // The shell draws the main row in its navigation bar.
+  readonly drawsTopBarRow = false
   readonly ShellBars = NativeShellBars
   // The shell draws the `+` that `registerScreen` snapshots.
   readonly Plus = returnNull
@@ -89,6 +87,11 @@ class NativeChromeRenderer implements ChromeRenderer {
    */
   readonly windowControlsWidth = new WritableStore(0)
   readonly attachFiles = createAttachQueue()
+  /**
+   * The search text of every entry with a search field, its revision, and
+   * the last text the shell sent for it.
+   */
+  readonly #search = new Map<number, { text: string; revision: number; fromShell: string | null }>()
 
   constructor(nativeChrome: NativeChromeService) {
     this.#nativeChrome = nativeChrome
@@ -96,13 +99,15 @@ class NativeChromeRenderer implements ChromeRenderer {
 
   registerScreen(entryId: number, chrome: { readonly current: ScreenChrome }): Unlisten {
     this.#screens.set(entryId, chrome)
-    const { back, leading, trailing, plus } = chrome.current
+    const { back, leading, trailing, plus, title, search } = chrome.current
     // A copy, so an in-place change of the screen's buttons is a change.
     const bar = structuredClone({
       canBack: back !== undefined,
       leading: leading ?? [],
       trailing: trailing ?? [],
       plus: plus === undefined ? null : toWirePlus(plus),
+      title: title === undefined ? null : toWireTitle(title),
+      search: this.#wireSearch(entryId, search),
     })
     this.#updateBars((bars) => {
       bars.set(entryId, bar)
@@ -112,6 +117,8 @@ class NativeChromeRenderer implements ChromeRenderer {
         return
       }
       this.#screens.delete(entryId)
+      // `#search` keeps the entry: a change of the screen's chrome
+      // registers again right after, and the revision must carry over.
       this.#updateBars((bars) => {
         bars.delete(entryId)
       })
@@ -128,6 +135,45 @@ class NativeChromeRenderer implements ChromeRenderer {
    */
   screenChrome(entryId: number): ScreenChrome | undefined {
     return this.#screens.get(entryId)?.current
+  }
+
+  /**
+   * The shell's search field of `entryId` changed to `text`. The screen's
+   * value that follows is an echo, so it keeps the revision.
+   */
+  noteShellSearch(entryId: number, text: string): void {
+    const entry = this.#search.get(entryId)
+    if (entry !== undefined) {
+      entry.fromShell = text
+    }
+  }
+
+  /**
+   * Ask the shell to focus the search field of `entryId`.
+   */
+  focusSearch(entryId: number): void {
+    this.#nativeChrome.post({ type: 'focusSearch', entryId } satisfies NativeChromeMessage)
+  }
+
+  /**
+   * The search field without its handlers. The revision grows only when the
+   * screen changes the text itself, so the shell never writes back an echo
+   * of what the user typed.
+   */
+  #wireSearch(entryId: number, search: ChromeSearch | undefined): NativeSearchState | null {
+    if (search === undefined) {
+      this.#search.delete(entryId)
+      return null
+    }
+    const entry = this.#search.get(entryId)
+    const revision =
+      entry === undefined
+        ? 0
+        : search.value === entry.text || search.value === entry.fromShell
+          ? entry.revision
+          : entry.revision + 1
+    this.#search.set(entryId, { text: search.value, revision, fromShell: entry?.fromShell ?? null })
+    return { placeholder: search.placeholder, label: search.label, text: search.value, revision }
   }
 
   openModal(): Unlisten {
@@ -164,38 +210,17 @@ function useNativeChromeRenderer(): NativeChromeRenderer {
 }
 
 /**
- * The web row with the space of the shell's corner buttons.
+ * The shell draws the main row. This only hands the screen's search ref the
+ * shell's search field.
  */
-function NativeTopBarRow(props: TopBarRowProps): ReactElement {
-  return <WebTopBarRow {...props} Corner={NativeTopBarCorner} />
-}
-
-/**
- * The space of the corner buttons and the back button that the shell draws
- * over the header row, or nothing when the shell draws them in another row.
- * The shell's back button is wider than the web one, so a spacer moves a
- * title that starts after it clear. Beside the sidebar, the shell draws a back
- * and a forward arrow on every screen, so the space holds both.
- */
-function NativeTopBarCorner(props: TopBarCornerProps): ReactElement | null {
+function NativeTopBarRow({ chrome }: TopBarRowProps): null {
   const renderer = useNativeChromeRenderer()
-  const cornersInHeaderRow = useStore(renderer.cornersInHeaderRow)
-  const history = useStore(sidebarVisible) !== null && props.edge === 'leading'
-  const clearsWindowControls =
-    useStore(renderer.windowControlsWidth) > 0 && props.edge === 'leading'
-  if (!cornersInHeaderRow) {
-    return null
-  }
-  const back = history ? returnNull : props.chrome.back
-  const clearsBack = props.edge === 'leading' && props.align === 'start' && back !== undefined
-  return (
-    <div className="invisible contents" inert aria-hidden>
-      {clearsWindowControls ? <div className="w-window-controls shrink-0" /> : null}
-      <WebTopBarCorner {...props} chrome={{ ...props.chrome, back }} />
-      {clearsBack ? <div className="w-1 shrink-0" /> : null}
-      {history ? <div className="w-13 shrink-0" /> : null}
-    </div>
-  )
+  const { entryId } = useRouterState()
+  useImperativeHandle(chrome.search?.ref, () => ({ focus: () => renderer.focusSearch(entryId) }), [
+    renderer,
+    entryId,
+  ])
+  return null
 }
 
 /**
@@ -240,6 +265,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
         toolbar: toolbar?.capabilities ?? null,
         sidebar: sidebarState,
         history: showsSidebar ? { back: canBack, forward: canForward } : null,
+        fullscreen: false,
         theme,
       }),
     )
@@ -302,6 +328,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
           attachFiles: renderer.attachFiles,
           toasts,
           setCornersInHeaderRow: (value) => renderer.cornersInHeaderRow.set(value),
+          noteShellSearch: (id, text) => renderer.noteShellSearch(id, text),
           setWindowControlsWidth: (value) => renderer.windowControlsWidth.set(value),
           setSidebarVisible: (value) => sidebarVisible.set(value),
         })

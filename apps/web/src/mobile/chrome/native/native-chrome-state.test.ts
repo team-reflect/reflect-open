@@ -1,10 +1,12 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { noop } from '@ocavue/utils'
 import { describe, expect, it } from 'vitest'
 import type { Route } from '@reflect/app'
 import {
   buildNoChromeState,
   buildShellChromeState,
+  toWireTitle,
   type ShellChromeInput,
 } from '@/mobile/chrome/native/native-chrome-state.ts'
 import type { NativeChromeMessage } from '@/mobile/chrome/native/protocol.ts'
@@ -24,6 +26,7 @@ const BASE: Omit<ShellChromeInput, 'route' | 'tab'> = {
   toolbar: null,
   sidebar: null,
   history: null,
+  fullscreen: false,
   theme: 'system',
 }
 
@@ -54,6 +57,8 @@ describe('buildShellChromeState', () => {
           { id: 'hidden', title: 'Hidden', hidden: true },
         ],
         plus: { kind: 'capture', audio: 'idle' },
+        title: { kind: 'month', text: 'November 2026', month: '2026-11' },
+        search: null,
       },
       sidebar: {
         selection: 'pinned:reflect-v2.md',
@@ -70,7 +75,7 @@ describe('buildShellChromeState', () => {
 
   it('shows the back button on a pushed screen', () => {
     const route: Route = { kind: 'note', path: 'ideas.md' }
-    const bar = { canBack: true, leading: [], trailing: [], plus: null }
+    const bar = { canBack: true, leading: [], trailing: [], plus: null, title: null, search: null }
     const state = buildShellChromeState({ ...BASE, route, tab: 'all', bar })
     expect(state).toMatchObject({ canBack: true, leading: [], trailing: [] })
   })
@@ -107,6 +112,8 @@ describe('buildShellChromeState', () => {
           },
         ],
         plus: null,
+        title: { kind: 'text', text: 'Edit note' },
+        search: null,
       },
       keyboardVisible: true,
       toolbar: {
@@ -121,7 +128,20 @@ describe('buildShellChromeState', () => {
     checkFixture('note', state)
   })
 
-  it('shows no corner buttons on All and Tasks', () => {
+  it('carries the title of a screen', () => {
+    expect(toWireTitle('Settings')).toEqual({ kind: 'text', text: 'Settings' })
+    expect(
+      toWireTitle({
+        kind: 'month',
+        month: '2026-12',
+        selected: '2026-11',
+        today: '2026-11',
+        onPick: noop,
+      }),
+    ).toEqual({ kind: 'month', text: 'December 2026', month: '2026-11' })
+  })
+
+  it('shows no corner buttons on All and Tasks without a bar', () => {
     for (const route of [{ kind: 'allNotes', tag: null }, { kind: 'tasks' }] satisfies Route[]) {
       expect(buildShellChromeState({ ...BASE, route, tab: 'all' })).toMatchObject({
         canBack: false,
@@ -138,8 +158,10 @@ describe('buildShellChromeState', () => {
         bar: {
           canBack: false,
           leading: [],
-          trailing: [],
+          trailing: [{ id: 'filters', title: 'Task filters', icon: 'filters' }],
           plus: { kind: 'action', label: 'New task' },
+          title: null,
+          search: { placeholder: 'Search tasks…', label: 'Search tasks', text: '', revision: 0 },
         },
       }),
     )
@@ -162,6 +184,7 @@ describe('page messages', () => {
       { type: 'backSwipe', phase: 'start' },
       { type: 'backSwipe', phase: 'cancel' },
       { type: 'chromeReady' },
+      { type: 'focusSearch', entryId: 3 },
     ]
     checkJSONFixture('messages', messages)
   })

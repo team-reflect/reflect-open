@@ -21,6 +21,7 @@ function makeIntentContext(overrides: Partial<IntentContext> = {}): IntentContex
     setCornersInHeaderRow: vi.fn(),
     setWindowControlsWidth: vi.fn(),
     setSidebarVisible: vi.fn(),
+    noteShellSearch: vi.fn(),
     runSidebar: vi.fn(),
     moveHistory: vi.fn(),
     ...overrides,
@@ -43,7 +44,7 @@ describe('parseNativeIntent', () => {
       '../../../../../../apple/Tests/ChromeKitTests/Fixtures/intents.json',
     )
     const intents = JSON.parse(readFileSync(path, 'utf8')) as unknown[]
-    expect(intents).toHaveLength(19)
+    expect(intents).toHaveLength(21)
     for (const intent of intents) {
       expect(parseNativeIntent(intent)).toEqual(intent)
     }
@@ -51,6 +52,26 @@ describe('parseNativeIntent', () => {
 })
 
 describe('runNativeIntent', () => {
+  it('hands the search text and the picked month to the screen on screen', () => {
+    const onChange = vi.fn()
+    const onPick = vi.fn()
+    const ctx = makeIntentContext({
+      screen: {
+        search: { value: '', placeholder: '', label: '', onChange },
+        title: { kind: 'month', month: '2026-11', selected: '2026-11', today: '2026-11', onPick },
+      },
+    })
+    runNativeIntent({ type: 'search', entryId: 4, text: 'x' }, ctx)
+    runNativeIntent({ type: 'pickMonth', entryId: 4, month: '2026-08' }, ctx)
+    expect(onChange).not.toHaveBeenCalled()
+    expect(onPick).not.toHaveBeenCalled()
+    runNativeIntent({ type: 'search', entryId: 5, text: 'meet' }, ctx)
+    runNativeIntent({ type: 'pickMonth', entryId: 5, month: '2026-08' }, ctx)
+    expect(ctx.noteShellSearch).toHaveBeenCalledWith(5, 'meet')
+    expect(onChange).toHaveBeenCalledWith('meet')
+    expect(onPick).toHaveBeenCalledWith('2026-08')
+  })
+
   it('goes back and runs actions for the entry on screen only', () => {
     const ctx = makeIntentContext()
     runNativeIntent({ type: 'back', entryId: 4 }, ctx)

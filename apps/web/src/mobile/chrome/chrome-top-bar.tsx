@@ -30,15 +30,17 @@ export function ChromeTopBar({
   const chromeRenderer = useChromeRenderer()
   const onTop = use(ChromeLayerContext)
   useScreenChrome(chrome)
-  const hasHeader = chromeRenderer.drawsTopBarRow || children !== undefined
+  const row = <chromeRenderer.TopBarRow align={align} chrome={chrome} />
   return (
     <>
-      {hasHeader ? (
+      {chromeRenderer.drawsTopBarRow || children !== undefined ? (
         <header className="shrink-0 border-b border-border px-safe">
-          <chromeRenderer.TopBarRow align={align} chrome={chrome} />
+          {row}
           {children}
         </header>
-      ) : null}
+      ) : (
+        row
+      )}
       {chrome.plus === undefined || !onTop ? null : <chromeRenderer.Plus plus={chrome.plus} />}
     </>
   )

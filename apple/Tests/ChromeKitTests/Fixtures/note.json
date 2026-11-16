@@ -49,7 +49,10 @@
   "plus": null,
   "sidebar": null,
   "history": null,
-  "title": null,
+  "title": {
+    "kind": "text",
+    "text": "Edit note"
+  },
   "search": null,
   "fullscreen": false,
   "theme": "dark",

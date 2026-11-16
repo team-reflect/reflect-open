@@ -48,6 +48,10 @@ export interface IntentContext {
    */
   setSidebarVisible: (visible: boolean | null) => void
   /**
+   * Records the text the shell's search field of `entryId` sent.
+   */
+  noteShellSearch: (entryId: number, text: string) => void
+  /**
    * Runs a tap in the iPad sidebar.
    */
   runSidebar: (command: Extract<NativeIntent, { type: 'sidebar' }>['command']) => void
@@ -138,8 +142,18 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
       context.runSidebar(intent.command)
       return
     case 'search':
-    case 'pickMonth':
+      if (intent.entryId === context.entryId) {
+        context.noteShellSearch(intent.entryId, intent.text)
+        context.screen?.search?.onChange(intent.text)
+      }
       return
+    case 'pickMonth': {
+      const title = context.screen?.title
+      if (intent.entryId === context.entryId && typeof title === 'object') {
+        title.onPick(intent.month)
+      }
+      return
+    }
     case 'plus': {
       const plus = context.screen?.plus
       if (intent.entryId === context.entryId && plus !== undefined) {

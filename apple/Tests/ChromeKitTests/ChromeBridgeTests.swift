@@ -32,6 +32,7 @@ final class ChromeBridgeTests: XCTestCase {
       [
         .transition(.init(phase: .start)), .transition(.init(phase: .end)),
         .backSwipe(.init(phase: .start)), .backSwipe(.init(phase: .cancel)), .chromeReady,
+        .focusSearch(.init(entryId: 3)),
       ])
   }
 
@@ -57,6 +58,8 @@ final class ChromeBridgeTests: XCTestCase {
       .sidebar(.init(command: .unpin(.init(path: "reflect-v2.md")))),
       .sidebar(.init(command: .share(.init(path: "reflect-v2.md")))),
       .sidebar(.init(command: .menu(.init(id: "graphs")))),
+      .search(.init(entryId: 3, text: "meet")),
+      .pickMonth(.init(entryId: 3, month: "2026-08")),
     ]
     let encoded = try JSONSerialization.jsonObject(with: try JSONEncoder().encode(intents))
     let expected = try JSONSerialization.jsonObject(with: try fixture("intents"))
@@ -70,6 +73,22 @@ final class ChromeBridgeTests: XCTestCase {
     XCTAssertEqual(state.history?.forward, false)
     XCTAssertEqual(state.leading.first?.icon, "gearshape")
     XCTAssertEqual(state.trailing.map(\.id), ["today"])
+    XCTAssertEqual(state.title, .month(.init(text: "November 2026", month: "2026-11")))
+  }
+
+  func testTasksFixtureCarriesTheSearchField() throws {
+    let state = try JSONDecoder().decode(ChromeState.self, from: try fixture("tasks"))
+    XCTAssertEqual(state.search?.placeholder, "Search tasks…")
+    XCTAssertEqual(state.search?.revision, 0)
+    XCTAssertEqual(state.trailing.map(\.icon), ["slider.horizontal.3"])
+  }
+
+  func testCallsFocusSearchWithTheEntry() throws {
+    let bridge = ChromeBridge()
+    var focused: [Int] = []
+    bridge.onFocusSearch = { focused.append($0) }
+    bridge.receive(try message(["type": "focusSearch", "entryId": 7]))
+    XCTAssertEqual(focused, [7])
   }
 
   func testFixturesCarryThePlusOfTheScreen() throws {

@@ -47,7 +47,11 @@
     "back": true,
     "forward": false
   },
-  "title": null,
+  "title": {
+    "kind": "month",
+    "text": "November 2026",
+    "month": "2026-11"
+  },
   "search": null,
   "fullscreen": false,
   "theme": "system",

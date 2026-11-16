@@ -17,5 +17,9 @@
   },
   {
     "type": "chromeReady"
+  },
+  {
+    "type": "focusSearch",
+    "entryId": 3
   }
 ]

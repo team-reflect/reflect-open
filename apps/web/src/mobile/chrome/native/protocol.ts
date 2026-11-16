@@ -12,11 +12,13 @@ export const NO_ENTRY = -1
  */
 export type {
   BarButton as NativeBarButton,
+  ChromeTitle as NativeChromeTitle,
   ChromeIntent as NativeIntent,
   ChromeMessage as NativeChromeMessage,
   MenuConfirm as NativeConfirm,
   MenuItem as NativeMenuItem,
   PlusState as NativePlusState,
+  SearchState as NativeSearchState,
   SidebarState as NativeSidebarState,
   ToolbarState as NativeToolbarState,
 } from '@reflect/types'

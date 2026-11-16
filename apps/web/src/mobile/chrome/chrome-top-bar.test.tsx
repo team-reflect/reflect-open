@@ -6,7 +6,7 @@ import { ChromeLayerContext } from '@/mobile/chrome/chrome-renderer.ts'
 import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import type { NativeBarButton } from '@/mobile/chrome/native/protocol.ts'
 import { lastChromeState, nativeChromeOptions } from '@/test-utils/native-chrome.tsx'
-import { renderInApp, type RenderInAppOptions } from '@/test-utils/render-in-app.tsx'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
 
 function bar(handlers: { back?: () => void; onAction?: (id: string) => void } = {}): ReactElement {
   return (
@@ -27,12 +27,9 @@ function rectOf(element: Element | null): DOMRect {
   return element.getBoundingClientRect()
 }
 
-describe.each<[string, () => RenderInAppOptions]>([
-  ['web', () => ({})],
-  ['native', () => nativeChromeOptions(createTestNativeChromeHost())],
-])('ChromeTopBar with the %s renderer', (_renderer, options) => {
+describe('ChromeTopBar with the web renderer', () => {
   it('centers the title between balanced corners', async () => {
-    const view = await renderInApp(bar(), options())
+    const view = await renderInApp(bar())
 
     const header = rectOf(view.container.querySelector('header'))
     const title = rectOf(view.container.querySelector('h1'))
@@ -49,7 +46,7 @@ describe.each<[string, () => RenderInAppOptions]>([
   it('keeps the corners clear of an uneven side inset', async () => {
     document.documentElement.style.setProperty('--twsa-safe-area-inset-right', '84px')
     try {
-      const view = await renderInApp(bar(), options())
+      const view = await renderInApp(bar())
       const header = rectOf(view.container.querySelector('header'))
       const more = rectOf(view.container.querySelector('[aria-label="More actions"]'))
       expect(more.right).toBeLessThanOrEqual(header.right - 84)

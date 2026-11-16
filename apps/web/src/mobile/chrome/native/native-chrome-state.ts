@@ -1,4 +1,4 @@
-import type { Route } from '@reflect/app'
+import { formatMonthLabel, type Route } from '@reflect/app'
 import type { ThemePreference } from '@reflect/core'
 import type { FormattingToolbarCapabilities } from '@/editor/formatting-toolbar-store.ts'
 import { toWireButtons } from '@/mobile/chrome/native/sf-symbols.ts'
@@ -6,10 +6,12 @@ import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 import {
   NO_ENTRY,
   type NativeChromeState,
+  type NativeChromeTitle,
   type NativePlusState,
+  type NativeSearchState,
   type NativeSidebarState,
 } from '@/mobile/chrome/native/protocol.ts'
-import type { ChromeButton, ChromePlus } from '@/mobile/chrome/screen-chrome.ts'
+import type { ChromeButton, ChromePlus, ChromeTitle } from '@/mobile/chrome/screen-chrome.ts'
 
 /**
  * The corners of one screen without its handlers.
@@ -19,6 +21,18 @@ export interface ScreenBar {
   leading: ChromeButton[]
   trailing: ChromeButton[]
   plus: NativePlusState | null
+  title: NativeChromeTitle | null
+  search: NativeSearchState | null
+}
+
+/**
+ * The title without its handler. A month title shows the label of its month
+ * and starts the picker at the selected month.
+ */
+export function toWireTitle(title: ChromeTitle): NativeChromeTitle {
+  return typeof title === 'string'
+    ? { kind: 'text', text: title }
+    : { kind: 'month', text: formatMonthLabel(title.month), month: title.selected }
 }
 
 /**
@@ -45,6 +59,7 @@ export interface ShellChromeInput {
   toolbar: FormattingToolbarCapabilities | null
   sidebar: NativeSidebarState | null
   history: NativeChromeState['history']
+  fullscreen: boolean
   theme: ThemePreference
 }
 
@@ -68,9 +83,9 @@ export function buildShellChromeState(input: ShellChromeInput): UnnumberedChrome
     plus: bar?.plus ?? null,
     sidebar: input.sidebar,
     history: input.history,
-    title: null,
-    search: null,
-    fullscreen: false,
+    title: bar?.title ?? null,
+    search: bar?.search ?? null,
+    fullscreen: input.fullscreen,
     theme: input.theme,
   }
 }
