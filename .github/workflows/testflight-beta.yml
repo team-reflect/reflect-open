@@ -18,6 +18,8 @@ jobs:
     with:
       commit: ${{ github.sha }}
       flavor: beta
+      # Faster beta builds. Stable releases keep the caches off.
+      cache: true
     secrets:
       APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
       APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
