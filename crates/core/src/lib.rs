@@ -115,6 +115,7 @@ impl Core {
         // SAFETY: a shell builds its core once, at startup, before any
         // command can run a libgit2 operation on another thread.
         unsafe { reflect_git::set_network_timeouts() };
+        reflect_git::configure_libgit2();
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()

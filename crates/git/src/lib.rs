@@ -1,6 +1,6 @@
 //! Git backup/sync primitives (Plan 12) with no Tauri in them.
 //!
-//! Rust owns the *capabilities* — init/adopt, commit, fetch, merge, push —
+//! Rust owns the *capabilities* — init/adopt, commit, fetch, merge, push, repack —
 //! while the sync **policy** (debounce cadence, retry loop, product states,
 //! GitHub specifics) lives in `@reflect/core` `sync/`. Nothing here is
 //! GitHub-specific: remotes are URLs, and an HTTPS sign-in arrives per call
@@ -18,6 +18,7 @@ mod commit_message;
 #[cfg(test)]
 mod fault;
 mod locks;
+mod maintenance;
 mod merge;
 mod remote;
 mod repo;
@@ -27,6 +28,8 @@ mod test_support;
 mod tests;
 
 use std::path::Path;
+
+pub use maintenance::{Repack, configure_libgit2, maintain};
 
 use reflect_types::{
     AppResult, CommitOutcome, GitCredential, GitStatus, PullOutcome, PushOutcome, RemoteDelta,
@@ -69,6 +72,10 @@ pub unsafe fn set_network_timeouts() {
 pub const MAX_FILE_BYTES: u64 = 95 * 1024 * 1024;
 
 pub fn status(root: &Path) -> AppResult<GitStatus> {
+    maintenance::with_object_read(root, || read_status(root))
+}
+
+fn read_status(root: &Path) -> AppResult<GitStatus> {
     if !root.join(".git").exists() {
         return Ok(GitStatus {
             initialized: false,
@@ -171,7 +178,7 @@ pub fn clone(url: &str, path: &Path, credential: Option<GitCredential>) -> AppRe
 
 /// Fetch `origin` and report ahead/behind for the current branch.
 pub fn fetch(root: &Path, credential: Option<GitCredential>) -> AppResult<RemoteDelta> {
-    remote::fetch(root, credential)
+    maintenance::with_object_read(root, || remote::fetch(root, credential))
 }
 
 /// Read the remote tip of the current branch without fetching. `url` probes
@@ -186,7 +193,7 @@ pub fn remote_head(
 
 /// Push the current branch to `origin`; rejections come back as data.
 pub fn push(root: &Path, credential: Option<GitCredential>) -> AppResult<PushOutcome> {
-    remote::push(root, credential)
+    maintenance::with_object_read(root, || remote::push(root, credential))
 }
 
 /// Commit every pending change (no-op when clean). See `commit_all` in `commit.rs`.

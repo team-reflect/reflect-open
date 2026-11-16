@@ -1,6 +1,8 @@
+use std::cell::RefCell;
 use std::fs;
 use std::panic::AssertUnwindSafe;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -11,6 +13,7 @@ use tempfile::tempdir;
 
 use super::commit::commit_all;
 use super::fault::{self, Fault, FaultPoint};
+use super::maintenance::{maintain, repack, with_object_read};
 use super::merge::merge_remote;
 use super::remote::{fetch, push, remote_head};
 use super::test_support::{
@@ -2400,4 +2403,196 @@ fn a_crash_before_the_ref_move_does_not_duplicate_the_copy() {
         .collect();
     assert_eq!(copies.len(), 1, "{copies:?}");
     assert_eq!(fs::read(root_a.join(&copy)).unwrap(), b"\x00from-b\x01");
+}
+
+/// Every object id in the repository at `root`.
+fn object_ids(root: &Path) -> Vec<git2::Oid> {
+    let repo = Repository::open(root).unwrap();
+    let mut ids = Vec::new();
+    repo.odb()
+        .unwrap()
+        .foreach(|id| {
+            ids.push(*id);
+            true
+        })
+        .unwrap();
+    ids
+}
+
+fn loose_object_count(root: &Path) -> usize {
+    let objects = root.join(".git/objects");
+    fs::read_dir(objects)
+        .unwrap()
+        .flatten()
+        .filter(|entry| entry.file_name().len() == 2)
+        .map(|entry| fs::read_dir(entry.path()).unwrap().count())
+        .sum()
+}
+
+fn pack_count(root: &Path) -> usize {
+    fs::read_dir(root.join(".git/objects/pack"))
+        .unwrap()
+        .flatten()
+        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "pack"))
+        .count()
+}
+
+/// Graph A with `fetches` packs from device B (also returned), local commits,
+/// an unreachable blob and a staged blob that no commit holds yet.
+fn repack_fixture(fetches: usize) -> (Fixture, PathBuf) {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    commit_file(root_a, "notes/a.md", "# A\n", true);
+    let root_b = second_device(&fixture);
+    for i in 0..fetches {
+        commit_file(&root_b, "notes/b.md", &format!("# B {i}\n"), true);
+        fetch(root_a, None).unwrap();
+        commit_file(root_a, "daily/2026-11-16.md", &format!("edit {i}\n"), false);
+    }
+    let repo = Repository::open(root_a).unwrap();
+    repo.blob(b"unreachable").unwrap();
+    write(root_a, "notes/staged.md", "staged\n");
+    let mut index = repo.index().unwrap();
+    index.add_path(Path::new("notes/staged.md")).unwrap();
+    index.write().unwrap();
+    (fixture, root_b)
+}
+
+#[test]
+fn repack_keeps_every_object_in_one_pack() {
+    let (fixture, _) = repack_fixture(3);
+    let root = &fixture.graph_a;
+    let before = object_ids(root);
+    assert!(loose_object_count(root) > 0);
+    assert!(pack_count(root) >= 3, "{}", pack_count(root));
+
+    let outcome = repack(root).unwrap();
+
+    assert_eq!(outcome.objects, before.len());
+    assert_eq!(loose_object_count(root), 0);
+    assert_eq!(pack_count(root), 1);
+    let repo = Repository::open(root).unwrap();
+    let odb = repo.odb().unwrap();
+    for id in &before {
+        assert!(odb.exists(*id), "{id} is gone after the repack");
+    }
+    // The repository keeps working: the staged blob commits, and a pull merges.
+    commit_all(root, "after repack", MAX_FILE_BYTES).unwrap();
+    assert!(head_tree_paths(root).contains(&"notes/staged.md".to_string()));
+    pull_all(root, "sync", MAX_FILE_BYTES).unwrap();
+}
+
+#[test]
+fn repack_keeps_objects_written_while_it_packs() {
+    let (fixture, _) = repack_fixture(1);
+    let root = fixture.graph_a.clone();
+    let late = Rc::new(RefCell::new(None));
+    let slot = Rc::clone(&late);
+    let hook_root = root.clone();
+    fault::arm(
+        FaultPoint::BeforeRepackRemove,
+        Fault::hook(move || {
+            let repo = Repository::open(&hook_root).unwrap();
+            *slot.borrow_mut() = Some(repo.blob(b"written during the repack").unwrap());
+        }),
+    );
+
+    repack(&root).unwrap();
+
+    let late = late.borrow().expect("the hook ran");
+    let repo = Repository::open(&root).unwrap();
+    assert!(repo.odb().unwrap().exists(late));
+    assert_eq!(loose_object_count(&root), 1);
+}
+
+#[test]
+fn maintain_waits_for_the_pack_limit() {
+    let (fixture, root_b) = repack_fixture(2);
+    let root = &fixture.graph_a;
+    assert_eq!(maintain(root).unwrap(), None);
+    assert!(loose_object_count(root) > 0);
+
+    // One fetch per pack: past `gc.autoPackLimit` (50) it repacks.
+    while pack_count(root) <= 50 {
+        commit_file(
+            &root_b,
+            "notes/b.md",
+            &format!("# B {}\n", pack_count(root)),
+            true,
+        );
+        fetch(root, None).unwrap();
+    }
+    let outcome = maintain(root).unwrap().expect("past the pack limit");
+    assert!(outcome.removed_packs > 50, "{outcome:?}");
+    assert_eq!(pack_count(root), 1);
+    assert_eq!(maintain(root).unwrap(), None);
+}
+
+#[test]
+fn maintain_removes_only_stale_temp_packs_below_the_thresholds() {
+    let (fixture, _) = repack_fixture(1);
+    let root = &fixture.graph_a;
+    let pack_dir = root.join(".git/objects/pack");
+    let stale = pack_dir.join("pack_git2_stale1");
+    let fresh = pack_dir.join("pack_git2_fresh1");
+    fs::write(&stale, "interrupted").unwrap();
+    fs::write(&fresh, "in progress").unwrap();
+    let two_days_ago = std::time::SystemTime::now() - Duration::from_secs(2 * 24 * 60 * 60);
+    fs::File::options()
+        .write(true)
+        .open(&stale)
+        .unwrap()
+        .set_modified(two_days_ago)
+        .unwrap();
+
+    assert_eq!(maintain(root).unwrap(), None);
+
+    assert!(!stale.exists());
+    assert!(fresh.exists());
+}
+
+#[test]
+fn maintain_ignores_kept_packs() {
+    let (fixture, _) = repack_fixture(1);
+    let root = &fixture.graph_a;
+    let pack_dir = root.join(".git/objects/pack");
+    // `.keep` packs are never removed, so they must not trigger a repack.
+    for i in 0..60 {
+        fs::write(pack_dir.join(format!("pack-kept{i}.pack")), "").unwrap();
+        fs::write(pack_dir.join(format!("pack-kept{i}.keep")), "").unwrap();
+    }
+
+    assert_eq!(maintain(root).unwrap(), None);
+}
+
+#[test]
+fn repack_removal_waits_for_object_readers() {
+    let (fixture, _) = repack_fixture(1);
+    let root = fixture.graph_a.clone();
+    let (entered_tx, entered_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel::<()>();
+    let reader_root = root.clone();
+    let reader = thread::spawn(move || {
+        with_object_read(&reader_root, || {
+            entered_tx.send(()).unwrap();
+            release_rx.recv().unwrap();
+        });
+    });
+    entered_rx.recv().unwrap();
+
+    let (done_tx, done_rx) = mpsc::channel();
+    let repack_root = root.clone();
+    let repacker = thread::spawn(move || {
+        repack(&repack_root).unwrap();
+        done_tx.send(()).unwrap();
+    });
+    assert!(
+        done_rx.recv_timeout(Duration::from_millis(500)).is_err(),
+        "the repack removed packs during a fetch, push or status"
+    );
+    release_tx.send(()).unwrap();
+    done_rx.recv_timeout(Duration::from_secs(30)).unwrap();
+    reader.join().unwrap();
+    repacker.join().unwrap();
+    assert_eq!(pack_count(&root), 1);
 }

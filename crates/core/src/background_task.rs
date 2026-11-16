@@ -6,9 +6,11 @@
 //! frontend can bracket its whole background persistence flush through the two
 //! commands below. Each path has an isolated registry. In the frontend
 //! registry, normal completion and UIKit's expiration callback race to remove
-//! the token, and only the winner ends the native assertion. In the scoped
-//! registry, the expiration callback waits for the guard to drop, so the
-//! assertion always ends after the lock is released.
+//! the token, and only the winner ends the native assertion. The scoped
+//! registry holds native guards, and each guard sets its expiration policy: a
+//! [`scoped`] guard's expiration callback waits for the guard to drop, so the
+//! assertion always ends after the lock is released; an [`expiring`] guard,
+//! for long work that owns no lock, ends at expiration like a frontend token.
 
 #[cfg(any(target_os = "ios", test))]
 use std::collections::HashMap;
@@ -116,10 +118,12 @@ enum Expiration {
     WaitForOwner,
 }
 
-/// RAII assertion for native operations that may own a file or SQLite lock.
-/// Only `Drop` ends the assertion: UIKit's expiration callback blocks the
-/// main thread until then, so the operation releases its lock first on any
-/// thread. The operation must not wait for the main thread.
+/// RAII assertion for a native operation, ended on `Drop`. A [`scoped`]
+/// guard is for operations that may own a file or SQLite lock: only `Drop`
+/// ends it, as UIKit's expiration callback blocks the main thread until
+/// then, so the operation releases its lock first on any thread. The
+/// operation must not wait for the main thread. An [`expiring`] guard also
+/// ends when UIKit's time runs out.
 pub struct ScopedBackgroundTask {
     registry: Arc<TaskRegistry>,
     token: Option<String>,
@@ -139,6 +143,17 @@ pub fn scoped(state: &BackgroundTaskState, name: &str) -> ScopedBackgroundTask {
     ScopedBackgroundTask {
         registry: Arc::clone(&state.scoped),
         token: platform::begin(Arc::clone(&state.scoped), name, Expiration::WaitForOwner),
+    }
+}
+
+/// Acquire an iOS background assertion that UIKit ends when its time runs
+/// out, for long native work that owns no file or SQLite lock: the process
+/// may be suspended in the middle of it. Other platforms return an inert
+/// guard.
+pub fn expiring(state: &BackgroundTaskState, name: &str) -> ScopedBackgroundTask {
+    ScopedBackgroundTask {
+        registry: Arc::clone(&state.scoped),
+        token: platform::begin(Arc::clone(&state.scoped), name, Expiration::End),
     }
 }
 
