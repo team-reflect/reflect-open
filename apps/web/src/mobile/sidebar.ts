@@ -34,6 +34,21 @@ export function useSyncChatSection(): void {
 }
 
 /**
+ * Opens Chat. It returns to where it was left where it is a section, and
+ * opens as a card over All elsewhere.
+ */
+export function openChat(
+  navigate: (route: Route) => void,
+  selectSection: (section: Section) => void,
+): void {
+  if (sidebarVisible.get() === null) {
+    navigate({ kind: 'chat', conversationId: null })
+  } else {
+    selectSection('chat')
+  }
+}
+
+/**
  * A tap in the iPad sidebar.
  */
 export type SidebarCommand =
@@ -142,13 +157,7 @@ export function useSidebar(): {
   const run = (command: SidebarCommand): void => {
     switch (command.kind) {
       case 'chat':
-        // Chat returns to where it was left where it is a section, and opens
-        // as a card over All elsewhere.
-        if (sidebarVisible.get() === null) {
-          navigate({ kind: 'chat', conversationId: null })
-        } else {
-          selectSection('chat')
-        }
+        openChat(navigate, selectSection)
         return
       case 'search':
         quickOpenVisible.set(true)
