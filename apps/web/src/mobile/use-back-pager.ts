@@ -4,8 +4,7 @@ import { watchScrollSettle } from '@/lib/scroll-settle.ts'
 
 /**
  * How far (px) past the screen edge the pop snap point leaves the current
- * page. The slow end of the release deceleration then runs off screen, and the
- * pop commits as soon as the page leaves the screen.
+ * page. The slow end of the release deceleration then runs off screen.
  */
 export const BACK_PAGER_OVERSHOOT_PX = 50
 
@@ -170,7 +169,10 @@ export function useBackPager({
         pop()
       },
       signal,
-      isSettled: () => scroller.scrollLeft <= REVEALED_PX,
+      // The pop commits only when the snap reaches the lower page. A pop
+      // during the snap changes the page list under the native scroll, which
+      // then moves the next page and snaps it back.
+      isSettled: () => scroller.scrollLeft <= 0,
       dragHandle: edgeRef.current ?? undefined,
     })
 
