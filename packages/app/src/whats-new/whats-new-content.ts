@@ -33,8 +33,8 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
     },
     {
       id: 'liquid-glass',
-      title: 'A brand-new look for iPhone and iPad',
-      body: 'A refreshed look for iPhone and iPad, with Liquid Glass on iOS 26.',
+      title: 'A fresh new look',
+      body: 'A new Liquid Glass design for iPhone and iPad.',
       platforms: ['ios'],
     },
     {
