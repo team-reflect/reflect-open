@@ -1,4 +1,4 @@
-import type { AppServices } from '@reflect/app'
+import type { WebAppServices } from '@/lib/commands/types.ts'
 import { errorMessage, type CoreServices } from '@reflect/core'
 
 /**
@@ -7,7 +7,7 @@ import { errorMessage, type CoreServices } from '@reflect/core'
  */
 export async function copyNoteDeepLink(
   { noteActions, graphSession }: CoreServices,
-  { clipboard, operations }: AppServices,
+  { clipboard, operations }: WebAppServices,
   path: string,
 ): Promise<void> {
   if (graphSession.get().session === null) {
@@ -34,7 +34,7 @@ export async function copyNoteDeepLink(
  */
 export async function copyNotePath(
   { noteActions, graphSession }: CoreServices,
-  { clipboard, operations }: AppServices,
+  { clipboard, operations }: WebAppServices,
   path: string,
 ): Promise<void> {
   if (graphSession.get().session === null) {
@@ -55,7 +55,7 @@ export async function copyNotePath(
  */
 export async function publishGistAndCopyLink(
   { gistPublish }: CoreServices,
-  { clipboard, operations }: AppServices,
+  { clipboard, operations }: WebAppServices,
   path: string,
 ): Promise<void> {
   const result = await gistPublish.publish(path)

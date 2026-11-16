@@ -1,9 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  createTestAppServices,
-  createTestWindowService,
-  type TestWindowService,
-} from '@reflect/app/testing'
+import { createTestWindowService, type TestWindowService } from '@reflect/app/testing'
 import { buildIndexedNote, parseNote } from '@reflect/core'
 import {
   createNodeTestDatabaseService,
@@ -18,6 +14,7 @@ import { deepLinkForRoute, notePathForRoute, type Route, type NavigateOptions } 
 import { APP_COMMANDS, keybindingFor } from './app-commands.ts'
 import type { CommandContext } from './types.ts'
 import { noop } from '@ocavue/utils'
+import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
 const TODAY = '2026-06-09'
 
@@ -59,7 +56,7 @@ function fakeContext(overrides?: Partial<CommandContext>) {
   const navigated: Route[] = []
   const navigateOptions: (NavigateOptions | undefined)[] = []
   const route: () => Route = overrides?.route ?? (() => ({ kind: 'today' }))
-  const appLayer = createTestAppServices(core, { window: windows })
+  const appLayer = createWebTestAppServices(core, { window: windows })
   const context: CommandContext = {
     services: core,
     app: appLayer,

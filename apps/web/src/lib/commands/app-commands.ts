@@ -1,8 +1,8 @@
 import type { NoteCreationService } from '@reflect/core'
-import { type CommandService, routeForPath, type Route } from '@reflect/app'
+import { type Commands, type CommandService, routeForPath, type Route } from '@reflect/app'
 import { attachFilesToNote } from '@/lib/attach-files.ts'
 import { copyNoteDeepLink, copyNotePath, publishGistAndCopyLink } from '@/lib/clipboard-actions.ts'
-import type { AppCommand, CommandContext } from './types.ts'
+import type { AppCommand, AppCommandId, CommandContext, GraphSwitchPosition } from './types.ts'
 
 /**
  * The app commands. Each command defines its keybinding and its behavior
@@ -34,17 +34,16 @@ function openNewNote(context: CommandContext): void {
 }
 
 /**
- * Keeps the literal `id` of each command, so {@link AppCommandId} lists them.
+ * Whether `position` has a `graph.switch` command.
  */
-function defineAppCommands<const Id extends string>(
-  commands: readonly (AppCommand & { id: Id })[],
-): readonly (AppCommand & { id: Id })[] {
-  return commands
+export function isGraphSwitchPosition(position: number): position is GraphSwitchPosition {
+  return Number.isSafeInteger(position) && position >= 1 && position <= 9
 }
 
-function defineSwitchGraphCommand<T extends number>(
-  position: T,
-): AppCommand & { id: `graph.switch${T}` } {
+/**
+ * The command that switches to the recent graph at `position`.
+ */
+function defineSwitchGraphCommand(position: GraphSwitchPosition): AppCommand {
   return {
     id: `graph.switch${position}`,
     title: `Switch to graph ${position}`,
@@ -55,8 +54,8 @@ function defineSwitchGraphCommand<T extends number>(
 }
 
 const APP_COMMANDS: Commands<AppCommandId, CommandContext> = [
-  defineSwitchGraphCommand<1>(1),
-  defineSwitchGraphCommand<2>(2),
+  defineSwitchGraphCommand(1),
+  defineSwitchGraphCommand(2),
   defineSwitchGraphCommand(3),
   defineSwitchGraphCommand(4),
   defineSwitchGraphCommand(5),
@@ -365,11 +364,6 @@ const APP_COMMANDS: Commands<AppCommandId, CommandContext> = [
     },
   },
 ]
-
-/**
- * The id of an app command.
- */
-export type AppCommandId = (typeof APP_COMMANDS)[number]['id'] // FIXME: remove this
 
 /**
  * The registered keybinding for `commandId`, or `null` when the command has

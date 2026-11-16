@@ -26,8 +26,8 @@ import { noop } from '@ocavue/utils'
 /**
  * {@link AppServices} where each service with a test double is that double.
  */
-export type TestAppServices = Omit<
-  AppServices,
+export type TestAppServices<CommandId extends string, Context> = Omit<
+  AppServices<CommandId, Context>,
   | 'navigation'
   | 'clipboard'
   | 'opener'
@@ -71,13 +71,13 @@ export function createTestAppHost(overrides: Partial<AppHost> = {}): AppHost {
  * default test window (`note-1` for a note window). `overrides` replace fields
  * of the result and reach the app services built over them.
  */
-export function createTestAppServices(
+export function createTestAppServices<CommandId extends string, Context>(
   core: CoreServices & {
     readonly progress?: OperationsService
     readonly role?: GraphRole
   },
-  overrides: Partial<AppServices> = {},
-): TestAppServices {
+  overrides: Partial<AppServices<CommandId, Context>> = {},
+): TestAppServices<CommandId, Context> {
   const operations = overrides.operations ?? core.progress ?? createTestOperationsService()
   const window =
     overrides.window ??
@@ -90,7 +90,7 @@ export function createTestAppServices(
   // Over the core's test activity port, so one emit reaches both layers.
   const activity = (core as { activity?: TestActivityPort }).activity
   const lifecycle = overrides.lifecycle ?? createTestLifecycleService({ activity })
-  const app = createAppServices(core, {
+  const app = createAppServices<CommandId, Context>(core, {
     ...createTestAppHost({ window, dialog, operations, clipboard, lifecycle }),
     updater: createTestUpdaterAdapter(),
     nativeMenu: createTestNativeMenuHost(),
@@ -141,5 +141,5 @@ export function createTestAppServices(
     navigation,
     deepLinkRouter,
     linkNavigation,
-  } as TestAppServices
+  } as TestAppServices<CommandId, Context>
 }

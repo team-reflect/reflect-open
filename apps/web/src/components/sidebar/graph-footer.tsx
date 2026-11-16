@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { useGraphColors } from '@/hooks/use-graph-colors.ts'
-import { type AppCommandId, keybindingFor } from '@/lib/commands/app-commands.ts'
+import { isGraphSwitchPosition, keybindingFor } from '@/lib/commands/app-commands.ts'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { useSelector } from '@/lib/use-store.ts'
 import { cn } from '@/lib/utils.ts'
@@ -30,7 +30,8 @@ const SETTINGS_BINDING = keybindingFor('settings.open')
 
 function graphSwitchBindingFor(index: number): string | null {
   // Recent rows are zero-based; `graph.switchN` commands and keycaps are one-based.
-  return keybindingFor(`graph.switch${index + 1}`)
+  const position = index + 1
+  return isGraphSwitchPosition(position) ? keybindingFor(`graph.switch${position}`) : null
 }
 
 type SyncStatus = Extract<GitSyncState, { phase: 'connected' }>['status']
@@ -160,9 +161,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
           ) : null}
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            onClick={() =>
-              void context.app.commands.run('settings.open' satisfies AppCommandId, context)
-            }
+            onClick={() => void context.app.commands.run('settings.open', context)}
             className={MENU_ITEM_CLASS}
           >
             <Settings aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
@@ -194,9 +193,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
               size="icon-sm"
               aria-label="Open settings"
               aria-current={settingsActive ? 'page' : undefined}
-              onClick={() =>
-                void context.app.commands.run('settings.open' satisfies AppCommandId, context)
-              }
+              onClick={() => void context.app.commands.run('settings.open', context)}
               className={cn(
                 'size-7 shrink-0 text-text-muted transition-colors duration-100 hover:bg-surface-hover hover:text-text-secondary',
                 settingsActive

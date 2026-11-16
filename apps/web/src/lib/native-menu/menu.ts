@@ -1,4 +1,4 @@
-import type { AppCommandId } from '@/lib/commands/app-commands.ts'
+import type { AppCommandId } from '@/lib/commands/types.ts'
 import type {
   AppMenuEntry,
   AppSubmenuLayout,
@@ -18,15 +18,15 @@ import type {
  * respect the modal palette/cheat-sheet exactly like keystrokes do.
  */
 
-function command(commandId: AppCommandId, text?: string): AppMenuEntry {
+function command(commandId: AppCommandId, text?: string): AppMenuEntry<AppCommandId> {
   return { kind: 'command', commandId, text }
 }
 
-function predefined(item: NativeMenuPredefinedItem, text?: string): AppMenuEntry {
+function predefined(item: NativeMenuPredefinedItem, text?: string): AppMenuEntry<AppCommandId> {
   return { kind: 'predefined', item, text }
 }
 
-function separator(): AppMenuEntry {
+function separator(): AppMenuEntry<AppCommandId> {
   return predefined('Separator')
 }
 
@@ -34,7 +34,7 @@ function separator(): AppMenuEntry {
  * The menu structure, as pure data so tests can hold it against the command
  * registry. macOS replaces the first submenu's title with the app name.
  */
-export function appMenuLayout(): AppSubmenuLayout[] {
+export function appMenuLayout(): AppSubmenuLayout<AppCommandId>[] {
   return [
     {
       text: 'Reflect',
@@ -126,6 +126,8 @@ export function appMenuLayout(): AppSubmenuLayout[] {
  * deliberately exempted there so its key equivalent belongs to this native
  * macOS application menu.
  */
-export async function installNativeMenu(nativeMenu: NativeMenuService): Promise<void> {
+export async function installNativeMenu(
+  nativeMenu: NativeMenuService<AppCommandId>,
+): Promise<void> {
   await nativeMenu.install(appMenuLayout())
 }

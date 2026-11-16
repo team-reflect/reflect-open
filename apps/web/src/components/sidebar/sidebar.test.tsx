@@ -18,7 +18,6 @@ import {
   type Route,
 } from '@reflect/app'
 import {
-  createTestAppServices,
   createTestOperationsService,
   createTestWindowService,
   type TestOpenerService,
@@ -34,6 +33,7 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { Sidebar } from './sidebar.tsx'
 import { noop, returnNull } from '@ocavue/utils'
+import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
 const openNativeContextMenu = vi.fn((options: NativeContextMenuOptions) => {
   return Promise.try(() => {
@@ -101,7 +101,7 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
     },
     gitSync: createTestGitSyncService({ state: { phase: 'disconnected' } }),
   })
-  const appLayer = createTestAppServices(core, {
+  const appLayer = createWebTestAppServices(core, {
     window: createTestWindowService({ openNoteWindow }),
   })
   const context: CommandContext = {

@@ -5,7 +5,7 @@ import { noop } from '@ocavue/utils'
 
 function setup(options?: { isApplePlatform?: boolean }) {
   const logger = createTestLoggerService()
-  const commands = createCommandService<string[]>({
+  const commands = createCommandService<string, string[]>({
     platform: createTestPlatformService({ isApplePlatform: options?.isApplePlatform ?? true }),
     logger,
   })

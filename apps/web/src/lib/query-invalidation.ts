@@ -1,4 +1,4 @@
-import type { AppServices } from '@reflect/app'
+import type { WebAppServices } from '@/lib/commands/types.ts'
 import type { CoreServices, Unlisten } from '@reflect/core'
 import {
   dropIcloudStatusQuery,
@@ -17,7 +17,7 @@ import {
  * archived X posts after a capture pass, the chat history after a saved turn,
  * and what the app holds per graph when graphs change.
  */
-export function installQueryInvalidation(core: CoreServices, { window }: AppServices): Unlisten {
+export function installQueryInvalidation(core: CoreServices, { window }: WebAppServices): Unlisten {
   const unlisteners = [
     core.capture.onXPostsWritten(invalidateXPostQueries),
     core.assetDescription.onDescriptionsIndexed(invalidateIndexQueries),

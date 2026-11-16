@@ -5,8 +5,7 @@ import {
   type GraphSessionService,
   type NoteDocumentService,
 } from '@reflect/core'
-import type { AppServices, LinkNavigationService, NativeMenuService } from '@reflect/app'
-import { createTestAppServices } from '@reflect/app/testing'
+import type { LinkNavigationService } from '@reflect/app'
 import {
   createTestCoreServices,
   createTestPlatformService,
@@ -38,6 +37,7 @@ import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useAppShortcuts } from './app-shortcuts.ts'
 import { useRouterActions, useRouterHandlers, useRouterState } from './router.tsx'
 import { noop, returnFalse } from '@ocavue/utils'
+import { createWebTestAppServices, type WebTestAppServices } from '@/test-utils/app-services.ts'
 
 const GRAPH = { root: '/g', name: 'g', generation: 1 } satisfies TestOpenGraph
 
@@ -72,10 +72,10 @@ const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
 let platform: TestPlatformOptions
 // The services of the rendered app; set by `shortcutsHook`.
 let core: TestCoreServices
-let appLayer: AppServices
+let appLayer: WebTestAppServices
 let openRecent: MockInstance<GraphSessionService['openRecent']>
 let openRouteInNewWindow: MockInstance<LinkNavigationService['openRouteInNewWindow']>
-let isNativeMenuInstalled: MockInstance<NativeMenuService['isInstalled']>
+let isNativeMenuInstalled: MockInstance<WebTestAppServices['nativeMenu']['isInstalled']>
 
 beforeEach(() => {
   platform = {
@@ -101,7 +101,7 @@ async function shortcutsHook() {
     },
   })
   core = services
-  appLayer = createTestAppServices(services)
+  appLayer = createWebTestAppServices(services)
   openRecent = vi.spyOn(services.graphSession, 'openRecent').mockResolvedValue(true)
   openRouteInNewWindow = vi
     .spyOn(appLayer.linkNavigation, 'openRouteInNewWindow')
@@ -237,7 +237,7 @@ describe('app shortcuts', () => {
   })
 
   it('registers the command keybindings in the central keymap registry', () => {
-    const { keymap } = createTestAppServices(
+    const { keymap } = createWebTestAppServices(
       createTestCoreServices({ database: createWasmTestDatabaseService() }),
     )
     registerAppKeymaps(keymap)
