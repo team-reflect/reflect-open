@@ -2348,9 +2348,9 @@ dependencies = [
 
 [[package]]
 name = "http-range-header"
-version = "0.4.2"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9171a2ea8a68358193d15dd5d70c1c10a2afc3e7e4c5bc92bc9f025cebd7359c"
+checksum = "b9da4ef94fe6551507165b22e3685e13c3bb5fbcabb64d38615c80b44c85d2be"
 
 [[package]]
 name = "httparse"
