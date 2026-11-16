@@ -110,14 +110,7 @@ async function main(): Promise<void> {
       // archive cannot create a development certificate on the account.
       ...(noSign
         ? ['CODE_SIGNING_ALLOWED=NO']
-        : [
-            'CODE_SIGN_STYLE=Manual',
-            'CODE_SIGN_IDENTITY=-',
-            'AD_HOC_CODE_SIGNING_ALLOWED=YES',
-            // Leaves out the development `get-task-allow`.
-            'CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO',
-            'PROVISIONING_PROFILE_SPECIFIER=',
-          ]),
+        : ['CODE_SIGN_IDENTITY=-', 'AD_HOC_CODE_SIGNING_ALLOWED=YES']),
     ]
     await exec('xcodebuild', archive, {
       throwOnError: true,
