@@ -296,7 +296,7 @@ export default defineESLintConfig(
 
   // Generated from Rust: `Option<serde_json::Value>` prints as `unknown | null`.
   {
-    files: ['packages/types/src/*.gen.ts'],
+    files: ['packages/types/src/*-gen.ts'],
     rules: { '@typescript-eslint/no-redundant-type-constituents': 'off' },
   },
 
