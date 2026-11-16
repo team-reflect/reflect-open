@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.19.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.19.0-beta.4...v0.19.0-beta.5) (2026-11-16)
+
+
+### Features
+
+* add new AI models ([#2184](https://github.com/team-reflect/reflect-open/issues/2184)) ([b522ce4](https://github.com/team-reflect/reflect-open/commit/b522ce443ffcaac5cd75eb7b84a6f7b3371cdba5))
+* **ios:** draw the top bar with UINavigationBar ([#2187](https://github.com/team-reflect/reflect-open/issues/2187)) ([b7a89a3](https://github.com/team-reflect/reflect-open/commit/b7a89a3ae6772efbdfe834c3c7f0e697732d7031))
+* **ios:** show the keyboard toolbar as a centered capsule ([#2188](https://github.com/team-reflect/reflect-open/issues/2188)) ([eb60395](https://github.com/team-reflect/reflect-open/commit/eb60395d8609ac0c7a4b1344f785e06f2e4c4f9d))
+* push the backup when the mobile app goes to the background ([#2193](https://github.com/team-reflect/reflect-open/issues/2193)) ([115d027](https://github.com/team-reflect/reflect-open/commit/115d0272c7850345da6d6fa0fcfb82e18a013612))
+* run app keyboard shortcuts on mobile ([#2199](https://github.com/team-reflect/reflect-open/issues/2199)) ([887f3ff](https://github.com/team-reflect/reflect-open/commit/887f3ff14da98d4fc15763deb46f54ca1b6a3c9c))
+
+
+### Bug Fixes
+
+* **core:** time out stalled git network calls ([#2192](https://github.com/team-reflect/reflect-open/issues/2192)) ([54db3a7](https://github.com/team-reflect/reflect-open/commit/54db3a716ee2db1fd4ec6f14e716ca0fcf8ae0e2))
+* **ios:** fade the top bar title in place ([#2198](https://github.com/team-reflect/reflect-open/issues/2198)) ([219c724](https://github.com/team-reflect/reflect-open/commit/219c724d4c4bdd1b18fdda576b7de12e106f3e76))
+* **ios:** fit the tab bar in narrow windows ([#2176](https://github.com/team-reflect/reflect-open/issues/2176)) ([ea19896](https://github.com/team-reflect/reflect-open/commit/ea19896a480592b80f652e65e7f795f15c16903d))
+* **ios:** hide the tab bar on Settings ([#2206](https://github.com/team-reflect/reflect-open/issues/2206)) ([03b7b26](https://github.com/team-reflect/reflect-open/commit/03b7b267568fb1237645066dc070ef8e954dda5c))
+* **ios:** keep notification calls off the main thread ([#2177](https://github.com/team-reflect/reflect-open/issues/2177)) ([36be9fb](https://github.com/team-reflect/reflect-open/commit/36be9fbc26203a91e58d826c5879c27111a8688d))
+* **ios:** keep the bars through launch so the page does not jump ([#2204](https://github.com/team-reflect/reflect-open/issues/2204)) ([418d96e](https://github.com/team-reflect/reflect-open/commit/418d96ec6eb48f7a9fe8b42c6a4fcc0bc1a2d789))
+* **ios:** keep the iPad sidebar footer height after rotation ([#2191](https://github.com/team-reflect/reflect-open/issues/2191)) ([0e193e6](https://github.com/team-reflect/reflect-open/commit/0e193e6cfbfd1e68eef6af49248c081b4d2c053f))
+* **ios:** let the search field fill a top bar with no title ([#2203](https://github.com/team-reflect/reflect-open/issues/2203)) ([b47d7c9](https://github.com/team-reflect/reflect-open/commit/b47d7c983f7010101d7b9d9d81a2497820e23580))
+* **ios:** show the top bar without a slide on launch ([#2201](https://github.com/team-reflect/reflect-open/issues/2201)) ([eac42f3](https://github.com/team-reflect/reflect-open/commit/eac42f36e39bdc70031bb481d2441268fcbbc5e5))
+* **mobile:** keep the revealed screen still after a back swipe ([#2210](https://github.com/team-reflect/reflect-open/issues/2210)) ([b75dc9d](https://github.com/team-reflect/reflect-open/commit/b75dc9db7ad1a130473d5b8b8ce0bc6d80b44225))
+* **mobile:** let the back pager take hits at rest ([#2180](https://github.com/team-reflect/reflect-open/issues/2180)) ([4b7ee39](https://github.com/team-reflect/reflect-open/commit/4b7ee398272a70548dd01b2050dad1e1af2337dc))
+* pull changes while the mobile app is open ([#2190](https://github.com/team-reflect/reflect-open/issues/2190)) ([6224d47](https://github.com/team-reflect/reflect-open/commit/6224d47253216da80a5ee97b7472cf16309ad0c8))
+* repack the Git backup and bound libgit2's open packs ([#2194](https://github.com/team-reflect/reflect-open/issues/2194)) ([100377e](https://github.com/team-reflect/reflect-open/commit/100377ebd3c7b0582a0ff8f5fb965845c36a7295))
+* show platform shortcut keys in hints ([#2183](https://github.com/team-reflect/reflect-open/issues/2183)) ([6b86886](https://github.com/team-reflect/reflect-open/commit/6b868866a48fef27f939d3679d22cbe6d5b352f3))
+
 ## [0.19.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.19.0-beta.3...v0.19.0-beta.4) (2026-11-14)
 
 
