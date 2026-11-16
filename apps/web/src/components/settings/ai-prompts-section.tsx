@@ -2,7 +2,9 @@ import { useState, type ReactElement } from 'react'
 import { Plus } from 'lucide-react'
 import type { AiPrompt, AiPromptDraft } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
+import { AI_MENU_BINDING } from '@/editor/keymap.ts'
 import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
+import { useAppServices } from '@/services/services-provider.tsx'
 import { AiPromptDialog } from './ai-prompt-dialog.tsx'
 import { AiPromptRow } from './ai-prompt-row.tsx'
 import { SettingsSection } from './section.tsx'
@@ -14,6 +16,7 @@ import { SettingsSection } from './section.tsx'
  */
 export function AiPromptsSection(): ReactElement {
   const { prompts, addPrompt, updatePrompt, removePrompt } = useAiPrompts()
+  const { keymap } = useAppServices()
   // null = closed; 'new' = adding; an AiPrompt = editing that prompt.
   const [editing, setEditing] = useState<AiPrompt | 'new' | null>(null)
 
@@ -29,8 +32,8 @@ export function AiPromptsSection(): ReactElement {
     <SettingsSection id="ai-prompts">
       {prompts.length === 0 ? (
         <p className="px-4 py-3.5 text-xs text-text-muted">
-          No saved prompts. Select text in a note and press ⌘⇧J to run the built-in prompts; prompts
-          you save here appear after them.
+          No saved prompts. Select text in a note and press {keymap.formatLabel(AI_MENU_BINDING)} to
+          run the built-in prompts; prompts you save here appear after them.
         </p>
       ) : (
         prompts.map((prompt) => (
