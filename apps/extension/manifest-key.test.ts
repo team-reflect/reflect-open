@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import config from './wxt.config.ts'
 
 /**
  * Drift guard for the pinned extension identity. The manifest `key` in
@@ -42,7 +43,7 @@ describe('pinned extension identity', () => {
     expect(originMatches).toContain(extensionIdFromKey(keyMatch![1]!))
   })
 
-  it('the Firefox add-on ID is the one the desktop host manifests allowlist', () => {
+  it('the Firefox add-on ID is the one the desktop host manifests allowlist', async () => {
     const wxtConfig = readFileSync(resolve(here, 'wxt.config.ts'), 'utf8')
     const idMatch = /const FIREFOX_ID = '([^']+)'/.exec(wxtConfig)
     expect(idMatch, 'FIREFOX_ID not found in wxt.config.ts').not.toBeNull()
@@ -53,5 +54,14 @@ describe('pinned extension identity', () => {
     const ids = [...allowlist![1]!.matchAll(/"([^"]+)"/g)].map((match) => match[1])
 
     expect(ids).toContain(idMatch![1])
+
+    // The manifest WXT emits for Firefox must actually carry that ID.
+    expect(typeof config.manifest).toBe('function')
+    const manifest = await (config.manifest as (env: { browser: string }) => unknown)({
+      browser: 'firefox',
+    })
+    expect(manifest).toMatchObject({
+      browser_specific_settings: { gecko: { id: idMatch![1] } },
+    })
   })
 })
