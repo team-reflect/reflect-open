@@ -112,6 +112,9 @@ pub struct Core {
 impl Core {
     /// Builds a core with its own multi-thread runtime.
     pub fn new(config: CoreConfig, host: Arc<dyn Host>) -> AppResult<Self> {
+        // SAFETY: a shell builds its core once, at startup, before any
+        // command can run a libgit2 operation on another thread.
+        unsafe { reflect_git::set_network_timeouts() };
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()

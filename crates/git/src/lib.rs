@@ -33,6 +33,38 @@ use reflect_types::{
     RemoteTip,
 };
 
+/// How long libgit2 waits to open a connection to a remote.
+const CONNECT_TIMEOUT_MS: i32 = 10_000;
+
+/// How long one read or write on a remote connection may make no progress.
+/// It bounds a stall, not a whole transfer.
+const IO_TIMEOUT_MS: i32 = 30_000;
+
+/// Set libgit2's network timeouts for the process. Without them a stalled
+/// connection, or a socket that died while iOS suspended the app, blocks a
+/// fetch or push (and the sync engine's single flight behind it) for
+/// minutes. libgit2 has no per-call timeout: these process-wide options are
+/// its only one. Calls after the first do nothing.
+///
+/// # Safety
+///
+/// It writes libgit2 globals without synchronization (see
+/// `git2::opts::set_server_timeout_in_milliseconds`). Call it at startup,
+/// before any other thread runs a libgit2 operation.
+pub unsafe fn set_network_timeouts() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        // SAFETY: the caller guarantees no concurrent libgit2 use.
+        let set = unsafe {
+            git2::opts::set_server_connect_timeout_in_milliseconds(CONNECT_TIMEOUT_MS)
+                .and_then(|()| git2::opts::set_server_timeout_in_milliseconds(IO_TIMEOUT_MS))
+        };
+        if let Err(err) = set {
+            tracing::warn!("setting git network timeouts failed: {err}");
+        }
+    });
+}
+
 /// GitHub rejects files over 100 MB, failing the whole push; stop just under.
 pub const MAX_FILE_BYTES: u64 = 95 * 1024 * 1024;
 
