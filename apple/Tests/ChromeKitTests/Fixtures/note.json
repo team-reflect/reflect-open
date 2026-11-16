@@ -55,6 +55,7 @@
   },
   "search": null,
   "fullscreen": false,
+  "hidesTabBar": false,
   "theme": "dark",
   "generation": 1
 }

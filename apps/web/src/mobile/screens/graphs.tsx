@@ -79,6 +79,7 @@ export function MobileGraphs(): ReactElement {
         align="center"
         back={() => (canBack ? back() : navigate({ kind: 'settings', page: 'main' }))}
         title="Graphs"
+        hidesTabBar
       />
       <main className="min-h-0 flex-1 overflow-y-auto px-safe pb-safe">
         <div className="flex flex-col gap-6 px-4 py-4">

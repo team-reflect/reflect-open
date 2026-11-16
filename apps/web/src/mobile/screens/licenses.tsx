@@ -13,6 +13,7 @@ export function MobileLicenses(): ReactElement {
         align="center"
         back={() => (canBack ? back() : navigate({ kind: 'settings', page: 'main' }))}
         title="Licenses"
+        hidesTabBar
       />
       <LicenseList className="flex-1 px-safe-offset-4 pt-3 pb-chrome-safe-offset-3" />
     </div>

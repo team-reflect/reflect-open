@@ -16,6 +16,7 @@
   "title": null,
   "search": null,
   "fullscreen": false,
+  "hidesTabBar": false,
   "theme": "light",
   "generation": 1
 }

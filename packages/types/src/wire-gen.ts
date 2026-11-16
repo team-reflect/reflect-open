@@ -344,6 +344,11 @@ export type ChromeMessage =
        *  hides its bars.
        */
       fullscreen: boolean
+      /**
+       *  The screen shows no tab bar (Settings). The iPad sidebar and top
+       *  tab bar stay.
+       */
+      hidesTabBar: boolean
       theme: ChromeTheme
     }
   /**

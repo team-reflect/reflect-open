@@ -51,6 +51,7 @@ describe('buildShellChromeState', () => {
       tab: 'daily',
       bar: {
         canBack: false,
+        hidesTabBar: false,
         leading: [{ id: 'settings', title: 'Settings', icon: 'settings' }],
         trailing: [
           { id: 'today', title: 'Today' },
@@ -75,9 +76,33 @@ describe('buildShellChromeState', () => {
 
   it('shows the back button on a pushed screen', () => {
     const route: Route = { kind: 'note', path: 'ideas.md' }
-    const bar = { canBack: true, leading: [], trailing: [], plus: null, title: null, search: null }
+    const bar = {
+      canBack: true,
+      hidesTabBar: false,
+      leading: [],
+      trailing: [],
+      plus: null,
+      title: null,
+      search: null,
+    }
     const state = buildShellChromeState({ ...BASE, route, tab: 'all', bar })
-    expect(state).toMatchObject({ canBack: true, leading: [], trailing: [] })
+    expect(state).toMatchObject({ canBack: true, leading: [], trailing: [], hidesTabBar: false })
+  })
+
+  it('hides the tab bar of a screen that asks for it', () => {
+    const route: Route = { kind: 'settings', page: 'main' }
+    const bar = {
+      canBack: true,
+      hidesTabBar: true,
+      leading: [],
+      trailing: [],
+      plus: null,
+      title: { kind: 'text', text: 'Settings' } as const,
+      search: null,
+    }
+    expect(buildShellChromeState({ ...BASE, route, tab: 'daily', bar })).toMatchObject({
+      hidesTabBar: true,
+    })
   })
 
   it('carries the note menu and a confirmation', () => {
@@ -87,6 +112,7 @@ describe('buildShellChromeState', () => {
       tab: 'daily',
       bar: {
         canBack: true,
+        hidesTabBar: false,
         leading: [],
         trailing: [
           {
@@ -157,6 +183,7 @@ describe('buildShellChromeState', () => {
         tab: 'tasks',
         bar: {
           canBack: false,
+          hidesTabBar: false,
           leading: [],
           trailing: [{ id: 'filters', title: 'Task filters', icon: 'filters' }],
           plus: { kind: 'action', label: 'New task' },

@@ -1121,9 +1121,10 @@ public struct ChromeMessageStateData: Codable, Sendable, Equatable {
     public let title: ChromeTitle?
     public let search: SearchState?
     public let fullscreen: Bool
+    public let hidesTabBar: Bool
     public let theme: ChromeTheme
 
-    public init(generation: Int, entryId: Int, chrome: ChromeKind, routeKind: String?, tab: ChromeTab, canBack: Bool, leading: [BarButton], trailing: [BarButton], keyboardVisible: Bool, modal: Bool, toolbar: ToolbarState?, plus: PlusState?, sidebar: SidebarState?, history: HistoryState?, title: ChromeTitle?, search: SearchState?, fullscreen: Bool, theme: ChromeTheme) {
+    public init(generation: Int, entryId: Int, chrome: ChromeKind, routeKind: String?, tab: ChromeTab, canBack: Bool, leading: [BarButton], trailing: [BarButton], keyboardVisible: Bool, modal: Bool, toolbar: ToolbarState?, plus: PlusState?, sidebar: SidebarState?, history: HistoryState?, title: ChromeTitle?, search: SearchState?, fullscreen: Bool, hidesTabBar: Bool, theme: ChromeTheme) {
         self.generation = generation
         self.entryId = entryId
         self.chrome = chrome
@@ -1141,6 +1142,7 @@ public struct ChromeMessageStateData: Codable, Sendable, Equatable {
         self.title = title
         self.search = search
         self.fullscreen = fullscreen
+        self.hidesTabBar = hidesTabBar
         self.theme = theme
     }
 }
@@ -1193,8 +1195,9 @@ extension ChromeMessage: Codable {
             let titleValue = try container.decodeIfPresent(ChromeTitle.self, forKey: CodingKeys("title"))
             let searchValue = try container.decodeIfPresent(SearchState.self, forKey: CodingKeys("search"))
             let fullscreenValue = try container.decode(Bool.self, forKey: CodingKeys("fullscreen"))
+            let hidesTabBarValue = try container.decode(Bool.self, forKey: CodingKeys("hidesTabBar"))
             let themeValue = try container.decode(ChromeTheme.self, forKey: CodingKeys("theme"))
-            self = .state(ChromeMessageStateData(generation: generationValue, entryId: entryIdValue, chrome: chromeValue, routeKind: routeKindValue, tab: tabValue, canBack: canBackValue, leading: leadingValue, trailing: trailingValue, keyboardVisible: keyboardVisibleValue, modal: modalValue, toolbar: toolbarValue, plus: plusValue, sidebar: sidebarValue, history: historyValue, title: titleValue, search: searchValue, fullscreen: fullscreenValue, theme: themeValue))
+            self = .state(ChromeMessageStateData(generation: generationValue, entryId: entryIdValue, chrome: chromeValue, routeKind: routeKindValue, tab: tabValue, canBack: canBackValue, leading: leadingValue, trailing: trailingValue, keyboardVisible: keyboardVisibleValue, modal: modalValue, toolbar: toolbarValue, plus: plusValue, sidebar: sidebarValue, history: historyValue, title: titleValue, search: searchValue, fullscreen: fullscreenValue, hidesTabBar: hidesTabBarValue, theme: themeValue))
         case "backSwipe":
             let phaseValue = try container.decode(BackSwipePhase.self, forKey: CodingKeys("phase"))
             self = .backSwipe(ChromeMessageBackswipeData(phase: phaseValue))
@@ -1230,6 +1233,7 @@ extension ChromeMessage: Codable {
             try container.encode(data.title, forKey: CodingKeys("title"))
             try container.encode(data.search, forKey: CodingKeys("search"))
             try container.encode(data.fullscreen, forKey: CodingKeys("fullscreen"))
+            try container.encode(data.hidesTabBar, forKey: CodingKeys("hidesTabBar"))
             try container.encode(data.theme, forKey: CodingKeys("theme"))
         case .backSwipe(let data):
             try container.encode("backSwipe", forKey: CodingKeys("type"))

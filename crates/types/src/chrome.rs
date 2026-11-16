@@ -51,6 +51,9 @@ pub enum ChromeMessage {
         /// A web surface covers the whole screen (the lightbox): the shell
         /// hides its bars.
         fullscreen: bool,
+        /// The screen shows no tab bar (Settings). The iPad sidebar and top
+        /// tab bar stay.
+        hides_tab_bar: bool,
         theme: ChromeTheme,
     },
     /// A user back swipe starts to move the page, or settles back without a
