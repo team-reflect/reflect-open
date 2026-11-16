@@ -51,7 +51,7 @@ fn main() {
     let ts_types = types.clone().register::<commands::Commands>();
 
     write(
-        &root.join("packages/types/src/wire.gen.ts"),
+        &root.join("packages/types/src/wire-gen.ts"),
         &name_shell_commands(&typescript(&ts_types)),
     );
     write(

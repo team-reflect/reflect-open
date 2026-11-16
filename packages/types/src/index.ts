@@ -1,1 +1,1 @@
-export * from './wire.gen.ts'
+export * from './wire-gen.ts'
