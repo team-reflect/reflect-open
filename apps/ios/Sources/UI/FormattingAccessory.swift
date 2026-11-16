@@ -108,15 +108,20 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
     picker = nil
   }
 
+  /// How long the strip stays off for a keyboard relayout.
+  private static let relayoutDelay: TimeInterval = 0.1
+
   /// Lays the keyboard out again after the window changed size: the strip
-  /// goes away for 0.1 s and comes back. With the strip up through a resize
-  /// (iPhone Duo posture), UIKit reports keyboard frames in the old
-  /// orientation, and WebKit sizes the page's visual viewport from them.
+  /// goes away for ``relayoutDelay`` and comes back. With the strip up
+  /// through a resize (iPhone Duo posture), UIKit reports keyboard frames in
+  /// the old orientation, and WebKit sizes the page's visual viewport from
+  /// them.
   func sizeDidChange() {
     guard shown, let contentView else { return }
     relayout = true
     contentView.reloadInputViews()
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self, weak contentView] in
+    DispatchQueue.main.asyncAfter(deadline: .now() + Self.relayoutDelay) {
+      [weak self, weak contentView] in
       guard let self else { return }
       self.relayout = false
       contentView?.reloadInputViews()
@@ -169,6 +174,9 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
     }
   }
 
+  /// The JPEG quality of an image that is not JPEG, PNG, or GIF.
+  nonisolated private static let jpegQuality: CGFloat = 0.9
+
   /// The image of `provider` as a file: JPEG, PNG, and GIF as they are,
   /// any other format (HEIC, RAW) as JPEG, which every web engine shows.
   private static func loadImage(_ provider: NSItemProvider) async -> IntentFile? {
@@ -192,7 +200,8 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
     guard provider.canLoadObject(ofClass: UIImage.self) else { return nil }
     let data: Data? = await withCheckedContinuation { continuation in
       _ = provider.loadObject(ofClass: UIImage.self) { object, _ in
-        continuation.resume(returning: (object as? UIImage)?.jpegData(compressionQuality: 0.9))
+        continuation.resume(
+          returning: (object as? UIImage)?.jpegData(compressionQuality: jpegQuality))
       }
     }
     guard let data else { return nil }
