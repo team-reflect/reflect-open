@@ -13,6 +13,11 @@ on:
         description: beta or stable
         required: true
         type: string
+      cache:
+        description: Whether to restore and save the pnpm, cargo and mise caches.
+        required: false
+        default: false
+        type: boolean
     secrets:
       APPLE_API_KEY:
         required: true
@@ -73,15 +78,16 @@ jobs:
       # Any master job can write the caches, so a release build starts cold.
       - uses: ./.github/actions/setup-node
         with:
-          cache: false
+          cache: ${{ inputs.cache }}
 
       - uses: ./.github/actions/setup-rust
         with:
-          cache: false
+          cache: ${{ inputs.cache }}
+          cache-key: publish-ios
 
       - uses: ./.github/actions/setup-mise
         with:
-          cache: false
+          cache: ${{ inputs.cache }}
 
       - name: Resolve build number
         id: build_number

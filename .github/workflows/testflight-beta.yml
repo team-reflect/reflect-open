@@ -18,6 +18,7 @@ jobs:
     with:
       commit: ${{ github.sha }}
       flavor: beta
+      cache: true
     secrets:
       APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
       APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
