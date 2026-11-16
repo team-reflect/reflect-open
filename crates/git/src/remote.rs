@@ -8,6 +8,7 @@
 use std::cell::RefCell;
 use std::net::Ipv6Addr;
 use std::path::Path;
+use std::sync::Once;
 
 use git2::{
     Cred, CredentialType, Direction, FetchOptions, PushOptions, RemoteCallbacks, Repository,
@@ -130,13 +131,40 @@ pub(super) fn http_origin(url: &str) -> Option<HttpOrigin> {
     (!host.is_empty()).then_some(HttpOrigin { scheme, host, port })
 }
 
+/// How long libgit2 waits to open a connection to a remote.
+const CONNECT_TIMEOUT_MS: i32 = 10_000;
+
+/// How long one read or write on a remote connection may make no progress.
+/// It bounds a stall, not a whole transfer.
+const IO_TIMEOUT_MS: i32 = 30_000;
+
+/// Set libgit2's process-wide network timeouts, once. Without them a stalled
+/// connection, or a socket that died while iOS suspended the app, blocks a
+/// fetch or push (and the sync engine's single flight behind it) for minutes.
+fn set_network_timeouts() {
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        // SAFETY: the two options are plain integers that libgit2 reads at
+        // connect time; `Once` keeps the writes off concurrent threads.
+        let set = unsafe {
+            git2::opts::set_server_connect_timeout_in_milliseconds(CONNECT_TIMEOUT_MS)
+                .and_then(|()| git2::opts::set_server_timeout_in_milliseconds(IO_TIMEOUT_MS))
+        };
+        if let Err(err) = set {
+            tracing::warn!("setting git network timeouts failed: {err}");
+        }
+    });
+}
+
 /// `RemoteCallbacks` with the credential chain, shared by every network call.
+/// It also sets the network timeouts before the first connection.
 ///
 /// A [`GitCredential`] is only ever presented to its own `origin`, checked
 /// against the URL of each request that asks for it. That holds whatever the
 /// remote points at: a remote moved to another host after the sign-in was
 /// picked, or a redirect to another host or to plain http, gets nothing.
 fn callbacks_with_credentials<'cb>(credential: Option<GitCredential>) -> RemoteCallbacks<'cb> {
+    set_network_timeouts();
     let mut callbacks = RemoteCallbacks::new();
     let mut tried = Tried::default();
     let expected = credential
