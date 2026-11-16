@@ -8,7 +8,7 @@ import UIKit
 /// wider than the strip. Its buttons never take focus, so the caret stays in
 /// the editor.
 @MainActor
-final class FormattingStrip: UIInputView {
+final class FormattingStrip: UIView {
   private struct Item {
     /// The command of the button, or `nil` for Insert image.
     let command: FormattingCommand?
@@ -20,7 +20,6 @@ final class FormattingStrip: UIInputView {
 
   /// The sizes of the strip, in points.
   private enum Metrics {
-    /// The height of the capsule.
     static let capsuleHeight: CGFloat = 44
     /// The space above and below the capsule.
     static let verticalMargin: CGFloat = 8
@@ -28,19 +27,14 @@ final class FormattingStrip: UIInputView {
     static let horizontalMargin: CGFloat = 12
     /// The space between the capsule's ends and its buttons.
     static let contentInset: CGFloat = 8
-    /// The width of a format button.
     static let buttonWidth: CGFloat = 40
-    /// The space between two format buttons.
     static let buttonSpacing: CGFloat = 4
-    /// The width of the button that hides the keyboard.
     static let dismissWidth: CGFloat = 44
-    /// The size of the line between the format buttons and the dismiss button.
     static let dividerWidth: CGFloat = 1
     static let dividerHeight: CGFloat = 24
     /// The space on each side of the divider.
     static let dividerSpacing: CGFloat = 4
 
-    /// The height of the strip.
     static let height = capsuleHeight + 2 * verticalMargin
     /// The width of the capsule beside the row of format buttons.
     static let fixedWidth =
@@ -75,14 +69,11 @@ final class FormattingStrip: UIInputView {
   private lazy var trailing = lane.trailingAnchor.constraint(equalTo: trailingAnchor)
 
   init() {
-    super.init(
-      frame: CGRect(x: 0, y: 0, width: 0, height: Metrics.height), inputViewStyle: .default)
-    allowsSelfSizing = true
-    backgroundColor = .clear
+    super.init(frame: CGRect(x: 0, y: 0, width: 0, height: Metrics.height))
+    // The keyboard sizes an accessory from its intrinsic height.
+    autoresizingMask = .flexibleHeight
     if #available(iOS 26, *) {
-      let glass = UIGlassEffect()
-      glass.isInteractive = true
-      capsule.effect = glass
+      capsule.effect = UIGlassEffect()
       capsule.cornerConfiguration = .capsule()
     } else {
       capsule.effect = UIBlurEffect(style: .systemChromeMaterial)
@@ -129,7 +120,6 @@ final class FormattingStrip: UIInputView {
     let fill = capsule.widthAnchor.constraint(equalTo: lane.widthAnchor)
     fill.priority = .defaultHigh
     NSLayoutConstraint.activate([
-      heightAnchor.constraint(equalToConstant: Metrics.height),
       leading,
       trailing,
       capsule.topAnchor.constraint(equalTo: topAnchor, constant: Metrics.verticalMargin),
@@ -163,6 +153,10 @@ final class FormattingStrip: UIInputView {
       row.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor),
     ])
     tintColor = .label
+  }
+
+  override var intrinsicContentSize: CGSize {
+    CGSize(width: UIView.noIntrinsicMetric, height: Metrics.height)
   }
 
   override func layoutSubviews() {
