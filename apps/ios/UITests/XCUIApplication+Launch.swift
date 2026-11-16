@@ -14,11 +14,26 @@ extension XCUIApplication {
     launchEnvironment["RUST_LOG"] = "info"
   }
 
-  /// Waits for the editor of today's note in an app that is starting.
+  /// Waits for the editor of today's note in an app that is starting, and
+  /// closes What's New if it opens first.
+  ///
+  /// A session starts as an install that finished onboarding, so a version
+  /// with What's New items opens its drawer over the note. The drawer is
+  /// modal: the editor is in the accessibility tree only after it closes.
+  /// Continue can turn to the review page, which closes with Not now.
   func waitForDailyNote() -> XCUIElement {
     let editor = webViews.textViews.firstMatch
-    XCTAssertTrue(
-      editor.waitForExistence(timeout: Self.patience), "today's note has an editor")
+    let whatsNewContinue = webViews.buttons["Continue"]
+    let reviewNotNow = webViews.buttons["Not now"]
+    let deadline = Date.now.addingTimeInterval(Self.patience)
+    while !editor.waitForExistence(timeout: 1), Date.now < deadline {
+      if whatsNewContinue.exists {
+        whatsNewContinue.tap()
+      } else if reviewNotNow.exists {
+        reviewNotNow.tap()
+      }
+    }
+    XCTAssertTrue(editor.exists, "today's note has an editor")
     return editor
   }
 }
