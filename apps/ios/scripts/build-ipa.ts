@@ -108,7 +108,6 @@ async function main(): Promise<void> {
       // Signed to run locally: no certificate, but the signature keeps the
       // entitlements that the export re-signs with. Without the API key, the
       // archive cannot create a development certificate on the account.
-      // https://github.com/ReviewStage/vespin/blob/6282a078ddee2484d028aad001abe0da56e7d175/.github/workflows/release-ios.yml#L174-L179
       ...(noSign
         ? ['CODE_SIGNING_ALLOWED=NO']
         : [
