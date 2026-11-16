@@ -4,7 +4,8 @@ import { watchScrollSettle } from '@/lib/scroll-settle.ts'
 
 /**
  * How far (px) past the screen edge the pop snap point leaves the current
- * page. The slow end of the release deceleration then runs off screen.
+ * page. The slow end of the release deceleration then runs off screen, and the
+ * pop commits as soon as the page leaves the screen.
  */
 export const BACK_PAGER_OVERSHOOT_PX = 50
 
@@ -109,9 +110,16 @@ export function useBackPager({
   // Before paint, so a changed page list never shows the lower page for a frame.
   useLayoutEffect(() => {
     const scroller = scrollerRef.current
-    if (scroller) {
-      pinToLastPage(scroller)
+    if (!scroller) {
+      return
     }
+    pinToLastPage(scroller)
+    if (scroller.style.overflowX !== 'hidden') {
+      return
+    }
+    // Restores scrolling a frame after the pop stopped it.
+    const frame = requestAnimationFrame(() => scroller.style.removeProperty('overflow-x'))
+    return () => cancelAnimationFrame(frame)
   }, [scrollerRef, pagesKey])
 
   useEffect(() => {
@@ -163,16 +171,16 @@ export function useBackPager({
           return
         }
         popped = true
+        // Stops the snap that still runs toward the lower page. It would
+        // otherwise move the next page list and snap it back.
+        scroller.style.overflowX = 'hidden'
         // The revealed page takes taps at once.
         setReleasing(scroller, false)
         revealBelow(scroller)
         pop()
       },
       signal,
-      // The pop commits only when the snap reaches the lower page. A pop
-      // during the snap changes the page list under the native scroll, which
-      // then moves the next page and snaps it back.
-      isSettled: () => scroller.scrollLeft <= 0,
+      isSettled: () => scroller.scrollLeft <= REVEALED_PX,
       dragHandle: edgeRef.current ?? undefined,
     })
 
