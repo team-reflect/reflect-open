@@ -70,8 +70,6 @@ jobs:
             'Cargo.lock'
             '*.sql'
             'apps/tauri/*.json'
-            # The generated wire types: `lint-rust` checks they are current.
-            'packages/types/src/*.gen.ts'
             'apple/Sources/TypesShared/*'
           )
           swift_files=(
