@@ -41,6 +41,14 @@ final class SidebarFooter: UIView {
     ])
   }
 
+  /// Asks the sidebar to measure the footer again. The height includes the
+  /// bottom inset, and a rotation briefly sets that inset to zero. Without a
+  /// new measure, the sidebar keeps the short height and squeezes the buttons.
+  override func safeAreaInsetsDidChange() {
+    super.safeAreaInsetsDidChange()
+    invalidateIntrinsicContentSize()
+  }
+
   @available(*, unavailable)
   required init?(coder: NSCoder) {
     fatalError("init(coder:) is not supported")
