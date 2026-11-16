@@ -12,6 +12,10 @@ const SF_SYMBOLS: Record<ChromeIcon, string> = {
   'lock-open': 'lock.open',
   share: 'square.and.arrow.up',
   trash: 'trash',
+  chat: 'message',
+  'chat-active': 'message.badge',
+  archive: 'archivebox',
+  filters: 'slider.horizontal.3',
 }
 
 function toWireMenuItem(item: ChromeMenuItem): NativeMenuItem {

@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
-import { Archive, CircleCheck, SlidersHorizontal } from 'lucide-react'
+import { CircleCheck } from 'lucide-react'
 import {
   composeVisibleTaskGroups,
   getTaskKey,
@@ -16,12 +16,11 @@ import { useTaskActions } from '@/lib/tasks/use-task-actions.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { SearchInput } from '@/mobile/search-input.tsx'
 import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet.tsx'
 import { TaskFiltersDrawer } from '@/mobile/task-filters-drawer.tsx'
 import { MobileTaskGroup } from '@/mobile/task-group.tsx'
 import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
-import { MobileTopBarIconButton } from '@/mobile/top-bar.tsx'
+import type { Focusable } from '@/mobile/chrome/screen-chrome.ts'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
@@ -61,7 +60,7 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
   const { navigate } = useRouterActions()
   const today = useToday()
   const { filters, toggle } = useTaskFilters()
-  const searchInputRef = useRef<HTMLInputElement>(null)
+  const searchInputRef = useRef<Focusable>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
   // The one row whose swipe actions are showing (its getTaskKey), across all groups.
   const [revealedRow] = useState(() => new WritableStore<string | null>(null))
@@ -156,35 +155,27 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
     <div className="flex h-full w-full flex-col pt-safe">
       <ChromeTopBar
         plus={{ kind: 'action', label: 'New task', onTap: () => onAdd(todaysDailyTarget(today)) }}
-        title={
-          <>
-            <SearchInput
-              ref={searchInputRef}
-              placeholder="Search tasks…"
-              aria-label="Search tasks"
-              value={query}
-              onValueChange={onQueryChange}
-            />
-            {recentlyCompleted.length > 0 ? (
-              <MobileTopBarIconButton
-                aria-label={`Archive ${recentlyCompleted.length} completed`}
-                onClick={archiveCompleted}
-              >
-                <Archive />
-              </MobileTopBarIconButton>
-            ) : null}
-            <MobileTopBarIconButton
-              edge="trailing"
-              aria-label="Task filters"
-              onClick={() => {
-                hapticImpactLight(haptics)
-                setFiltersOpen(true)
-              }}
-            >
-              <SlidersHorizontal />
-            </MobileTopBarIconButton>
-          </>
-        }
+        search={{
+          value: query,
+          placeholder: 'Search tasks…',
+          label: 'Search tasks',
+          onChange: onQueryChange,
+          ref: searchInputRef,
+        }}
+        trailing={[
+          ...(recentlyCompleted.length > 0
+            ? [{ id: 'archive', title: 'Archive completed', icon: 'archive' } as const]
+            : []),
+          { id: 'filters', title: 'Task filters', icon: 'filters' },
+        ]}
+        onAction={(id) => {
+          if (id === 'archive') {
+            archiveCompleted()
+          } else if (id === 'filters') {
+            hapticImpactLight(haptics)
+            setFiltersOpen(true)
+          }
+        }}
       />
       {isError ? (
         <p role="alert" className="px-safe-offset-4 py-6 text-sm text-text-muted">

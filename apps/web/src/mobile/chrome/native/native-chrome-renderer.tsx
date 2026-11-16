@@ -20,10 +20,14 @@ import {
   type ChromeRenderer,
   type ShellBarsProps,
   type StackMotion,
-  type TopBarCornerProps,
+  type TopBarRowProps,
 } from '@/mobile/chrome/chrome-renderer.ts'
 import type { ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
-import { WebTopBarCorner } from '@/mobile/chrome/web/web-top-bar-corner.tsx'
+import {
+  WebTopBarCorner,
+  WebTopBarRow,
+  type TopBarCornerProps,
+} from '@/mobile/chrome/web/web-top-bar-row.tsx'
 import {
   createAttachQueue,
   runNativeIntent,
@@ -57,7 +61,8 @@ class NativeChromeRenderer implements ChromeRenderer {
    * How many web drawers are open.
    */
   readonly #modalCount = new WritableStore(0)
-  readonly TopBarCorner = NativeTopBarCorner
+  readonly TopBarRow = NativeTopBarRow
+  readonly drawsTopBarRow = true
   readonly ShellBars = NativeShellBars
   // The shell draws the `+` that `registerScreen` snapshots.
   readonly Plus = returnNull
@@ -156,6 +161,13 @@ function useNativeChromeRenderer(): NativeChromeRenderer {
     throw new TypeError('The native chrome renders only under its own renderer')
   }
   return renderer
+}
+
+/**
+ * The web row with the space of the shell's corner buttons.
+ */
+function NativeTopBarRow(props: TopBarRowProps): ReactElement {
+  return <WebTopBarRow {...props} Corner={NativeTopBarCorner} />
 }
 
 /**

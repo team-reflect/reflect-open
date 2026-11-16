@@ -55,7 +55,7 @@ describe('NativeChromeRenderer', () => {
       <ChromeTopBar
         back={vi.fn()}
         trailing={[{ id: 'more', title: 'More', icon: 'ellipsis' }]}
-        title={<h1>Tag</h1>}
+        title="Tag"
       />,
       nativeChromeOptions(host),
     )
@@ -78,7 +78,7 @@ describe('NativeChromeRenderer', () => {
   })
   it('moves the header row past the window controls', async () => {
     const host = createTestNativeChromeHost()
-    const view = await renderInApp(<ChromeTopBar title={<h1>Tag</h1>} />, nativeChromeOptions(host))
+    const view = await renderInApp(<ChromeTopBar title="Tag" />, nativeChromeOptions(host))
     const left = (): number => view.container.querySelector('h1')!.getBoundingClientRect().left
     await vi.waitFor(() => {
       expect(host.posted).toContainEqual({ type: 'chromeReady' })

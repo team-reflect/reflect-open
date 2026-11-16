@@ -1,12 +1,13 @@
 import { useEffect, useRef, type RefObject } from 'react'
+import type { Focusable } from '@/mobile/chrome/screen-chrome.ts'
 
 export interface ArrivalFocusOptions {
   /** The router's navigation counter — bumped on every `navigate`. */
   arrivalSeq: number
   /** Whether the latest navigation asked the destination to focus its input. */
   arrivalFocusEditor: boolean
-  /** The element a focus arrival should focus. */
-  target: RefObject<HTMLElement | null>
+  /** What a focus arrival should focus. */
+  target: RefObject<Focusable | null>
   /** Select existing text after focusing text controls. */
   selectText?: boolean
 }
@@ -32,11 +33,8 @@ export function useArrivalFocus({
     if (newArrival && arrivalFocusEditor) {
       const element = target.current
       element?.focus()
-      if (
-        selectText &&
-        (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)
-      ) {
-        element.select()
+      if (selectText) {
+        element?.select?.()
       }
     }
   }, [arrivalSeq, arrivalFocusEditor, selectText, target])
