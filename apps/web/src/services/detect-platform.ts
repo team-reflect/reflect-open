@@ -70,6 +70,13 @@ export interface HostGlobals {
 }
 
 /**
+ * The global that a Debug build of the Swift shell sets.
+ */
+interface DebugShellGlobals {
+  readonly __reflectDebugBuild?: boolean | undefined
+}
+
+/**
  * Detect which shell hosts the webview from its globals.
  */
 export function detectHostKind(globals: HostGlobals): HostKind {
@@ -95,6 +102,9 @@ export function detectHostKind(globals: HostGlobals): HostKind {
  */
 export function detectPlatformFacts(hostKind: HostKind): PlatformFacts {
   const nativeShell = hostKind !== 'browser'
+  // A Debug build of the Swift shell sets this global before any page script
+  // runs. Its web bundle is the same production build as a Release build.
+  const debugShell = (globalThis as DebugShellGlobals).__reflectDebugBuild === true
   const env = import.meta.env.TAURI_ENV_PLATFORM || ''
   const hasNavigator = typeof navigator !== 'undefined'
   // iPadOS masquerades as macOS in the user agent; the touch-point check excludes it.
@@ -121,7 +131,7 @@ export function detectPlatformFacts(hostKind: HostKind): PlatformFacts {
       hasNavigator && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent),
     hasMacosTitleBarOverlay: macosDesktop,
     surface: { touchEditor: mobile, mobileApp: mobile },
-    isDev: import.meta.env.DEV,
+    isDev: import.meta.env.DEV || debugShell,
     appVersion: version,
   }
 }

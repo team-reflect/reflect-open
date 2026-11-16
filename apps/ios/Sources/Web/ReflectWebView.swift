@@ -20,6 +20,14 @@ final class ReflectWebView: WKWebView {
       AppSchemeHandler(routes: routes), forURLScheme: AppSchemeHandler.scheme)
     configuration.setURLSchemeHandler(assets, forURLScheme: AssetSchemeHandler.scheme)
     configuration.userContentController.addUserScript(HostBridge.userScript)
+    #if DEBUG
+    // The web app treats a Debug build as a development build: for example,
+    // it shows no What's New.
+    configuration.userContentController.addUserScript(
+      WKUserScript(
+        source: "window.__reflectDebugBuild = true", injectionTime: .atDocumentStart,
+        forMainFrameOnly: true))
+    #endif
     configuration.userContentController.add(bridge, name: HostBridge.messageHandlerName)
     configuration.allowsInlineMediaPlayback = true
     configuration.allowsPictureInPictureMediaPlayback = true

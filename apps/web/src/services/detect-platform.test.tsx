@@ -9,6 +9,7 @@ const originalUrl = window.location.href
 
 afterEach(() => {
   vi.unstubAllEnvs()
+  vi.unstubAllGlobals()
   window.history.replaceState(null, '', originalUrl)
 })
 
@@ -46,6 +47,17 @@ describe('detectPlatformFacts', () => {
     const facts = detectPlatformFacts('browser')
     expect(facts.appPlatform).toBe('desktop')
     expect(facts.surface).toEqual(DESKTOP_SURFACE)
+  })
+
+  it('is a development build in a Debug build of the Swift shell', () => {
+    vi.stubEnv('DEV', false)
+    vi.stubGlobal('__reflectDebugBuild', true)
+    expect(detectPlatformFacts('swift').isDev).toBe(true)
+  })
+
+  it('is not a development build in a Release build of the Swift shell', () => {
+    vi.stubEnv('DEV', false)
+    expect(detectPlatformFacts('swift').isDev).toBe(false)
   })
 
   it('is the iOS surface in the Swift shell without a build target', () => {
