@@ -55,6 +55,10 @@ jobs:
         if: steps.changes.outputs.rust == 'true'
         run: cargo fmt --all
 
+      - name: Generate types
+        if: steps.changes.outputs.rust == 'true'
+        run: pnpm gen:types
+
       - name: Fix (Swift)
         run: |
           swift format --version
