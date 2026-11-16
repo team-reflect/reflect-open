@@ -37,9 +37,8 @@ final class ChromeCoordinator {
     bar.send = { [weak self] intent in self?.send(intent) }
     bar.sendKeepingFocus = { [bridge] intent in bridge.send(intent) }
     bar.pickMonth = { [weak self] month, source in self?.presentMonthPicker(month, from: source) }
-    monthPicker.onPick = { [weak self] month in
-      guard let self, let entryId = self.host.chrome.state?.entryId else { return }
-      self.send(.pickMonth(.init(entryId: entryId, month: month)))
+    monthPicker.onPick = { [weak self] month, entryId in
+      self?.send(.pickMonth(.init(entryId: entryId, month: month)))
     }
     tabs.onSidebarVisible = { [bridge] visible in bridge.sidebarVisible = visible }
     tabs.onWindowControlsWidth = { [bridge] width in bridge.windowControlsWidth = width }
@@ -69,6 +68,7 @@ final class ChromeCoordinator {
     }
     bar.setDimmed(state.modal)
     menus.pageDidShow(entryId: state.entryId)
+    monthPicker.close(keeping: state.entryId)
     formatting.update(state.toolbar)
   }
 
@@ -81,7 +81,8 @@ final class ChromeCoordinator {
   }
 
   private func presentMonthPicker(_ month: String, from source: UIView) {
-    monthPicker.present(month: month, from: source, in: container)
+    guard let entryId = host.chrome.state?.entryId else { return }
+    monthPicker.present(month: month, entryId: entryId, from: source, in: container)
   }
 
   /// A user back swipe starts to move the page, or settles back without a
@@ -111,6 +112,7 @@ final class ChromeCoordinator {
   /// theme stays until the first state, so a pinned style does not flip.
   private func reset() {
     menus.closeAll()
+    monthPicker.close()
     shownTab = nil
     swipeEntryId = nil
     bar.reset()

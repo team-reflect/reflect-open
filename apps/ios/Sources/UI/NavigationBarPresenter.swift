@@ -28,6 +28,10 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
   private var searchRevision: (entryId: Int, revision: Int)?
   /// The last text sent to the page, so the field's own updates send once.
   private var sentText: String?
+  /// Set while the shell itself changes the field, so the change is not sent.
+  private var writingSearch = false
+  /// A focus request for an entry the bar does not show yet.
+  private var pendingFocus: Int?
 
   private lazy var titleButton: UIButton = {
     var configuration = UIButton.Configuration.plain()
@@ -85,6 +89,18 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
     showTitle(state.title)
     showButtons(Shown(state), newEntry: newEntry, animated: animated)
     showSearch(state.search, newEntry: newEntry)
+    if let pendingFocus, pendingFocus == entryId {
+      self.pendingFocus = nil
+      // The search bar joins the window in the next layout pass.
+      DispatchQueue.main.async { [weak self] in self?.focusSearch(entryId: pendingFocus) }
+    }
+  }
+
+  /// Runs `change` without sending the field's updates to the page.
+  private func writeSearch(_ change: () -> Void) {
+    writingSearch = true
+    change()
+    writingSearch = false
   }
 
   private func showTitle(_ title: ChromeTitle?) {
@@ -190,14 +206,14 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
   private func showSearch(_ state: SearchState?, newEntry: Bool) {
     guard let state else {
       if item.searchController != nil {
-        search.isActive = false
+        writeSearch { search.isActive = false }
         item.searchController = nil
       }
       searchRevision = nil
       return
     }
     if newEntry, search.isActive {
-      search.isActive = false
+      writeSearch { search.isActive = false }
     }
     if item.searchController !== search {
       item.searchController = search
@@ -209,13 +225,18 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
     {
       searchRevision = revision
       sentText = state.text
-      search.searchBar.text = state.text
+      writeSearch { search.searchBar.text = state.text }
     }
   }
 
-  /// Focuses the search field of `entryId` and selects its text.
+  /// Focuses the search field of `entryId` and selects its text. A request
+  /// for an entry that is not shown yet waits for that entry.
   func focusSearch(entryId: Int) {
-    guard entryId == self.entryId, item.searchController === search else { return }
+    guard entryId == self.entryId else {
+      pendingFocus = entryId
+      return
+    }
+    guard item.searchController === search else { return }
     let field = search.searchBar.searchTextField
     field.becomeFirstResponder()
     field.selectAll(nil)
@@ -223,7 +244,7 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
 
   func updateSearchResults(for searchController: UISearchController) {
     let text = searchController.searchBar.text ?? ""
-    guard text != sentText else { return }
+    guard !writingSearch, text != sentText else { return }
     sentText = text
     sendKeepingFocus(.search(.init(entryId: entryId, text: text)))
   }
@@ -258,7 +279,8 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
     entryId = -1
     searchRevision = nil
     sentText = nil
-    search.isActive = false
+    pendingFocus = nil
+    writeSearch { search.isActive = false }
     item.searchController = nil
     item.title = nil
     item.titleView = nil

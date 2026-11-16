@@ -1,17 +1,22 @@
 import UIKit
 
 /// The month wheel of the Daily title, in a popover on every device. It
-/// reports the month when the popover closes, if the month changed.
+/// reports the month and the entry it opened for when the user closes the
+/// popover, if the month changed.
 @MainActor
 final class MonthPickerPresenter: NSObject, UIPopoverPresentationControllerDelegate {
-  var onPick: (String) -> Void = { _ in }
+  var onPick: (_ month: String, _ entryId: Int) -> Void = { _, _ in }
 
   private var start: String?
+  private var entryId: Int?
   private weak var picker: UIDatePicker?
+  private weak var controller: UIViewController?
 
   private static let calendar = Calendar(identifier: .gregorian)
 
-  func present(month: String, from source: UIView, in presenter: UIViewController) {
+  func present(
+    month: String, entryId: Int, from source: UIView, in presenter: UIViewController
+  ) {
     let picker = UIDatePicker()
     picker.datePickerMode = .yearAndMonth
     picker.preferredDatePickerStyle = .wheels
@@ -24,7 +29,9 @@ final class MonthPickerPresenter: NSObject, UIPopoverPresentationControllerDeleg
     controller.popoverPresentationController?.sourceItem = source
     controller.popoverPresentationController?.delegate = self
     start = month
+    self.entryId = entryId
     self.picker = picker
+    self.controller = controller
     presenter.present(controller, animated: true)
   }
 
@@ -34,8 +41,17 @@ final class MonthPickerPresenter: NSObject, UIPopoverPresentationControllerDeleg
   ) -> UIModalPresentationStyle { .none }
 
   func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
-    guard let picker, let month = Self.month(picker.date), month != start else { return }
-    onPick(month)
+    guard let picker, let entryId, let month = Self.month(picker.date), month != start
+    else { return }
+    onPick(month, entryId)
+  }
+
+  /// Closes the popover without a pick, unless it shows the picker of
+  /// `entryId`.
+  func close(keeping entryId: Int? = nil) {
+    guard let controller, self.entryId != entryId else { return }
+    controller.dismiss(animated: true)
+    self.controller = nil
   }
 
   static func date(_ month: String) -> Date? {
