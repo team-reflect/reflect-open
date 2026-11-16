@@ -135,6 +135,11 @@ export function githubCredential(token: string): GitCredential {
  */
 const REFRESH_MARGIN_MS = 5 * 60 * 1000
 
+/**
+ * How long a stored app token must stay valid for a push that may not refresh it.
+ */
+const PEEK_MARGIN_MS = 60 * 1000
+
 function toAuth(
   accessToken: string,
   parsed: { refresh_token?: string | undefined; expires_in?: number | undefined },
@@ -194,6 +199,11 @@ export interface GithubAuthService extends Store<GithubAuthState> {
    * reconnect.
    */
   getToken(): Promise<string | null>
+  /**
+   * The stored token without a refresh: `undefined` when an app token
+   * expires within a minute, `null` when none is stored.
+   */
+  peekToken(): Promise<string | null | undefined>
   /**
    * Begin the device flow: returns the code to show + where the user enters it.
    */
@@ -293,6 +303,17 @@ class GithubAuthServiceImpl implements GithubAuthService {
     // A refresh keeps the machine connected, so subscribers are not notified.
     await this.#store(refreshed)
     return refreshed.kind === 'pat' ? refreshed.token : refreshed.accessToken
+  }
+
+  async peekToken(): Promise<string | null | undefined> {
+    const auth = await this.#readStored()
+    if (auth === null) {
+      return null
+    }
+    if (auth.kind === 'app' && this.#deps.clock.now() >= auth.expiresAt - PEEK_MARGIN_MS) {
+      return undefined
+    }
+    return usableToken(auth)
   }
 
   async deviceFlowStart(clientId: string = GITHUB_APP_CLIENT_ID): Promise<DeviceFlowStart> {

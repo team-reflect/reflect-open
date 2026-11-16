@@ -277,16 +277,18 @@ describe('createSyncEngineFactory', () => {
     }
   })
 
-  it('a push-only cycle hidden after its commit pushes', async () => {
+  it('a push-only cycle hidden after its commit pushes with the stored token', async () => {
     let canStartCycle = true
     const git = fakeGit()
     git.onCommitAll(() => {
       canStartCycle = false
       return COMMITTED
     })
+    const getCredential = vi.fn(() => CRED)
     const engine = createSyncEngine({
       generation: 1,
-      getCredential: () => CRED,
+      getCredential,
+      peekCredential: () => CRED,
       canStartCycle: () => canStartCycle,
       idleMs: 100,
     })
@@ -294,6 +296,7 @@ describe('createSyncEngineFactory', () => {
     await advance(100)
     await runAllTimers()
     expect(methodsOf(git)).toEqual(['commitAll', 'push'])
+    expect(getCredential).not.toHaveBeenCalled()
     engine.stop()
   })
 
@@ -429,6 +432,137 @@ describe('createSyncEngineFactory', () => {
     expect(methodsOf(git)).toEqual(['commitAll'])
     await engine.syncNow()
     expect(methodsOf(git)).toEqual(['commitAll']) // still gated
+    engine.stop()
+  })
+
+  it('pushHidden pushes once with the stored token even when the owner gates cycles', async () => {
+    const git = fakeGit()
+    const getCredential = vi.fn(() => CRED)
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential,
+      peekCredential: () => CRED,
+      canStartCycle: returnFalse,
+    })
+    await engine.pushHidden()
+    expect(git.calls()).toEqual([
+      { method: 'commitAll', args: ['Update notes', 1] },
+      { method: 'push', args: [CRED, 1] },
+    ])
+    expect(getCredential).not.toHaveBeenCalled()
+    engine.stop()
+  })
+
+  it('pushHidden only commits without a stored-token reader', async () => {
+    const git = fakeGit()
+    const engine = createSyncEngine({ generation: 1, getCredential: () => CRED })
+    await engine.pushHidden()
+    expect(methodsOf(git)).toEqual(['commitAll'])
+    engine.stop()
+  })
+
+  it('pushHidden ends quietly when another device pushed first', async () => {
+    const git = fakeGit()
+    git.onPush(() => NON_FAST_FORWARD)
+    const statuses: SyncStatus[] = []
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: () => CRED,
+      peekCredential: () => CRED,
+      canStartCycle: returnFalse,
+      onStatus: (status) => {
+        statuses.push(status)
+      },
+    })
+    await engine.pushHidden()
+    expect(methodsOf(git)).toEqual(['commitAll', 'push'])
+    expect(statuses.at(-1)).toEqual({ state: 'idle' })
+    engine.stop()
+  })
+
+  it('pushHidden reports a push the remote rejects', async () => {
+    const git = fakeGit()
+    git.onPush(() => ({
+      pushed: false,
+      nonFastForward: false,
+      rejectionMessage: 'push protection',
+    }))
+    const statuses: SyncStatus[] = []
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: () => CRED,
+      peekCredential: () => CRED,
+      onStatus: (status) => {
+        statuses.push(status)
+      },
+    })
+    await engine.pushHidden()
+    expect(statuses.at(-1)).toEqual({
+      state: 'error',
+      errorKind: 'rejected',
+      message: 'push protection',
+    })
+    engine.stop()
+  })
+
+  it('pushHidden uses the stored token and only commits when it is due for a refresh', async () => {
+    const git = fakeGit()
+    const getCredential = vi.fn(() => CRED)
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential,
+      peekCredential: noop,
+    })
+    await engine.pushHidden()
+    expect(methodsOf(git)).toEqual(['commitAll'])
+    expect(getCredential).not.toHaveBeenCalled()
+    engine.stop()
+  })
+
+  it('pushHidden skips the network when nothing is ahead, and in local-only mode', async () => {
+    const git = fakeGit()
+    git.onCommitAll(() => CLEAN_COMMIT)
+    const peekCredential = vi.fn(() => CRED)
+    const engine = createSyncEngine({ generation: 1, getCredential: () => CRED, peekCredential })
+    await engine.pushHidden()
+    expect(methodsOf(git)).toEqual(['commitAll'])
+    expect(peekCredential).not.toHaveBeenCalled()
+    engine.stop()
+
+    const localGit = fakeGit()
+    const local = createSyncEngine({ generation: 1, getCredential: returnNull, localOnly: true })
+    await local.pushHidden()
+    expect(methodsOf(localGit)).toEqual(['commitAll'])
+    local.stop()
+  })
+
+  it('a background flush queued behind a sync commits and pushes when the app hides meanwhile', async () => {
+    const gate: { release: () => void } = { release: noop }
+    const git = fakeGit()
+    git.onPull(() => {
+      return new Promise((resolve) => {
+        gate.release = () => resolve(PULLED)
+      })
+    })
+    let canStartCycle = true
+    const engine = createSyncEngine({
+      generation: 1,
+      getCredential: () => CRED,
+      peekCredential: () => CRED,
+      canStartCycle: () => canStartCycle,
+    })
+    const first = engine.syncNow()
+    await vi.waitFor(() => expect(methodsOf(git)).toContain('pull'))
+    const second = engine.syncNow()
+    canStartCycle = false
+    const flushed = engine.pushHidden()
+    const committed = engine.commitNow()
+    gate.release()
+    await first
+    await flushed
+    await committed
+    await second
+    expect(methodsOf(git)).toEqual(['fetch', 'pull', 'commitAll', 'push'])
     engine.stop()
   })
 

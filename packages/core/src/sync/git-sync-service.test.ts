@@ -1129,7 +1129,7 @@ describe('createGitSyncService', () => {
     }
   })
 
-  it('the mobile background flush commits while the document is hidden', async () => {
+  it('the mobile background flush commits and pushes while the document is hidden', async () => {
     const { calls } = fakeServices({ mobile: true })
     const gitSync = createGitSync({ indexGeneration: 1 })
     try {
@@ -1137,11 +1137,36 @@ describe('createGitSyncService', () => {
       await vi.waitFor(() => {
         expect(calls).toContain('pull') // the launch cycle ran
       })
-      const before = commitCount(calls)
+      await vi.waitFor(() => {
+        expect(gitSync.get()).toMatchObject({ status: { state: 'idle' } })
+      })
+      const before = calls.length
 
       activity.setHidden(true)
       await persistenceFlush.flushAll()
-      expect(commitCount(calls)).toBe(before + 1)
+      expect(calls.slice(before).filter((command) => command !== 'committed')).toEqual([
+        'commitAll',
+        'push',
+      ])
+    } finally {
+      gitSync.dispose()
+    }
+  })
+
+  it('the desktop quit flush commits without pushing', async () => {
+    const { calls } = fakeServices()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    try {
+      await gitSync.start()
+      await vi.waitFor(() => {
+        expect(gitSync.get()).toMatchObject({ status: { state: 'idle' } })
+      })
+      const before = calls.length
+
+      await persistenceFlush.flushAll()
+      expect(calls.slice(before).filter((command) => command !== 'committed')).toEqual([
+        'commitAll',
+      ])
     } finally {
       gitSync.dispose()
     }

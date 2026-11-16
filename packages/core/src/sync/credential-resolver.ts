@@ -13,7 +13,15 @@ import { returnNull } from '@ocavue/utils'
  * stored (the GitHub account is signed out, or the host has no entry).
  */
 export type ResolvedCredential =
-  | { kind: 'ready'; get: () => MaybePromise<GitCredential | null> }
+  | {
+      kind: 'ready'
+      get: () => MaybePromise<GitCredential | null>
+      /**
+       * The stored sign-in without a token refresh: `undefined` when the
+       * stored token is due for one.
+       */
+      peek: () => MaybePromise<GitCredential | null | undefined>
+    }
   | { kind: 'missing' }
 
 /**
@@ -58,6 +66,13 @@ class CredentialResolverImpl implements CredentialResolver {
             const token = await githubAuth.getToken()
             return token === null ? null : githubCredential(token)
           },
+          peek: async () => {
+            const token = await githubAuth.peekToken()
+            if (token === undefined) {
+              return
+            }
+            return token === null ? null : githubCredential(token)
+          },
         }
       }
       case 'https': {
@@ -70,11 +85,12 @@ class CredentialResolverImpl implements CredentialResolver {
           return { kind: 'missing' }
         }
         // Re-read per cycle so an updated sign-in takes effect without a restart.
-        return { kind: 'ready', get: () => gitHostCredentials.load(remote.origin) }
+        const get = () => gitHostCredentials.load(remote.origin)
+        return { kind: 'ready', get, peek: get }
       }
       case 'ssh':
       case 'path':
-        return { kind: 'ready', get: returnNull }
+        return { kind: 'ready', get: returnNull, peek: returnNull }
     }
   }
 }

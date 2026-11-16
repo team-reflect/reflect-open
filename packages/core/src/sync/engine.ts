@@ -75,6 +75,14 @@ export interface SyncEngineOptions {
    */
   getCredential: () => MaybePromise<GitCredential | null>
   /**
+   * The stored sign-in without a token refresh, read instead of
+   * {@link getCredential} while the owner's gate is closed and by
+   * {@link SyncEngine.pushHidden}. `undefined` means the stored token is due
+   * for a refresh, and the push waits for the next resume. Without it, those
+   * cycles only commit.
+   */
+  peekCredential?: (() => MaybePromise<GitCredential | null | undefined>) | undefined
+  /**
    * Observes every product-state transition. Called synchronously; never
    * called again after `stop()`.
    */
@@ -110,8 +118,8 @@ export interface SyncEngineOptions {
    * suppresses every subsequent command, except the commit, credential, and
    * push of a push-only cycle and the push of a full cycle (they only send
    * what is already committed). A full cycle that owes a flush commit and is
-   * stopped before its pull commits once. The owner must replay a full cycle
-   * when work is allowed again.
+   * stopped before its pull commits once. {@link SyncEngine.pushHidden} never
+   * checks it. The owner must replay a full cycle when work is allowed again.
    */
   canStartCycle?: (() => boolean) | undefined
   /**
@@ -148,6 +156,13 @@ export interface SyncEngine {
    */
   commitNow(): Promise<void>
   /**
+   * Commit, then push once: the mobile background flush. It runs while the
+   * owner's gate is closed, and it never fetches, merges, or refreshes a
+   * token. A push that another device's push got ahead of ends quietly; the
+   * next resume runs a full cycle.
+   */
+  pushHidden(): Promise<void>
+  /**
    * Abort the engine: cancel timers, suppress further status emissions, and
    * unwind any in-flight cycle at its next step boundary.
    */
@@ -169,17 +184,40 @@ const MAX_PUSH_ATTEMPTS = 3
 /**
  * What a cycle does. The debounce asks for `network` only (commit, then
  * push if anything is pending). Launch, focus, and manual syncs add `fetch`
- * (fetch, pull, push). The quit and background flush ask for neither and
- * stop at the commit. A follow-up requested mid-cycle is the union of the
- * requests.
+ * (fetch, pull, push). The quit flush asks for neither and stops at the
+ * commit. The mobile background flush asks for `hidden`: commit, then one
+ * push, with the owner's gate closed. A follow-up requested mid-cycle is the
+ * union of the requests.
  */
 interface CycleRequest {
   readonly fetch: boolean
   readonly network: boolean
+  readonly hidden: boolean
 }
-const COMMIT: CycleRequest = { fetch: false, network: false }
-const PUSH: CycleRequest = { fetch: false, network: true }
-const FULL: CycleRequest = { fetch: true, network: true }
+const COMMIT: CycleRequest = { fetch: false, network: false, hidden: false }
+const PUSH: CycleRequest = { fetch: false, network: true, hidden: false }
+const FULL: CycleRequest = { fetch: true, network: true, hidden: false }
+const HIDDEN_PUSH: CycleRequest = { fetch: false, network: true, hidden: true }
+
+/**
+ * What a follow-up still owes when the owner's gate closes before it runs:
+ * the commit of a quit flush, or the commit and push of a background flush.
+ */
+type Owed = 'none' | 'commit' | 'push'
+
+function owedBy(request: CycleRequest): Owed {
+  if (request.hidden) {
+    return 'push'
+  }
+  return request.network ? 'none' : 'commit'
+}
+
+function strongerOwed(a: Owed, b: Owed): Owed {
+  if (a === 'push' || b === 'push') {
+    return 'push'
+  }
+  return a === 'commit' || b === 'commit' ? 'commit' : 'none'
+}
 
 /**
  * A push the remote refused for a non-divergence reason (e.g. push protection).
@@ -229,13 +267,13 @@ class SyncEngineImpl implements SyncEngine {
    * The one follow-up requested while a cycle was in flight (the union of
    * every request). Its callers await `done`, which settles when the
    * follow-up itself finishes, not when the cycle they landed behind does:
-   * the quit flush must not report done before its own commit ran. `flush`
-   * remembers that a commit-only request joined: a network follow-up the
-   * owner gates in the meantime still owes that commit.
+   * the quit flush must not report done before its own commit ran. `owed`
+   * remembers that a flush joined: a network follow-up the owner gates in
+   * the meantime still owes that flush's commit, or its commit and push.
    */
   #followUp: {
     request: CycleRequest
-    flush: boolean
+    owed: Owed
     done: Promise<void>
     settle: () => void
   } | null = null
@@ -293,6 +331,10 @@ class SyncEngineImpl implements SyncEngine {
 
   commitNow(): Promise<void> {
     return this.#run(COMMIT)
+  }
+
+  pushHidden(): Promise<void> {
+    return this.#run(HIDDEN_PUSH)
   }
 
   stop(): void {
@@ -443,10 +485,11 @@ class SyncEngineImpl implements SyncEngine {
   }
 
   async #run(request: CycleRequest, owesCommit = false): Promise<void> {
-    // A commit-only cycle is the background/quit flush: it must run while the
-    // document is hidden (that is when it fires), so only network cycles
+    // The quit flush and the background flush run while the document is
+    // hidden (that is when they fire), so only the other network cycles
     // honor the owner's gate.
-    if (this.#signal.aborted || (request.network && this.#options.canStartCycle?.() === false)) {
+    const gated = request.network && !request.hidden
+    if (this.#signal.aborted || (gated && this.#options.canStartCycle?.() === false)) {
       return
     }
     if (this.#running !== null) {
@@ -456,14 +499,15 @@ class SyncEngineImpl implements SyncEngine {
         const done = new Promise<void>((resolve) => {
           settle = resolve
         })
-        this.#followUp = { request, flush: !request.network, done, settle }
+        this.#followUp = { request, owed: owedBy(request), done, settle }
       } else {
         const queued = this.#followUp.request
         this.#followUp.request = {
           fetch: queued.fetch || request.fetch,
           network: queued.network || request.network,
+          hidden: queued.hidden && request.hidden,
         }
-        this.#followUp.flush ||= !request.network
+        this.#followUp.owed = strongerOwed(this.#followUp.owed, owedBy(request))
       }
       return await this.#followUp.done
     }
@@ -515,10 +559,11 @@ class SyncEngineImpl implements SyncEngine {
           const next = this.#followUp
           this.#followUp = null
           // A stopped engine runs nothing more, but its awaiters must not hang.
-          // A gated network follow-up still runs the commit a flush asked for.
+          // A gated network follow-up still runs the flush that joined it.
           const gated = this.#options.canStartCycle?.() === false
-          const request = gated && next.flush ? COMMIT : next.request
-          void (this.#signal.aborted ? Promise.resolve() : this.#run(request, next.flush)).finally(
+          const request = gated ? followUpWhenGated(next.request, next.owed) : next.request
+          const owesCommit = next.owed !== 'none'
+          void (this.#signal.aborted ? Promise.resolve() : this.#run(request, owesCommit)).finally(
             next.settle,
           )
         }
@@ -540,6 +585,10 @@ class SyncEngineImpl implements SyncEngine {
       this.#reportSkipped(flushed.skippedLargeFiles)
       return
     }
+    if (request.hidden) {
+      await this.#hiddenPush(quiet)
+      return
+    }
     const offline = this.#options.localOnly === true || quiet
     if (offline || !request.fetch) {
       // The commit lands even if the owner gates the network work after it.
@@ -550,9 +599,14 @@ class SyncEngineImpl implements SyncEngine {
       if (offline) {
         return // the commit is the whole cycle: no remote, or the sign-in is known bad
       }
-      const credential = await this.#step(this.#options.getCredential(), { gated: false })
+      // A cycle that began visible can reach this step hidden: never refresh then.
+      const gated = this.#options.canStartCycle?.() === false
+      const credential = await this.#step(
+        gated ? this.#options.peekCredential?.() : this.#options.getCredential(),
+        { gated: false },
+      )
       // A pull's own writes re-enter via the watcher: nothing to push.
-      if (!commit.committed && commit.ahead === 0) {
+      if (credential === undefined || (!commit.committed && commit.ahead === 0)) {
         return
       }
       await this.#push(credential, remoteChanges)
@@ -603,6 +657,35 @@ class SyncEngineImpl implements SyncEngine {
     )
   }
 
+  /**
+   * Commit, then push once with the stored token. No step checks the gate:
+   * the document is hidden for the whole cycle. A fetch or merge would
+   * rewrite files that iOS can suspend the app in the middle of, and a token
+   * refresh suspended after GitHub rotated the refresh token would lose the
+   * sign-in, so this cycle does neither.
+   */
+  async #hiddenPush(quiet: boolean): Promise<void> {
+    const commit = await this.#deps.git.commitAll('Update notes', this.#options.generation)
+    this.#signal.throwIfAborted()
+    this.#reportSkipped(commit.skippedLargeFiles)
+    if (this.#options.localOnly === true || quiet) {
+      return
+    }
+    if (!commit.committed && commit.ahead === 0) {
+      return
+    }
+    const credential = await this.#options.peekCredential?.()
+    this.#signal.throwIfAborted()
+    if (credential === undefined) {
+      return
+    }
+    const push = await this.#deps.git.push(credential, this.#options.generation)
+    this.#signal.throwIfAborted()
+    if (!push.pushed && !push.nonFastForward) {
+      throw new PushRejectedError(push.rejectionMessage ?? 'the remote rejected the backup')
+    }
+  }
+
   #reportSkipped(files: SkippedFile[]): void {
     if (files.length > 0) {
       this.#options.onLargeFilesSkipped?.(files)
@@ -626,6 +709,21 @@ class SyncEngineImpl implements SyncEngine {
         }
       },
     })
+  }
+}
+
+/**
+ * The request a follow-up runs when the owner's gate closed before it: the
+ * flush that joined it, or nothing (its gated network work drops).
+ */
+function followUpWhenGated(request: CycleRequest, owed: Owed): CycleRequest {
+  switch (owed) {
+    case 'push':
+      return HIDDEN_PUSH
+    case 'commit':
+      return COMMIT
+    case 'none':
+      return request
   }
 }
 
