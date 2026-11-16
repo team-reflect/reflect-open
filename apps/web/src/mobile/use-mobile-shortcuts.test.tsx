@@ -4,8 +4,7 @@ import { useStore } from '@/lib/use-store.ts'
 import { quickOpenVisible } from '@/mobile/quick-open.tsx'
 import { useRouterState } from '@/routing/router.tsx'
 import { act } from '@/test-utils/act.ts'
-import { MOD_KEY } from '@/test-utils/mod-key.ts'
-import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { useMobileShortcuts } from './use-mobile-shortcuts.ts'
 
 function Probe(): ReactElement {
@@ -30,7 +29,8 @@ async function press(
     key,
     bubbles: true,
     cancelable: true,
-    ...MOD_KEY,
+    // iOS is an Apple platform, so `Mod` is ⌘ whatever the host OS of the test.
+    metaKey: true,
     ...mods,
   })
   await act(() => {
@@ -41,7 +41,10 @@ async function press(
 
 describe('useMobileShortcuts', () => {
   it('goes to today on ⌘D', async () => {
-    const view = await renderInApp(<Probe />, { route: { kind: 'tasks' } })
+    const view = await renderInApp(<Probe />, {
+      route: { kind: 'tasks' },
+      platform: MOBILE_PLATFORM,
+    })
     await expect.element(view.getByRole('status')).toMatchTextContent('tasks')
 
     const event = await press(document.body, 'd')
@@ -51,7 +54,10 @@ describe('useMobileShortcuts', () => {
   })
 
   it('opens All notes on ⌘⇧A and Tasks on ⌘T', async () => {
-    const view = await renderInApp(<Probe />, { route: { kind: 'today' } })
+    const view = await renderInApp(<Probe />, {
+      route: { kind: 'today' },
+      platform: MOBILE_PLATFORM,
+    })
 
     await press(document.body, 'a', { shiftKey: true })
     await expect.element(view.getByRole('status')).toMatchTextContent('allNotes')
@@ -62,7 +68,10 @@ describe('useMobileShortcuts', () => {
 
   it('opens Quick Open on ⌘K, unless the editor took the key', async () => {
     quickOpenVisible.set(false)
-    const view = await renderInApp(<Probe />, { route: { kind: 'today' } })
+    const view = await renderInApp(<Probe />, {
+      route: { kind: 'today' },
+      platform: MOBILE_PLATFORM,
+    })
 
     await press(view.getByTestId('editor').element(), 'k')
     await expect.element(view.getByText('closed')).toBeInTheDocument()
