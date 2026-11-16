@@ -163,12 +163,9 @@ function MobileSurface(): ReactElement {
     )
   }
 
-  return (
-    <>
-      <chromeRenderer.NoChrome />
-      <LoadingScreen />
-    </>
-  )
+  // No `NoChrome`: the shell's bars stay through the loading screen, so the
+  // shell's first paint has its final safe area.
+  return <LoadingScreen />
 }
 
 function LoadingScreen(): ReactElement {
