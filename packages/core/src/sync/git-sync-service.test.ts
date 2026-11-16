@@ -493,7 +493,32 @@ describe('createGitSyncService', () => {
       }
     })
 
-    it('does not probe iCloud-hosted graphs, mobile, hidden windows, or while in error', async () => {
+    it('probes the remote on mobile while visible', async () => {
+      const { git, calls, gitSync } = await startSettled({ mobile: true })
+      try {
+        let probes = 0
+        git.onRemoteHead(() => {
+          probes += 1
+          return MOVED
+        })
+        const fetches = calls.filter((command) => command === 'fetch').length
+
+        activity.setHidden(true)
+        await advance(5 * 60_000)
+        expect(probes).toBe(0)
+
+        activity.setHidden(false)
+        await advance(90_000)
+        expect(probes).toBe(1)
+        await vi.waitFor(() => {
+          expect(calls.filter((command) => command === 'fetch')).toHaveLength(fetches + 1)
+        })
+      } finally {
+        gitSync.dispose()
+      }
+    })
+
+    it('does not probe iCloud-hosted graphs, hidden windows, or while in error', async () => {
       let probes = 0
       const probed = (): number => probes
       const watch = (git: TestGitRepositoryService): void => {
@@ -507,12 +532,6 @@ describe('createGitSyncService', () => {
       watch(icloud.git)
       await advance(5 * 60_000)
       icloud.gitSync.dispose()
-      expect(probed()).toBe(0)
-
-      const mobile = await startSettled({ mobile: true })
-      watch(mobile.git)
-      await advance(5 * 60_000)
-      mobile.gitSync.dispose()
       expect(probed()).toBe(0)
 
       const hidden = await startSettled({})
