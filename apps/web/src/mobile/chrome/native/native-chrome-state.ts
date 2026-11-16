@@ -18,6 +18,7 @@ import type { ChromeButton, ChromePlus, ChromeTitle } from '@/mobile/chrome/scre
  */
 export interface ScreenBar {
   canBack: boolean
+  hidesTabBar: boolean
   leading: ChromeButton[]
   trailing: ChromeButton[]
   plus: NativePlusState | null
@@ -86,6 +87,7 @@ export function buildShellChromeState(input: ShellChromeInput): UnnumberedChrome
     title: bar?.title ?? null,
     search: bar?.search ?? null,
     fullscreen: input.fullscreen,
+    hidesTabBar: bar?.hidesTabBar ?? false,
     theme: input.theme,
   }
 }
@@ -113,6 +115,7 @@ export function buildNoChromeState(theme: ThemePreference): UnnumberedChromeStat
     title: null,
     search: null,
     fullscreen: false,
+    hidesTabBar: false,
     theme,
   }
 }

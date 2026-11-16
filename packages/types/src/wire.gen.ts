@@ -327,7 +327,12 @@ search: SearchState | null;
  *  A web surface covers the whole screen (the lightbox): the shell
  *  hides its bars.
  */
-fullscreen: boolean; theme: ChromeTheme } | 
+fullscreen: boolean; 
+/**
+ *  The screen shows no tab bar (Settings). The iPad sidebar and top
+ *  tab bar stay.
+ */
+hidesTabBar: boolean; theme: ChromeTheme } | 
 /**
  *  A user back swipe starts to move the page, or settles back without a
  *  pop.

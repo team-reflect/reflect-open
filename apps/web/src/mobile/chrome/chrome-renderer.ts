@@ -128,6 +128,7 @@ export function useScreenChrome(chrome: ScreenChrome): void {
     chrome.leading,
     chrome.trailing,
     chrome.back !== undefined,
+    chrome.hidesTabBar,
     chrome.plus,
     title,
     search === undefined

@@ -46,6 +46,9 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// The last state's reasons to hide the tab bar.
   private var hidesForState = false
   private var hidesForKeyboard = false
+  /// The screen shows no tab bar (Settings). A phone hides its bar or rail;
+  /// the iPad keeps its sidebar and top tab bar.
+  private var hidesForScreen = false
   /// Whether the page shows its shell, so a tap on a tab moves to it. The
   /// iPad sidebar stays tappable while the tab bar is hidden.
   private var showsShell = false
@@ -405,6 +408,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     }
     hidesForState = !showsShell || state.modal || state.fullscreen
     hidesForKeyboard = state.keyboardVisible
+    hidesForScreen = state.hidesTabBar
     plus.update(state.plus)
     entryId = state.entryId
     history = state.history
@@ -415,7 +419,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// it, and the iPad bar sits at the top. The `+` hides with the keyboard in
   /// every form.
   private func updateTabBarHidden() {
-    let hidden = hidesForState || (hidesForKeyboard && form == .bar)
+    let hidden =
+      hidesForState || (hidesForScreen && form != .pad) || (hidesForKeyboard && form == .bar)
     let systemHidden = hidden || form == .bar
     if systemHidden != isTabBarHidden {
       // The rail's tabs reach their place only when the animation ends.
@@ -459,6 +464,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     tabFollow = TabFollow()
     hidesForState = false
     hidesForKeyboard = false
+    hidesForScreen = false
     showsShell = false
     entryId = nil
     history = nil

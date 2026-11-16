@@ -103,10 +103,11 @@ class NativeChromeRenderer implements ChromeRenderer {
 
   registerScreen(entryId: number, chrome: { readonly current: ScreenChrome }): Unlisten {
     this.#screens.set(entryId, chrome)
-    const { back, leading, trailing, plus, title, search } = chrome.current
+    const { back, hidesTabBar, leading, trailing, plus, title, search } = chrome.current
     // A copy, so an in-place change of the screen's buttons is a change.
     const bar = structuredClone({
       canBack: back !== undefined,
+      hidesTabBar: hidesTabBar ?? false,
       leading: leading ?? [],
       trailing: trailing ?? [],
       plus: plus === undefined ? null : toWirePlus(plus),

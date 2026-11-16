@@ -136,6 +136,10 @@ export interface ScreenChrome {
    * Pops the screen. The bar shows a back button only with it.
    */
   back?: (() => void) | undefined
+  /**
+   * The screen shows no tab bar. The iPad sidebar and top tab bar stay.
+   */
+  hidesTabBar?: boolean | undefined
   leading?: ChromeButton[] | undefined
   trailing?: ChromeButton[] | undefined
   /**

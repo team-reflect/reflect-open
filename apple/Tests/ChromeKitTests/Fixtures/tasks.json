@@ -30,6 +30,7 @@
     "revision": 0
   },
   "fullscreen": false,
+  "hidesTabBar": false,
   "theme": "system",
   "generation": 1
 }

@@ -341,6 +341,7 @@ export function MobileSettings(): ReactElement {
         align="center"
         back={() => (canBack ? back() : navigate({ kind: 'today' }))}
         title="Settings"
+        hidesTabBar
       />
       <main className="min-h-0 flex-1 overflow-y-auto bg-surface-app px-safe pb-safe">
         <div className="flex flex-col gap-8 px-4 py-5">
