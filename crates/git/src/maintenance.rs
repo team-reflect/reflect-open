@@ -11,11 +11,11 @@
 //! packs and loose objects that the new pack holds. It never decides
 //! reachability, so it never removes an object that is not in the new pack.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::Once;
+use std::sync::{Arc, LazyLock, Mutex, Once, PoisonError, RwLock};
 use std::time::Duration;
 
 use git2::Oid;
@@ -45,6 +45,26 @@ const TEMP_PACK_MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
 /// libgit2 stops listing the pack before its data disappears.
 const PACK_EXTENSIONS: [&str; 5] = ["idx", "pack", "rev", "bitmap", "mtimes"];
 
+type ObjectLock = Arc<RwLock<()>>;
+
+/// One lock per repository between the commands that read objects outside
+/// the graph lock (readers) and a repack removing packs (the writer).
+static OBJECT_LOCKS: LazyLock<Mutex<HashMap<PathBuf, ObjectLock>>> = LazyLock::new(Mutex::default);
+
+fn object_lock(root: &Path) -> ObjectLock {
+    let key = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    let mut locks = OBJECT_LOCKS.lock().unwrap_or_else(PoisonError::into_inner);
+    Arc::clone(locks.entry(key).or_default())
+}
+
+/// Run `f`, which reads objects without the graph lock (fetch, push, status),
+/// while no repack removes packs. Readers do not wait for each other.
+pub(super) fn with_object_read<T>(root: &Path, f: impl FnOnce() -> T) -> T {
+    let lock = object_lock(root);
+    let _guard = lock.read().unwrap_or_else(PoisonError::into_inner);
+    f()
+}
+
 /// What a repack did.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Repack {
@@ -54,12 +74,15 @@ pub struct Repack {
 }
 
 /// Bound the pack files libgit2 keeps open (see [`MWINDOW_FILE_LIMIT`]).
-/// Runs once per process, before the first repository is opened.
+/// Call it before the first libgit2 call of the process; later calls do
+/// nothing.
 pub fn configure_libgit2() {
     static CONFIGURE: Once = Once::new();
     CONFIGURE.call_once(|| {
-        // SAFETY: libgit2 options are unsynchronized globals. `Once` makes
-        // this the only write, and callers run it before any git command.
+        // SAFETY: the option is an unsynchronized libgit2 global, so no other
+        // thread may use libgit2 during this write. `Once` makes it the only
+        // write, and `Core::new` calls it before the core exists: every
+        // libgit2 call in the app runs inside a core command.
         if let Err(err) = unsafe { git2::opts::set_mwindow_file_limit(MWINDOW_FILE_LIMIT) } {
             tracing::warn!(%err, "failed to limit libgit2's open pack files");
         }
@@ -71,10 +94,11 @@ pub fn configure_libgit2() {
 ///
 /// The pack is written outside the graph lock, so note writes and commits go
 /// on meanwhile: objects they add are not in the snapshot and stay. Only the
-/// removal takes the lock. Run it between git commands, not during a fetch or
-/// push: those read packs without the lock.
+/// removal takes the graph lock, and the object lock that fetch, push and
+/// status read under.
 pub fn maintain(root: &Path) -> AppResult<Option<Repack>> {
     let objects = open_existing(root)?.path().join("objects");
+    remove_stale_temp_packs(&objects.join("pack"))?;
     if !needs_repack(&objects) {
         return Ok(None);
     }
@@ -84,7 +108,7 @@ pub fn maintain(root: &Path) -> AppResult<Option<Repack>> {
 fn needs_repack(objects: &Path) -> bool {
     let loose = count_entries(&objects.join(LOOSE_SAMPLE_DIR), |_| true);
     let packs = count_entries(&objects.join("pack"), |path| {
-        path.extension().is_some_and(|ext| ext == "pack")
+        path.extension().is_some_and(|ext| ext == "pack") && !path.with_extension("keep").exists()
     });
     loose > LOOSE_OBJECT_LIMIT.div_ceil(256) || packs > PACK_LIMIT
 }
@@ -136,11 +160,20 @@ pub(super) fn repack(root: &Path) -> AppResult<Repack> {
     drop(builder);
     drop(walk);
     drop(repo);
+    // The old copies go next: the new pack must be on disk first.
+    if let Some(stem) = &new_pack {
+        for ext in ["pack", "idx"] {
+            fs::File::open(pack_dir.join(format!("{stem}.{ext}")))?.sync_all()?;
+        }
+        fs::File::open(&pack_dir)?.sync_all()?;
+    }
 
     #[cfg(test)]
     super::fault::trip(super::fault::FaultPoint::BeforeRepackRemove)?;
     let ids: HashSet<Oid> = ids.into_iter().collect();
     reflect_graph_io::with_graph_lock(root, || {
+        let lock = object_lock(root);
+        let _readers_done = lock.write().unwrap_or_else(PoisonError::into_inner);
         let mut outcome = Repack {
             objects: packed,
             ..Repack::default()
@@ -156,7 +189,6 @@ pub(super) fn repack(root: &Path) -> AppResult<Repack> {
             remove_if_exists(&pack_dir.join("multi-pack-index"))?;
         }
         outcome.removed_loose_objects = remove_loose_objects(&objects, &ids)?;
-        remove_stale_temp_packs(&pack_dir)?;
         Ok(outcome)
     })
 }
@@ -217,7 +249,10 @@ fn remove_loose_objects(objects: &Path, packed: &HashSet<Oid>) -> AppResult<usiz
 }
 
 fn remove_stale_temp_packs(pack_dir: &Path) -> AppResult<()> {
-    for entry in fs::read_dir(pack_dir)? {
+    let Ok(entries) = fs::read_dir(pack_dir) else {
+        return Ok(());
+    };
+    for entry in entries {
         let entry = entry?;
         let stale = entry
             .metadata()?

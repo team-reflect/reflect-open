@@ -13,7 +13,7 @@ use tempfile::tempdir;
 
 use super::commit::commit_all;
 use super::fault::{self, Fault, FaultPoint};
-use super::maintenance::{maintain, repack};
+use super::maintenance::{maintain, repack, with_object_read};
 use super::merge::merge_remote;
 use super::remote::{fetch, push, remote_head};
 use super::test_support::{
@@ -2529,7 +2529,7 @@ fn maintain_waits_for_the_pack_limit() {
 }
 
 #[test]
-fn repack_removes_only_stale_temp_packs() {
+fn maintain_removes_only_stale_temp_packs_below_the_thresholds() {
     let (fixture, _) = repack_fixture(1);
     let root = &fixture.graph_a;
     let pack_dir = root.join(".git/objects/pack");
@@ -2545,8 +2545,54 @@ fn repack_removes_only_stale_temp_packs() {
         .set_modified(two_days_ago)
         .unwrap();
 
-    repack(root).unwrap();
+    assert_eq!(maintain(root).unwrap(), None);
 
     assert!(!stale.exists());
     assert!(fresh.exists());
+}
+
+#[test]
+fn maintain_ignores_kept_packs() {
+    let (fixture, _) = repack_fixture(1);
+    let root = &fixture.graph_a;
+    let pack_dir = root.join(".git/objects/pack");
+    // `.keep` packs are never removed, so they must not trigger a repack.
+    for i in 0..60 {
+        fs::write(pack_dir.join(format!("pack-kept{i}.pack")), "").unwrap();
+        fs::write(pack_dir.join(format!("pack-kept{i}.keep")), "").unwrap();
+    }
+
+    assert_eq!(maintain(root).unwrap(), None);
+}
+
+#[test]
+fn repack_removal_waits_for_object_readers() {
+    let (fixture, _) = repack_fixture(1);
+    let root = fixture.graph_a.clone();
+    let (entered_tx, entered_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel::<()>();
+    let reader_root = root.clone();
+    let reader = thread::spawn(move || {
+        with_object_read(&reader_root, || {
+            entered_tx.send(()).unwrap();
+            release_rx.recv().unwrap();
+        });
+    });
+    entered_rx.recv().unwrap();
+
+    let (done_tx, done_rx) = mpsc::channel();
+    let repack_root = root.clone();
+    let repacker = thread::spawn(move || {
+        repack(&repack_root).unwrap();
+        done_tx.send(()).unwrap();
+    });
+    assert!(
+        done_rx.recv_timeout(Duration::from_millis(500)).is_err(),
+        "the repack removed packs during a fetch, push or status"
+    );
+    release_tx.send(()).unwrap();
+    done_rx.recv_timeout(Duration::from_secs(30)).unwrap();
+    reader.join().unwrap();
+    repacker.join().unwrap();
+    assert_eq!(pack_count(&root), 1);
 }

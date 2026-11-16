@@ -6,9 +6,11 @@
 //! frontend can bracket its whole background persistence flush through the two
 //! commands below. Each path has an isolated registry. In the frontend
 //! registry, normal completion and UIKit's expiration callback race to remove
-//! the token, and only the winner ends the native assertion. In the scoped
-//! registry, the expiration callback waits for the guard to drop, so the
-//! assertion always ends after the lock is released.
+//! the token, and only the winner ends the native assertion. The scoped
+//! registry holds native guards, and each guard sets its expiration policy: a
+//! [`scoped`] guard's expiration callback waits for the guard to drop, so the
+//! assertion always ends after the lock is released; an [`expiring`] guard,
+//! for long work that owns no lock, ends at expiration like a frontend token.
 
 #[cfg(any(target_os = "ios", test))]
 use std::collections::HashMap;

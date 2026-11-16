@@ -40,6 +40,10 @@ use reflect_types::{
 pub const MAX_FILE_BYTES: u64 = 95 * 1024 * 1024;
 
 pub fn status(root: &Path) -> AppResult<GitStatus> {
+    maintenance::with_object_read(root, || read_status(root))
+}
+
+fn read_status(root: &Path) -> AppResult<GitStatus> {
     if !root.join(".git").exists() {
         return Ok(GitStatus {
             initialized: false,
@@ -142,7 +146,7 @@ pub fn clone(url: &str, path: &Path, credential: Option<GitCredential>) -> AppRe
 
 /// Fetch `origin` and report ahead/behind for the current branch.
 pub fn fetch(root: &Path, credential: Option<GitCredential>) -> AppResult<RemoteDelta> {
-    remote::fetch(root, credential)
+    maintenance::with_object_read(root, || remote::fetch(root, credential))
 }
 
 /// Read the remote tip of the current branch without fetching. `url` probes
@@ -157,7 +161,7 @@ pub fn remote_head(
 
 /// Push the current branch to `origin`; rejections come back as data.
 pub fn push(root: &Path, credential: Option<GitCredential>) -> AppResult<PushOutcome> {
-    remote::push(root, credential)
+    maintenance::with_object_read(root, || remote::push(root, credential))
 }
 
 /// Commit every pending change (no-op when clean). See `commit_all` in `commit.rs`.

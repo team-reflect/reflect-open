@@ -149,10 +149,9 @@ impl Core {
         outcome
     }
 
-    /// Repack the repository when it crosses the `git gc --auto` thresholds.
-    /// Runs after a pull: the cycle's fetch is done and its push has not
-    /// started, so no git command reads packs outside the graph lock. A
-    /// failure only skips this repack.
+    /// Repack the repository when it crosses the `git gc --auto` thresholds,
+    /// after a pull: the cycle's fetch is done and its push has not started.
+    /// A failure only skips this repack.
     ///
     /// The first repack of a long-used repository can take a minute, and it
     /// owns no file lock, so its assertion may expire: iOS then suspends the
