@@ -12,7 +12,6 @@
     "zip": "WXT_STORE_BUILD=true wxt zip",
     "zip:unpacked": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
-    "typecheck": "wxt prepare && tsc -b",
     "test": "vitest run",
     "gen:wxt": "wxt prepare"
   },
@@ -37,7 +36,6 @@
     "vite": "^8.3.5",
     "vitest": "^5.1.0",
     "vitest-fail-on-console": "^0.10.1",
-    "web-ext": "^10.8.0",
     "wxt": "^0.21.5"
   }
 }
