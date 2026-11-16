@@ -151,6 +151,10 @@ const MACOS_BROWSER_DIRS: [&str; 10] = [
     "Arc/User Data",
 ];
 
+/// Directory inside a Chromium browser's data dir that holds host manifests.
+#[cfg(any(target_os = "macos", test))]
+const CHROMIUM_HOSTS_DIR_NAME: &str = "NativeMessagingHosts";
+
 /// Firefox keeps profiles for every channel (release, Developer Edition,
 /// Nightly) under `Firefox/`, but reads per-user host manifests from the
 /// shared `Mozilla/NativeMessagingHosts/`.
@@ -171,7 +175,7 @@ fn detected_manifest_dirs(app_support: &Path) -> Vec<(PathBuf, BrowserFamily)> {
         .iter()
         .map(|dir| app_support.join(dir))
         .filter(|dir| dir.is_dir())
-        .map(|dir| (dir.join("NativeMessagingHosts"), BrowserFamily::Chromium))
+        .map(|dir| (dir.join(CHROMIUM_HOSTS_DIR_NAME), BrowserFamily::Chromium))
         .collect();
     if app_support.join(MACOS_FIREFOX_DATA_DIR).is_dir() {
         dirs.push((
