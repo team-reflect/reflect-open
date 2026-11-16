@@ -46,7 +46,7 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
     {
       id: 'mobile-faster-sync',
       title: 'Faster sync on mobile',
-      body: 'Your notes now stay in sync across devices faster.',
+      body: 'Your notes now sync faster across devices.',
       platforms: ['ios'],
     },
   ],
