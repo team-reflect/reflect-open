@@ -116,10 +116,12 @@ enum Expiration {
     WaitForOwner,
 }
 
-/// RAII assertion for native operations that may own a file or SQLite lock.
-/// Only `Drop` ends the assertion: UIKit's expiration callback blocks the
-/// main thread until then, so the operation releases its lock first on any
-/// thread. The operation must not wait for the main thread.
+/// RAII assertion for a native operation, ended on `Drop`. A [`scoped`]
+/// guard is for operations that may own a file or SQLite lock: only `Drop`
+/// ends it, as UIKit's expiration callback blocks the main thread until
+/// then, so the operation releases its lock first on any thread. The
+/// operation must not wait for the main thread. An [`expiring`] guard also
+/// ends when UIKit's time runs out.
 pub struct ScopedBackgroundTask {
     registry: Arc<TaskRegistry>,
     token: Option<String>,
@@ -139,6 +141,17 @@ pub fn scoped(state: &BackgroundTaskState, name: &str) -> ScopedBackgroundTask {
     ScopedBackgroundTask {
         registry: Arc::clone(&state.scoped),
         token: platform::begin(Arc::clone(&state.scoped), name, Expiration::WaitForOwner),
+    }
+}
+
+/// Acquire an iOS background assertion that UIKit ends when its time runs
+/// out, for long native work that owns no file or SQLite lock: the process
+/// may be suspended in the middle of it. Other platforms return an inert
+/// guard.
+pub fn expiring(state: &BackgroundTaskState, name: &str) -> ScopedBackgroundTask {
+    ScopedBackgroundTask {
+        registry: Arc::clone(&state.scoped),
+        token: platform::begin(Arc::clone(&state.scoped), name, Expiration::End),
     }
 }
 

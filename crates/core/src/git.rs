@@ -153,9 +153,13 @@ impl Core {
     /// Runs after a pull: the cycle's fetch is done and its push has not
     /// started, so no git command reads packs outside the graph lock. A
     /// failure only skips this repack.
+    ///
+    /// The first repack of a long-used repository can take a minute, and it
+    /// owns no file lock, so its assertion may expire: iOS then suspends the
+    /// repack, and it goes on when the app resumes.
     async fn git_maintain(&self, root: PathBuf) {
         let _background_task =
-            background_task::scoped(&self.background_tasks, "Reflect git maintenance");
+            background_task::expiring(&self.background_tasks, "Reflect git maintenance");
         let started = std::time::Instant::now();
         match self
             .spawn_blocking(move || reflect_git::maintain(&root))

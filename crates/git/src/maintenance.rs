@@ -16,6 +16,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Once;
+use std::time::Duration;
 
 use git2::Oid;
 use reflect_types::AppResult;
@@ -33,6 +34,12 @@ const LOOSE_SAMPLE_DIR: &str = "17";
 
 /// `gc.autoPackLimit`: repack above this many packs.
 const PACK_LIMIT: usize = 50;
+
+/// libgit2 writes a pack to `pack/pack_git2_XXXXXX` and renames it when it is
+/// complete. A process killed in between leaves the temp file behind.
+const TEMP_PACK_PREFIX: &str = "pack_git2_";
+/// Older temp packs belong to no running write.
+const TEMP_PACK_MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
 
 /// Files that belong to a pack, removed with it. `.idx` goes first, so
 /// libgit2 stops listing the pack before its data disappears.
@@ -149,6 +156,7 @@ pub(super) fn repack(root: &Path) -> AppResult<Repack> {
             remove_if_exists(&pack_dir.join("multi-pack-index"))?;
         }
         outcome.removed_loose_objects = remove_loose_objects(&objects, &ids)?;
+        remove_stale_temp_packs(&pack_dir)?;
         Ok(outcome)
     })
 }
@@ -206,6 +214,26 @@ fn remove_loose_objects(objects: &Path, packed: &HashSet<Oid>) -> AppResult<usiz
         let _ = fs::remove_dir(entry.path());
     }
     Ok(removed)
+}
+
+fn remove_stale_temp_packs(pack_dir: &Path) -> AppResult<()> {
+    for entry in fs::read_dir(pack_dir)? {
+        let entry = entry?;
+        let stale = entry
+            .metadata()?
+            .modified()?
+            .elapsed()
+            .is_ok_and(|age| age > TEMP_PACK_MAX_AGE);
+        if stale
+            && entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with(TEMP_PACK_PREFIX)
+        {
+            remove_if_exists(&entry.path())?;
+        }
+    }
+    Ok(())
 }
 
 fn remove_if_exists(path: &Path) -> AppResult<()> {

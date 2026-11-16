@@ -2527,3 +2527,26 @@ fn maintain_waits_for_the_pack_limit() {
     assert_eq!(pack_count(root), 1);
     assert_eq!(maintain(root).unwrap(), None);
 }
+
+#[test]
+fn repack_removes_only_stale_temp_packs() {
+    let (fixture, _) = repack_fixture(1);
+    let root = &fixture.graph_a;
+    let pack_dir = root.join(".git/objects/pack");
+    let stale = pack_dir.join("pack_git2_stale1");
+    let fresh = pack_dir.join("pack_git2_fresh1");
+    fs::write(&stale, "interrupted").unwrap();
+    fs::write(&fresh, "in progress").unwrap();
+    let two_days_ago = std::time::SystemTime::now() - Duration::from_secs(2 * 24 * 60 * 60);
+    fs::File::options()
+        .write(true)
+        .open(&stale)
+        .unwrap()
+        .set_modified(two_days_ago)
+        .unwrap();
+
+    repack(root).unwrap();
+
+    assert!(!stale.exists());
+    assert!(fresh.exists());
+}
