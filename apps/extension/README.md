@@ -100,9 +100,9 @@ when it detects `~/Library/Application Support/Firefox/`.
 
 `wxt.config.ts` explains the two IDs: a public `key` pins the unpacked ID, and
 the store rejects `key` and minted its own ID, so `pnpm zip` drops it.
-`CHROMIUM_EXTENSION_ORIGINS` in `apps/desktop/src-tauri/src/capture.rs` must keep both
+`extension-ids.json` (embedded by `crates/core/src/capture.rs`) must keep both
 IDs, or the native hop fails for one of the two install modes. Changing the key
-without updating that constant silently breaks unpacked loads.
+without updating that file fails `manifest-key.test.ts`.
 
 To derive an ID from a key (if it ever has to change):
 

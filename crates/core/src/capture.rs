@@ -40,20 +40,24 @@ const HOST_NAME: &str = "app.reflect.capture";
 #[cfg(target_os = "macos")]
 const HOST_BINARY: &str = "reflect-capture-host";
 
-/// Chromium extension origins allowed to launch the host. The first is the
-/// dev/unpacked ID, pinned by the `key` field in `apps/extension/wxt.config.ts`;
-/// the second is the published Chrome Web Store listing.
+/// The extension IDs allowed to launch the host, shared with the extension's
+/// own tests (`apps/extension/extension-ids.json`). The first Chromium ID is
+/// the dev/unpacked one, pinned by the manifest `key` in
+/// `apps/extension/lib/identity.ts`; the second is the published Chrome Web
+/// Store listing. The Firefox ID is the `browser_specific_settings.gecko.id`,
+/// the same for temporary loads and signed builds.
 #[cfg(any(target_os = "macos", test))]
-const CHROMIUM_EXTENSION_ORIGINS: [&str; 2] = [
-    "chrome-extension://dlbliojklpickgimjdmjjdnbjdiomjik/",
-    "chrome-extension://ccabifmooehighoonjeiololjfofkhkd/",
-];
+#[derive(serde::Deserialize)]
+struct ExtensionIds {
+    chromium: Vec<String>,
+    firefox: Vec<String>,
+}
 
-/// Firefox add-on IDs allowed to launch the host: the
-/// `browser_specific_settings.gecko.id` in `apps/extension/wxt.config.ts`,
-/// which is the same for temporary loads and signed builds.
 #[cfg(any(target_os = "macos", test))]
-const FIREFOX_EXTENSION_IDS: [&str; 1] = ["capture@reflect.app"];
+fn extension_ids() -> ExtensionIds {
+    serde_json::from_str(include_str!("../../../apps/extension/extension-ids.json"))
+        .expect("extension-ids.json is valid")
+}
 
 /// Graph-relative spool directory the host writes and the drain reads.
 const INBOX_DIR: &str = ".reflect/inbox";
@@ -125,10 +129,15 @@ fn host_manifest_json(host_path: &Path, family: BrowserFamily) -> String {
     });
     match family {
         BrowserFamily::Chromium => {
-            manifest["allowed_origins"] = serde_json::json!(CHROMIUM_EXTENSION_ORIGINS);
+            let origins: Vec<String> = extension_ids()
+                .chromium
+                .iter()
+                .map(|id| format!("chrome-extension://{id}/"))
+                .collect();
+            manifest["allowed_origins"] = serde_json::json!(origins);
         }
         BrowserFamily::Firefox => {
-            manifest["allowed_extensions"] = serde_json::json!(FIREFOX_EXTENSION_IDS);
+            manifest["allowed_extensions"] = serde_json::json!(extension_ids().firefox);
         }
     }
     serde_json::to_string_pretty(&manifest).expect("static manifest serializes")
