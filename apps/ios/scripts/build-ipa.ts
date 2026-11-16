@@ -105,7 +105,12 @@ async function main(): Promise<void> {
       `REFLECT_MARKETING_VERSION=${packageJson.version.split('-')[0]}`,
       `REFLECT_BUILD_NUMBER=${buildNumber}`,
       `REFLECT_SENTRY_DSN=${(process.env.VITE_SENTRY_DSN ?? '').trim()}`,
-      ...(noSign ? ['CODE_SIGNING_ALLOWED=NO'] : signing),
+      // Signed to run locally: no certificate, but the signature keeps the
+      // entitlements that the export re-signs with. Without the API key, the
+      // archive cannot create a development certificate on the account.
+      ...(noSign
+        ? ['CODE_SIGNING_ALLOWED=NO']
+        : ['CODE_SIGN_IDENTITY=-', 'AD_HOC_CODE_SIGNING_ALLOWED=YES']),
     ]
     await exec('xcodebuild', archive, {
       throwOnError: true,
