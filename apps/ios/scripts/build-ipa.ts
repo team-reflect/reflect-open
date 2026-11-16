@@ -42,7 +42,7 @@ const DSYM_PATH = join(ARCHIVE_PATH, 'dSYMs', 'Reflect.app.dSYM')
 
 // The ad-hoc signed archive has no team, so the export options name it.
 // It repeats `DEVELOPMENT_TEAM` of `apps/ios/Config/Shared.xcconfig`.
-const EXPORT_OPTIONS_PATH = join(import.meta.dirname, 'ExportOptions.plist')
+const EXPORT_OPTIONS_PATH = join(IOS_DIR, 'ExportOptions.plist')
 
 async function main(): Promise<void> {
   const { values } = parseArgs({
