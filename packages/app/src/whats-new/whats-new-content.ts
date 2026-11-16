@@ -28,8 +28,26 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
     {
       id: 'claude-fable-5-2',
       title: 'New AI models',
-      body: 'New AI models: Claude Fable 5.2, Gemini 4 Hydrogen, and Gemini 4 Carbon.',
+      body: 'Claude Fable 5.2, Gemini 4 Hydrogen, and Gemini 4 Carbon are now available.',
       platforms: ALL_PLATFORMS,
+    },
+    {
+      id: 'liquid-glass',
+      title: 'A brand-new look for iPhone and iPad',
+      body: 'Reimagined with Liquid Glass. Smoother, lighter, and more beautiful than ever.',
+      platforms: ['ios'],
+    },
+    {
+      id: 'mobile-keyboard-shortcuts',
+      title: 'Keyboard shortcuts on mobile',
+      body: 'Desktop keyboard shortcuts now work with a hardware keyboard.',
+      platforms: ['ios'],
+    },
+    {
+      id: 'mobile-faster-sync',
+      title: 'Faster sync on mobile',
+      body: 'Your notes now stay in sync across devices faster.',
+      platforms: ['ios'],
     },
   ],
   '0.18.0': [
