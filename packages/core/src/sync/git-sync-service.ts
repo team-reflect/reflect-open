@@ -269,7 +269,10 @@ class GitSyncServiceImpl implements GitSyncService {
             isPrimaryChannel,
             status: engineStatus,
           })
-          if (remote.kind === 'github' && isForbidden(engineStatus)) {
+          // The classification reads the token with a refresh: not while iOS
+          // can suspend the app. The next resume classifies it again.
+          const hidden = this.#mobile && activity.isHidden()
+          if (remote.kind === 'github' && isForbidden(engineStatus) && !hidden) {
             void this.#classifyForbidden(engineStatus, remoteUrl, remote, isPrimaryChannel)
           }
         },

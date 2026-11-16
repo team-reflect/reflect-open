@@ -75,9 +75,11 @@ export interface SyncEngineOptions {
    */
   getCredential: () => MaybePromise<GitCredential | null>
   /**
-   * The stored sign-in without a token refresh, for {@link SyncEngine.pushHidden}:
-   * `undefined` means the stored token is due for a refresh, and the push
-   * waits for the next resume. Defaults to {@link getCredential}.
+   * The stored sign-in without a token refresh, read instead of
+   * {@link getCredential} while the owner's gate is closed and by
+   * {@link SyncEngine.pushHidden}. `undefined` means the stored token is due
+   * for a refresh, and the push waits for the next resume. Without it, those
+   * cycles only commit.
    */
   peekCredential?: (() => MaybePromise<GitCredential | null | undefined>) | undefined
   /**
@@ -597,9 +599,14 @@ class SyncEngineImpl implements SyncEngine {
       if (offline) {
         return // the commit is the whole cycle: no remote, or the sign-in is known bad
       }
-      const credential = await this.#step(this.#options.getCredential(), { gated: false })
+      // A cycle that began visible can reach this step hidden: never refresh then.
+      const gated = this.#options.canStartCycle?.() === false
+      const credential = await this.#step(
+        gated ? this.#options.peekCredential?.() : this.#options.getCredential(),
+        { gated: false },
+      )
       // A pull's own writes re-enter via the watcher: nothing to push.
-      if (!commit.committed && commit.ahead === 0) {
+      if (credential === undefined || (!commit.committed && commit.ahead === 0)) {
         return
       }
       await this.#push(credential, remoteChanges)
@@ -667,8 +674,7 @@ class SyncEngineImpl implements SyncEngine {
     if (!commit.committed && commit.ahead === 0) {
       return
     }
-    const peek = this.#options.peekCredential ?? this.#options.getCredential
-    const credential = await peek()
+    const credential = await this.#options.peekCredential?.()
     this.#signal.throwIfAborted()
     if (credential === undefined) {
       return

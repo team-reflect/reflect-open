@@ -244,7 +244,7 @@ describe('GithubAuthService.getToken', () => {
 })
 
 describe('GithubAuthService.peekToken', () => {
-  it('returns the stored token, and undefined for an app token due for a refresh', async () => {
+  it('returns the stored token, and undefined for an app token that expires within a minute', async () => {
     const appAuth = (expiresAt: number) => ({
       'github-auth': JSON.stringify({
         kind: 'app',
@@ -259,6 +259,8 @@ describe('GithubAuthService.peekToken', () => {
     expect(await setup({ now: 1_000, secrets: appAuth(10_000_000) }).auth.peekToken()).toBe(
       'ghu_live',
     )
+    // Inside the 5 min refresh margin but valid for over a minute: still usable.
+    expect(await setup({ secrets: appAuth(2 * 60_000) }).auth.peekToken()).toBe('ghu_live')
     const due = setup({ now: 2_000, secrets: appAuth(3_000) })
     expect(await due.auth.peekToken()).toBeUndefined()
     expect(due.http.requests()).toHaveLength(0)

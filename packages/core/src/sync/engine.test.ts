@@ -277,16 +277,18 @@ describe('createSyncEngineFactory', () => {
     }
   })
 
-  it('a push-only cycle hidden after its commit pushes', async () => {
+  it('a push-only cycle hidden after its commit pushes with the stored token', async () => {
     let canStartCycle = true
     const git = fakeGit()
     git.onCommitAll(() => {
       canStartCycle = false
       return COMMITTED
     })
+    const getCredential = vi.fn(() => CRED)
     const engine = createSyncEngine({
       generation: 1,
-      getCredential: () => CRED,
+      getCredential,
+      peekCredential: () => CRED,
       canStartCycle: () => canStartCycle,
       idleMs: 100,
     })
@@ -294,6 +296,7 @@ describe('createSyncEngineFactory', () => {
     await advance(100)
     await runAllTimers()
     expect(methodsOf(git)).toEqual(['commitAll', 'push'])
+    expect(getCredential).not.toHaveBeenCalled()
     engine.stop()
   })
 
@@ -432,11 +435,13 @@ describe('createSyncEngineFactory', () => {
     engine.stop()
   })
 
-  it('pushHidden commits and pushes once even when the owner gates cycles', async () => {
+  it('pushHidden pushes once with the stored token even when the owner gates cycles', async () => {
     const git = fakeGit()
+    const getCredential = vi.fn(() => CRED)
     const engine = createSyncEngine({
       generation: 1,
-      getCredential: () => CRED,
+      getCredential,
+      peekCredential: () => CRED,
       canStartCycle: returnFalse,
     })
     await engine.pushHidden()
@@ -444,6 +449,15 @@ describe('createSyncEngineFactory', () => {
       { method: 'commitAll', args: ['Update notes', 1] },
       { method: 'push', args: [CRED, 1] },
     ])
+    expect(getCredential).not.toHaveBeenCalled()
+    engine.stop()
+  })
+
+  it('pushHidden only commits without a stored-token reader', async () => {
+    const git = fakeGit()
+    const engine = createSyncEngine({ generation: 1, getCredential: () => CRED })
+    await engine.pushHidden()
+    expect(methodsOf(git)).toEqual(['commitAll'])
     engine.stop()
   })
 
@@ -454,6 +468,7 @@ describe('createSyncEngineFactory', () => {
     const engine = createSyncEngine({
       generation: 1,
       getCredential: () => CRED,
+      peekCredential: () => CRED,
       canStartCycle: returnFalse,
       onStatus: (status) => {
         statuses.push(status)
@@ -476,6 +491,7 @@ describe('createSyncEngineFactory', () => {
     const engine = createSyncEngine({
       generation: 1,
       getCredential: () => CRED,
+      peekCredential: () => CRED,
       onStatus: (status) => {
         statuses.push(status)
       },
@@ -506,11 +522,11 @@ describe('createSyncEngineFactory', () => {
   it('pushHidden skips the network when nothing is ahead, and in local-only mode', async () => {
     const git = fakeGit()
     git.onCommitAll(() => CLEAN_COMMIT)
-    const getCredential = vi.fn(() => CRED)
-    const engine = createSyncEngine({ generation: 1, getCredential })
+    const peekCredential = vi.fn(() => CRED)
+    const engine = createSyncEngine({ generation: 1, getCredential: () => CRED, peekCredential })
     await engine.pushHidden()
     expect(methodsOf(git)).toEqual(['commitAll'])
-    expect(getCredential).not.toHaveBeenCalled()
+    expect(peekCredential).not.toHaveBeenCalled()
     engine.stop()
 
     const localGit = fakeGit()
@@ -532,6 +548,7 @@ describe('createSyncEngineFactory', () => {
     const engine = createSyncEngine({
       generation: 1,
       getCredential: () => CRED,
+      peekCredential: () => CRED,
       canStartCycle: () => canStartCycle,
     })
     const first = engine.syncNow()

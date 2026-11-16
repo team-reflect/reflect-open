@@ -135,6 +135,11 @@ export function githubCredential(token: string): GitCredential {
  */
 const REFRESH_MARGIN_MS = 5 * 60 * 1000
 
+/**
+ * How long a stored app token must stay valid for a push that may not refresh it.
+ */
+const PEEK_MARGIN_MS = 60 * 1000
+
 function toAuth(
   accessToken: string,
   parsed: { refresh_token?: string | undefined; expires_in?: number | undefined },
@@ -195,8 +200,8 @@ export interface GithubAuthService extends Store<GithubAuthState> {
    */
   getToken(): Promise<string | null>
   /**
-   * The stored token without a refresh: `undefined` when an app token is
-   * within the refresh margin of its expiry, `null` when none is stored.
+   * The stored token without a refresh: `undefined` when an app token
+   * expires within a minute, `null` when none is stored.
    */
   peekToken(): Promise<string | null | undefined>
   /**
@@ -305,7 +310,7 @@ class GithubAuthServiceImpl implements GithubAuthService {
     if (auth === null) {
       return null
     }
-    if (auth.kind === 'app' && this.#deps.clock.now() >= auth.expiresAt - REFRESH_MARGIN_MS) {
+    if (auth.kind === 'app' && this.#deps.clock.now() >= auth.expiresAt - PEEK_MARGIN_MS) {
       return undefined
     }
     return usableToken(auth)
