@@ -243,6 +243,28 @@ describe('GithubAuthService.getToken', () => {
   })
 })
 
+describe('GithubAuthService.peekToken', () => {
+  it('returns the stored token, and undefined for an app token due for a refresh', async () => {
+    const appAuth = (expiresAt: number) => ({
+      'github-auth': JSON.stringify({
+        kind: 'app',
+        accessToken: 'ghu_live',
+        refreshToken: 'ghr_r',
+        expiresAt,
+      }),
+    })
+    expect(await setup().auth.peekToken()).toBeNull()
+    const pat = setup({ secrets: { 'github-auth': JSON.stringify({ kind: 'pat', token: 'ghp' }) } })
+    expect(await pat.auth.peekToken()).toBe('ghp')
+    expect(await setup({ now: 1_000, secrets: appAuth(10_000_000) }).auth.peekToken()).toBe(
+      'ghu_live',
+    )
+    const due = setup({ now: 2_000, secrets: appAuth(3_000) })
+    expect(await due.auth.peekToken()).toBeUndefined()
+    expect(due.http.requests()).toHaveLength(0)
+  })
+})
+
 describe('GithubAuthService.getAuthenticatedUser', () => {
   it('returns the login (instant token validation + owner for the wizard)', async () => {
     const { auth, http } = setup()

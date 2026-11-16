@@ -195,6 +195,11 @@ export interface GithubAuthService extends Store<GithubAuthState> {
    */
   getToken(): Promise<string | null>
   /**
+   * The stored token without a refresh: `undefined` when an app token is
+   * within the refresh margin of its expiry, `null` when none is stored.
+   */
+  peekToken(): Promise<string | null | undefined>
+  /**
    * Begin the device flow: returns the code to show + where the user enters it.
    */
   deviceFlowStart(clientId?: string): Promise<DeviceFlowStart>
@@ -293,6 +298,17 @@ class GithubAuthServiceImpl implements GithubAuthService {
     // A refresh keeps the machine connected, so subscribers are not notified.
     await this.#store(refreshed)
     return refreshed.kind === 'pat' ? refreshed.token : refreshed.accessToken
+  }
+
+  async peekToken(): Promise<string | null | undefined> {
+    const auth = await this.#readStored()
+    if (auth === null) {
+      return null
+    }
+    if (auth.kind === 'app' && this.#deps.clock.now() >= auth.expiresAt - REFRESH_MARGIN_MS) {
+      return undefined
+    }
+    return usableToken(auth)
   }
 
   async deviceFlowStart(clientId: string = GITHUB_APP_CLIENT_ID): Promise<DeviceFlowStart> {

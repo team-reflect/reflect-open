@@ -82,6 +82,8 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
   [icloud-sync.md](../icloud-sync.md).
 - **Hidden windows (iOS):** a debounced commit that has begun still pushes after the
   app is hidden. A pull's fetch and merge do not start or continue once it is hidden.
+  Hiding the app commits and pushes once, with the stored token (no refresh, no
+  fetch); a push that another device got ahead of waits for the next resume.
   Auth, push-protection, and size failures surface immediately — only divergence retries.
 - **Merge, not rebase.** Single branch; merge commits are fine — history is invisible
   product-wise, and rewriting published history breaks multi-device.

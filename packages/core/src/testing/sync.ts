@@ -443,6 +443,10 @@ class TestGithubAuthServiceImpl implements TestGithubAuthService {
     return this.#inner.getToken()
   }
 
+  peekToken(): Promise<string | null | undefined> {
+    return this.#inner.peekToken()
+  }
+
   deviceFlowStart(clientId?: string): Promise<DeviceFlowStart> {
     return this.#inner.deviceFlowStart(clientId)
   }
