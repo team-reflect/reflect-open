@@ -20,7 +20,8 @@ final class ChromeCoordinator {
   private let bar: NavigationBarPresenter
   private let monthPicker = MonthPickerPresenter()
   private let formatting: FormattingAccessory
-  /// The tab of the last state: bar buttons animate only within one tab.
+  /// The tab of the last shell state: the bar animates only within one tab.
+  /// A state without chrome (the loading screen) shows no tab.
   private var shownTab: ChromeTab?
   /// The entry a back swipe faded the bar for.
   private var swipeEntryId: Int?
@@ -61,7 +62,7 @@ final class ChromeCoordinator {
     applyTheme(state.theme)
     tabs.apply(state)
     bar.show(state, animated: state.tab == shownTab)
-    shownTab = state.tab
+    shownTab = state.chrome == .none ? nil : state.tab
     // The pop of a back swipe brings a new entry: the bar fades back in.
     if let swipeEntryId, swipeEntryId != state.entryId {
       endBackSwipe()
