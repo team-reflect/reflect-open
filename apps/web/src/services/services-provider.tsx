@@ -1,9 +1,9 @@
 import { createContext, use, type ReactElement, type ReactNode } from 'react'
-import type { AppServices } from '@reflect/app'
+import type { WebAppServices } from '@/lib/commands/types.ts'
 import type { CoreServices, GraphServices } from '@reflect/core'
 
 const CoreServicesContext = createContext<CoreServices | null>(null)
-const AppServicesContext = createContext<AppServices | null>(null)
+const AppServicesContext = createContext<WebAppServices | null>(null)
 const GraphServicesContext = createContext<GraphServices | null>(null)
 
 export function CoreServicesProvider({
@@ -23,7 +23,7 @@ export function AppServicesProvider({
   services,
   children,
 }: {
-  services: AppServices
+  services: WebAppServices
   children: ReactNode
 }): ReactElement {
   return <AppServicesContext value={services}>{children}</AppServicesContext>
@@ -53,7 +53,7 @@ export function useCoreServices(): CoreServices {
 /**
  * The {@link AppServices} of the nearest `AppServicesProvider`.
  */
-export function useAppServices(): AppServices {
+export function useAppServices(): WebAppServices {
   const services = use(AppServicesContext)
   if (services === null) {
     throw new Error('useAppServices() must be called inside an <AppServicesProvider>')

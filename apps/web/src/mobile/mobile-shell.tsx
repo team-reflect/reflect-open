@@ -13,6 +13,7 @@ import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { useSyncChatSection } from '@/mobile/sidebar.ts'
 import { useAllSearch } from '@/mobile/all-search.tsx'
 import { MobileQuickOpen } from '@/mobile/quick-open.tsx'
+import { useMobileShortcuts } from '@/mobile/use-mobile-shortcuts.ts'
 
 /**
  * The tabbed mobile shell (Plan 19, V1 parity): screens above, the
@@ -43,6 +44,7 @@ export function MobileShell(): ReactElement {
   // V1's wake-to-today: foregrounding on a new calendar date lands on today.
   useWakeToToday()
   useSyncChatSection()
+  useMobileShortcuts()
 
   const handleTabSelect = (next: MobileTab): void => {
     const doubleTap = isDoubleTap(next)

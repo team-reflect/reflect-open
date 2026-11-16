@@ -1,8 +1,8 @@
 import type { NoteCreationService } from '@reflect/core'
-import { type CommandService, routeForPath, type Route } from '@reflect/app'
+import { type Commands, type CommandService, routeForPath, type Route } from '@reflect/app'
 import { attachFilesToNote } from '@/lib/attach-files.ts'
 import { copyNoteDeepLink, copyNotePath, publishGistAndCopyLink } from '@/lib/clipboard-actions.ts'
-import type { AppCommand, CommandContext } from './types.ts'
+import type { AppCommand, AppCommandId, CommandContext, GraphSwitchPosition } from './types.ts'
 
 /**
  * The app commands. Each command defines its keybinding and its behavior
@@ -33,19 +33,36 @@ function openNewNote(context: CommandContext): void {
   context.navigate(newNoteRoute(context.services.noteCreation))
 }
 
-const GRAPH_SWITCH_COMMANDS: AppCommand[] = Array.from({ length: 9 }, (_, index) => {
-  const position = index + 1
+/**
+ * Whether `position` has a `graph.switch` command.
+ */
+export function isGraphSwitchPosition(position: number): position is GraphSwitchPosition {
+  return Number.isSafeInteger(position) && position >= 1 && position <= 9
+}
+
+/**
+ * The command that switches to the recent graph at `position`.
+ */
+function defineSwitchGraphCommand(position: GraphSwitchPosition): AppCommand {
   return {
     id: `graph.switch${position}`,
     title: `Switch to graph ${position}`,
     keywords: ['graph', 'workspace', 'switch', 'recent'],
     keybinding: `Mod-${position}`,
-    run: (context) => context.switchGraph(index),
+    run: (context) => context.switchGraph(position - 1),
   }
-})
+}
 
-const APP_COMMANDS: AppCommand[] = [
-  ...GRAPH_SWITCH_COMMANDS,
+const APP_COMMANDS: Commands<AppCommandId, CommandContext> = [
+  defineSwitchGraphCommand(1),
+  defineSwitchGraphCommand(2),
+  defineSwitchGraphCommand(3),
+  defineSwitchGraphCommand(4),
+  defineSwitchGraphCommand(5),
+  defineSwitchGraphCommand(6),
+  defineSwitchGraphCommand(7),
+  defineSwitchGraphCommand(8),
+  defineSwitchGraphCommand(9),
   {
     id: 'nav.today',
     title: 'Go to today',
@@ -350,11 +367,11 @@ const APP_COMMANDS: AppCommand[] = [
 
 /**
  * The registered keybinding for `commandId`, or `null` when the command has
- * none (or the id is unknown). UI hints — sidebar keycaps, "go to today"
- * affordances — derive bindings through this so they can never drift from the
- * command definition, and disappear if the binding ever does.
+ * none. UI hints — sidebar keycaps, "go to today" affordances — derive
+ * bindings through this so they can never drift from the command definition,
+ * and disappear if the binding ever does.
  */
-export function keybindingFor(commandId: string): string | null {
+export function keybindingFor(commandId: AppCommandId): string | null {
   return APP_COMMANDS.find((command) => command.id === commandId)?.keybinding ?? null
 }
 
@@ -363,7 +380,7 @@ const registeredIn = new WeakSet<object>()
 /**
  * Register the app commands in `registry`. Idempotent per registry.
  */
-export function registerAppCommands(registry: CommandService<CommandContext>): void {
+export function registerAppCommands(registry: CommandService<AppCommandId, CommandContext>): void {
   if (registeredIn.has(registry)) {
     return
   }

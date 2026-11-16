@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { getIsComposing } from '@meowdown/core'
 import { usePalette } from '@/components/command-palette/palette-provider.tsx'
-import type { CommandContext } from '@/lib/commands/types.ts'
+import type { AppCommandId, CommandContext } from '@/lib/commands/types.ts'
 import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
 import { useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { useGraphActions, useGraphInfo, useGraphRecents } from '@/providers/graph-provider.tsx'
@@ -26,12 +26,12 @@ import { useRouterActions, useRouterState, useRouterHandlers } from './router.ts
  * (`registerAppKeymaps`).
  */
 
-const HISTORY_COMMAND_IDS = new Set(['history.back', 'history.forward'])
+const HISTORY_COMMAND_IDS = new Set<AppCommandId>(['history.back', 'history.forward'])
 
 // AppKit owns this key equivalent on macOS. Keep it in the registry for
 // display, collision detection, and the plain-browser/non-macOS fallback, but
 // do not consume its keydown in the webview before the native menu sees it.
-const NATIVE_MACOS_MENU_COMMAND_IDS = new Set([
+const NATIVE_MACOS_MENU_COMMAND_IDS = new Set<AppCommandId>([
   'sidebar.toggle',
   'note.find',
   'note.findNext',
@@ -205,11 +205,11 @@ export function useAppShortcuts(): CommandContext {
   )
 
   useEffect(() => {
-    function idForKeyDown(event: KeyboardEvent): string | null {
+    function idForKeyDown(event: KeyboardEvent): AppCommandId | null {
       return commands.commandForKeyDown(event)
     }
 
-    function isNativeMacosMenuCommand(commandId: string): boolean {
+    function isNativeMacosMenuCommand(commandId: AppCommandId): boolean {
       return (
         platform.isMacosDesktop &&
         nativeMenu.isInstalled() &&
@@ -219,7 +219,7 @@ export function useAppShortcuts(): CommandContext {
 
     // The one guarded entry point for app commands, shared by keystrokes and
     // native menu activations. Returns whether the command was handled.
-    function triggerCommand(id: string): boolean {
+    function triggerCommand(id: AppCommandId): boolean {
       if (paletteOpenRef.current) {
         return false // modal palette owns the screen; Esc closes, then commands resume
       }

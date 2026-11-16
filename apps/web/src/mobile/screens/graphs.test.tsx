@@ -1,7 +1,6 @@
 import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { MobileOnboardingService } from '@reflect/app'
-import { createTestAppServices } from '@reflect/app/testing'
 import type { MobileStorageInfo } from '@reflect/core'
 import {
   createTestCoreServices,
@@ -11,6 +10,7 @@ import {
 import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileGraphs } from './graphs.tsx'
+import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
 /**
  * The Graphs screen (the mobile graph switcher): a checkmark-selection list
@@ -38,7 +38,7 @@ async function mount(storage: MobileStorageInfo = STORAGE): Promise<void> {
     platform: createTestPlatformService(MOBILE_PLATFORM),
     mobileStorage: createTestMobileStorageService({ storage }),
   })
-  const appServices = createTestAppServices(core)
+  const appServices = createWebTestAppServices(core)
   completeOnboarding = vi
     .spyOn(appServices.mobileOnboarding, 'completeOnboarding')
     .mockImplementation(completeOnboardingResult)

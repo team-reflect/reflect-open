@@ -122,7 +122,7 @@ export {
   weekOf,
   type WeekWindow,
 } from './daily/week-window.ts'
-export { type Command, type CommandService } from './commands/command-service.ts'
+export { type Command, type Commands, type CommandService } from './commands/command-service.ts'
 export { formatBinding } from './commands/keybindings.ts'
 export { type KeymapService } from './commands/keymap-service.ts'
 export {

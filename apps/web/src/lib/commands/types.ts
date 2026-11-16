@@ -14,7 +14,7 @@ export interface CommandContext {
    * The core services, for the commands that call one directly.
    */
   services: CoreServices
-  app: AppServices
+  app: WebAppServices
   navigate: (route: Route, options?: NavigateOptions) => void
   /**
    * Go to a section: where it was left from elsewhere, its root from within.
@@ -69,6 +69,53 @@ export interface CommandContext {
 }
 
 /**
+ * The 1-based position of a recent graph that a `graph.switch` command opens.
+ */
+export type GraphSwitchPosition = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+
+/**
+ * The id of an app command.
+ */
+export type AppCommandId =
+  | `graph.switch${GraphSwitchPosition}`
+  | 'nav.today'
+  | 'nav.allNotes'
+  | 'nav.tasks'
+  | 'note.new'
+  | 'note.openInNewWindow'
+  | 'note.find'
+  | 'note.findNext'
+  | 'note.findPrevious'
+  | 'chat.open'
+  | 'chat.new'
+  | 'history.back'
+  | 'history.forward'
+  | 'palette.open'
+  | 'note.togglePin'
+  | 'note.togglePrivate'
+  | 'note.publishGist'
+  | 'note.attachFile'
+  | 'note.copyDeepLink'
+  | 'note.copyPath'
+  | 'note.random'
+  | 'template.insert'
+  | 'template.new'
+  | 'audioMemo.toggle'
+  | 'theme.toggle'
+  | 'sidebar.toggle'
+  | 'settings.open'
+  | 'whatsNew.show'
+  | 'shortcuts.show'
+  | 'semantic.enable'
+  | 'index.rebuild'
+  | 'dev.toggleDevtools'
+
+/**
  * A command of this app: it runs with a {@link CommandContext}.
  */
-export type AppCommand = Command<CommandContext>
+export type AppCommand = Command<AppCommandId, CommandContext>
+
+/**
+ * The app services of this app, typed with its commands.
+ */
+export type WebAppServices = AppServices<AppCommandId, CommandContext>
