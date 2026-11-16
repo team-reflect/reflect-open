@@ -49,6 +49,9 @@
   "plus": null,
   "sidebar": null,
   "history": null,
+  "title": null,
+  "search": null,
+  "fullscreen": false,
   "theme": "dark",
   "generation": 1
 }

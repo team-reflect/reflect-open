@@ -47,6 +47,9 @@
     "back": true,
     "forward": false
   },
+  "title": null,
+  "search": null,
+  "fullscreen": false,
   "theme": "system",
   "generation": 1
 }

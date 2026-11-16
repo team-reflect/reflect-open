@@ -16,6 +16,9 @@
   },
   "sidebar": null,
   "history": null,
+  "title": null,
+  "search": null,
+  "fullscreen": false,
   "theme": "system",
   "generation": 1
 }

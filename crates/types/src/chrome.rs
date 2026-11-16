@@ -44,6 +44,13 @@ pub enum ChromeMessage {
         /// Where the history can move, while the window has a sidebar. The shell
         /// then shows a back and a forward button in place of the back button.
         history: Option<HistoryState>,
+        /// The middle of the top bar: a title, or a title that picks a month.
+        title: Option<ChromeTitle>,
+        /// The search field of the top bar.
+        search: Option<SearchState>,
+        /// A web surface covers the whole screen (the lightbox): the shell
+        /// hides its bars.
+        fullscreen: bool,
         theme: ChromeTheme,
     },
     /// A web push or pop slide starts or ends.
@@ -53,6 +60,37 @@ pub enum ChromeMessage {
     BackSwipe { phase: BackSwipePhase },
     /// The page listens for intents.
     ChromeReady,
+    /// Focuses the search field of the screen of `entry_id` and selects its
+    /// text.
+    FocusSearch { entry_id: isize },
+}
+
+/// The middle of the top bar.
+#[derive(Serialize, Deserialize, specta::Type)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ChromeTitle {
+    Text {
+        text: String,
+    },
+    /// A title that opens a month picker. `text` is the label the page
+    /// formatted; `month` is the picker's start value, `YYYY-MM`.
+    Month {
+        text: String,
+        month: String,
+    },
+}
+
+/// The search field of the top bar.
+#[derive(Serialize, Deserialize, specta::Type)]
+pub struct SearchState {
+    pub placeholder: String,
+    /// The accessibility label.
+    pub label: String,
+    pub text: String,
+    /// Grows only when the page itself changes `text`. The shell writes
+    /// `text` into the field only when `revision` changes, so the echo of
+    /// what the user typed never replaces newer typing.
+    pub revision: isize,
 }
 
 /// The phase of a web push or pop slide.
@@ -268,6 +306,16 @@ pub enum ChromeIntent {
     /// A tap in the iPad sidebar.
     Sidebar {
         command: SidebarIntent,
+    },
+    /// The text of the search field of `entry_id` changed.
+    Search {
+        entry_id: isize,
+        text: String,
+    },
+    /// The user picked `month` (`YYYY-MM`) in the title's month picker.
+    PickMonth {
+        entry_id: isize,
+        month: String,
     },
 }
 

@@ -20,6 +20,8 @@ public final class ChromeBridge {
   /// Called when a user back swipe starts to move the page (`true`), or
   /// settles back without a pop (`false`).
   public var onBackSwipe: (Bool) -> Void = { _ in }
+  /// Called when the page asks to focus the search field of an entry.
+  public var onFocusSearch: (Int) -> Void = { _ in }
   /// Called when a new document starts: the shell drops what it shows for the old one.
   public var onReset: () -> Void = {}
   /// Called with a message the bridge could not decode.
@@ -91,6 +93,8 @@ public final class ChromeBridge {
       if let sidebarVisible {
         send(.sidebarVisible(.init(visible: sidebarVisible)))
       }
+    case .focusSearch(let focus):
+      onFocusSearch(focus.entryId)
     }
   }
 

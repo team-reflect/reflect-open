@@ -137,6 +137,9 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
     case 'sidebar':
       context.runSidebar(intent.command)
       return
+    case 'search':
+    case 'pickMonth':
+      return
     case 'plus': {
       const plus = context.screen?.plus
       if (intent.entryId === context.entryId && plus !== undefined) {

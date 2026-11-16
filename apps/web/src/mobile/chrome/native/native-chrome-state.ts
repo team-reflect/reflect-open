@@ -68,6 +68,9 @@ export function buildShellChromeState(input: ShellChromeInput): UnnumberedChrome
     plus: bar?.plus ?? null,
     sidebar: input.sidebar,
     history: input.history,
+    title: null,
+    search: null,
+    fullscreen: false,
     theme: input.theme,
   }
 }
@@ -92,6 +95,9 @@ export function buildNoChromeState(theme: ThemePreference): UnnumberedChromeStat
     plus: null,
     sidebar: null,
     history: null,
+    title: null,
+    search: null,
+    fullscreen: false,
     theme,
   }
 }

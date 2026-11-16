@@ -69,6 +69,8 @@ const intentSchema = z.discriminatedUnion('type', [
     command: z.enum(['tap', 'note', 'task', 'audio']),
   }),
   z.object({ type: z.literal('sidebarVisible'), visible: z.boolean().nullable() }),
+  z.object({ type: z.literal('search'), entryId: z.number(), text: z.string() }),
+  z.object({ type: z.literal('pickMonth'), entryId: z.number(), month: z.string() }),
   z.object({
     type: z.literal('sidebar'),
     command: z.discriminatedUnion('kind', [
