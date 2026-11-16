@@ -69,7 +69,7 @@ class CredentialResolverImpl implements CredentialResolver {
           peek: async () => {
             const token = await githubAuth.peekToken()
             if (token === undefined) {
-              return undefined
+              return
             }
             return token === null ? null : githubCredential(token)
           },

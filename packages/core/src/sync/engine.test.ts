@@ -495,7 +495,7 @@ describe('createSyncEngineFactory', () => {
     const engine = createSyncEngine({
       generation: 1,
       getCredential,
-      peekCredential: () => undefined,
+      peekCredential: noop,
     })
     await engine.pushHidden()
     expect(methodsOf(git)).toEqual(['commitAll'])
