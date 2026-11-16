@@ -51,6 +51,16 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
     return button
   }()
 
+  private lazy var textTitle: UILabel = {
+    let label = UILabel()
+    label.font = .preferredFont(forTextStyle: .headline)
+    label.adjustsFontForContentSizeCategory = true
+    label.textColor = .label
+    label.lineBreakMode = .byTruncatingTail
+    label.accessibilityTraits = .header
+    return label
+  }()
+
   private lazy var search: UISearchController = {
     let search = UISearchController(searchResultsController: nil)
     search.obscuresBackgroundDuringPresentation = false
@@ -86,7 +96,18 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
       state.chrome == .none || state.fullscreen, animated: animated)
     let newEntry = state.entryId != entryId
     entryId = state.entryId
-    showTitle(state.title)
+    // The title lays out before the buttons animate, so it does not move
+    // in from the corner of its frame.
+    var titleChanged = false
+    UIView.performWithoutAnimation {
+      titleChanged = showTitle(state.title)
+      bar.layoutIfNeeded()
+    }
+    if animated, titleChanged, let titleView = item.titleView {
+      let alpha = titleView.alpha
+      titleView.alpha = 0
+      UIView.animate(withDuration: 0.25) { titleView.alpha = alpha }
+    }
     showButtons(Shown(state), newEntry: newEntry, animated: animated)
     showSearch(state.search, newEntry: newEntry)
     if let pendingFocus, pendingFocus == entryId {
@@ -103,7 +124,11 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
     writingSearch = false
   }
 
-  private func showTitle(_ title: ChromeTitle?) {
+  /// Shows `title` in its title view. Returns whether the bar shows a
+  /// different title now.
+  private func showTitle(_ title: ChromeTitle?) -> Bool {
+    let shownView = item.titleView
+    let shownText = (shownView as? UILabel)?.text ?? monthTitle?.text
     switch title {
     case .month(let month):
       monthTitle = (month.text, month.month)
@@ -115,16 +140,20 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
         // The bar keeps a title view's frame: a longer month needs a wider one.
         titleButton.sizeToFit()
       }
-      item.title = nil
       item.titleView = titleButton
+      return shownView !== titleButton || shownText != month.text
     case .text(let text):
       monthTitle = nil
-      item.titleView = nil
-      item.title = text.text
+      if textTitle.text != text.text {
+        textTitle.text = text.text
+        textTitle.sizeToFit()
+      }
+      item.titleView = textTitle
+      return shownView !== textTitle || shownText != text.text
     case nil:
       monthTitle = nil
       item.titleView = nil
-      item.title = nil
+      return shownView != nil
     }
   }
 
@@ -282,7 +311,6 @@ final class NavigationBarPresenter: NSObject, UISearchResultsUpdating, UISearchB
     pendingFocus = nil
     writeSearch { search.isActive = false }
     item.searchController = nil
-    item.title = nil
     item.titleView = nil
     item.setLeftBarButtonItems(nil, animated: false)
     item.setRightBarButtonItems(nil, animated: false)
