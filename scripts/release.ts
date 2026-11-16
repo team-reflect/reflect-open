@@ -142,16 +142,7 @@ export async function runWithSigningKeychain(
     ['set-keychain-settings', '-lut', '21600', keychain],
     ['unlock-keychain', '-p', password, keychain],
     ['list-keychains', '-d', 'user', '-s', keychain, ...previous],
-    [
-      'import',
-      certificate,
-      '-k',
-      keychain,
-      '-P',
-      certificatePassword,
-      '-T',
-      '/usr/bin/codesign',
-    ],
+    ['import', certificate, '-k', keychain, '-P', certificatePassword, '-T', '/usr/bin/codesign'],
     [
       'set-key-partition-list',
       '-S',
