@@ -17,9 +17,8 @@ async function main(): Promise<void> {
 
     const { keyId, issuer, keyPath } = apiKey
     const credentials = ['--api-key', keyId, '--api-issuer', issuer, '--p8-file-path', keyPath]
-    // App Store Connect processes the build after the upload and emails
-    // the team if processing fails.
-    const upload = ['--upload-package', IPA_PATH, '--show-progress']
+    // --wait blocks until App Store Connect has processed the build.
+    const upload = ['--upload-package', IPA_PATH, '--show-progress', '--wait']
     await exec('xcrun', ['altool', ...upload, ...credentials, '--output-format', 'json'], {
       throwOnError: true,
       nodeOptions: { env: { APPLE_API_KEY_PATH: keyPath }, stdio: 'inherit' },

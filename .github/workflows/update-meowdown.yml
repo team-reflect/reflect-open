@@ -21,8 +21,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # This job runs a new npm release before review, so it must not write
-      # the master caches that the TestFlight beta build reads.
       - uses: ./.github/actions/setup-node
         with:
           cache: false
