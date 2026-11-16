@@ -24,6 +24,8 @@ pub(super) enum FaultPoint {
     BeforeMergeRefMove,
     /// Commit: on entry, before the graph lock is taken.
     BeforeCommit,
+    /// Repack: after the new pack is written, before the old files are removed.
+    BeforeRepackRemove,
 }
 
 /// What happens when an armed point is reached.

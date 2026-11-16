@@ -112,6 +112,7 @@ pub struct Core {
 impl Core {
     /// Builds a core with its own multi-thread runtime.
     pub fn new(config: CoreConfig, host: Arc<dyn Host>) -> AppResult<Self> {
+        reflect_git::configure_libgit2();
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()
