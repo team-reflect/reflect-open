@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { getIsComposing } from '@meowdown/core'
 import { usePalette } from '@/components/command-palette/palette-provider.tsx'
+import type { AppCommandId } from '@/lib/commands/app-commands.ts'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
 import { useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
@@ -26,17 +27,20 @@ import { useRouterActions, useRouterState, useRouterHandlers } from './router.ts
  * (`registerAppKeymaps`).
  */
 
-const HISTORY_COMMAND_IDS = new Set(['history.back', 'history.forward'])
+const HISTORY_COMMAND_IDS = new Set<string>([
+  'history.back',
+  'history.forward',
+] satisfies AppCommandId[])
 
 // AppKit owns this key equivalent on macOS. Keep it in the registry for
 // display, collision detection, and the plain-browser/non-macOS fallback, but
 // do not consume its keydown in the webview before the native menu sees it.
-const NATIVE_MACOS_MENU_COMMAND_IDS = new Set([
+const NATIVE_MACOS_MENU_COMMAND_IDS = new Set<string>([
   'sidebar.toggle',
   'note.find',
   'note.findNext',
   'note.findPrevious',
-])
+] satisfies AppCommandId[])
 
 /**
  * Install the app-level shortcut listener and build the {@link CommandContext}
@@ -226,7 +230,7 @@ export function useAppShortcuts(): CommandContext {
       if (shortcutsOpenRef.current) {
         // The cheat-sheet is modal too: nothing may navigate behind it, but
         // the command that opened it closes it again.
-        if (id === 'shortcuts.show') {
+        if (id === ('shortcuts.show' satisfies AppCommandId)) {
           closeShortcuts()
           return true
         }

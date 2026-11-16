@@ -1,3 +1,4 @@
+import type { AppCommandId } from '@/lib/commands/app-commands.ts'
 import type {
   AppMenuEntry,
   AppSubmenuLayout,
@@ -17,7 +18,7 @@ import type {
  * respect the modal palette/cheat-sheet exactly like keystrokes do.
  */
 
-function command(commandId: string, text?: string): AppMenuEntry {
+function command(commandId: AppCommandId, text?: string): AppMenuEntry {
   return { kind: 'command', commandId, text }
 }
 

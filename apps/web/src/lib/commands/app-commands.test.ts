@@ -102,9 +102,8 @@ describe('keybindingFor', () => {
     expect(keybindingFor('palette.open')).toBe('Mod-k')
   })
 
-  it('returns null for unbound commands and unknown ids', () => {
-    expect(keybindingFor('theme.toggle')).toBeNull() // a real command, no binding
-    expect(keybindingFor('no.such.command')).toBeNull()
+  it('returns null for unbound commands', () => {
+    expect(keybindingFor('theme.toggle')).toBeNull()
   })
 
   it('audioMemo.toggle is bound to Mod-Shift-r', () => {

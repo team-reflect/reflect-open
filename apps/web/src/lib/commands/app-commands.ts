@@ -33,18 +33,30 @@ function openNewNote(context: CommandContext): void {
   context.navigate(newNoteRoute(context.services.noteCreation))
 }
 
-const GRAPH_SWITCH_COMMANDS: AppCommand[] = Array.from({ length: 9 }, (_, index) => {
-  const position = index + 1
-  return {
-    id: `graph.switch${position}`,
-    title: `Switch to graph ${position}`,
-    keywords: ['graph', 'workspace', 'switch', 'recent'],
-    keybinding: `Mod-${position}`,
-    run: (context) => context.switchGraph(index),
-  }
-})
+/**
+ * Keeps the literal `id` of each command, so {@link AppCommandId} lists them.
+ */
+function defineAppCommands<const Id extends string>(
+  commands: readonly (AppCommand & { id: Id })[],
+): readonly (AppCommand & { id: Id })[] {
+  return commands
+}
 
-const APP_COMMANDS: AppCommand[] = [
+const GRAPH_SWITCH_COMMANDS = Array.from(
+  { length: 9 },
+  (_, index): AppCommand & { id: `graph.switch${number}` } => {
+    const position = index + 1
+    return {
+      id: `graph.switch${position}`,
+      title: `Switch to graph ${position}`,
+      keywords: ['graph', 'workspace', 'switch', 'recent'],
+      keybinding: `Mod-${position}`,
+      run: (context) => context.switchGraph(index),
+    }
+  },
+)
+
+const APP_COMMANDS = defineAppCommands([
   ...GRAPH_SWITCH_COMMANDS,
   {
     id: 'nav.today',
@@ -346,15 +358,20 @@ const APP_COMMANDS: AppCommand[] = [
       }
     },
   },
-]
+])
+
+/**
+ * The id of an app command.
+ */
+export type AppCommandId = (typeof APP_COMMANDS)[number]['id']
 
 /**
  * The registered keybinding for `commandId`, or `null` when the command has
- * none (or the id is unknown). UI hints — sidebar keycaps, "go to today"
- * affordances — derive bindings through this so they can never drift from the
- * command definition, and disappear if the binding ever does.
+ * none. UI hints — sidebar keycaps, "go to today" affordances — derive
+ * bindings through this so they can never drift from the command definition,
+ * and disappear if the binding ever does.
  */
-export function keybindingFor(commandId: string): string | null {
+export function keybindingFor(commandId: AppCommandId): string | null {
   return APP_COMMANDS.find((command) => command.id === commandId)?.keybinding ?? null
 }
 

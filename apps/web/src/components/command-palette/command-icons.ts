@@ -1,3 +1,4 @@
+import type { AppCommandId } from '@/lib/commands/app-commands.ts'
 import {
   ArrowLeft,
   ArrowRight,
@@ -39,6 +40,6 @@ export const COMMAND_ICONS: Record<string, LucideIcon> = {
   'settings.open': Settings,
   'semantic.enable': Sparkles,
   'index.rebuild': RefreshCw,
-}
+} satisfies Partial<Record<AppCommandId, LucideIcon>>
 
 export const FALLBACK_COMMAND_ICON: LucideIcon = Command
