@@ -2284,4 +2284,11 @@ export type WindowBootstrap = {
 /**
  * The name of every command that reads the index.
  */
-export type IndexReadCommand = 'db_query' | 'index_meta_get' | 'index_graph_stats'
+export type IndexReadCommand =
+  | 'db_query'
+  | 'index_meta_get'
+  | 'index_graph_stats'
+  | 'index_daily_dates'
+  | 'index_daily_notes'
+  | 'chat_conversations'
+  | 'chat_messages'

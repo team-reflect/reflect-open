@@ -17,7 +17,8 @@ import type { AssistantPart, ChatTurn } from './transcript.ts'
  *
  * Writes go through generation-gated Rust commands like every other index
  * mutation: a save issued for one graph can never land in another's
- * history. Reads ride the ordinary read-only Kysely `db_query` bridge.
+ * history. Reads go through the `chat_conversations` and `chat_messages`
+ * commands.
  */
 
 export type { ChatConversation }
