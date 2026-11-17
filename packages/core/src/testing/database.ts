@@ -3,6 +3,7 @@ import { createWasmIndexBackend, type WasmIndexBackend } from '@reflect/index-wa
 import { toAppError } from '../errors.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import { buildIndexedNote, type IndexedNote } from '../indexing/indexed-note.ts'
+import type { CommandArgs, CommandName, CommandResult } from '../ipc/ipc-service.ts'
 import { parseNote } from '../markdown/extract.ts'
 
 /**
@@ -52,6 +53,10 @@ class TestDatabaseServiceImpl implements TestDatabaseService {
       this.#queries.push({ sql, params: [...params] })
       return this.invoke('db_query', { sql, params: [...params] })
     })
+  }
+
+  read<C extends CommandName>(command: C, args: CommandArgs<C>): Promise<CommandResult<C>> {
+    return Promise.try(() => this.invoke(command, args) as CommandResult<C>)
   }
 
   applyProjection(note: IndexedNote): void {

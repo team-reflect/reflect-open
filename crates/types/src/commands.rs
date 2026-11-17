@@ -120,6 +120,8 @@ macro_rules! commands {
             }
             index_read {
                 db_query(sql: String, params: Vec<serde_json::Value>) -> Vec<serde_json::Map<String, serde_json::Value>>,
+                index_meta_get(key: String) -> Option<String>,
+                index_graph_stats(tag_limit: u32) -> GraphStats,
             }
             desktop {
                 skill::skill_status() -> AgentSkillStatus,

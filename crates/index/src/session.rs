@@ -376,16 +376,15 @@ impl IndexSession {
         }))
     }
 
-    /// Execute a read query and return its rows. `requested` is the reader
-    /// generation the caller saw when the query was issued: a session rebound
-    /// in between must error rather than answer with another graph's rows,
-    /// because the frontend caches results under root-scoped keys.
-    pub fn query(
+    /// Run `body` on the query connection. `requested` is the reader
+    /// generation the caller saw when the command was issued: a session
+    /// rebound in between must error rather than answer with another graph's
+    /// rows, because the frontend caches results under root-scoped keys.
+    fn on_reader<T>(
         &self,
         requested: u64,
-        sql: &str,
-        params: &[Value],
-    ) -> AppResult<Vec<Map<String, Value>>> {
+        body: impl FnOnce(&mut Connection) -> AppResult<T>,
+    ) -> AppResult<T> {
         let mut reader = self.lock_reader()?;
         if reader.generation != requested {
             return Err(AppError::io("index reopened during query"));
@@ -398,11 +397,37 @@ impl IndexSession {
             if writer.generation != requested {
                 return Err(AppError::io("index reopened during query"));
             }
-            let conn = writer.conn.as_mut().ok_or_else(AppError::no_graph)?;
-            return query::run_query(conn, sql, params);
+            return body(writer.conn.as_mut().ok_or_else(AppError::no_graph)?);
         }
-        let conn = reader.conn.as_mut().ok_or_else(AppError::no_graph)?;
-        query::run_query(conn, sql, params)
+        body(reader.conn.as_mut().ok_or_else(AppError::no_graph)?)
+    }
+
+    /// Run the queries of one read command in one read transaction, so they
+    /// all see the same committed state. `requested` is the reader generation
+    /// of [`read_generation`] when the command was issued.
+    ///
+    /// [`read_generation`]: IndexSession::read_generation
+    pub fn read<T>(
+        &self,
+        requested: u64,
+        body: impl FnOnce(&Connection) -> AppResult<T>,
+    ) -> AppResult<T> {
+        self.on_reader(requested, |conn| {
+            let tx = conn.transaction()?;
+            body(&tx)
+        })
+    }
+
+    /// Execute a read query and return its rows; `requested` as in [`read`].
+    ///
+    /// [`read`]: IndexSession::read
+    pub fn query(
+        &self,
+        requested: u64,
+        sql: &str,
+        params: &[Value],
+    ) -> AppResult<Vec<Map<String, Value>>> {
+        self.on_reader(requested, |conn| query::run_query(conn, sql, params))
     }
 }
 

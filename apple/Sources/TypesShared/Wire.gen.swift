@@ -1927,6 +1927,54 @@ public struct GraphInfo: Codable, Sendable, Equatable {
     }
 }
 
+/// The aggregates of one graph, private notes excluded throughout.
+public struct GraphStats: Codable, Sendable, Equatable {
+    public let noteCount: UInt32
+    public let dailyNoteCount: UInt32
+    public let earliestDailyDate: String?
+    public let latestDailyDate: String?
+    public let tags: [TagFacet]
+    public let tagsTruncated: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case noteCount = "noteCount"
+        case dailyNoteCount = "dailyNoteCount"
+        case earliestDailyDate = "earliestDailyDate"
+        case latestDailyDate = "latestDailyDate"
+        case tags = "tags"
+        case tagsTruncated = "tagsTruncated"
+    }
+
+    public init(noteCount: UInt32, dailyNoteCount: UInt32, earliestDailyDate: String?, latestDailyDate: String?, tags: [TagFacet], tagsTruncated: Bool) {
+        self.noteCount = noteCount
+        self.dailyNoteCount = dailyNoteCount
+        self.earliestDailyDate = earliestDailyDate
+        self.latestDailyDate = latestDailyDate
+        self.tags = tags
+        self.tagsTruncated = tagsTruncated
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.noteCount = try container.decode(UInt32.self, forKey: .noteCount)
+        self.dailyNoteCount = try container.decode(UInt32.self, forKey: .dailyNoteCount)
+        self.earliestDailyDate = try container.decodeIfPresent(String.self, forKey: .earliestDailyDate)
+        self.latestDailyDate = try container.decodeIfPresent(String.self, forKey: .latestDailyDate)
+        self.tags = try container.decode([TagFacet].self, forKey: .tags)
+        self.tagsTruncated = try container.decode(Bool.self, forKey: .tagsTruncated)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(noteCount, forKey: .noteCount)
+        try container.encode(dailyNoteCount, forKey: .dailyNoteCount)
+        try container.encode(earliestDailyDate, forKey: .earliestDailyDate)
+        try container.encode(latestDailyDate, forKey: .latestDailyDate)
+        try container.encode(tags, forKey: .tags)
+        try container.encode(tagsTruncated, forKey: .tagsTruncated)
+    }
+}
+
 /// The direction of a move in the history.
 public enum HistoryDirection: String, Codable, Sendable, Equatable, CaseIterable {
     case back = "back"
@@ -4206,6 +4254,34 @@ public enum SweepScope: String, Codable, Sendable, Equatable, CaseIterable {
     case full = "full"
     case candidates = "candidates"
     case ingested = "ingested"
+}
+
+/// One tag with the number of notes that carry it.
+public struct TagFacet: Codable, Sendable, Equatable {
+    public let tag: String
+    public let count: UInt32
+
+    private enum CodingKeys: String, CodingKey {
+        case tag = "tag"
+        case count = "count"
+    }
+
+    public init(tag: String, count: UInt32) {
+        self.tag = tag
+        self.count = count
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.tag = try container.decode(String.self, forKey: .tag)
+        self.count = try container.decode(UInt32.self, forKey: .count)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(tag, forKey: .tag)
+        try container.encode(count, forKey: .count)
+    }
 }
 
 /// Captured text: one folded line the drain writes into the capture day's

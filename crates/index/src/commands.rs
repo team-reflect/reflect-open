@@ -2,13 +2,15 @@
 //! the command table in `reflect_types::commands`, and the router from a
 //! command name to its method.
 
+use rusqlite::Connection;
 use serde_json::{Map, Value};
 
 use reflect_types::{
-    AppError, AppResult, ChatConversation, ChatMessageRow, EmbeddedChunk, IndexTouch, IndexedNote,
-    MovedNoteAddress,
+    AppError, AppResult, ChatConversation, ChatMessageRow, EmbeddedChunk, GraphStats, IndexTouch,
+    IndexedNote, MovedNoteAddress,
 };
 
+use crate::read;
 use crate::session::{Applied, IndexSession};
 
 /// Where a committed write is announced.
@@ -41,6 +43,10 @@ impl<'a> IndexCommands<'a> {
             events,
             read_generation,
         }
+    }
+
+    fn read<T>(&self, body: impl FnOnce(&Connection) -> AppResult<T>) -> AppResult<T> {
+        self.session.read(self.read_generation, body)
     }
 
     fn announce(&self, applied: Applied) {
@@ -140,6 +146,16 @@ impl<'a> IndexCommands<'a> {
     /// Drops a note's chunks and vectors.
     fn embed_remove(&self, path: String, generation: u64) -> AppResult<()> {
         self.session.remove_embeddings(generation, &path).map(drop)
+    }
+
+    /// The value of one `index_meta` key.
+    fn index_meta_get(&self, key: String) -> AppResult<Option<String>> {
+        self.read(|conn| read::meta::meta(conn, &key))
+    }
+
+    /// The aggregates of the graph, private notes excluded.
+    fn index_graph_stats(&self, tag_limit: u32) -> AppResult<GraphStats> {
+        self.read(|conn| read::stats::graph_stats(conn, tag_limit))
     }
 
     /// Executes a read query that the frontend compiled with Kysely.

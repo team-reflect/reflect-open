@@ -6,6 +6,7 @@ use reflect_index_schema::LATEST_SCHEMA_VERSION;
 use reflect_types::{
     ChatConversation, ChatMessageRow, EmbeddedChunk, IndexedAlias, IndexedClaim, IndexedEmail,
     IndexedLink, IndexedNote, IndexedTag, IndexedTask, LinkKind, MovedNoteAddress, NoteKind,
+    TagFacet,
 };
 use rusqlite::Connection;
 use serde_json::Value;
@@ -14,6 +15,8 @@ use super::chat_write::{delete_conversation, save_message};
 use super::connections::{migrate, migrate_to, open_in_memory, open_index_at, validate_migrations};
 use super::embed_write::{apply_chunks, remove_chunks};
 use super::query::run_query;
+use super::read::meta::meta;
+use super::read::stats::graph_stats;
 use super::scan::scan_reconcile;
 use super::write::{apply_note, claim_tier, clear_index, move_note, touch_note};
 use super::{Applied, FileIndexConnections, IndexConnections, IndexSession};
@@ -2185,4 +2188,85 @@ fn a_failed_reader_open_unbinds_the_writer() {
         .apply(1, &[note("notes/a.md", "A", vec![])])
         .expect_err("no index");
     assert_eq!(err.message(), "No graph is open");
+}
+
+fn tagged_note(path: &str, title: &str, tags: &[&str]) -> IndexedNote {
+    let mut tagged = note(path, title, vec![]);
+    tagged.tags = tags
+        .iter()
+        .map(|tag| IndexedTag {
+            tag: tag.to_string(),
+            tag_key: tag.to_lowercase(),
+        })
+        .collect();
+    tagged
+}
+
+#[test]
+fn meta_reads_one_key() {
+    let conn = migrated();
+    conn.execute("INSERT INTO index_meta(key, value) VALUES('k', 'v')", [])
+        .unwrap();
+
+    assert_eq!(meta(&conn, "k").unwrap(), Some("v".to_string()));
+    assert_eq!(meta(&conn, "missing").unwrap(), None);
+}
+
+#[test]
+fn graph_stats_skip_private_notes_and_cap_the_tags() {
+    let conn = migrated();
+    apply_note(&conn, &tagged_note("notes/a.md", "A", &["Book", "idea"])).unwrap();
+    apply_note(&conn, &tagged_note("notes/b.md", "B", &["book"])).unwrap();
+    let mut secret = tagged_note("notes/secret.md", "Secret", &["hidden"]);
+    secret.is_private = true;
+    apply_note(&conn, &secret).unwrap();
+    apply_note(&conn, &daily_note("daily/2026-01-02.md", "2026-01-02")).unwrap();
+    apply_note(&conn, &daily_note("daily/2026-03-04.md", "2026-03-04")).unwrap();
+
+    let stats = graph_stats(&conn, 1).unwrap();
+    assert_eq!(stats.note_count, 2);
+    assert_eq!(stats.daily_note_count, 2);
+    assert_eq!(stats.earliest_daily_date.as_deref(), Some("2026-01-02"));
+    assert_eq!(stats.latest_daily_date.as_deref(), Some("2026-03-04"));
+    assert_eq!(
+        stats.tags,
+        [TagFacet {
+            tag: "Book".to_string(),
+            count: 2
+        }]
+    );
+    assert!(stats.tags_truncated);
+
+    let all = graph_stats(&conn, 2).unwrap();
+    assert_eq!(all.tags.len(), 2);
+    assert!(!all.tags_truncated);
+}
+
+#[test]
+fn read_runs_on_the_single_connection_of_a_host_without_a_reader() {
+    struct OneConnection;
+
+    impl IndexConnections for OneConnection {
+        fn open_writer(&self, _root: &std::path::Path) -> reflect_types::AppResult<Connection> {
+            Ok(migrated())
+        }
+
+        fn open_reader(
+            &self,
+            _root: &std::path::Path,
+        ) -> reflect_types::AppResult<Option<Connection>> {
+            Ok(None)
+        }
+    }
+
+    let session = IndexSession::new();
+    let generation = session
+        .open(std::path::Path::new("/memory"), &OneConnection)
+        .unwrap();
+    session.set_meta(generation, "k", "v").unwrap();
+
+    let value = session.read(generation, |conn| meta(conn, "k")).unwrap();
+    assert_eq!(value, Some("v".to_string()));
+    let stale = session.read(generation + 1, |conn| meta(conn, "k"));
+    assert_eq!(stale.unwrap_err().message(), "index reopened during query");
 }

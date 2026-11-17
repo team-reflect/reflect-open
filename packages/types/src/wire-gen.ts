@@ -1014,6 +1014,18 @@ export type Commands = {
     }
     result: { [key in string]: unknown }[]
   }
+  index_meta_get: {
+    args: {
+      key: string
+    }
+    result: string | null
+  }
+  index_graph_stats: {
+    args: {
+      tagLimit: number
+    }
+    result: GraphStats
+  }
   skill_status: {
     args: Record<string, never>
     result: AgentSkillStatus
@@ -1410,6 +1422,22 @@ export type GraphInfo = {
    *  for one graph can never land in another graph's same-named file.
    */
   generation: number
+}
+
+/**  The aggregates of one graph, private notes excluded throughout. */
+export type GraphStats = {
+  /**  Non-daily notes. */
+  noteCount: number
+  /**  Days with a daily note. */
+  dailyNoteCount: number
+  /**  ISO date of the first daily note. */
+  earliestDailyDate: string | null
+  /**  ISO date of the latest daily note. */
+  latestDailyDate: string | null
+  /**  Tag facets over non-daily notes, most-used first, then by tag key. */
+  tags: TagFacet[]
+  /**  More tags exist than the requested limit. */
+  tagsTruncated: boolean
 }
 
 /**  The direction of a move in the history. */
@@ -2118,6 +2146,13 @@ export type SweepScope =
    *  working file is the `Full` sweep's job.
    */
   | 'ingested'
+
+/**  One tag with the number of notes that carry it. */
+export type TagFacet = {
+  /**  One display casing of the tag. */
+  tag: string
+  count: number
+}
 
 /**
  *  Captured text: one folded line the drain writes into the capture day's
