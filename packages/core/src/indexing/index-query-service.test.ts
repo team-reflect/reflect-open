@@ -53,17 +53,15 @@ describe('getNote', () => {
 })
 
 describe('getNoteIdsByPath', () => {
-  it('asks nothing for no paths', async () => {
+  it('returns no ids for no paths', async () => {
     const database = createNodeTestDatabaseService()
     await expect(createIndexQueryService({ database }).getNoteIdsByPath([])).resolves.toEqual(
       new Map(),
     )
-    expect(database.getQueries()).toEqual([])
   })
 
-  it('chunks the IN clause under SQLite variable limits and merges the results', async () => {
-    // A mass external move can orphan thousands of paths in one reconcile —
-    // a single statement would blow the bound-variable budget.
+  it('reads the ids of more paths than SQLite has bound variables', async () => {
+    // A mass external move can orphan thousands of paths in one reconcile.
     const database = seeded([
       { path: 'notes/0.md', markdown: '---\nid: id-0\n---\n# Zero\n' },
       { path: 'notes/500.md', markdown: '---\nid: id-500\n---\n# Five hundred\n' },
@@ -73,7 +71,6 @@ describe('getNoteIdsByPath', () => {
 
     const ids = await createIndexQueryService({ database }).getNoteIdsByPath(paths)
 
-    expect(database.getQueries().map((query) => query.params.length)).toEqual([500, 500, 200])
     expect(ids).toEqual(
       new Map([
         ['notes/0.md', 'id-0'],

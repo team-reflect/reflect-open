@@ -83,6 +83,43 @@ export type AudioPhase = 'idle' | 'requesting' | 'recording' | 'transcribing' | 
 /**  The phase of a user back swipe. */
 export type BackSwipePhase = 'start' | 'cancel'
 
+/**  One link that points at a note. */
+export type Backlink = {
+  sourcePath: string
+  /**  The link target as written. */
+  targetRaw: string
+  alias: string | null
+  /**  The UTF-16 offsets of the link in the source body. */
+  posFrom: number
+  posTo: number
+}
+
+/**  One page of the sources that link to a note, most recent first. */
+export type BacklinkPage = {
+  sources: BacklinkSource[]
+  /**  Where the next page starts; `None` on the last page. */
+  nextCursor: BacklinkSourceCursor | null
+  /**  The number of links to the target, over all pages. */
+  indexedLinkCount: number
+  /**  Every wiki key that resolves to the target. */
+  targetKeys: string[]
+}
+
+/**  One source note of a backlink page. */
+export type BacklinkSource = {
+  sourcePath: string
+  sourceTitle: string
+  /**  The start offset of each link to the target, ascending. */
+  positions: number[]
+}
+
+/**  The position after one source in a backlink listing. */
+export type BacklinkSourceCursor = {
+  /**  The recency of the source: its daily date, else its last change (epoch ms). */
+  recencyMs: number
+  sourcePath: string
+}
+
 /**
  *  A button of the native top bar. A tap opens
  *  `menu` when it has one, and sends an `action` intent with `id` otherwise.
@@ -378,6 +415,12 @@ export type ChromeTitle =
    *  formatted; `month` is the picker's start value, `YYYY-MM`.
    */
   | { kind: 'month'; text: string; month: string }
+
+/**  The content hash and model of one stored embedding chunk. */
+export type ChunkHash = {
+  contentHash: string
+  modelId: string
+}
 
 /**
  *  Every command with its arguments and result. A Swift shell command
@@ -1014,6 +1057,210 @@ export type Commands = {
     }
     result: { [key in string]: unknown }[]
   }
+  index_meta_get: {
+    args: {
+      key: string
+    }
+    result: string | null
+  }
+  index_graph_stats: {
+    args: {
+      tagLimit: number
+    }
+    result: GraphStats
+  }
+  index_note: {
+    args: {
+      path: string
+    }
+    result: NoteRow | null
+  }
+  index_pinned_notes: {
+    args: Record<string, never>
+    result: PinnedNoteRow[]
+  }
+  index_templates: {
+    args: Record<string, never>
+    result: TemplateEntry[]
+  }
+  index_file_facts: {
+    args: {
+      paths: string[]
+    }
+    result: NoteFileFacts[]
+  }
+  index_note_ids: {
+    args: {
+      paths: string[]
+    }
+    result: NoteId[]
+  }
+  index_random_note: {
+    args: Record<string, never>
+    result: string | null
+  }
+  index_resolve_target: {
+    args: {
+      target: string
+      dailyPath: string | null
+      key: string
+    }
+    result: string | null
+  }
+  index_path_taken: {
+    args: {
+      path: string
+    }
+    result: boolean
+  }
+  index_asset_owners: {
+    args: {
+      assetPaths: string[]
+    }
+    result: string[]
+  }
+  index_person_owners: {
+    args: {
+      emailKeys: string[]
+      tagKey: string
+    }
+    result: string[]
+  }
+  index_embeddable_paths: {
+    args: Record<string, never>
+    result: string[]
+  }
+  embed_chunk_hashes: {
+    args: {
+      path: string
+    }
+    result: ChunkHash[]
+  }
+  index_list_notes: {
+    args: {
+      tagKey: string | null
+    }
+    result: NoteListEntry[]
+  }
+  index_recent_notes: {
+    args: {
+      limit: number
+      tagKey: string | null
+    }
+    result: RecentNoteRow[]
+  }
+  index_note_tags: {
+    args: Record<string, never>
+    result: TagFacet[]
+  }
+  index_tasks: {
+    args: {
+      checked: boolean
+    }
+    result: TaskRow[]
+  }
+  index_resolve_wiki: {
+    args: {
+      key: string
+    }
+    result: string | null
+  }
+  index_wiki_target_match: {
+    args: {
+      key: string
+    }
+    result: WikiClaimMatch | null
+  }
+  index_notes_by_path_key: {
+    args: {
+      pathKey: string
+    }
+    result: string[]
+  }
+  index_link_sources: {
+    args: {
+      targetKey: string
+    }
+    result: string[]
+  }
+  index_path_link_sources: {
+    args: {
+      targetPathKey: string
+    }
+    result: string[]
+  }
+  index_wiki_address_note: {
+    args: {
+      path: string
+    }
+    result: WikiTitleCandidate | null
+  }
+  index_backlinks: {
+    args: {
+      path: string
+    }
+    result: Backlink[]
+  }
+  index_backlink_page: {
+    args: {
+      path: string
+      limit: number
+      cursor: BacklinkSourceCursor | null
+    }
+    result: BacklinkPage
+  }
+  index_suggest_tags: {
+    args: {
+      tagKey: string
+      limit: number
+    }
+    result: TagFacet[]
+  }
+  index_wiki_candidates: {
+    args: {
+      key: string
+    }
+    result: WikiCandidates
+  }
+  index_wiki_key_winners: {
+    args: {
+      keys: string[]
+    }
+    result: WikiKeyWinner[]
+  }
+  index_wiki_winning_aliases: {
+    args: {
+      paths: string[]
+    }
+    result: WikiWinningAlias[]
+  }
+  index_daily_dates: {
+    args: {
+      start: string
+      end: string
+    }
+    result: string[]
+  }
+  index_daily_notes: {
+    args: {
+      start: string
+      end: string
+      limit: number
+    }
+    result: DailyNoteRow[]
+  }
+  chat_conversations: {
+    args: {
+      limit: number
+    }
+    result: ChatConversation[]
+  }
+  chat_messages: {
+    args: {
+      conversationId: string
+    }
+    result: ChatMessageRow[]
+  }
   skill_status: {
     args: Record<string, never>
     result: AgentSkillStatus
@@ -1205,6 +1452,18 @@ export type CoreStartConfig = {
   appDataDir: string | null
   documentDir: string | null
   userAgent: string | null
+}
+
+/**  One daily note, as a listing shows it. */
+export type DailyNoteRow = {
+  path: string
+  title: string
+  dailyDate: string
+  /**  The indexed row preview; may be empty. */
+  preview: string
+  /**  File modification time (epoch ms). */
+  mtime: number
+  isPrivate: boolean
 }
 
 /**
@@ -1410,6 +1669,22 @@ export type GraphInfo = {
    *  for one graph can never land in another graph's same-named file.
    */
   generation: number
+}
+
+/**  The aggregates of one graph, private notes excluded throughout. */
+export type GraphStats = {
+  /**  Non-daily notes. */
+  noteCount: number
+  /**  Days with a daily note. */
+  dailyNoteCount: number
+  /**  ISO date of the first daily note. */
+  earliestDailyDate: string | null
+  /**  ISO date of the latest daily note. */
+  latestDailyDate: string | null
+  /**  Tag facets over non-daily notes, most-used first, then by tag key. */
+  tags: TagFacet[]
+  /**  More tags exist than the requested limit. */
+  tagsTruncated: boolean
 }
 
 /**  The direction of a move in the history. */
@@ -1765,8 +2040,35 @@ export type NoteCreateOutcome =
   /**  A file or iCloud eviction placeholder already owns the path. */
   | { kind: 'collision' }
 
+/**  The stored hash and modification time of one indexed note. */
+export type NoteFileFacts = {
+  path: string
+  fileHash: string
+  /**  File modification time (epoch ms). */
+  mtime: number
+}
+
+/**  The frontmatter `id` of one indexed note. */
+export type NoteId = {
+  path: string
+  id: string | null
+}
+
 /**  What a note file is, from its path. */
 export type NoteKind = 'daily' | 'note' | 'template'
+
+/**  One row of the All Notes list. */
+export type NoteListEntry = {
+  path: string
+  title: string
+  /**  The indexed row preview; may be empty. */
+  snippet: string
+  /**  The display casing of each tag, ordered by tag key. */
+  tags: string[]
+  /**  File modification time (epoch ms). */
+  mtime: number
+  isPinned: boolean
+}
 
 /**
  *  One user-initiated move, with the folded addressing for both directions:
@@ -1778,6 +2080,19 @@ export type NoteMoveRequest = {
   to: string
   toAddress: MovedNoteAddress
   fromAddress: MovedNoteAddress
+}
+
+/**  The core fields of one note row. */
+export type NoteRow = {
+  path: string
+  title: string
+  dailyDate: string | null
+  /**  The `private: true` frontmatter flag. */
+  isPrivate: boolean
+  /**  The html url of the published gist. */
+  gistUrl: string | null
+  /**  The body changed since it was last published. */
+  gistStale: boolean
 }
 
 /**  What a note write left on disk. */
@@ -1796,6 +2111,15 @@ export type PinnedNote = {
   path: string
   /**  The name the sidebar shows. */
   title: string
+}
+
+/**  One pinned note. */
+export type PinnedNoteRow = {
+  path: string
+  title: string
+  dailyDate: string | null
+  /**  The explicit `pinned: <n>` order. */
+  pinnedOrder: number | null
 }
 
 /**  A tap on the `+` (`tap`) or on one item of the capture menu. */
@@ -1859,6 +2183,17 @@ export type RecentGraph = {
   root: string
   name: string
   openedMs: number
+}
+
+/**  One recently changed note. */
+export type RecentNoteRow = {
+  path: string
+  title: string
+  /**  The indexed row preview; may be empty. */
+  preview: string
+  /**  File modification time (epoch ms). */
+  mtime: number
+  isPrivate: boolean
 }
 
 /**  The reconcile delta: what changed on disk relative to the index. */
@@ -2119,6 +2454,39 @@ export type SweepScope =
    */
   | 'ingested'
 
+/**  One tag with the number of notes that carry it. */
+export type TagFacet = {
+  /**  One display casing of the tag. */
+  tag: string
+  count: number
+}
+
+/**  One task row with the fields of its note that the task list shows. */
+export type TaskRow = {
+  notePath: string
+  /**  The stored address of the task: JSON text that the frontend decodes. */
+  astPath: string
+  markdown: string
+  /**  The stored breadcrumbs: JSON text that the frontend decodes. */
+  breadcrumbs: string
+  checked: boolean
+  noteTitle: string
+  dailyDate: string | null
+  isPinned: boolean
+  /**  The explicit `pinned: <n>` order of the note. */
+  pinnedOrder: number | null
+  /**  When the note's row last changed (epoch ms). */
+  updatedAt: number
+}
+
+/**  One template. */
+export type TemplateEntry = {
+  path: string
+  title: string
+  /**  File modification time (epoch ms). */
+  mtime: number
+}
+
 /**
  *  Captured text: one folded line the drain writes into the capture day's
  *  daily note.
@@ -2189,6 +2557,61 @@ export type WebAuthStartArgs = {
   payload: WebAuthOptions
 }
 
+/**  One note as a wiki link suggestion candidate, found by an alias. */
+export type WikiAliasCandidate = {
+  path: string
+  title: string
+  titleKey: string
+  dailyDate: string | null
+  /**  File modification time (epoch ms). */
+  mtime: number
+  alias: string
+  aliasKey: string
+  /**  The number of links that point at a key the note claims. */
+  linkCount: number
+}
+
+/**  The notes that a wiki link query can suggest, before ranking. */
+export type WikiCandidates = {
+  titles: WikiTitleCandidate[]
+  aliases: WikiAliasCandidate[]
+}
+
+/**  The notes that claim a wiki key in its strongest tier. */
+export type WikiClaimMatch = {
+  /**  The strongest tier that claims the key; a lower number is stronger. */
+  tier: number
+  /**  Every note that claims the key in that tier, by path. */
+  paths: string[]
+}
+
+/**  The note that wins one wiki key. */
+export type WikiKeyWinner = {
+  key: string
+  path: string
+  dailyDate: string | null
+  /**  The number of notes that claim the key in the winning tier. */
+  claimCount: number
+}
+
+/**  One note as a wiki link suggestion candidate, found by its title. */
+export type WikiTitleCandidate = {
+  path: string
+  title: string
+  titleKey: string
+  dailyDate: string | null
+  /**  File modification time (epoch ms). */
+  mtime: number
+  /**  The number of links that point at a key the note claims. */
+  linkCount: number
+}
+
+/**  One alias that resolves to its own note and to no other. */
+export type WikiWinningAlias = {
+  notePath: string
+  alias: string
+}
+
 /**
  *  What a secondary window needs to boot: the open graph's identity (both
  *  session generations, unbumped) and the deep link it was created to show.
@@ -2206,3 +2629,43 @@ export type WindowBootstrap = {
    */
   initialDeepLink: string | null
 }
+
+/**
+ * The name of every command that reads the index.
+ */
+export type IndexReadCommand =
+  | 'db_query'
+  | 'index_meta_get'
+  | 'index_graph_stats'
+  | 'index_note'
+  | 'index_pinned_notes'
+  | 'index_templates'
+  | 'index_file_facts'
+  | 'index_note_ids'
+  | 'index_random_note'
+  | 'index_resolve_target'
+  | 'index_path_taken'
+  | 'index_asset_owners'
+  | 'index_person_owners'
+  | 'index_embeddable_paths'
+  | 'embed_chunk_hashes'
+  | 'index_list_notes'
+  | 'index_recent_notes'
+  | 'index_note_tags'
+  | 'index_tasks'
+  | 'index_resolve_wiki'
+  | 'index_wiki_target_match'
+  | 'index_notes_by_path_key'
+  | 'index_link_sources'
+  | 'index_path_link_sources'
+  | 'index_wiki_address_note'
+  | 'index_backlinks'
+  | 'index_backlink_page'
+  | 'index_suggest_tags'
+  | 'index_wiki_candidates'
+  | 'index_wiki_key_winners'
+  | 'index_wiki_winning_aliases'
+  | 'index_daily_dates'
+  | 'index_daily_notes'
+  | 'chat_conversations'
+  | 'chat_messages'

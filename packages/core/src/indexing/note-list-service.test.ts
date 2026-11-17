@@ -68,16 +68,6 @@ describe('listNotes', () => {
     ])
     expect(entries[1]?.tags).toEqual(['Book'])
   })
-
-  it('skips the tag fetch entirely when no notes match', async () => {
-    const database = createNodeTestDatabaseService()
-    seedNotes(database, NOTES)
-
-    await expect(
-      createNoteListService({ database }).listNotes({ tag: 'nothing' }),
-    ).resolves.toEqual([])
-    expect(database.getQueries()).toHaveLength(1)
-  })
 })
 
 describe('listRecentNotes', () => {

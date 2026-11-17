@@ -119,6 +119,20 @@ pub fn build_fts_match(query: &str) -> Option<String> {
     )
 }
 
+/// Build an FTS5 `MATCH` expression for titles that contain `text` as a
+/// phrase whose last word may be a prefix. The tokenizer drops diacritics, so
+/// `elisk` matches `Eliška`. `None` unless that last word has two or more
+/// letters or digits: a one-letter prefix expands to most of the vocabulary
+/// of the index, which is slow on every keystroke. Every combining mark
+/// splits a word here, which can only shorten it, so this errs towards
+/// skipping the index.
+pub fn build_fts_title_prefix_match(text: &str) -> Option<String> {
+    let last_token = text
+        .split(|character| !is_fts_token_char(character))
+        .rfind(|token| !token.is_empty())?;
+    (last_token.chars().count() > 1).then(|| format!("title : {}*", quote_fts_literal(text)))
+}
+
 /// The `instr` needles for title recall, one per folded query term — the twin
 /// of `titleRecallNeedles` (`search-query.ts`). Matched against
 /// `' ' || notes.title_key`: terms in space-delimited scripts carry a leading
@@ -145,7 +159,7 @@ pub const RANK_EXPR: &str = "bm25(search_fts, 0, 10.0, 1.0)";
 
 #[cfg(test)]
 mod tests {
-    use super::{build_fts_match, title_recall_needles};
+    use super::{build_fts_match, build_fts_title_prefix_match, title_recall_needles};
 
     /// Parity with `titleRecallNeedles` (`search-query.ts`): space-delimited
     /// terms anchor at word starts (leading space); unsegmented-script terms
@@ -239,5 +253,32 @@ mod tests {
             Some("(title : \"a\"* OR body : \"a\"*) AND (title : \"b\"* OR body : \"b\"*)")
         );
         assert_eq!(title_recall_needles("a\u{85}b"), vec![" a\u{85}b"]);
+    }
+
+    #[test]
+    fn title_prefix_match_needs_a_last_word_of_two_letters() {
+        let phrase = |text: &str| build_fts_title_prefix_match(text);
+        assert_eq!(
+            phrase("eliska nov").as_deref(),
+            Some("title : \"eliska nov\"*")
+        );
+        assert_eq!(phrase("ab\"cd").as_deref(), Some("title : \"ab\"\"cd\"*"));
+        // Every combining mark splits a token here, even those `unicode61` keeps.
+        for text in [
+            "",
+            "e",
+            "c++",
+            "ab c",
+            "i\u{307}s",
+            "the\u{336}b",
+            "राम",
+            "𝐀",
+        ] {
+            assert_eq!(phrase(text), None, "{text}");
+        }
+        assert_eq!(
+            phrase("i\u{307}st").as_deref(),
+            Some("title : \"i\u{307}st\"*")
+        );
     }
 }

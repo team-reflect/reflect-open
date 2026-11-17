@@ -313,12 +313,7 @@ class IndexStoreServiceImpl implements IndexStoreService {
   }
 
   async getMeta(key: string): Promise<string | null> {
-    const row = await this.#deps.database.db
-      .selectFrom('indexMeta')
-      .where('key', '=', key)
-      .select('value')
-      .executeTakeFirst()
-    return row?.value ?? null
+    return await this.#deps.database.read('index_meta_get', { key })
   }
 
   async setMeta(key: string, value: string, generation: number): Promise<void> {

@@ -107,20 +107,19 @@ interface IndexServices {
 }
 
 /**
- * The index read services over a transport that answers `db_query` from `db`.
+ * The index read services over a transport that answers index commands from `db`.
  */
 function connectIndex(db: TestDatabaseService, captured: CapturedQuery[] = []): IndexServices {
   const ipc = createIpcBridgeService({
     transport: {
       invoke: (command, args) => {
         return Promise.try(() => {
-          if (command !== 'db_query') {
-            throw new Error(`Unexpected command: ${command}`)
+          if (command === 'db_query') {
+            const sql = String(args['sql'])
+            const params = (args['params'] as readonly unknown[]) ?? []
+            captured.push({ sql, params })
           }
-          const sql = String(args['sql'])
-          const params = (args['params'] as readonly unknown[]) ?? []
-          captured.push({ sql, params })
-          return db.invoke('db_query', { sql, params })
+          return db.invoke(command, args)
         })
       },
       listen: () => Promise.resolve(noop),

@@ -192,12 +192,7 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
       return this.#meta.get(key) ?? null
     }
     this.#seedMeta()
-    const row = await database.db
-      .selectFrom('indexMeta')
-      .where('key', '=', key)
-      .select('value')
-      .executeTakeFirst()
-    return row?.value ?? null
+    return await database.read('index_meta_get', { key })
   }
 
   setMeta(key: string, value: string, writeGeneration: number): Promise<void> {

@@ -1,5 +1,4 @@
 import type { MaybePromise } from '@reflect/utils'
-import { sql } from 'kysely'
 import type { DatabaseService } from './database-service.ts'
 import type { NoteTagFacet } from './note-list-service.ts'
 
@@ -74,48 +73,7 @@ class GraphStatsServiceImpl implements GraphStatsService {
   }
 
   async loadGraphStats({ tagLimit }: GraphStatsOptions): Promise<GraphStats> {
-    const { db } = this.#deps.database
-    const [noteRow, dailyRow, tagRows] = await Promise.all([
-      db
-        .selectFrom('notes')
-        .where('kind', '=', 'note')
-        .where('isPrivate', '=', 0)
-        .select(sql<number>`count(*)`.as('count'))
-        .executeTakeFirst(),
-      db
-        .selectFrom('notes')
-        .where('dailyDate', 'is not', null)
-        .where('isPrivate', '=', 0)
-        .select([
-          sql<number>`count(*)`.as('count'),
-          sql<string | null>`min(daily_date)`.as('earliest'),
-          sql<string | null>`max(daily_date)`.as('latest'),
-        ])
-        .executeTakeFirst(),
-      // The same facet shape as `listNoteTags` (grouped on the stored folded
-      // `tag_key`, one deterministic display casing), narrowed to non-private
-      // notes and capped one past the limit so truncation is detectable.
-      db
-        .selectFrom('tags')
-        .innerJoin('notes', 'notes.path', 'tags.notePath')
-        .where('notes.kind', '=', 'note')
-        .where('notes.isPrivate', '=', 0)
-        .select([sql<string>`min(tags.tag)`.as('tag'), sql<number>`count(*)`.as('count')])
-        .groupBy('tags.tagKey')
-        .orderBy(sql`count(*)`, 'desc')
-        .orderBy('tags.tagKey')
-        .limit(tagLimit + 1)
-        .execute(),
-    ])
-    const tagsTruncated = tagRows.length > tagLimit
-    return {
-      noteCount: noteRow?.count ?? 0,
-      dailyNoteCount: dailyRow?.count ?? 0,
-      earliestDailyDate: dailyRow?.earliest ?? null,
-      latestDailyDate: dailyRow?.latest ?? null,
-      tags: tagsTruncated ? tagRows.slice(0, tagLimit) : tagRows,
-      tagsTruncated,
-    }
+    return await this.#deps.database.read('index_graph_stats', { tagLimit })
   }
 }
 

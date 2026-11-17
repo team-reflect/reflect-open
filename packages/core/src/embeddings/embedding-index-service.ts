@@ -201,11 +201,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
     // there are stored rows to pair with (apply_chunks pairs one row per
     // skipped chunk — an unmatched skip is a loud error). A model change makes
     // every chunk "new", so a model switch re-embeds with no extra bookkeeping.
-    const existing = await database.db
-      .selectFrom('embeddingChunks')
-      .where('notePath', '=', path)
-      .select(['contentHash', 'modelId'])
-      .execute()
+    const existing = await database.read('embed_chunk_hashes', { path })
     const available = new Map<string, number>()
     for (const row of existing) {
       const key = `${row.modelId} ${row.contentHash}`
@@ -340,29 +336,24 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
   ): Promise<'completed' | 'aborted'> {
     const { database, logger } = this.#deps
     const { generation, fileGeneration, modelId, onProgress, signal } = options
-    const rows = await database.db
-      .selectFrom('notes')
-      .where('kind', '!=', 'template')
-      .select('path')
-      .orderBy('path')
-      .execute()
-    counts.notes = rows.length
-    for (const row of rows) {
+    const paths = await database.read('index_embeddable_paths', {})
+    counts.notes = paths.length
+    for (const path of paths) {
       if (signal?.aborted === true) {
         return 'aborted'
       }
       try {
-        const chunks = await this.embedNote({ path: row.path, generation, fileGeneration, modelId })
+        const chunks = await this.embedNote({ path, generation, fileGeneration, modelId })
         if (chunks > 0) {
           counts.notesEmbedded += 1
           counts.chunksEmbedded += chunks
         }
       } catch (cause) {
         counts.failed += 1
-        logger.error(`embedding backfill failed for ${row.path}:`, cause)
+        logger.error(`embedding backfill failed for ${path}:`, cause)
       }
       counts.done += 1
-      onProgress?.(counts.done, rows.length)
+      onProgress?.(counts.done, paths.length)
     }
     return 'completed'
   }

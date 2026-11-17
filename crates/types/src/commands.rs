@@ -120,6 +120,40 @@ macro_rules! commands {
             }
             index_read {
                 db_query(sql: String, params: Vec<serde_json::Value>) -> Vec<serde_json::Map<String, serde_json::Value>>,
+                index_meta_get(key: String) -> Option<String>,
+                index_graph_stats(tag_limit: u32) -> GraphStats,
+                index_note(path: String) -> Option<NoteRow>,
+                index_pinned_notes() -> Vec<PinnedNoteRow>,
+                index_templates() -> Vec<TemplateEntry>,
+                index_file_facts(paths: Vec<String>) -> Vec<NoteFileFacts>,
+                index_note_ids(paths: Vec<String>) -> Vec<NoteId>,
+                index_random_note() -> Option<String>,
+                index_resolve_target(target: String, daily_path: Option<String>, key: String) -> Option<String>,
+                index_path_taken(path: String) -> bool,
+                index_asset_owners(asset_paths: Vec<String>) -> Vec<String>,
+                index_person_owners(email_keys: Vec<String>, tag_key: String) -> Vec<String>,
+                index_embeddable_paths() -> Vec<String>,
+                embed_chunk_hashes(path: String) -> Vec<ChunkHash>,
+                index_list_notes(tag_key: Option<String>) -> Vec<NoteListEntry>,
+                index_recent_notes(limit: u32, tag_key: Option<String>) -> Vec<RecentNoteRow>,
+                index_note_tags() -> Vec<TagFacet>,
+                index_tasks(checked: bool) -> Vec<TaskRow>,
+                index_resolve_wiki(key: String) -> Option<String>,
+                index_wiki_target_match(key: String) -> Option<WikiClaimMatch>,
+                index_notes_by_path_key(path_key: String) -> Vec<String>,
+                index_link_sources(target_key: String) -> Vec<String>,
+                index_path_link_sources(target_path_key: String) -> Vec<String>,
+                index_wiki_address_note(path: String) -> Option<WikiTitleCandidate>,
+                index_backlinks(path: String) -> Vec<Backlink>,
+                index_backlink_page(path: String, limit: i64, cursor: Option<BacklinkSourceCursor>) -> BacklinkPage,
+                index_suggest_tags(tag_key: String, limit: u32) -> Vec<TagFacet>,
+                index_wiki_candidates(key: String) -> WikiCandidates,
+                index_wiki_key_winners(keys: Vec<String>) -> Vec<WikiKeyWinner>,
+                index_wiki_winning_aliases(paths: Vec<String>) -> Vec<WikiWinningAlias>,
+                index_daily_dates(start: String, end: String) -> Vec<String>,
+                index_daily_notes(start: String, end: String, limit: u32) -> Vec<DailyNoteRow>,
+                chat_conversations(limit: u32) -> Vec<ChatConversation>,
+                chat_messages(conversation_id: String) -> Vec<ChatMessageRow>,
             }
             desktop {
                 skill::skill_status() -> AgentSkillStatus,
@@ -200,6 +234,10 @@ macro_rules! define_commands {
             $( pub $desktop: $desktop::Signature, )*
             $( pub $shell: $shell::Signature, )*
         }
+
+        /// The name of every command that reads the index.
+        #[cfg(feature = "codegen")]
+        pub const INDEX_READ_COMMANDS: &[&str] = &[$( stringify!($read) ),*];
 
         /// The identifier and the name of every Swift shell command.
         #[cfg(feature = "codegen")]

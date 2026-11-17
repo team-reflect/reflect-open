@@ -255,7 +255,7 @@ pub struct NoteMoveRequest {
 /// A conversation's metadata, sent with every message save so the row can be
 /// created lazily on the first message. Mirrors the zod contract in
 /// `packages/core/src/ai/chat/store.ts` field-for-field.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
 #[cfg_attr(feature = "codegen", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct ChatConversation {
@@ -268,7 +268,7 @@ pub struct ChatConversation {
 /// One persisted exchange: the user message and everything the assistant did
 /// in response. The JSON columns are opaque strings here — the TS store owns
 /// their shapes and validates them on read.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
 #[cfg_attr(feature = "codegen", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct ChatMessageRow {
