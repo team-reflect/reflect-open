@@ -12,9 +12,10 @@ use crate::commands::warn;
 use crate::error::CliError;
 use crate::graph::Graph;
 use crate::index::{IndexOpen, detect_staleness, open_read_only};
-use crate::keys::fold_key;
 use crate::note_file::{read_note, subject_display_title};
-use crate::search::{SearchHit, build_fts_match, search_index};
+use crate::search::{SearchHit, search_index};
+use reflect_index::text::fts::build_fts_match;
+use reflect_index::text::keys::fold_key;
 
 /// The privacy re-check: the index row said public, but the file's own
 /// frontmatter is the truth — a note flagged private after the last index run
