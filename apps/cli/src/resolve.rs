@@ -10,9 +10,9 @@ use std::path::{Component, Path, PathBuf};
 use rusqlite::{Connection, params};
 
 use crate::error::CliError;
-use crate::keys::fold_key;
 use crate::note_file::{checked_note_path, parse_note_meta, read_note_text, walk_notes};
 use crate::paths::{daily_path, parse_calendar_date};
+use reflect_index::text::keys::fold_key;
 
 /// What a `<note>` argument resolved to.
 pub enum ResolvedNote {

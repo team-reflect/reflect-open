@@ -23,7 +23,7 @@ export function splitSearchTerms(query: string): string[] {
  * A character `unicode61` keeps inside a token: its default `categories` is
  * `'L* N* Co'`, so letters, numbers and private-use codepoints of every script
  * count (Han, kana, Hangul and Thai included), while punctuation, symbols and
- * combining marks separate tokens. `is_fts_token_char` (`apps/cli/src/search.rs`)
+ * combining marks separate tokens. `is_fts_token_char` (`crates/index/src/text/fts.rs`)
  * mirrors this codepoint for codepoint; the two must move together.
  */
 const FTS_TOKEN_CHAR_RE = /[\p{L}\p{N}\p{Co}]/u
@@ -103,7 +103,7 @@ export function buildFtsTitlePrefixMatch(text: string): string | null {
  * can never match it lexically — such terms need anywhere-in-the-title
  * substring recall. Space-delimited scripts must NOT get it: `car` may find
  * `Car log` but never `Oscar party`. The Rust CLI mirrors this table
- * (`apps/cli/src/keys.rs`); the two must move together.
+ * (`crates/index/src/text/keys.rs`); the two must move together.
  */
 const UNSEGMENTED_SCRIPT_RANGES: ReadonlyArray<readonly [number, number]> = [
   [0x0e00, 0x0eff], // Thai, Lao

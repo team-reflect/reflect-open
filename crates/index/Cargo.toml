@@ -17,6 +17,7 @@ native = ["dep:reflect-index-schema"]
 rusqlite = { workspace = true, features = ["hooks"] }
 serde_json = { workspace = true }
 tracing = { workspace = true }
+unicode-normalization = { workspace = true }
 reflect-types = { workspace = true, features = ["rusqlite"] }
 # The file-backed connections (`FileIndexConnections`) need the schema crate's
 # openers; a host that owns its own connection can turn the feature off.

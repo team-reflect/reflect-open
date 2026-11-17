@@ -19,7 +19,6 @@ pub mod frontmatter;
 pub mod graph;
 pub mod hash;
 pub mod index;
-pub mod keys;
 pub mod note_file;
 pub mod paths;
 pub mod resolve;

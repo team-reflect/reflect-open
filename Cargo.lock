@@ -4557,6 +4557,7 @@ dependencies = [
  "jiff",
  "pulldown-cmark",
  "reflect-graph-paths",
+ "reflect-index",
  "reflect-index-schema",
  "rusqlite",
  "saphyr",
@@ -4564,7 +4565,6 @@ dependencies = [
  "serde_json",
  "sha2 0.11.1",
  "tempfile",
- "unicode-normalization",
 ]
 
 [[package]]
@@ -4677,6 +4677,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tracing",
+ "unicode-normalization",
 ]
 
 [[package]]

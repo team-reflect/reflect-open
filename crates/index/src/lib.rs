@@ -21,6 +21,7 @@ mod scan;
 mod session;
 #[cfg(test)]
 mod tests;
+pub mod text;
 mod write;
 
 #[cfg(any(feature = "native", test))]

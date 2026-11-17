@@ -3,7 +3,7 @@
 //! `packages/core/src/indexing/search-query.ts`. This must produce the same
 //! keys the TS indexer wrote to `notes.title_key` / `aliases.alias_key` and
 //! classify query terms the same way the app's search does, or lookups
-//! silently miss and CLI/app result orders drift.
+//! silently miss and the result orders of the CLI and the app drift.
 
 use unicode_normalization::UnicodeNormalization;
 
@@ -73,7 +73,7 @@ mod tests {
             input: String,
             key: String,
         }
-        let raw = include_str!("../../../fixtures/fold-key-parity.json");
+        let raw = include_str!("../../../../fixtures/fold-key-parity.json");
         let rows: Vec<Row> = serde_json::from_str(raw).expect("valid parity corpus");
         assert!(!rows.is_empty());
         for row in rows {

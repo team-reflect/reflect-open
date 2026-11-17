@@ -77,7 +77,7 @@ describe('buildFtsTitlePrefixMatch', () => {
 })
 
 describe('containsUnsegmentedScript', () => {
-  // The Rust CLI mirrors this classification (`apps/cli/src/keys.rs`) — the
+  // The Rust CLI mirrors this classification (`crates/index/src/text/keys.rs`) — the
   // same inputs must classify the same way there.
   it('detects scripts written without word separators', () => {
     expect(containsUnsegmentedScript('東京')).toBe(true) // Han
