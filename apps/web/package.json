@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "node ../../scripts/build-index-wasm.ts && vite",
+    "build": "node ../../scripts/build-index-wasm.ts && vite build",
     "preview": "vite preview",
     "gen:licenses": "node scripts/generate-licenses.ts",
     "test": "node ../../scripts/build-index-wasm.ts && vitest run --config ../../vitest.config.ts --project web-browser --project web-node",

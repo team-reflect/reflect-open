@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import {
   buildIndexedNote,
   createDailyNoteService,
@@ -87,7 +87,11 @@ async function searchTitles(
 }
 
 function openDb(): TestDatabaseService {
-  return createWasmTestDatabaseService()
+  const db = createWasmTestDatabaseService()
+  onTestFinished(() => {
+    db.close()
+  })
+  return db
 }
 
 interface CapturedQuery {
