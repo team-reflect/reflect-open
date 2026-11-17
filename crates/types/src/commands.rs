@@ -203,6 +203,10 @@ macro_rules! define_commands {
             $( pub $shell: $shell::Signature, )*
         }
 
+        /// The name of every command that reads the index.
+        #[cfg(feature = "codegen")]
+        pub const INDEX_READ_COMMANDS: &[&str] = &[$( stringify!($read) ),*];
+
         /// The identifier and the name of every Swift shell command.
         #[cfg(feature = "codegen")]
         pub const SHELL_COMMANDS: &[(&str, &str)] = &[$( (stringify!($shell), $name) ),*];

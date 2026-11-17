@@ -1,9 +1,10 @@
 import { createDb } from '@reflect/db'
+import type { IndexReadCommand } from '@reflect/types'
 import { createWasmIndexBackend, type WasmIndexBackend } from '@reflect/index-wasm'
 import { toAppError } from '../errors.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import { buildIndexedNote, type IndexedNote } from '../indexing/indexed-note.ts'
-import type { CommandArgs, CommandName, CommandResult } from '../ipc/ipc-service.ts'
+import type { CommandArgs, CommandResult } from '../ipc/ipc-service.ts'
 import { parseNote } from '../markdown/extract.ts'
 
 /**
@@ -55,7 +56,7 @@ class TestDatabaseServiceImpl implements TestDatabaseService {
     })
   }
 
-  read<C extends CommandName>(command: C, args: CommandArgs<C>): Promise<CommandResult<C>> {
+  read<C extends IndexReadCommand>(command: C, args: CommandArgs<C>): Promise<CommandResult<C>> {
     return Promise.try(() => this.invoke(command, args) as CommandResult<C>)
   }
 

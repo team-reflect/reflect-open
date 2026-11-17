@@ -52,7 +52,7 @@ fn main() {
 
     write(
         &root.join("packages/types/src/wire-gen.ts"),
-        &name_shell_commands(&typescript(&ts_types)),
+        &(name_shell_commands(&typescript(&ts_types)) + &index_read_commands()),
     );
     write(
         &root.join("apple/Sources/TypesShared/Wire.gen.swift"),
@@ -83,6 +83,18 @@ fn typescript(types: &Types) -> String {
         .export(&remapper.remap_types(types.clone()), specta_serde::Format)
         .expect("typescript export");
     add_undefined(&out)
+}
+
+/// The union of the commands that read the index.
+fn index_read_commands() -> String {
+    let names: Vec<String> = commands::INDEX_READ_COMMANDS
+        .iter()
+        .map(|name| format!("{name:?}"))
+        .collect();
+    format!(
+        "\n/**\n * The name of every command that reads the index.\n */\nexport type IndexReadCommand = {}\n",
+        names.join(" | ")
+    )
 }
 
 /// Renames each Swift shell command in `Commands` from its identifier to its

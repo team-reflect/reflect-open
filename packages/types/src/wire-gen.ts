@@ -2241,3 +2241,8 @@ export type WindowBootstrap = {
    */
   initialDeepLink: string | null
 }
+
+/**
+ * The name of every command that reads the index.
+ */
+export type IndexReadCommand = 'db_query' | 'index_meta_get' | 'index_graph_stats'
