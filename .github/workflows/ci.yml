@@ -177,6 +177,9 @@ jobs:
     needs: [classify, build-index-wasm]
     if: needs.classify.outputs.lint-node == 'true'
     runs-on: ubuntu-24.04
+    env:
+      # The job downloads the wasm build of the index; it has no Rust toolchain.
+      REFLECT_INDEX_WASM_PREBUILT: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -215,6 +218,9 @@ jobs:
     needs: [classify, build-index-wasm]
     if: needs.classify.outputs.test-node == 'true'
     runs-on: ubuntu-24.04
+    env:
+      # The job downloads the wasm build of the index; it has no Rust toolchain.
+      REFLECT_INDEX_WASM_PREBUILT: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -241,6 +247,8 @@ jobs:
         shard: [1, 2, 3]
     name: test-chromium (${{ matrix.shard }}/3)
     env:
+      # The job downloads the wasm build of the index; it has no Rust toolchain.
+      REFLECT_INDEX_WASM_PREBUILT: '1'
       REFLECT_TEST_BROWSER: chromium
       # Chromium on Linux does not promptly free the iframe of a finished
       # test file (https://issues.chromium.org/issues/530892387), so one
@@ -276,6 +284,8 @@ jobs:
     if: needs.classify.outputs.test-webkit == 'true'
     runs-on: xcode-27
     env:
+      # The job downloads the wasm build of the index; it has no Rust toolchain.
+      REFLECT_INDEX_WASM_PREBUILT: '1'
       REFLECT_TEST_BROWSER: webkit
       # Suspected workaround, root cause unknown: WebContent sometimes
       # segfaults in JavaScriptCore JIT code ("The webkit page crashed") in
