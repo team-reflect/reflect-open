@@ -45,6 +45,10 @@ pub(crate) fn page(
     if limit <= 0 {
         return Err(AppError::parse("the backlink page limit must be positive"));
     }
+    let target_keys = conn
+        .prepare_cached("SELECT key FROM note_keys WHERE note_path = ?1 AND key IS NOT NULL")?
+        .query_map([path], |row| row.get(0))?
+        .collect::<Result<_, _>>()?;
 
     // Sources strictly after the cursor in (recency DESC, path) order.
     let after = "(?2 IS NULL OR recency < ?2 OR (recency = ?2 AND source_path > ?3))";
