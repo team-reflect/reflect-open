@@ -71,7 +71,7 @@ class TestDatabaseServiceImpl implements TestDatabaseService {
 
   read<C extends IndexReadCommand>(command: C, args: CommandArgs<C>): Promise<CommandResult<C>> {
     return Promise.try(() => {
-      this.#reads.push({ command, args })
+      this.#reads.push({ command, args: structuredClone(args) })
       return this.invoke(command, args) as CommandResult<C>
     })
   }
