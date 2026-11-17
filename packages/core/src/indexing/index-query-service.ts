@@ -1,5 +1,4 @@
 import type { MaybePromise } from '@reflect/utils'
-import { isNotNullish } from '@ocavue/utils'
 import { isIsoDate } from '@reflect/utils'
 import { sql } from 'kysely'
 import { dailyPath } from '../graph/paths.ts'
@@ -39,17 +38,6 @@ export interface NoteRow {
    * The body changed since it was last published — the "Republish" nudge.
    */
   gistStale: boolean
-}
-
-/**
- * Notes sharing one frontmatter `id` — a sync fork (Plan 17).
- */
-export interface DuplicateIdGroup {
-  id: string
-  /**
-   * Every path claiming the id, ordered (the first is resolution's winner).
-   */
-  paths: string[]
 }
 
 /**
@@ -97,12 +85,6 @@ export interface IndexQueryService {
    * the point of pinning: the list must not reshuffle as notes are edited.
    */
   getPinnedNotes(): Promise<PinnedNote[]>
-  /**
-   * Frontmatter `id`s claimed by more than one note. Two files claiming one
-   * identity means a sync fork (e.g. rename/rename divergence). No UI shows
-   * forks; the user sees two notes, merges any differing edits, and deletes one.
-   */
-  getDuplicateNoteIds(): Promise<DuplicateIdGroup[]>
   /**
    * Every template in the graph (`templates/*.md`), A→Z by folded title
    * (matching v1's menu order). Templates are indexed like notes but carry
@@ -186,41 +168,6 @@ class IndexQueryServiceImpl implements IndexQueryService {
       .orderBy('titleKey')
       .orderBy('path')
       .execute()
-  }
-
-  async getDuplicateNoteIds(): Promise<DuplicateIdGroup[]> {
-    const { db } = this.#deps.database
-    const duplicated = await db
-      .selectFrom('notes')
-      .where('id', 'is not', null)
-      .select('id')
-      .groupBy('id')
-      .having(sql<number>`count(*)`, '>', 1)
-      .execute()
-    // Sorted before chunking so group order stays deterministic across chunks.
-    const ids = duplicated
-      .map((row) => row.id)
-      .filter(isNotNullish)
-      .sort()
-    const groups = new Map<string, string[]>()
-    for (const chunk of inClauseChunks(ids)) {
-      const rows = await db
-        .selectFrom('notes')
-        .where('id', 'in', chunk)
-        .select(['id', 'path'])
-        .orderBy('id')
-        .orderBy('path')
-        .execute()
-      for (const row of rows) {
-        if (row.id === null) {
-          continue
-        }
-        const paths = groups.get(row.id) ?? []
-        paths.push(row.path)
-        groups.set(row.id, paths)
-      }
-    }
-    return [...groups].map(([id, paths]) => ({ id, paths }))
   }
 
   async listTemplates(): Promise<TemplateEntry[]> {
