@@ -2,13 +2,18 @@
 //! the command table in `reflect_types::commands`, and the router from a
 //! command name to its method.
 
+use rusqlite::Connection;
 use serde_json::{Map, Value};
 
 use reflect_types::{
-    AppError, AppResult, ChatConversation, ChatMessageRow, EmbeddedChunk, IndexTouch, IndexedNote,
-    MovedNoteAddress,
+    AppError, AppResult, Backlink, BacklinkPage, BacklinkSourceCursor, ChatConversation,
+    ChatMessageRow, ChunkHash, DailyNoteRow, EmbeddedChunk, GraphStats, IndexTouch, IndexedNote,
+    MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry, NoteRow, PinnedNoteRow, RecentNoteRow,
+    TagFacet, TaskRow, TemplateEntry, WikiCandidates, WikiClaimMatch, WikiKeyWinner,
+    WikiTitleCandidate, WikiWinningAlias,
 };
 
+use crate::read;
 use crate::session::{Applied, IndexSession};
 
 /// Where a committed write is announced.
@@ -41,6 +46,10 @@ impl<'a> IndexCommands<'a> {
             events,
             read_generation,
         }
+    }
+
+    fn read<T>(&self, body: impl FnOnce(&Connection) -> AppResult<T>) -> AppResult<T> {
+        self.session.read(self.read_generation, body)
     }
 
     fn announce(&self, applied: Applied) {
@@ -140,6 +149,199 @@ impl<'a> IndexCommands<'a> {
     /// Drops a note's chunks and vectors.
     fn embed_remove(&self, path: String, generation: u64) -> AppResult<()> {
         self.session.remove_embeddings(generation, &path).map(drop)
+    }
+
+    /// The value of one `index_meta` key.
+    fn index_meta_get(&self, key: String) -> AppResult<Option<String>> {
+        self.read(|conn| read::meta::meta(conn, &key))
+    }
+
+    /// The aggregates of the graph, private notes excluded.
+    fn index_graph_stats(&self, tag_limit: u32) -> AppResult<GraphStats> {
+        self.read(|conn| read::stats::graph_stats(conn, tag_limit))
+    }
+
+    /// The row of the note at `path`.
+    fn index_note(&self, path: String) -> AppResult<Option<NoteRow>> {
+        self.read(|conn| read::notes::note(conn, &path))
+    }
+
+    /// Every pinned note, in shelf order.
+    fn index_pinned_notes(&self) -> AppResult<Vec<PinnedNoteRow>> {
+        self.read(read::notes::pinned_notes)
+    }
+
+    /// Every template, by folded title.
+    fn index_templates(&self) -> AppResult<Vec<TemplateEntry>> {
+        self.read(read::notes::templates)
+    }
+
+    /// The stored hash and mtime of each indexed path in `paths`.
+    fn index_file_facts(&self, paths: Vec<String>) -> AppResult<Vec<NoteFileFacts>> {
+        self.read(|conn| read::notes::file_facts(conn, &paths))
+    }
+
+    /// The frontmatter `id` of each indexed path in `paths`.
+    fn index_note_ids(&self, paths: Vec<String>) -> AppResult<Vec<NoteId>> {
+        self.read(|conn| read::notes::note_ids(conn, &paths))
+    }
+
+    /// The path of a uniformly random note.
+    fn index_random_note(&self) -> AppResult<Option<String>> {
+        self.read(read::notes::random_note)
+    }
+
+    /// Resolves a free-form note target to a path.
+    fn index_resolve_target(
+        &self,
+        target: String,
+        daily_path: Option<String>,
+        key: String,
+    ) -> AppResult<Option<String>> {
+        self.read(|conn| read::notes::resolve_target(conn, &target, daily_path, &key))
+    }
+
+    /// Whether a note is indexed at `path`.
+    fn index_path_taken(&self, path: String) -> AppResult<bool> {
+        self.read(|conn| read::notes::path_taken(conn, &path))
+    }
+
+    /// The notes that reference any of `asset_paths`.
+    fn index_asset_owners(&self, asset_paths: Vec<String>) -> AppResult<Vec<String>> {
+        self.read(|conn| read::assets::note_paths(conn, &asset_paths))
+    }
+
+    /// The notes with the tag `tag_key` that carry any of `email_keys`.
+    fn index_person_owners(
+        &self,
+        email_keys: Vec<String>,
+        tag_key: String,
+    ) -> AppResult<Vec<String>> {
+        self.read(|conn| read::notes::person_owners(conn, &email_keys, &tag_key))
+    }
+
+    /// The path of every note that gets embeddings, ascending.
+    fn index_embeddable_paths(&self) -> AppResult<Vec<String>> {
+        self.read(read::notes::embeddable_paths)
+    }
+
+    /// The hash and model of each stored chunk of the note at `path`.
+    fn embed_chunk_hashes(&self, path: String) -> AppResult<Vec<ChunkHash>> {
+        self.read(|conn| read::embed::chunk_hashes(conn, &path))
+    }
+
+    /// The All Notes list: every note, or the notes and dailies with a tag.
+    fn index_list_notes(&self, tag_key: Option<String>) -> AppResult<Vec<NoteListEntry>> {
+        self.read(|conn| read::lists::list_notes(conn, tag_key.as_deref()))
+    }
+
+    /// The most recently changed non-private notes.
+    fn index_recent_notes(
+        &self,
+        limit: u32,
+        tag_key: Option<String>,
+    ) -> AppResult<Vec<RecentNoteRow>> {
+        self.read(|conn| read::lists::recent_notes(conn, limit, tag_key.as_deref()))
+    }
+
+    /// The tag facets over non-daily notes, by tag key.
+    fn index_note_tags(&self) -> AppResult<Vec<TagFacet>> {
+        self.read(read::lists::note_tags)
+    }
+
+    /// The open or the completed tasks of every note but templates.
+    fn index_tasks(&self, checked: bool) -> AppResult<Vec<TaskRow>> {
+        self.read(|conn| read::tasks::tasks(conn, checked))
+    }
+
+    /// The note that wins the wiki key `key`.
+    fn index_resolve_wiki(&self, key: String) -> AppResult<Option<String>> {
+        self.read(|conn| read::wiki::resolve(conn, &key))
+    }
+
+    /// The notes that claim `key` in its strongest tier.
+    fn index_wiki_target_match(&self, key: String) -> AppResult<Option<WikiClaimMatch>> {
+        self.read(|conn| read::wiki::claim_match(conn, &key))
+    }
+
+    /// The notes whose folded path is `path_key`, by path.
+    fn index_notes_by_path_key(&self, path_key: String) -> AppResult<Vec<String>> {
+        self.read(|conn| read::wiki::notes_by_path_key(conn, &path_key))
+    }
+
+    /// The notes with a link to the wiki key `target_key`, by path.
+    fn index_link_sources(&self, target_key: String) -> AppResult<Vec<String>> {
+        self.read(|conn| read::wiki::link_sources(conn, &target_key))
+    }
+
+    /// The notes with a link to the folded path `target_path_key`, by path.
+    fn index_path_link_sources(&self, target_path_key: String) -> AppResult<Vec<String>> {
+        self.read(|conn| read::wiki::path_link_sources(conn, &target_path_key))
+    }
+
+    /// The note at `path` as a suggestion candidate; templates have none.
+    fn index_wiki_address_note(&self, path: String) -> AppResult<Option<WikiTitleCandidate>> {
+        self.read(|conn| read::wiki::address_note(conn, &path))
+    }
+
+    /// Every link that points at the note at `path`, by source path.
+    fn index_backlinks(&self, path: String) -> AppResult<Vec<Backlink>> {
+        self.read(|conn| read::backlinks::backlinks(conn, &path))
+    }
+
+    /// One page of the sources that link to the note at `path`.
+    fn index_backlink_page(
+        &self,
+        path: String,
+        limit: i64,
+        cursor: Option<BacklinkSourceCursor>,
+    ) -> AppResult<BacklinkPage> {
+        self.read(|conn| read::backlinks::page(conn, &path, limit, cursor.as_ref()))
+    }
+
+    /// The most used tags whose key contains `tag_key`.
+    fn index_suggest_tags(&self, tag_key: String, limit: u32) -> AppResult<Vec<TagFacet>> {
+        self.read(|conn| read::suggest::tags(conn, &tag_key, limit))
+    }
+
+    /// The notes whose title or alias matches the wiki key `key`.
+    fn index_wiki_candidates(&self, key: String) -> AppResult<WikiCandidates> {
+        self.read(|conn| read::suggest::wiki_candidates(conn, &key))
+    }
+
+    /// The winner of each wiki key in `keys` that a note claims.
+    fn index_wiki_key_winners(&self, keys: Vec<String>) -> AppResult<Vec<WikiKeyWinner>> {
+        self.read(|conn| read::suggest::key_winners(conn, &keys))
+    }
+
+    /// The aliases of the notes in `paths` that resolve only to their note.
+    fn index_wiki_winning_aliases(&self, paths: Vec<String>) -> AppResult<Vec<WikiWinningAlias>> {
+        self.read(|conn| read::suggest::winning_aliases(conn, &paths))
+    }
+
+    /// The dates in `start..=end` whose daily note has content, ascending.
+    fn index_daily_dates(&self, start: String, end: String) -> AppResult<Vec<String>> {
+        self.read(|conn| read::daily::dates_in_range(conn, &start, &end))
+    }
+
+    /// The non-private daily notes in `start..=end`, newest first.
+    fn index_daily_notes(
+        &self,
+        start: String,
+        end: String,
+        limit: u32,
+    ) -> AppResult<Vec<DailyNoteRow>> {
+        self.read(|conn| read::daily::notes_in_range(conn, &start, &end, limit))
+    }
+
+    /// The most recently active conversations first.
+    fn chat_conversations(&self, limit: u32) -> AppResult<Vec<ChatConversation>> {
+        self.read(|conn| read::chat::conversations(conn, limit))
+    }
+
+    /// The messages of one conversation, in order.
+    fn chat_messages(&self, conversation_id: String) -> AppResult<Vec<ChatMessageRow>> {
+        self.read(|conn| read::chat::messages(conn, &conversation_id))
     }
 
     /// Executes a read query that the frontend compiled with Kysely.

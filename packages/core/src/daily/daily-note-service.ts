@@ -1,4 +1,3 @@
-import { isNotNullish } from '@ocavue/utils'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
@@ -83,36 +82,11 @@ class DailyNoteServiceImpl implements DailyNoteService {
   }
 
   async dailyDatesInRange(start: string, end: string): Promise<string[]> {
-    const rows = await this.#deps.database.db
-      .selectFrom('notes')
-      .where('dailyDate', 'is not', null)
-      .where('dailyDate', '>=', start)
-      .where('dailyDate', '<=', end)
-      .where('hasContent', '=', 1)
-      .select('dailyDate')
-      .orderBy('dailyDate')
-      .execute()
-    return rows.map((row) => row.dailyDate).filter(isNotNullish)
+    return await this.#deps.database.read('index_daily_dates', { start, end })
   }
 
   async listDailyNotes(range: DailyNotesRange): Promise<DailyNoteRow[]> {
-    const rows = await this.#deps.database.db
-      .selectFrom('notes')
-      .where('dailyDate', 'is not', null)
-      .where('dailyDate', '>=', range.start)
-      .where('dailyDate', '<=', range.end)
-      .where('isPrivate', '=', 0)
-      .select(['path', 'title', 'dailyDate', 'preview', 'mtime', 'isPrivate'])
-      .orderBy('dailyDate', 'desc')
-      .limit(range.limit)
-      .execute()
-    return rows
-      .flatMap((row) => {
-        return row.dailyDate === null
-          ? null
-          : { ...row, dailyDate: row.dailyDate, isPrivate: row.isPrivate !== 0 }
-      })
-      .filter(isNotNullish)
+    return await this.#deps.database.read('index_daily_notes', range)
   }
 
   subscribeWakeOnNewDay(listener: (today: string) => void): Unlisten {

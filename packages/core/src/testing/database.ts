@@ -1,8 +1,10 @@
 import { createDb } from '@reflect/db'
+import type { IndexReadCommand } from '@reflect/types'
 import { createWasmIndexBackend, type WasmIndexBackend } from '@reflect/index-wasm'
 import { toAppError } from '../errors.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import { buildIndexedNote, type IndexedNote } from '../indexing/indexed-note.ts'
+import type { CommandArgs, CommandResult } from '../ipc/ipc-service.ts'
 import { parseNote } from '../markdown/extract.ts'
 
 /**
@@ -11,6 +13,14 @@ import { parseNote } from '../markdown/extract.ts'
 export interface TestDatabaseQuery {
   readonly sql: string
   readonly params: readonly unknown[]
+}
+
+/**
+ * One read command the database ran.
+ */
+export interface TestDatabaseRead {
+  readonly command: string
+  readonly args: Readonly<Record<string, unknown>>
 }
 
 export interface TestDatabaseService extends DatabaseService {
@@ -31,6 +41,10 @@ export interface TestDatabaseService extends DatabaseService {
    */
   getQueries(): readonly TestDatabaseQuery[]
   /**
+   * Every read command run through `read` so far, in order.
+   */
+  getReads(): readonly TestDatabaseRead[]
+  /**
    * Release the database; later queries and seeding throw.
    */
   close(): void
@@ -39,6 +53,7 @@ export interface TestDatabaseService extends DatabaseService {
 class TestDatabaseServiceImpl implements TestDatabaseService {
   readonly db: DatabaseService['db']
   readonly #queries: TestDatabaseQuery[] = []
+  readonly #reads: TestDatabaseRead[] = []
   #index: WasmIndexBackend | null = null
   #generation = 0
   #closed = false
@@ -51,6 +66,13 @@ class TestDatabaseServiceImpl implements TestDatabaseService {
     return Promise.try(() => {
       this.#queries.push({ sql, params: [...params] })
       return this.invoke('db_query', { sql, params: [...params] })
+    })
+  }
+
+  read<C extends IndexReadCommand>(command: C, args: CommandArgs<C>): Promise<CommandResult<C>> {
+    return Promise.try(() => {
+      this.#reads.push({ command, args: structuredClone(args) })
+      return this.invoke(command, args) as CommandResult<C>
     })
   }
 
@@ -77,6 +99,10 @@ class TestDatabaseServiceImpl implements TestDatabaseService {
 
   getQueries(): readonly TestDatabaseQuery[] {
     return [...this.#queries]
+  }
+
+  getReads(): readonly TestDatabaseRead[] {
+    return [...this.#reads]
   }
 
   close(): void {

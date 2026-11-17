@@ -72,7 +72,7 @@ function setup({ indexed = [], files = {}, placeholders = [], readErrors = [] }:
      * How many `note_claims` lookups ran.
      */
     claimLookups: () => {
-      return database.getQueries().filter((query) => query.sql.includes('note_claims')).length
+      return database.getReads().filter((read) => read.command === 'index_wiki_target_match').length
     },
   }
 }

@@ -125,12 +125,7 @@ class NotePathServiceImpl implements NotePathService {
    */
   async #pathTaken(path: string): Promise<boolean> {
     const { database, noteFile } = this.#deps
-    const row = await database.db
-      .selectFrom('notes')
-      .where('path', '=', path)
-      .select('path')
-      .executeTakeFirst()
-    if (row !== undefined) {
+    if (await database.read('index_path_taken', { path })) {
       return true
     }
     return await noteFile.exists(path)

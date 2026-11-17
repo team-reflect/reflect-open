@@ -56,13 +56,14 @@ function setup({ indexed = [], files = {}, placeholders = [], readErrors = [] }:
      * How many `note_claims` lookups the resolver ran.
      */
     claimLookups: () => {
-      return database.getQueries().filter((query) => query.sql.includes('note_claims')).length
+      return database.getReads().filter((read) => read.command === 'index_wiki_target_match').length
     },
     expectNoWrites: () => {
       expect(noteFile.writes()).toEqual([])
       expect(noteFile.trashed()).toEqual([])
     },
     expectUntouched: () => {
+      expect(database.getReads()).toEqual([])
       expect(database.getQueries()).toEqual([])
       expect(read).not.toHaveBeenCalled()
       expect(listNotes).not.toHaveBeenCalled()

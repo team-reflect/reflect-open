@@ -1,7 +1,8 @@
 import { createDb, type Database, type QueryRunner } from '@reflect/db'
 import type { Kysely } from 'kysely'
 import { toAppError } from '../errors.ts'
-import type { IpcBridgeService } from '../ipc/ipc-service.ts'
+import type { IndexReadCommand } from '@reflect/types'
+import type { CommandArgs, CommandResult, IpcBridgeService } from '../ipc/ipc-service.ts'
 
 export interface DatabaseServiceDeps {
   readonly ipc: IpcBridgeService
@@ -23,14 +24,21 @@ export interface DatabaseService {
    * rejection is an `AppError`.
    */
   readonly runQuery: QueryRunner
+  /**
+   * Run one read command of the index and resolve with its typed result. A
+   * rejection is an `AppError`.
+   */
+  read<C extends IndexReadCommand>(command: C, args: CommandArgs<C>): Promise<CommandResult<C>>
 }
 
 class DatabaseServiceImpl implements DatabaseService {
   readonly db: Kysely<Database>
   readonly runQuery: QueryRunner
+  readonly #ipc: IpcBridgeService
 
   constructor(deps: DatabaseServiceDeps) {
     const { ipc } = deps
+    this.#ipc = ipc
     this.runQuery = async (sql, params) => {
       try {
         return await ipc.call('db_query', { sql, params: [...params] })
@@ -39,6 +47,17 @@ class DatabaseServiceImpl implements DatabaseService {
       }
     }
     this.db = createDb(this.runQuery)
+  }
+
+  async read<C extends IndexReadCommand>(
+    command: C,
+    args: CommandArgs<C>,
+  ): Promise<CommandResult<C>> {
+    try {
+      return await this.#ipc.call(command, args)
+    } catch (error) {
+      throw toAppError(error)
+    }
   }
 }
 
