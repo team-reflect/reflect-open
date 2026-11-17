@@ -208,7 +208,7 @@ mod tests {
     }
 
     #[test]
-    fn dispatch_opens_writes_and_queries_the_index() {
+    fn dispatch_opens_writes_and_reads_the_index() {
         let dir = tempfile::tempdir().unwrap();
         let host = Arc::new(RecordingHost::default());
         let core = Arc::new(Core::new(CoreConfig::default(), host.clone()).unwrap());
@@ -234,10 +234,11 @@ mod tests {
                     Value::Null
                 )]
             );
-            let args = br#"{"sql":"select 1 as one","params":[]}"#;
             assert_eq!(
-                core.dispatch("db_query", args, b"{}", None).await.unwrap(),
-                Reply::Json(r#"[{"one":1}]"#.into())
+                core.dispatch("index_meta_get", br#"{"key":"k"}"#, b"{}", None)
+                    .await
+                    .unwrap(),
+                Reply::Json("null".into())
             );
         });
     }

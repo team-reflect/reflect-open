@@ -121,7 +121,7 @@ reflect-open/
 ├── apple/                 # Shared Swift package
 ├── packages/core/         # Shared TypeScript logic
 ├── packages/app/          # App layer: windows, routes, commands, menus
-├── packages/db/           # Database types and helpers
+├── packages/index-wasm/   # The Rust index compiled to wasm, for dev and tests
 ├── crates/core/           # Rust commands shared by both shells
 ├── crates/ffi/            # C ABI over the Rust core for the iOS app
 ├── crates/git/            # Git backup and sync

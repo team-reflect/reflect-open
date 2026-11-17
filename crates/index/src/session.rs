@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
 use rusqlite::{Connection, params};
-use serde_json::{Map, Value};
 
 use reflect_types::{
     AppError, AppResult, ChatConversation, ChatMessageRow, EmbeddedChunk, FileMeta, IndexTouch,
@@ -14,7 +13,6 @@ use reflect_types::{
 
 use crate::chat_write;
 use crate::embed_write;
-use crate::query;
 use crate::scan;
 use crate::write;
 
@@ -416,18 +414,6 @@ impl IndexSession {
             let tx = conn.transaction()?;
             body(&tx)
         })
-    }
-
-    /// Execute a read query and return its rows; `requested` as in [`read`].
-    ///
-    /// [`read`]: IndexSession::read
-    pub fn query(
-        &self,
-        requested: u64,
-        sql: &str,
-        params: &[Value],
-    ) -> AppResult<Vec<Map<String, Value>>> {
-        self.on_reader(requested, |conn| query::run_query(conn, sql, params))
     }
 }
 

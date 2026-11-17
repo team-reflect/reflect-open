@@ -391,14 +391,10 @@ function setupGraph(options?: { unreadable?: string[] }) {
     storeChunks: true,
     failApply: (apply) => (unwritable.has(apply.path) ? new Error('disk full') : undefined),
   })
-  const storedPaths = async (): Promise<string[]> => {
-    const rows = await database.db
-      .selectFrom('embeddingChunks')
-      .select('notePath')
-      .distinct()
-      .orderBy('notePath')
-      .execute()
-    return rows.map((row) => row.notePath)
+  const storedPaths = (): unknown[] => {
+    return database
+      .query('SELECT DISTINCT note_path FROM embedding_chunks ORDER BY note_path')
+      .map((row) => row['note_path'])
   }
   return { index, database, noteFile, indexLifecycle, logger, runtime, storedPaths, unwritable }
 }
@@ -419,7 +415,7 @@ describe('removeNote', () => {
     await index.removeNote('notes/a.md', 1)
 
     expect(index.removed()).toEqual([{ path: 'notes/a.md', generation: 1 }])
-    await expect(storedPaths()).resolves.toEqual(['notes/b.md'])
+    expect(storedPaths()).toEqual(['notes/b.md'])
   })
 })
 
@@ -446,7 +442,7 @@ describe('backfill', () => {
       [1, 2],
       [2, 2],
     ])
-    await expect(storedPaths()).resolves.toEqual(['notes/a.md', 'notes/b.md'])
+    expect(storedPaths()).toEqual(['notes/a.md', 'notes/b.md'])
   })
 
   it('embeds nothing on a second pass (the hash-skip)', async () => {
@@ -574,7 +570,7 @@ describe('follow', () => {
     await queueDrained()
 
     expect(index.removed()).toEqual([{ path: 'notes/a.md', generation: 7 }])
-    await expect(storedPaths()).resolves.toEqual(['notes/b.md'])
+    expect(storedPaths()).toEqual(['notes/b.md'])
     stop()
   })
 

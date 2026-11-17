@@ -25,10 +25,10 @@ describe('createWasmTestDatabaseService', () => {
     }
   })
 
-  it('rejects queries after close', async () => {
+  it('rejects queries after close', () => {
     const database = createWasmTestDatabaseService()
     database.close()
-    await expect(database.runQuery('select 1', [])).rejects.toMatchObject({ kind: 'unknown' })
+    expect(() => database.query('select 1')).toThrow('the test database is closed')
   })
 })
 

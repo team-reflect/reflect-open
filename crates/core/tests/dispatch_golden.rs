@@ -225,11 +225,7 @@ fn commands_reply_their_pinned_json() {
     );
 
     ok("index_open", json!({}), json!(1));
-    ok(
-        "db_query",
-        json!({"sql": "select 1 as n, 'x' as s", "params": []}),
-        json!([{"n": 1, "s": "x"}]),
-    );
+    ok("index_meta_get", json!({"key": "k"}), json!(null));
     ok(
         "index_meta_set",
         json!({"key": "k", "value": "v", "generation": 1}),

@@ -1,4 +1,3 @@
-import { createDb } from '@reflect/db'
 import type { IndexReadCommand } from '@reflect/types'
 import { createWasmIndexBackend, type WasmIndexBackend } from '@reflect/index-wasm'
 import { toAppError } from '../errors.ts'
@@ -6,14 +5,6 @@ import type { DatabaseService } from '../indexing/database-service.ts'
 import { buildIndexedNote, type IndexedNote } from '../indexing/indexed-note.ts'
 import type { CommandArgs, CommandResult } from '../ipc/ipc-service.ts'
 import { parseNote } from '../markdown/extract.ts'
-
-/**
- * One query the database ran, in its compiled form.
- */
-export interface TestDatabaseQuery {
-  readonly sql: string
-  readonly params: readonly unknown[]
-}
 
 /**
  * One read command the database ran.
@@ -29,6 +20,11 @@ export interface TestDatabaseService extends DatabaseService {
    */
   applyProjection(note: IndexedNote): void
   /**
+   * Run one read-only SQL statement and return its rows, with the column
+   * names of the schema. For assertions on rows that no read command returns.
+   */
+  query(sql: string, params?: readonly unknown[]): Record<string, unknown>[]
+  /**
    * Run one index command on the database, like the native shell.
    */
   invoke(command: string, args: Record<string, unknown>): unknown
@@ -36,10 +32,6 @@ export interface TestDatabaseService extends DatabaseService {
    * The generation of the open index, which a write command must carry.
    */
   generation(): number
-  /**
-   * Every query run so far, in order.
-   */
-  getQueries(): readonly TestDatabaseQuery[]
   /**
    * Every read command run through `read` so far, in order.
    */
@@ -51,22 +43,13 @@ export interface TestDatabaseService extends DatabaseService {
 }
 
 class TestDatabaseServiceImpl implements TestDatabaseService {
-  readonly db: DatabaseService['db']
-  readonly #queries: TestDatabaseQuery[] = []
   readonly #reads: TestDatabaseRead[] = []
   #index: WasmIndexBackend | null = null
   #generation = 0
   #closed = false
 
-  constructor() {
-    this.db = createDb(this.runQuery)
-  }
-
-  readonly runQuery = (sql: string, params: readonly unknown[]): Promise<unknown> => {
-    return Promise.try(() => {
-      this.#queries.push({ sql, params: [...params] })
-      return this.invoke('db_query', { sql, params: [...params] })
-    })
+  query(sql: string, params: readonly unknown[] = []): Record<string, unknown>[] {
+    return this.invoke('test_query', { sql, params: [...params] }) as Record<string, unknown>[]
   }
 
   read<C extends IndexReadCommand>(command: C, args: CommandArgs<C>): Promise<CommandResult<C>> {
@@ -95,10 +78,6 @@ class TestDatabaseServiceImpl implements TestDatabaseService {
   generation(): number {
     this.#open()
     return this.#generation
-  }
-
-  getQueries(): readonly TestDatabaseQuery[] {
-    return [...this.#queries]
   }
 
   getReads(): readonly TestDatabaseRead[] {

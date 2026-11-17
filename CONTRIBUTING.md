@@ -52,7 +52,7 @@ message and, for `feat`/`fix`, the user-facing changelog entry.
 - **Rust owns capabilities, TypeScript owns policy.** A Rust command never
   encodes a product rule beyond the primitive it exposes (e.g. the watcher
   emits events; *what* to reindex is decided in core).
-- **`@reflect/core` and `@reflect/db` never import Tauri.** Native access goes
+- **`@reflect/core` never imports Tauri.** Native access goes
   through the adapters the app passes to `createCoreServices(adapters)`. Core
   has no global instances: a service gets what it needs through its `deps`,
   and tests build services over the test doubles in `@reflect/core/testing`

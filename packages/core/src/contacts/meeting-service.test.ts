@@ -412,7 +412,6 @@ describe('addMeetingToDaily', () => {
     expect(noteFile.writes()).toEqual([])
     // No attendee was resolved and no note was created.
     expect(database.getReads()).toEqual([])
-    expect(database.getQueries()).toEqual([])
     expect(noteCreation.created()).toEqual([])
   })
 

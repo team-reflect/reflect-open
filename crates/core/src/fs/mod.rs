@@ -505,7 +505,7 @@ impl Core {
     where
         F: FnOnce(io::FileCatalog) -> Vec<FileMeta> + Send + 'static,
     {
-        // Pin the graph session before the hop, like `note_read` and `db_query`:
+        // Pin the graph session before the hop, like `note_read` and the index reads:
         // an unpinned call resolved inside the closure could list a root swapped
         // in after the invoke (the rebuild path calls this without a
         // generation). A pinned call the switch superseded fails the

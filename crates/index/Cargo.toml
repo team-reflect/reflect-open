@@ -1,7 +1,7 @@
 [package]
 name = "reflect-index"
 version = "0.0.0"
-description = "The SQLite index of a graph: the note projection writer, the read-only query bridge, the reconcile scan, chat history and embedding rows, behind one generation-gated session."
+description = "The SQLite index of a graph: the note projection writer, the read queries, the reconcile scan, chat history and embedding rows, behind one generation-gated session."
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,9 +12,7 @@ default = ["native"]
 native = ["dep:reflect-index-schema"]
 
 [dependencies]
-# `hooks` adds the authorizer API that locks the read-only `db_query` bridge
-# down to pure reads (deny ATTACH/DETACH/PRAGMA); see `query.rs`.
-rusqlite = { workspace = true, features = ["hooks"] }
+rusqlite = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
