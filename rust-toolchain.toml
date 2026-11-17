@@ -1,5 +1,6 @@
 [toolchain]
 channel = "1.100.0"
 profile = "minimal"
-components = ["clippy", "rustfmt"]
-targets = ["aarch64-apple-ios", "aarch64-apple-ios-sim"]
+# `llvm-tools` has the `llvm-ar` that archives the wasm build of SQLite.
+components = ["clippy", "rustfmt", "llvm-tools"]
+targets = ["aarch64-apple-ios", "aarch64-apple-ios-sim", "wasm32-unknown-unknown"]

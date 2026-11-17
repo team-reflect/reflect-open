@@ -31,7 +31,7 @@ percent-encoding = { workspace = true }
 tokio = { workspace = true, features = ["time", "sync", "fs", "io-util"] }
 serde_json = { workspace = true }
 reflect-types = { workspace = true, features = ["git2", "rusqlite"] }
-reflect-index = { workspace = true }
+reflect-index = { workspace = true, features = ["native"] }
 reflect-graph-io = { workspace = true }
 reflect-core = { workspace = true }
 tempfile = { workspace = true }

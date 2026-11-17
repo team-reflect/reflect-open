@@ -15,6 +15,7 @@ members = [
   "crates/graph-paths",
   "crates/index",
   "crates/index-schema",
+  "crates/index-wasm",
   "crates/types",
 ]
 
@@ -35,7 +36,7 @@ reflect-core = { path = "crates/core" }
 reflect-graph-io = { path = "crates/graph-io" }
 reflect-graph-paths = { path = "crates/graph-paths" }
 reflect-git = { path = "crates/git" }
-reflect-index = { path = "crates/index" }
+reflect-index = { path = "crates/index", default-features = false }
 reflect-index-schema = { path = "crates/index-schema", default-features = false }
 reflect-types = { path = "crates/types" }
 
@@ -44,6 +45,7 @@ apple-native-keyring-store = "1.0.2"
 base64 = "0.23.1"
 block2 = "0.6.2"
 clap = "4.6.7"
+console_error_panic_hook = "0.1.7"
 core-foundation = "0.10.1"
 dbus-secret-service-keyring-store = "1.0.1"
 dirs = "7.0.0"
@@ -70,6 +72,7 @@ http-range-header = "1.0.0"
 ignore = "0.4.34"
 image = { version = "0.25.10", default-features = false }
 infer = "0.22.0"
+js-sys = "0.3.103"
 jiff = { version = "0.2.45", default-features = false, features = ["std"] }
 keyring-core = "1.0.1"
 log = "0.4.35"
@@ -102,6 +105,7 @@ specta-swift = "=0.0.6"
 specta-typescript = "=0.0.15"
 specta-util = "=0.0.15"
 sqlite-vec = "0.1.9"
+sqlite-wasm-vec = "0.1.3"
 tauri = "2.12.5"
 tauri-build = "2.7.4"
 tauri-plugin-deep-link = "2.6.3"
@@ -120,6 +124,7 @@ trash = "5.3.0"
 unicode-normalization = "0.1.26"
 urlpattern = "0.6.0"
 walkdir = "2.5.0"
+wasm-bindgen = "0.2.126"
 windows-native-keyring-store = "1.1.0"
 xattr = "1.7.0"
 zip = { version = "9.0.5", default-features = false }
@@ -129,3 +134,11 @@ zip = { version = "9.0.5", default-features = false }
 # downloads, for slower release builds. Set CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16
 # for faster local release builds.
 codegen-units = 1
+
+# The index for browsers and tests (`crates/index-wasm`), built for size.
+[profile.wasm]
+inherits = "release"
+opt-level = "z"
+lto = true
+panic = "abort"
+strip = true

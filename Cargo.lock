@@ -828,6 +828,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "console_error_panic_hook"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06aeb73f470f66dcdbf7223caeebb85984942f22f1adb2a088cf9668146bbbc"
+dependencies = [
+ "cfg-if",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "const-oid"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4687,6 +4697,22 @@ dependencies = [
  "rusqlite",
  "rusqlite_migration",
  "sqlite-vec",
+ "sqlite-wasm-vec",
+]
+
+[[package]]
+name = "reflect-index-wasm"
+version = "0.0.0"
+dependencies = [
+ "console_error_panic_hook",
+ "js-sys",
+ "reflect-index",
+ "reflect-index-schema",
+ "reflect-types",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -5642,6 +5668,15 @@ dependencies = [
  "js-sys",
  "rsqlite-vfs",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "sqlite-wasm-vec"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3a529ca31748cbd4ad97be7dac7c799b1c9e2cb3f020846300593ee471ad6b0"
+dependencies = [
+ "cc",
 ]
 
 [[package]]

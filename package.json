@@ -10,6 +10,7 @@
     "build": "turbo run build",
     "build:ipa": "pnpm --filter @reflect/ios build:ipa",
     "build:ffi": "node scripts/build-ffi.ts",
+    "build:index-wasm": "node scripts/build-index-wasm.ts",
     "build:linux": "pnpm --filter @reflect/tauri build:linux",
     "build:macos": "pnpm --filter @reflect/tauri build:macos",
     "build:windows": "pnpm --filter @reflect/tauri build:windows",

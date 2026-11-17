@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-slim
     timeout-minutes: 10
     outputs:
+      build-index-wasm: ${{ steps.classify.outputs.build-index-wasm }}
       lint-node: ${{ steps.classify.outputs.lint-node }}
       test-node: ${{ steps.classify.outputs.test-node }}
       test-chromium: ${{ steps.classify.outputs.test-chromium }}
@@ -72,6 +73,17 @@ jobs:
             'apps/tauri/*.json'
             'apple/Sources/TypesShared/*'
           )
+          # The TypeScript tests run the Rust index, built to wasm.
+          index_wasm_files=(
+            'crates/index/*'
+            'crates/index-schema/*'
+            'crates/index-wasm/*'
+            'crates/types/*'
+            'Cargo.lock'
+            'Cargo.toml'
+            'rust-toolchain.toml'
+            'mise.toml'
+          )
           swift_files=(
             '.github/*'
             '*.swift'
@@ -101,7 +113,7 @@ jobs:
             skip_slow=false
           else
             git diff --name-only --no-renames HEAD^1 HEAD
-            if changed "${js_files[@]}"; then
+            if changed "${js_files[@]}" "${index_wasm_files[@]}"; then
               js=true
             fi
             if changed "${rust_files[@]}"; then
@@ -120,6 +132,7 @@ jobs:
           fi
 
           {
+            echo "build-index-wasm=$js"
             echo "lint-node=$js"
             echo "test-node=$js"
             echo "test-chromium=$js"
@@ -130,8 +143,38 @@ jobs:
             echo "test-rust=$rust"
           } | tee -a "$GITHUB_OUTPUT"
 
-  lint-node:
+  # Builds the Rust index to wasm once; the TypeScript jobs download it.
+  build-index-wasm:
     needs: classify
+    if: needs.classify.outputs.build-index-wasm == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache-key: index-wasm
+
+      - uses: ./.github/actions/setup-mise
+
+      - name: Build
+        run: pnpm build:index-wasm
+
+      - name: Upload the index wasm build
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: index-wasm
+          path: |
+            packages/index-wasm/pkg
+            !packages/index-wasm/pkg/*.d.ts
+          retention-days: 1
+
+  lint-node:
+    needs: [classify, build-index-wasm]
     if: needs.classify.outputs.lint-node == 'true'
     runs-on: ubuntu-24.04
     steps:
@@ -140,6 +183,12 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node
+
+      - name: Download the index wasm build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: index-wasm
+          path: packages/index-wasm/pkg
 
       - name: Verify generated DB types are current
         run: |
@@ -163,7 +212,7 @@ jobs:
         run: pnpm build
 
   test-node:
-    needs: classify
+    needs: [classify, build-index-wasm]
     if: needs.classify.outputs.test-node == 'true'
     runs-on: ubuntu-24.04
     steps:
@@ -173,11 +222,17 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
+      - name: Download the index wasm build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: index-wasm
+          path: packages/index-wasm/pkg
+
       - name: Test
         run: pnpm run test:node
 
   test-chromium:
-    needs: classify
+    needs: [classify, build-index-wasm]
     if: needs.classify.outputs.test-chromium == 'true'
     runs-on: ubuntu-24.04
     strategy:
@@ -203,6 +258,12 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
+      - name: Download the index wasm build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: index-wasm
+          path: packages/index-wasm/pkg
+
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:chromium
 
@@ -211,7 +272,7 @@ jobs:
 
   # Not part of `all-green`: a WebKit failure does not block merging.
   test-webkit:
-    needs: [classify, test-chromium]
+    needs: [classify, build-index-wasm, test-chromium]
     if: needs.classify.outputs.test-webkit == 'true'
     runs-on: xcode-27
     env:
@@ -230,6 +291,12 @@ jobs:
       - uses: ./.github/actions/setup-xcode
 
       - uses: ./.github/actions/setup-node
+
+      - name: Download the index wasm build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: index-wasm
+          path: packages/index-wasm/pkg
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:webkit
@@ -349,6 +416,12 @@ jobs:
         if: matrix.name == 'macOS'
         run: cargo clippy --workspace --exclude reflect-open --all-targets --target aarch64-apple-ios-sim
 
+      - name: Clippy (wasm)
+        if: matrix.name == 'Linux'
+        run: |
+          export AR_wasm32_unknown_unknown="$(rustc --print sysroot)/lib/rustlib/$(rustc -vV | sed -n 's/host: //p')/bin/llvm-ar"
+          cargo clippy --package reflect-index-wasm --target wasm32-unknown-unknown
+
       - name: Format check
         run: cargo fmt --all -- --check
 
@@ -399,6 +472,7 @@ jobs:
     if: always()
     needs:
       - classify
+      - build-index-wasm
       - lint-node
       - test-node
       - test-chromium
