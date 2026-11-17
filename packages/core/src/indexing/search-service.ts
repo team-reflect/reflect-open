@@ -13,8 +13,8 @@ import type { WikiResolverService } from './wiki-resolver-service.ts'
  * title recall. Title recall matches each query term at a title word start —
  * except terms in unsegmented scripts such as Japanese, which match anywhere:
  * FTS5's default `unicode61` tokenizer treats an uninterrupted title as one
- * token, so a shorter title query can never match it lexically
- * (`buildTitleMatchSql`). Free-text ranking promotes exact, prefix, then
+ * token, so a shorter title query can never match it lexically. The query
+ * runs in Rust (`crates/index/src/read/search.rs`). Free-text ranking promotes exact, prefix, then
  * all-terms title matches ahead of body hits, followed by title-boosted bm25,
  * pinned, and recency. Filters may be empty — plain text search is the
  * degenerate case, so there is exactly one search path to keep correct.
@@ -68,9 +68,6 @@ export interface FilteredSearchOptions {
   notesOnly?: boolean
 }
 
-/**
- * The columns every hit carries besides the FTS snippet.
- */
 export interface SearchServiceDeps {
   readonly database: DatabaseService
   readonly wikiResolver: WikiResolverService
