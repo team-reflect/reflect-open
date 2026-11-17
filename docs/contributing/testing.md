@@ -59,8 +59,9 @@ the service plus members that seed, drive or observe it.
   history, embeddings, `index_meta`).
 - The tests need the wasm build of the index. `pnpm test` builds it first; it
   needs the Rust toolchain and the `wasm-bindgen` CLI (`mise install`). After a
-  change in `crates/index`, run `pnpm build:index-wasm` before a test that is
-  already in watch mode.
+  change in `crates/index`, `crates/index-schema`, `crates/index-wasm` or
+  `crates/types`, run `pnpm build:index-wasm` before a test that is already in
+  watch mode.
 
 ## The service containers
 

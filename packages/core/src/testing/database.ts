@@ -19,10 +19,6 @@ export interface TestDatabaseService extends DatabaseService {
    */
   applyProjection(note: IndexedNote): void
   /**
-   * Whether `invoke` answers `command`.
-   */
-  has(command: string): boolean
-  /**
    * Run one index command on the database, like the native shell.
    */
   invoke(command: string, args: Record<string, unknown>): unknown
@@ -60,10 +56,6 @@ class TestDatabaseServiceImpl implements TestDatabaseService {
 
   applyProjection(note: IndexedNote): void {
     this.invoke('index_apply', { note, generation: this.generation() })
-  }
-
-  has(command: string): boolean {
-    return this.#open().has(command)
   }
 
   invoke(command: string, args: Record<string, unknown>): unknown {

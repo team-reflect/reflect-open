@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "gen:licenses": "node scripts/generate-licenses.ts",
-    "test": "vitest run --config ../../vitest.config.ts --project web-browser --project web-node",
+    "test": "node ../../scripts/build-index-wasm.ts && vitest run --config ../../vitest.config.ts --project web-browser --project web-node",
     "test:install": "pnpm run test:install:chromium && pnpm run test:install:webkit",
     "test:install:chromium": "playwright install chromium",
     "test:install:webkit": "playwright install webkit"
