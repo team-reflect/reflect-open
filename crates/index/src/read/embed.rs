@@ -31,10 +31,11 @@ fn chunk_hit(row: &Row<'_>) -> rusqlite::Result<ChunkHit> {
     })
 }
 
-/// The nearest chunks of non-private notes to each of the first `seed_limit`
-/// chunks of the note at `note_path`: one list per seed chunk, each nearest
-/// first with at most `candidates` chunks. The note's own chunks are in the
-/// lists.
+/// The non-private chunks among the `candidates` nearest chunks to each of
+/// the first `seed_limit` chunks of the note at `note_path`: one list per seed
+/// chunk, nearest first. The private filter runs after the nearest-neighbour
+/// limit, so a list can be shorter than `candidates`. The note's own chunks
+/// are in the lists.
 pub(crate) fn related_chunks(
     conn: &Connection,
     note_path: &str,

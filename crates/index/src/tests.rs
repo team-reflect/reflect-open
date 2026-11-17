@@ -2799,17 +2799,42 @@ fn vector_reads_find_the_nearest_chunks_and_keep_private_notes_out_of_related() 
     apply_note(&conn, &secret).unwrap();
     let mut far = vec384(0.0);
     far[0] = 1.0;
-    apply_chunks(&conn, "notes/self.md", &[chunk("s1", Some(vec384(0.5)))]).unwrap();
+    // The note has two chunks that point in different directions; each one
+    // seeds its own neighbour list.
+    let mut second = vec384(0.0);
+    second[1] = 1.0;
+    let mut second_chunk = chunk("s2", Some(second.clone()));
+    second_chunk.pos_from = 20;
+    apply_chunks(
+        &conn,
+        "notes/self.md",
+        &[chunk("s1", Some(vec384(0.5))), second_chunk],
+    )
+    .unwrap();
+    index_note(&conn, "notes/other.md");
+    second[2] = 0.1;
+    apply_chunks(&conn, "notes/other.md", &[chunk("o1", Some(second))]).unwrap();
     let mut near = vec384(0.5);
     near[0] = 0.1;
     apply_chunks(&conn, "notes/near.md", &[chunk("n1", Some(near))]).unwrap();
     apply_chunks(&conn, "notes/secret.md", &[chunk("x1", Some(far.clone()))]).unwrap();
 
     let related = related_chunks(&conn, "notes/self.md", 16, 24).unwrap();
-    assert_eq!(related.len(), 1);
-    let paths: Vec<&str> = related[0].iter().map(|hit| hit.path.as_str()).collect();
-    assert_eq!(paths, ["notes/self.md", "notes/near.md"]);
+    let nearest_two = |list: &[reflect_types::ChunkHit]| -> Vec<String> {
+        list.iter().take(2).map(|hit| hit.path.clone()).collect()
+    };
+    assert_eq!(related.len(), 2);
+    assert_eq!(nearest_two(&related[0]), ["notes/self.md", "notes/near.md"]);
+    assert_eq!(
+        nearest_two(&related[1]),
+        ["notes/self.md", "notes/other.md"]
+    );
     assert!(related[0][0].distance.abs() < 1e-6);
+    assert!(related.iter().flatten().all(|hit| !hit.is_private));
+    assert_eq!(
+        related_chunks(&conn, "notes/self.md", 1, 24).unwrap().len(),
+        1
+    );
     assert_eq!(
         related_chunks(&conn, "notes/missing.md", 16, 24)
             .unwrap()
