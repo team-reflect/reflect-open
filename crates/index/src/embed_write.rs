@@ -7,7 +7,7 @@ use rusqlite::{Connection, params};
 
 use reflect_types::{AppError, AppResult, EmbeddedChunk};
 
-fn vector_json(vector: &[f32]) -> String {
+pub(crate) fn vector_json(vector: &[f32]) -> String {
     let mut out = String::with_capacity(vector.len() * 10 + 2);
     out.push('[');
     for (i, value) in vector.iter().enumerate() {

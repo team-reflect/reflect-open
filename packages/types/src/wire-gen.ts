@@ -422,6 +422,18 @@ export type ChunkHash = {
   modelId: string
 }
 
+/**  One embedding chunk near a query vector. */
+export type ChunkHit = {
+  /**  The path of the note that holds the chunk. */
+  path: string
+  title: string
+  heading: string | null
+  text: string
+  isPrivate: boolean
+  /**  The cosine distance to the query vector; 0 is identical. */
+  distance: number
+}
+
 /**
  *  Every command with its arguments and result. A Swift shell command
  *  field is named after its identifier; the codegen renames it after
@@ -1233,6 +1245,27 @@ export type Commands = {
       paths: string[]
     }
     result: WikiWinningAlias[]
+  }
+  index_note_privacy: {
+    args: {
+      paths: string[]
+    }
+    result: NotePrivacy[]
+  }
+  embed_related_chunks: {
+    args: {
+      path: string
+      seedLimit: number
+      candidates: number
+    }
+    result: ChunkHit[][]
+  }
+  embed_semantic_chunks: {
+    args: {
+      vector: number[]
+      candidates: number
+    }
+    result: ChunkHit[]
   }
   index_daily_dates: {
     args: {
@@ -2082,6 +2115,12 @@ export type NoteMoveRequest = {
   fromAddress: MovedNoteAddress
 }
 
+/**  The `private` flag of one indexed note. */
+export type NotePrivacy = {
+  path: string
+  isPrivate: boolean
+}
+
 /**  The core fields of one note row. */
 export type NoteRow = {
   path: string
@@ -2665,6 +2704,9 @@ export type IndexReadCommand =
   | 'index_wiki_candidates'
   | 'index_wiki_key_winners'
   | 'index_wiki_winning_aliases'
+  | 'index_note_privacy'
+  | 'embed_related_chunks'
+  | 'embed_semantic_chunks'
   | 'index_daily_dates'
   | 'index_daily_notes'
   | 'chat_conversations'

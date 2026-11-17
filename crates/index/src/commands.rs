@@ -7,10 +7,10 @@ use serde_json::{Map, Value};
 
 use reflect_types::{
     AppError, AppResult, Backlink, BacklinkPage, BacklinkSourceCursor, ChatConversation,
-    ChatMessageRow, ChunkHash, DailyNoteRow, EmbeddedChunk, GraphStats, IndexTouch, IndexedNote,
-    MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry, NoteRow, PinnedNoteRow, RecentNoteRow,
-    TagFacet, TaskRow, TemplateEntry, WikiCandidates, WikiClaimMatch, WikiKeyWinner,
-    WikiTitleCandidate, WikiWinningAlias,
+    ChatMessageRow, ChunkHash, ChunkHit, DailyNoteRow, EmbeddedChunk, GraphStats, IndexTouch,
+    IndexedNote, MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry, NotePrivacy, NoteRow,
+    PinnedNoteRow, RecentNoteRow, TagFacet, TaskRow, TemplateEntry, WikiCandidates, WikiClaimMatch,
+    WikiKeyWinner, WikiTitleCandidate, WikiWinningAlias,
 };
 
 use crate::read;
@@ -317,6 +317,26 @@ impl<'a> IndexCommands<'a> {
     /// The aliases of the notes in `paths` that resolve only to their note.
     fn index_wiki_winning_aliases(&self, paths: Vec<String>) -> AppResult<Vec<WikiWinningAlias>> {
         self.read(|conn| read::suggest::winning_aliases(conn, &paths))
+    }
+
+    /// The `private` flag of each indexed path in `paths`.
+    fn index_note_privacy(&self, paths: Vec<String>) -> AppResult<Vec<NotePrivacy>> {
+        self.read(|conn| read::notes::privacy(conn, &paths))
+    }
+
+    /// The nearest non-private chunks to each of the first chunks of a note.
+    fn embed_related_chunks(
+        &self,
+        path: String,
+        seed_limit: u32,
+        candidates: u32,
+    ) -> AppResult<Vec<Vec<ChunkHit>>> {
+        self.read(|conn| read::embed::related_chunks(conn, &path, seed_limit, candidates))
+    }
+
+    /// The nearest chunks to `vector`, private notes included.
+    fn embed_semantic_chunks(&self, vector: Vec<f32>, candidates: u32) -> AppResult<Vec<ChunkHit>> {
+        self.read(|conn| read::embed::semantic_chunks(conn, &vector, candidates))
     }
 
     /// The dates in `start..=end` whose daily note has content, ascending.

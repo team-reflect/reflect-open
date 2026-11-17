@@ -286,3 +286,27 @@ pub struct WikiWinningAlias {
     pub note_path: String,
     pub alias: String,
 }
+
+/// One embedding chunk near a query vector.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct ChunkHit {
+    /// The path of the note that holds the chunk.
+    pub path: String,
+    pub title: String,
+    pub heading: Option<String>,
+    pub text: String,
+    pub is_private: bool,
+    /// The cosine distance to the query vector; 0 is identical.
+    pub distance: f64,
+}
+
+/// The `private` flag of one indexed note.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct NotePrivacy {
+    pub path: String,
+    pub is_private: bool,
+}

@@ -2,7 +2,9 @@
 
 use rusqlite::{Connection, OptionalExtension, params};
 
-use reflect_types::{AppResult, NoteFileFacts, NoteId, NoteRow, PinnedNoteRow, TemplateEntry};
+use reflect_types::{
+    AppResult, NoteFileFacts, NoteId, NotePrivacy, NoteRow, PinnedNoteRow, TemplateEntry,
+};
 
 /// A list of text values as one bound parameter, for
 /// `IN (SELECT value FROM json_each(?))`.
@@ -186,4 +188,20 @@ pub(crate) fn embeddable_paths(conn: &Connection) -> AppResult<Vec<String>> {
         .query_map([], |row| row.get(0))?
         .collect::<Result<_, _>>()?;
     Ok(paths)
+}
+
+/// The `private` flag of each indexed path in `paths`.
+pub(crate) fn privacy(conn: &Connection, paths: &[String]) -> AppResult<Vec<NotePrivacy>> {
+    let flags = conn
+        .prepare_cached(
+            "SELECT path, is_private FROM notes WHERE path IN (SELECT value FROM json_each(?1))",
+        )?
+        .query_map([json_list(paths)?], |row| {
+            Ok(NotePrivacy {
+                path: row.get(0)?,
+                is_private: row.get(1)?,
+            })
+        })?
+        .collect::<Result<_, _>>()?;
+    Ok(flags)
 }
