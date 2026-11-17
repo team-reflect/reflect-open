@@ -21,22 +21,22 @@ pub(crate) fn resolve(conn: &Connection, key: &str) -> AppResult<Option<String>>
         .optional()?)
 }
 
-/// The notes that claim `key` in its strongest tier, by path.
+/// The notes that claim `key` in its strongest tier, by path. One statement
+/// reads the tier and its notes, so a caller with no transaction still gets
+/// a consistent answer.
 pub(crate) fn claim_match(conn: &Connection, key: &str) -> AppResult<Option<WikiClaimMatch>> {
-    let tier: Option<i64> = conn
-        .prepare_cached("SELECT min(tier) FROM note_claims WHERE key = ?1")?
-        .query_row([key], |row| row.get(0))?;
-    let Some(tier) = tier else {
-        return Ok(None);
-    };
-    let paths = conn
+    let claims: Vec<(String, i64)> = conn
         .prepare_cached(
-            "SELECT DISTINCT note_path FROM note_claims
-             WHERE key = ?1 AND tier = ?2
+            "SELECT DISTINCT note_path, tier FROM note_claims
+             WHERE key = ?1 AND tier = (SELECT min(tier) FROM note_claims WHERE key = ?1)
              ORDER BY note_path",
         )?
-        .query_map(rusqlite::params![key, tier], |row| row.get(0))?
+        .query_map([key], |row| Ok((row.get(0)?, row.get(1)?)))?
         .collect::<Result<_, _>>()?;
+    let Some(tier) = claims.first().map(|(_, tier)| *tier) else {
+        return Ok(None);
+    };
+    let paths = claims.into_iter().map(|(path, _)| path).collect();
     Ok(Some(WikiClaimMatch { tier, paths }))
 }
 

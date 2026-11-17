@@ -107,6 +107,7 @@ describe('resolvePerson', () => {
     })
     // The owner query alone: a conflict never asks for a wiki address.
     expect(database.getReads().map((read) => read.command)).toEqual(['index_person_owners'])
+    expect(database.getQueries()).toEqual([])
   })
 
   it('blocks a unique owner without a safe wiki address', async () => {

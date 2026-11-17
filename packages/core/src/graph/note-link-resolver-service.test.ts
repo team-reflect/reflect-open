@@ -64,6 +64,7 @@ function setup({ indexed = [], files = {}, placeholders = [], readErrors = [] }:
     },
     expectUntouched: () => {
       expect(database.getReads()).toEqual([])
+      expect(database.getQueries()).toEqual([])
       expect(read).not.toHaveBeenCalled()
       expect(listNotes).not.toHaveBeenCalled()
     },
