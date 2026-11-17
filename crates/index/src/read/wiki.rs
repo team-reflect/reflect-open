@@ -24,7 +24,7 @@ pub(crate) fn resolve(conn: &Connection, key: &str) -> AppResult<Option<String>>
 /// The notes that claim `key` in its strongest tier, by path. One statement
 /// reads the tier and its notes, so a caller with no transaction still gets
 /// a consistent answer.
-pub(crate) fn claim_match(conn: &Connection, key: &str) -> AppResult<Option<WikiClaimMatch>> {
+pub fn claim_match(conn: &Connection, key: &str) -> AppResult<Option<WikiClaimMatch>> {
     let claims: Vec<(String, i64)> = conn
         .prepare_cached(
             "SELECT DISTINCT note_path, tier FROM note_claims

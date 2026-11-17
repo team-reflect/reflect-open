@@ -14,8 +14,6 @@ use crate::graph::Graph;
 use crate::index::{IndexOpen, detect_staleness, open_read_only};
 use crate::note_file::{read_note, subject_display_title};
 use crate::search::{SearchHit, search_index};
-use reflect_index::text::fts::build_fts_match;
-use reflect_index::text::keys::fold_key;
 
 /// The privacy re-check: the index row said public, but the file's own
 /// frontmatter is the truth — a note flagged private after the last index run
@@ -47,10 +45,7 @@ pub fn run(graph: &Graph, json: bool, query: &str, limit: usize) -> Result<(), C
         ));
     }
 
-    let hits: Vec<SearchHit> = match build_fts_match(query) {
-        Some(match_expr) => search_index(&opened.conn, &match_expr, &fold_key(query), limit)?,
-        None => Vec::new(),
-    };
+    let hits = search_index(&opened.conn, query, limit)?;
     let hits: Vec<SearchHit> = hits
         .into_iter()
         .filter(|hit| still_public_on_disk(&graph.root, &hit.path))

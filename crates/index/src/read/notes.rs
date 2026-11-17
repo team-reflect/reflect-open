@@ -1,5 +1,7 @@
 //! Row lookups over the `notes` and `aliases` tables.
 
+use std::collections::HashMap;
+
 use rusqlite::{Connection, OptionalExtension, params};
 
 use reflect_types::{
@@ -204,4 +206,13 @@ pub(crate) fn privacy(conn: &Connection, paths: &[String]) -> AppResult<Vec<Note
         })?
         .collect::<Result<_, _>>()?;
     Ok(flags)
+}
+
+/// The stored mtime and content hash of every indexed note, by path.
+pub fn stored_file_facts(conn: &Connection) -> AppResult<HashMap<String, (i64, String)>> {
+    let facts = conn
+        .prepare_cached("SELECT path, mtime, file_hash FROM notes")?
+        .query_map([], |row| Ok((row.get(0)?, (row.get(1)?, row.get(2)?))))?
+        .collect::<Result<_, _>>()?;
+    Ok(facts)
 }

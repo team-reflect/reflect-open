@@ -17,7 +17,7 @@ mod commands;
 mod connections;
 mod embed_write;
 mod query;
-mod read;
+pub mod read;
 mod scan;
 mod session;
 #[cfg(test)]

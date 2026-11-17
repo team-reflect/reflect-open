@@ -7,7 +7,7 @@
 
 use std::path::{Component, Path, PathBuf};
 
-use rusqlite::{Connection, params};
+use rusqlite::Connection;
 
 use crate::error::CliError;
 use crate::note_file::{checked_note_path, parse_note_meta, read_note_text, walk_notes};
@@ -82,24 +82,9 @@ fn absolute_graph_relative(candidate: &Path, canonical_root: &Path) -> Option<Pa
 /// templates claim nothing, so the CLI reads the same ranking instead of
 /// restating it tier by tier.
 fn index_lookup(conn: &Connection, key: &str) -> Result<Vec<String>, CliError> {
-    collect_paths(
-        conn,
-        "SELECT note_path FROM note_claims
-          WHERE key = ?1
-            AND tier = (SELECT min(tier) FROM note_claims WHERE key = ?1)
-          ORDER BY note_path",
-        key,
-    )
-}
-
-fn collect_paths(conn: &Connection, sql: &str, key: &str) -> Result<Vec<String>, CliError> {
-    let mut statement = conn.prepare(sql)?;
-    let rows = statement.query_map(params![key], |row| row.get::<_, String>(0))?;
-    let mut paths = Vec::new();
-    for row in rows {
-        paths.push(row?);
-    }
-    Ok(paths)
+    let matched = reflect_index::read::wiki::claim_match(conn, key)
+        .map_err(|err| CliError::runtime(err.message()))?;
+    Ok(matched.map(|matched| matched.paths).unwrap_or_default())
 }
 
 /// The index-free fallback: derive every note's title/aliases from disk and
