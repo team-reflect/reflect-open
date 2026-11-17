@@ -1,4 +1,10 @@
 [tools]
+cargo-binstall = "1.27.0"
 "cargo:cbindgen" = "0.29.4"
 "github:Boshen/cargo-shear" = "1.14.0"
 "github:EmbarkStudios/cargo-about" = "0.9.3"
+
+[settings]
+# cbindgen ships no macOS binary, so allow the signed QuickInstall builds
+# instead of compiling it from source.
+cargo.binstall_quickinstall = true
