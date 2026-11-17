@@ -1,12 +1,12 @@
+import type { PinnedNoteRow } from '@reflect/types'
 import { describe, expect, it } from 'vitest'
-import type { PinnedNote } from '../indexing/index-query-service.ts'
 import { getNextPinOrder, isValidPinOrder, updatePinOrder, renumberPinOrder } from './pin-order.ts'
 import { returnNull } from '@ocavue/utils'
 
 const HI = 2 ** 31 - 1
 
 /** A shelf in the order a drop left it, each note carrying the order it still has. */
-function shelf(...orders: (number | null)[]): PinnedNote[] {
+function shelf(...orders: (number | null)[]): PinnedNoteRow[] {
   return orders.map((pinnedOrder, index) => ({
     path: `${index}.md`,
     title: String(index),

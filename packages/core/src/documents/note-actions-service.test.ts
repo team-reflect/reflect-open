@@ -1,15 +1,11 @@
+import type { NoteRow, PinnedNoteRow } from '@reflect/types'
 import { describe, expect, it, vi } from 'vitest'
 import { AppError } from '../errors.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { createTestClockService } from '../testing/clock.ts'
 import { createPathService, createPosixPathTransport } from '../ports/path-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
-import {
-  createIndexQueryService,
-  type IndexQueryService,
-  type NoteRow,
-  type PinnedNote,
-} from '../indexing/index-query-service.ts'
+import { createIndexQueryService, type IndexQueryService } from '../indexing/index-query-service.ts'
 import { createTestDatabaseService } from '../testing/database.ts'
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createTestNoteSession, type TestNoteSessionOptions } from '../testing/documents.ts'
@@ -112,7 +108,7 @@ function setup(options?: {
   /**
    * The pinned shelf the index lists.
    */
-  pinned?: readonly PinnedNote[] | (() => Promise<PinnedNote[]>)
+  pinned?: readonly PinnedNoteRow[] | (() => Promise<PinnedNoteRow[]>)
   /**
    * Index rows by path, for the privacy the index reports.
    */
@@ -147,7 +143,7 @@ function setup(options?: {
   return { actions, files, session, openDocuments, progress, noteRows, graph }
 }
 
-function shelfNote(path: string, pinnedOrder: number | null): PinnedNote {
+function shelfNote(path: string, pinnedOrder: number | null): PinnedNoteRow {
   return { path, title: path, dailyDate: null, pinnedOrder }
 }
 
@@ -289,7 +285,7 @@ describe('togglePinned', () => {
   })
 
   it('answers a second call while the first is in flight with the first result', async () => {
-    const gate = Promise.withResolvers<PinnedNote[]>()
+    const gate = Promise.withResolvers<PinnedNoteRow[]>()
     const getPinnedNotes = vi.fn(() => gate.promise)
     const { actions, files } = setup({ files: { 'notes/a.md': '# A\n' }, pinned: getPinnedNotes })
     const first = actions.togglePinned('notes/a.md')
@@ -307,7 +303,7 @@ describe('togglePinned', () => {
   })
 
   it('does not dedupe across notes or generations', async () => {
-    const gate = Promise.withResolvers<PinnedNote[]>()
+    const gate = Promise.withResolvers<PinnedNoteRow[]>()
     let calls = 0
     const { actions, graph } = setup({
       files: { 'notes/a.md': '# A\n', 'notes/b.md': '# B\n' },
@@ -550,7 +546,7 @@ describe('togglePrivate', () => {
   })
 
   it('is deduped apart from pin actions on the same note', async () => {
-    const gate = Promise.withResolvers<PinnedNote[]>()
+    const gate = Promise.withResolvers<PinnedNoteRow[]>()
     const { actions } = setup({ files: { 'notes/a.md': '# A\n' }, pinned: () => gate.promise })
     const pin = actions.togglePinned('notes/a.md')
 

@@ -15,8 +15,6 @@ import {
 } from './snippet-tasks.ts'
 import { noop } from '@ocavue/utils'
 
-export type { Backlink }
-
 export interface BacklinkContext {
   sourcePath: string
   sourceTitle: string
@@ -35,8 +33,6 @@ export interface BacklinkContext {
    */
   tasks: SnippetTask[]
 }
-
-export type { BacklinkSourceCursor }
 
 /**
  * Keyset page controls for {@link BacklinkService.getBacklinksWithContext}.

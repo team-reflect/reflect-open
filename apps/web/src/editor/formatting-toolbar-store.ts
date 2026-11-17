@@ -1,9 +1,7 @@
-import type { ToolbarState as FormattingToolbarCapabilities } from '@reflect/types'
+import type { ToolbarState } from '@reflect/types'
 import { isDeepEqual } from '@ocavue/utils'
 import { WritableStore } from '@reflect/core'
 import { useSelector } from '@/lib/use-store.ts'
-
-export type { FormattingToolbarCapabilities }
 
 /** Autocomplete-trigger characters the toolbar can type into the editor. */
 export type FormattingTriggerText = '/' | '[[' | '#'
@@ -30,7 +28,7 @@ export interface FormattingToolbarCommands {
    * Persist picked files into the graph's `assets/` and insert their markdown
    * at the caret — `![](…)` for an image, a `[name](…)` link otherwise, the
    * same markdown a paste or drop produces. A no-op without
-   * {@link FormattingToolbarCapabilities.canAttachFiles}.
+   * {@link ToolbarState.canAttachFiles}.
    */
   attachFiles: (files: File[]) => Promise<void>
   /**
@@ -42,7 +40,7 @@ export interface FormattingToolbarCommands {
 
 /** What the mobile shell's toolbar renders for the focused editor. */
 export interface FormattingToolbar {
-  capabilities: FormattingToolbarCapabilities
+  capabilities: ToolbarState
   commands: FormattingToolbarCommands
 }
 

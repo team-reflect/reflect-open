@@ -5,7 +5,6 @@ export {
   type FileChangeSource,
 } from './file-change-service.ts'
 export type { ApplyErrorHandler, MovedHandler } from './live.ts'
-export { type TemplateEntry } from './index-query-service.ts'
 export {
   buildIndexedNote,
   CLAIM_TIER,
@@ -19,24 +18,14 @@ export {
 } from './indexed-note.ts'
 export { PROJECTION_VERSION_KEY, type IndexPassOptions } from './indexer.ts'
 export {
-  type Backlink,
   type BacklinkContext,
   type BacklinkContextPage,
   type BacklinkContextPageOptions,
-  type BacklinkSourceCursor,
 } from './backlink-service.ts'
-export { type NoteRow, type PinnedNote } from './index-query-service.ts'
-export { type DailyNoteRow, type DailyNotesRange } from '../daily/daily-note-service.ts'
-export { type TagSuggestion } from './suggestion-service.ts'
+export { type DailyNotesRange } from '../daily/daily-note-service.ts'
 export { type WikiLinkSuggestionResult } from './queries-shared.ts'
 
-export {
-  type NoteListEntry,
-  type NoteListOptions,
-  type NoteTagFacet,
-  type RecentNoteRow,
-  type RecentNotesOptions,
-} from './note-list-service.ts'
+export { type NoteListOptions, type RecentNotesOptions } from './note-list-service.ts'
 export {
   aliasHint,
   rankWikiSuggestions,

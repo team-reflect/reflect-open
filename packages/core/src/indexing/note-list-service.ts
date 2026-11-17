@@ -1,4 +1,4 @@
-import type { NoteListEntry, RecentNoteRow, TagFacet as NoteTagFacet } from '@reflect/types'
+import type { NoteListEntry, RecentNoteRow, TagFacet } from '@reflect/types'
 import { foldTag } from '../markdown/index.ts'
 import type { DatabaseService } from './database-service.ts'
 
@@ -12,16 +12,12 @@ import type { DatabaseService } from './database-service.ts'
  * neither query carries a per-row parameter, so list size has no SQL ceiling.
  */
 
-export type { NoteListEntry }
-
 export interface NoteListOptions {
   /**
    * Only notes carrying this tag (case-insensitive). `null` lists all.
    */
   tag?: string | null
 }
-
-export type { RecentNoteRow }
 
 export interface RecentNotesOptions {
   /**
@@ -33,8 +29,6 @@ export interface RecentNotesOptions {
    */
   tag?: string | null
 }
-
-export type { NoteTagFacet }
 
 export interface NoteListServiceDeps {
   readonly database: DatabaseService
@@ -65,7 +59,7 @@ export interface NoteListService {
    * filter (and the `#tag` search token): `#Book` and `#book` are one facet,
    * displayed with one deterministic casing.
    */
-  listNoteTags(): Promise<NoteTagFacet[]>
+  listNoteTags(): Promise<TagFacet[]>
 }
 
 class NoteListServiceImpl implements NoteListService {
@@ -86,7 +80,7 @@ class NoteListServiceImpl implements NoteListService {
     })
   }
 
-  async listNoteTags(): Promise<NoteTagFacet[]> {
+  async listNoteTags(): Promise<TagFacet[]> {
     return await this.#deps.database.read('index_note_tags', {})
   }
 }

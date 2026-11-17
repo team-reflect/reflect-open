@@ -1,3 +1,4 @@
+import type { NoteRow } from '@reflect/types'
 import type { ReactElement } from 'react'
 import type { ShareService } from '@reflect/app'
 import {
@@ -7,7 +8,6 @@ import {
   type IndexQueryService,
   type NoteActionsService,
   type NoteDocumentService,
-  type NoteRow,
   AppError,
 } from '@reflect/core'
 import {

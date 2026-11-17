@@ -1,9 +1,10 @@
+import type { TagFacet } from '@reflect/types'
 import { page } from 'vitest/browser'
 import { noop } from '@ocavue/utils'
 import { describe, expect, it } from 'vitest'
 import type { ReactElement } from 'react'
 import { EMPTY_ALL_NOTES_FILTERS, type Route } from '@reflect/app'
-import type { FilteredSearchHit, NoteTagFacet } from '@reflect/core'
+import type { FilteredSearchHit } from '@reflect/core'
 import { useRouterState } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { MobileAllNotes, matchingTagFacets, rowForHit } from './all-notes.tsx'
@@ -93,7 +94,7 @@ describe('rowForHit', () => {
 })
 
 describe('matchingTagFacets', () => {
-  const facets: NoteTagFacet[] = [
+  const facets: TagFacet[] = [
     { tag: 'Book', count: 3 },
     { tag: 'notebook', count: 1 },
     { tag: 'work', count: 5 },

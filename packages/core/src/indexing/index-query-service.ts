@@ -1,13 +1,9 @@
-import type { PinnedNoteRow as PinnedNote, NoteRow, TemplateEntry } from '@reflect/types'
+import type { NoteRow, PinnedNoteRow, TemplateEntry } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import { isIsoDate } from '@reflect/utils'
 import { dailyPath } from '../graph/paths.ts'
 import { foldKey } from '../markdown/index.ts'
 import type { DatabaseService } from './database-service.ts'
-
-export type { PinnedNote }
-
-export type { NoteRow }
 
 /**
  * What a pass knows about an indexed note without reading its file.
@@ -22,8 +18,6 @@ export interface IndexedFileFacts {
    */
   readonly mtime: number
 }
-
-export type { TemplateEntry }
 
 export interface IndexQueryServiceDeps {
   readonly database: DatabaseService
@@ -43,7 +37,7 @@ export interface IndexQueryService {
    * alphabetically by case-folded title (path as the tiebreak). Stable order is
    * the point of pinning: the list must not reshuffle as notes are edited.
    */
-  getPinnedNotes(): Promise<PinnedNote[]>
+  getPinnedNotes(): Promise<PinnedNoteRow[]>
   /**
    * Every template in the graph (`templates/*.md`), A→Z by folded title
    * (matching v1's menu order). Templates are indexed like notes but carry
@@ -103,7 +97,7 @@ class IndexQueryServiceImpl implements IndexQueryService {
     return (await this.#deps.database.read('index_note', { path })) ?? undefined
   }
 
-  async getPinnedNotes(): Promise<PinnedNote[]> {
+  async getPinnedNotes(): Promise<PinnedNoteRow[]> {
     return await this.#deps.database.read('index_pinned_notes', {})
   }
 

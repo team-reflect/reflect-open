@@ -1,4 +1,4 @@
-import type { TagFacet as TagSuggestion } from '@reflect/types'
+import type { TagFacet } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import { foldTag, normalizeWikiTarget } from '../markdown/index.ts'
 import type { DatabaseService } from './database-service.ts'
@@ -10,8 +10,6 @@ import { mergeDateSuggestions, rankWikiSuggestions, type WikiSuggestion } from '
 /**
  * How many ranked-in-SQL rows each candidate query hands to the in-memory ranker.
  */
-export type { TagSuggestion }
-
 interface WikiTargetCandidateResult {
   readonly candidates: readonly WikiSuggestion[]
   readonly candidateTargetKeys: readonly string[]
@@ -30,7 +28,7 @@ export interface SuggestionService {
    * `#` autocomplete candidates for `query` (Plan 18): tags whose folded key
    * contains the query, most-used first, deduped on the stored `tag_key`.
    */
-  suggestTags(query: string, limit?: number): MaybePromise<TagSuggestion[]>
+  suggestTags(query: string, limit?: number): MaybePromise<TagFacet[]>
   /**
    * `[[` autocomplete candidates for `query` (Plan 07): title and alias contains-
    * matches ranked by {@link rankWikiSuggestions}. With `dateGen`, fuzzy date
@@ -61,7 +59,7 @@ class SuggestionServiceImpl implements SuggestionService {
     this.#deps = deps
   }
 
-  async suggestTags(query: string, limit = 8): Promise<TagSuggestion[]> {
+  async suggestTags(query: string, limit = 8): Promise<TagFacet[]> {
     if (limit <= 0) {
       return []
     }

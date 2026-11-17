@@ -1,7 +1,8 @@
+import type { PinnedNoteRow } from '@reflect/types'
 import { memo, useCallback, type CSSProperties, type MouseEvent, type ReactElement } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { errorMessage, type PinnedNote } from '@reflect/core'
+import { errorMessage } from '@reflect/core'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import { routeForPath, routesEqual } from '@reflect/app'
 import { useRouterState } from '@/routing/router.tsx'
@@ -11,7 +12,7 @@ import { isModEvent } from '@meowdown/core'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 interface SidebarSortablePinnedRowProps {
-  note: PinnedNote
+  note: PinnedNoteRow
 }
 
 export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({

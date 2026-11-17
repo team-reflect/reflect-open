@@ -1,3 +1,4 @@
+import type { DailyNoteRow, RecentNoteRow } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import type {
   Tool,
@@ -10,8 +11,8 @@ import type { RetrievalService, RetrieveOptions } from '../../embeddings/retriev
 import type { AssetPrivacyService } from '../../assets/asset-privacy-service.ts'
 import type { NoteFileService } from '../../graph/note-file-service.ts'
 import type { AssetReferences } from '../../indexing/asset-refs.ts'
-import type { NoteListService, RecentNoteRow } from '../../indexing/note-list-service.ts'
-import type { DailyNoteRow, DailyNotesRange } from '../../daily/daily-note-service.ts'
+import type { NoteListService } from '../../indexing/note-list-service.ts'
+import type { DailyNotesRange } from '../../daily/daily-note-service.ts'
 import { isTagName } from '../../markdown/extract.ts'
 import type {
   CloudNoteListing,

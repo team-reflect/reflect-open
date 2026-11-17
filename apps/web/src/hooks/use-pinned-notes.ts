@@ -1,17 +1,13 @@
+import type { NoteRow, PinnedNoteRow } from '@reflect/types'
 import { useCallback, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  applyPinnedNoteOverlays,
-  dateFromDailyPath,
-  type NoteRow,
-  type PinnedNote,
-} from '@reflect/core'
+import { applyPinnedNoteOverlays, dateFromDailyPath } from '@reflect/core'
 import { useNoteRowOverlays } from '@/hooks/note-row-overlay.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
-const EMPTY: readonly PinnedNote[] = []
+const EMPTY: readonly PinnedNoteRow[] = []
 
 function titleFromPath(path: string): string {
   const name = path.split('/').at(-1) ?? path
@@ -24,7 +20,7 @@ function titleFromPath(path: string): string {
  * with the note-row overlay merged over them so a pin, unpin, or reorder
  * shows at once. Every caller shares one query key, so they share one fetch.
  */
-export function usePinnedNotes(): readonly PinnedNote[] {
+export function usePinnedNotes(): readonly PinnedNoteRow[] {
   const graph = useGraphInfo()
   const root = graph?.root
   const { indexQuery, noteRows } = useCoreServices()
@@ -50,7 +46,7 @@ export function usePinnedNotes(): readonly PinnedNote[] {
 
   // A note the index does not list yet: its cached row's title, else its file name.
   const preview = useCallback(
-    (path: string): PinnedNote => {
+    (path: string): PinnedNoteRow => {
       const row = queryClient.getQueryData<NoteRow | null>(queryKeys.index.note(root, path))
       return {
         path,

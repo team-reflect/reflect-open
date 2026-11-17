@@ -1,6 +1,7 @@
+import type { NoteRow } from '@reflect/types'
 import { act } from '@/test-utils/act.ts'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
-import type { IndexQueryService, NoteRow } from '@reflect/core'
+import type { IndexQueryService } from '@reflect/core'
 import {
   createTestDatabaseService,
   createTestCoreServices,

@@ -1,3 +1,4 @@
+import type { NoteRow } from '@reflect/types'
 import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import {
@@ -7,7 +8,6 @@ import {
   type IndexQueryService,
   type NoteActionsService,
   type NoteDocumentService,
-  type NoteRow,
   AppError,
 } from '@reflect/core'
 import {

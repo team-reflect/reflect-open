@@ -1,8 +1,9 @@
+import type { TemplateEntry } from '@reflect/types'
 import { useState, type ReactElement } from 'react'
 import { Autocomplete } from '@base-ui/react/autocomplete'
 import { useQuery } from '@tanstack/react-query'
 import { FilePlus2, LayoutTemplate, SearchIcon } from 'lucide-react'
-import { displayNoteTitle, type TemplateEntry } from '@reflect/core'
+import { displayNoteTitle } from '@reflect/core'
 import {
   Dialog,
   DialogContent,

@@ -1,4 +1,4 @@
-import type { MenuConfirm as ChromeConfirm } from '@reflect/types'
+import type { MenuConfirm } from '@reflect/types'
 import type { RefObject } from 'react'
 import type { AudioMemoPhase } from '@reflect/core'
 import type { MaybePromise } from '@reflect/utils'
@@ -72,8 +72,6 @@ export interface ChromeSearch {
   ref?: RefObject<Focusable | null> | undefined
 }
 
-export type { ChromeConfirm }
-
 /**
  * One row of a corner button's menu, in the order the menu shows it.
  */
@@ -89,7 +87,7 @@ export type ChromeMenuItem =
        * Shows a checkmark.
        */
       checked?: boolean | undefined
-      confirm?: ChromeConfirm | undefined
+      confirm?: MenuConfirm | undefined
     }
   | {
       type: 'section'

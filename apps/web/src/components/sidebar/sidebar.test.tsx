@@ -1,3 +1,4 @@
+import type { PinnedNoteRow } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import type { ReactNode } from 'react'
 import { page, userEvent } from 'vitest/browser'
@@ -8,7 +9,6 @@ import {
   type AiProviderConfig,
   type GraphSessionService,
   type NoteDocumentService,
-  type PinnedNote,
   type SettingsService,
 } from '@reflect/core'
 import {
@@ -57,7 +57,7 @@ const OPENAI: AiProviderConfig = {
 }
 
 // What the app's fakes answer; each test sets them before `renderSidebar`.
-const getPinnedNotes = vi.fn<() => Promise<PinnedNote[]>>()
+const getPinnedNotes = vi.fn<() => Promise<PinnedNoteRow[]>>()
 const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
 const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
 let aiProviders: AiProviderConfig[]

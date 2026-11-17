@@ -5,8 +5,6 @@ import type { DatabaseService } from '../indexing/database-service.ts'
 import type { Unlisten } from '../unlisten.ts'
 import { formatIsoDate } from '@reflect/utils'
 
-export type { DailyNoteRow }
-
 export interface DailyNotesRange {
   /**
    * First day, inclusive (ISO `YYYY-MM-DD`).

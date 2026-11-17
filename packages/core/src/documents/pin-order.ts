@@ -1,5 +1,5 @@
+import type { PinnedNoteRow } from '@reflect/types'
 import { clamp } from '@ocavue/utils'
-import type { PinnedNote } from '../indexing/index-query-service.ts'
 
 /**
  * Spacing between orders when the shelf is numbered from scratch.
@@ -16,7 +16,7 @@ export function isValidPinOrder(order: number | null | undefined): order is numb
   return order != null && Number.isSafeInteger(order) && order >= LO && order <= HI
 }
 
-export function getNextPinOrder(shelf: readonly PinnedNote[]): number {
+export function getNextPinOrder(shelf: readonly PinnedNoteRow[]): number {
   let highest: number | null = null
   for (const note of shelf) {
     const order = note.pinnedOrder
@@ -32,7 +32,10 @@ export function getNextPinOrder(shelf: readonly PinnedNote[]): number {
  * the whole shelf when the moved note has no number to take. Returns a new
  * array, leaving the original untouched.
  */
-export function updatePinOrder(shelf: readonly PinnedNote[], movedPath: string): PinnedNote[] {
+export function updatePinOrder(
+  shelf: readonly PinnedNoteRow[],
+  movedPath: string,
+): PinnedNoteRow[] {
   if (isSorted(shelf)) {
     return [...shelf]
   }
@@ -50,14 +53,14 @@ export function updatePinOrder(shelf: readonly PinnedNote[], movedPath: string):
   return isSorted(next) ? next : renumberPinOrder(next)
 }
 
-export function renumberPinOrder(shelf: readonly PinnedNote[]): PinnedNote[] {
+export function renumberPinOrder(shelf: readonly PinnedNoteRow[]): PinnedNoteRow[] {
   const minStep = 1
   const maxStep = GAP
   const step = clamp(Math.floor(HI / (shelf.length + 1)), minStep, maxStep)
   return shelf.map((note, index) => ({ ...note, pinnedOrder: step * (index + 1) }))
 }
 
-function isSorted(shelf: readonly PinnedNote[]): boolean {
+function isSorted(shelf: readonly PinnedNoteRow[]): boolean {
   let previous: number | null = null
   for (const note of shelf) {
     const order = note.pinnedOrder
@@ -91,7 +94,7 @@ function getOrderBetween(before?: number | null, after?: number | null): number 
   return before < result && result < after && isValidPinOrder(result) ? result : null
 }
 
-function getSafePinnedOrder(note: PinnedNote | undefined): number | undefined {
+function getSafePinnedOrder(note: PinnedNoteRow | undefined): number | undefined {
   const order = note?.pinnedOrder
   return isValidPinOrder(order) ? order : undefined
 }

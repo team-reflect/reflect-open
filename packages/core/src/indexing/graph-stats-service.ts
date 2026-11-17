@@ -14,8 +14,6 @@ import type { DatabaseService } from './database-service.ts'
  * data reaches a prompt.
  */
 
-export type { GraphStats }
-
 export interface GraphStatsOptions {
   /**
    * Facet cap — the most-used tags win (prompt token budget, not recall).

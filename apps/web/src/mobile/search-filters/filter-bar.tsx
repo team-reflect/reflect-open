@@ -1,6 +1,7 @@
+import type { TagFacet } from '@reflect/types'
 import { useState, type ReactElement } from 'react'
 import { X } from 'lucide-react'
-import { foldTag, type NoteTagFacet } from '@reflect/core'
+import { foldTag } from '@reflect/core'
 import { FilterChip } from './filter-chip.tsx'
 import {
   EMPTY_ALL_NOTES_FILTERS,
@@ -19,7 +20,7 @@ interface FilterBarProps {
   filters: AllNotesFilters
   onFiltersChange: (filters: AllNotesFilters) => void
   /** Every tag in the graph — the Tags drawer's rows and chip labels. */
-  facets: NoteTagFacet[]
+  facets: TagFacet[]
   /** The route's tag (a tag tap landed here); rendered as its own chip. */
   routeTag: string | null
   /** Clear the route tag (Reset, or tapping its chip). */
@@ -27,7 +28,7 @@ interface FilterBarProps {
 }
 
 /** The Tags chip's label: the first selected tag's display casing, plus count. */
-function tagsLabel(selected: string[], facets: NoteTagFacet[]): string {
+function tagsLabel(selected: string[], facets: TagFacet[]): string {
   if (selected.length === 0) {
     return 'Tags'
   }
