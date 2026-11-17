@@ -244,6 +244,7 @@ pub struct ToolbarState {
     pub can_dedent: bool,
     pub can_move_up: bool,
     pub can_move_down: bool,
+    /// Whether the editor can save files.
     pub can_attach_files: bool,
 }
 

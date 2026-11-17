@@ -1,25 +1,9 @@
+import type { ToolbarState as FormattingToolbarCapabilities } from '@reflect/types'
 import { isDeepEqual } from '@ocavue/utils'
 import { WritableStore } from '@reflect/core'
 import { useSelector } from '@/lib/use-store.ts'
 
-/**
- * Enable/disable state for the toolbar's structural buttons, recomputed from
- * the editor selection (ProseKit `canExec`). Selection-aware enablement is
- * what made V1's native accessory bar feel native — the porting doc calls it
- * the load-bearing behavior, not the buttons themselves.
- */
-export interface FormattingToolbarCapabilities {
-  canIndent: boolean
-  canDedent: boolean
-  canMoveUp: boolean
-  canMoveDown: boolean
-  /**
-   * Whether this editor can persist files. Only a pane that was given a
-   * `saveFile` can (the inline task editor, for one, was not), and an attach
-   * button over an editor without one is a button that does nothing.
-   */
-  canAttachFiles: boolean
-}
+export type { FormattingToolbarCapabilities }
 
 /** Autocomplete-trigger characters the toolbar can type into the editor. */
 export type FormattingTriggerText = '/' | '[[' | '#'

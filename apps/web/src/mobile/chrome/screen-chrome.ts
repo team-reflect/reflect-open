@@ -1,3 +1,4 @@
+import type { MenuConfirm as ChromeConfirm } from '@reflect/types'
 import type { RefObject } from 'react'
 import type { AudioMemoPhase } from '@reflect/core'
 import type { MaybePromise } from '@reflect/utils'
@@ -71,18 +72,7 @@ export interface ChromeSearch {
   ref?: RefObject<Focusable | null> | undefined
 }
 
-/**
- * A confirmation shown before a menu item runs, with one destructive button
- * and Cancel.
- */
-export interface ChromeConfirm {
-  title: string
-  message?: string | undefined
-  /**
-   * The label of the destructive button.
-   */
-  action: string
-}
+export type { ChromeConfirm }
 
 /**
  * One row of a corner button's menu, in the order the menu shows it.
