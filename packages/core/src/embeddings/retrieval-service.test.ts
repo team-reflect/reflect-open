@@ -72,10 +72,9 @@ async function setup(options?: { status?: EmbedStatus; embedded?: boolean }) {
   const logger = createTestLoggerService()
   if (options?.embedded !== false) {
     const index = createTestEmbeddingIndexService({
-      database,
       noteFile,
       embeddingRuntime: createTestEmbeddingRuntimeService({ vectors: embed }),
-      storeChunks: true,
+      storeChunksIn: database,
     })
     await expect(
       index.backfill({ generation: 1, fileGeneration: 1, modelId: MODEL }),

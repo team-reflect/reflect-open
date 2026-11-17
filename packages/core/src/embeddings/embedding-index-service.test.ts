@@ -383,12 +383,11 @@ function setupGraph(options?: { unreadable?: string[] }) {
   })
   const indexLifecycle = createTestIndexLifecycleService({ database, noteFile, logger })
   const index = createTestEmbeddingIndexService({
-    database,
     noteFile,
     indexLifecycle,
     logger,
     embeddingRuntime: runtime,
-    storeChunks: true,
+    storeChunksIn: database,
     failApply: (apply) => (unwritable.has(apply.path) ? new Error('disk full') : undefined),
   })
   const storedPaths = (): unknown[] => {
