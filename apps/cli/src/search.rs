@@ -30,8 +30,9 @@ pub struct SearchHit {
 
 /// Ranked search over the notes that are not private, with the ranking of
 /// the app's palette search (`reflect_index::read::search`). A hit that only
-/// its title matched has an empty snippet and score `0`. The caller re-checks
-/// each hit's file frontmatter (the index row may lag a just-flagged note).
+/// its title matched has an empty snippet, and score `0` when title recall
+/// admits it. The caller re-checks each hit's file frontmatter (the index row
+/// may lag a just-flagged note).
 pub fn search_index(
     conn: &Connection,
     query: &str,
