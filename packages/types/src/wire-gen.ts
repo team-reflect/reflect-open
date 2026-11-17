@@ -1209,6 +1209,31 @@ export type Commands = {
     }
     result: BacklinkPage
   }
+  index_suggest_tags: {
+    args: {
+      tagKey: string
+      limit: number
+    }
+    result: TagFacet[]
+  }
+  index_wiki_candidates: {
+    args: {
+      key: string
+    }
+    result: WikiCandidates
+  }
+  index_wiki_key_winners: {
+    args: {
+      keys: string[]
+    }
+    result: WikiKeyWinner[]
+  }
+  index_wiki_winning_aliases: {
+    args: {
+      paths: string[]
+    }
+    result: WikiWinningAlias[]
+  }
   index_daily_dates: {
     args: {
       start: string
@@ -2532,12 +2557,41 @@ export type WebAuthStartArgs = {
   payload: WebAuthOptions
 }
 
+/**  One note as a wiki link suggestion candidate, found by an alias. */
+export type WikiAliasCandidate = {
+  path: string
+  title: string
+  titleKey: string
+  dailyDate: string | null
+  /**  File modification time (epoch ms). */
+  mtime: number
+  alias: string
+  aliasKey: string
+  /**  The number of links that point at a key the note claims. */
+  linkCount: number
+}
+
+/**  The notes that a wiki link query can suggest, before ranking. */
+export type WikiCandidates = {
+  titles: WikiTitleCandidate[]
+  aliases: WikiAliasCandidate[]
+}
+
 /**  The notes that claim a wiki key in its strongest tier. */
 export type WikiClaimMatch = {
   /**  The strongest tier that claims the key; a lower number is stronger. */
   tier: number
   /**  Every note that claims the key in that tier, by path. */
   paths: string[]
+}
+
+/**  The note that wins one wiki key. */
+export type WikiKeyWinner = {
+  key: string
+  path: string
+  dailyDate: string | null
+  /**  The number of notes that claim the key in the winning tier. */
+  claimCount: number
 }
 
 /**  One note as a wiki link suggestion candidate, found by its title. */
@@ -2550,6 +2604,12 @@ export type WikiTitleCandidate = {
   mtime: number
   /**  The number of links that point at a key the note claims. */
   linkCount: number
+}
+
+/**  One alias that resolves to its own note and to no other. */
+export type WikiWinningAlias = {
+  notePath: string
+  alias: string
 }
 
 /**
@@ -2601,6 +2661,10 @@ export type IndexReadCommand =
   | 'index_wiki_address_note'
   | 'index_backlinks'
   | 'index_backlink_page'
+  | 'index_suggest_tags'
+  | 'index_wiki_candidates'
+  | 'index_wiki_key_winners'
+  | 'index_wiki_winning_aliases'
   | 'index_daily_dates'
   | 'index_daily_notes'
   | 'chat_conversations'

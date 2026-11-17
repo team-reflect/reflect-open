@@ -13,8 +13,3 @@ export function inClauseChunks<Value>(values: readonly Value[]): Value[][] {
   }
   return chunks
 }
-
-/** Escape `%`/`_`/`\` so user text can't act as LIKE wildcards. */
-export function likeContains(key: string): string {
-  return `%${key.replaceAll(/[\\%_]/g, (match) => `\\${match}`)}%`
-}

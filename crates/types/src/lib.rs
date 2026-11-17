@@ -66,7 +66,8 @@ pub use index::{
 pub use index_read::{
     Backlink, BacklinkPage, BacklinkSource, BacklinkSourceCursor, ChunkHash, DailyNoteRow,
     GraphStats, NoteFileFacts, NoteId, NoteListEntry, NoteRow, PinnedNoteRow, RecentNoteRow,
-    TagFacet, TaskRow, TemplateEntry, WikiClaimMatch, WikiTitleCandidate,
+    TagFacet, TaskRow, TemplateEntry, WikiAliasCandidate, WikiCandidates, WikiClaimMatch,
+    WikiKeyWinner, WikiTitleCandidate, WikiWinningAlias,
 };
 pub use link_preview::LinkPreviewHtml;
 pub use settings::SettingsDoc;

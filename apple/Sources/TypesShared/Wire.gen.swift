@@ -5071,6 +5071,92 @@ public struct WebAuthStartArgs: Codable, Sendable, Equatable {
     }
 }
 
+/// One note as a wiki link suggestion candidate, found by an alias.
+public struct WikiAliasCandidate: Codable, Sendable, Equatable {
+    public let path: String
+    public let title: String
+    public let titleKey: String
+    public let dailyDate: String?
+    public let mtime: Int64
+    public let alias: String
+    public let aliasKey: String
+    public let linkCount: UInt32
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case title = "title"
+        case titleKey = "titleKey"
+        case dailyDate = "dailyDate"
+        case mtime = "mtime"
+        case alias = "alias"
+        case aliasKey = "aliasKey"
+        case linkCount = "linkCount"
+    }
+
+    public init(path: String, title: String, titleKey: String, dailyDate: String?, mtime: Int64, alias: String, aliasKey: String, linkCount: UInt32) {
+        self.path = path
+        self.title = title
+        self.titleKey = titleKey
+        self.dailyDate = dailyDate
+        self.mtime = mtime
+        self.alias = alias
+        self.aliasKey = aliasKey
+        self.linkCount = linkCount
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.titleKey = try container.decode(String.self, forKey: .titleKey)
+        self.dailyDate = try container.decodeIfPresent(String.self, forKey: .dailyDate)
+        self.mtime = try container.decode(Int64.self, forKey: .mtime)
+        self.alias = try container.decode(String.self, forKey: .alias)
+        self.aliasKey = try container.decode(String.self, forKey: .aliasKey)
+        self.linkCount = try container.decode(UInt32.self, forKey: .linkCount)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(title, forKey: .title)
+        try container.encode(titleKey, forKey: .titleKey)
+        try container.encode(dailyDate, forKey: .dailyDate)
+        try container.encode(mtime, forKey: .mtime)
+        try container.encode(alias, forKey: .alias)
+        try container.encode(aliasKey, forKey: .aliasKey)
+        try container.encode(linkCount, forKey: .linkCount)
+    }
+}
+
+/// The notes that a wiki link query can suggest, before ranking.
+public struct WikiCandidates: Codable, Sendable, Equatable {
+    public let titles: [WikiTitleCandidate]
+    public let aliases: [WikiAliasCandidate]
+
+    private enum CodingKeys: String, CodingKey {
+        case titles = "titles"
+        case aliases = "aliases"
+    }
+
+    public init(titles: [WikiTitleCandidate], aliases: [WikiAliasCandidate]) {
+        self.titles = titles
+        self.aliases = aliases
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.titles = try container.decode([WikiTitleCandidate].self, forKey: .titles)
+        self.aliases = try container.decode([WikiAliasCandidate].self, forKey: .aliases)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(titles, forKey: .titles)
+        try container.encode(aliases, forKey: .aliases)
+    }
+}
+
 /// The notes that claim a wiki key in its strongest tier.
 public struct WikiClaimMatch: Codable, Sendable, Equatable {
     public let tier: Int64
@@ -5096,6 +5182,44 @@ public struct WikiClaimMatch: Codable, Sendable, Equatable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(tier, forKey: .tier)
         try container.encode(paths, forKey: .paths)
+    }
+}
+
+/// The note that wins one wiki key.
+public struct WikiKeyWinner: Codable, Sendable, Equatable {
+    public let key: String
+    public let path: String
+    public let dailyDate: String?
+    public let claimCount: Int64
+
+    private enum CodingKeys: String, CodingKey {
+        case key = "key"
+        case path = "path"
+        case dailyDate = "dailyDate"
+        case claimCount = "claimCount"
+    }
+
+    public init(key: String, path: String, dailyDate: String?, claimCount: Int64) {
+        self.key = key
+        self.path = path
+        self.dailyDate = dailyDate
+        self.claimCount = claimCount
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.key = try container.decode(String.self, forKey: .key)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.dailyDate = try container.decodeIfPresent(String.self, forKey: .dailyDate)
+        self.claimCount = try container.decode(Int64.self, forKey: .claimCount)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(key, forKey: .key)
+        try container.encode(path, forKey: .path)
+        try container.encode(dailyDate, forKey: .dailyDate)
+        try container.encode(claimCount, forKey: .claimCount)
     }
 }
 
@@ -5144,6 +5268,34 @@ public struct WikiTitleCandidate: Codable, Sendable, Equatable {
         try container.encode(dailyDate, forKey: .dailyDate)
         try container.encode(mtime, forKey: .mtime)
         try container.encode(linkCount, forKey: .linkCount)
+    }
+}
+
+/// One alias that resolves to its own note and to no other.
+public struct WikiWinningAlias: Codable, Sendable, Equatable {
+    public let notePath: String
+    public let alias: String
+
+    private enum CodingKeys: String, CodingKey {
+        case notePath = "notePath"
+        case alias = "alias"
+    }
+
+    public init(notePath: String, alias: String) {
+        self.notePath = notePath
+        self.alias = alias
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.notePath = try container.decode(String.self, forKey: .notePath)
+        self.alias = try container.decode(String.self, forKey: .alias)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(notePath, forKey: .notePath)
+        try container.encode(alias, forKey: .alias)
     }
 }
 

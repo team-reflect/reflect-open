@@ -115,7 +115,7 @@ class WikiResolverServiceImpl implements WikiResolverService {
       return null
     }
     const result = await verifyWikiSuggestionAddresses(
-      database.db,
+      database,
       [candidate],
       [note.titleKey],
       1,

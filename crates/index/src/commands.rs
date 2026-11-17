@@ -9,7 +9,8 @@ use reflect_types::{
     AppError, AppResult, Backlink, BacklinkPage, BacklinkSourceCursor, ChatConversation,
     ChatMessageRow, ChunkHash, DailyNoteRow, EmbeddedChunk, GraphStats, IndexTouch, IndexedNote,
     MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry, NoteRow, PinnedNoteRow, RecentNoteRow,
-    TagFacet, TaskRow, TemplateEntry, WikiClaimMatch, WikiTitleCandidate,
+    TagFacet, TaskRow, TemplateEntry, WikiCandidates, WikiClaimMatch, WikiKeyWinner,
+    WikiTitleCandidate, WikiWinningAlias,
 };
 
 use crate::read;
@@ -296,6 +297,26 @@ impl<'a> IndexCommands<'a> {
         cursor: Option<BacklinkSourceCursor>,
     ) -> AppResult<BacklinkPage> {
         self.read(|conn| read::backlinks::page(conn, &path, limit, cursor.as_ref()))
+    }
+
+    /// The most used tags whose key contains `tag_key`.
+    fn index_suggest_tags(&self, tag_key: String, limit: u32) -> AppResult<Vec<TagFacet>> {
+        self.read(|conn| read::suggest::tags(conn, &tag_key, limit))
+    }
+
+    /// The notes whose title or alias matches the wiki key `key`.
+    fn index_wiki_candidates(&self, key: String) -> AppResult<WikiCandidates> {
+        self.read(|conn| read::suggest::wiki_candidates(conn, &key))
+    }
+
+    /// The winner of each wiki key in `keys` that a note claims.
+    fn index_wiki_key_winners(&self, keys: Vec<String>) -> AppResult<Vec<WikiKeyWinner>> {
+        self.read(|conn| read::suggest::key_winners(conn, &keys))
+    }
+
+    /// The aliases of the notes in `paths` that resolve only to their note.
+    fn index_wiki_winning_aliases(&self, paths: Vec<String>) -> AppResult<Vec<WikiWinningAlias>> {
+        self.read(|conn| read::suggest::winning_aliases(conn, &paths))
     }
 
     /// The dates in `start..=end` whose daily note has content, ascending.

@@ -239,3 +239,50 @@ pub struct BacklinkPage {
     /// Every wiki key that resolves to the target.
     pub target_keys: Vec<String>,
 }
+
+/// One note as a wiki link suggestion candidate, found by an alias.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct WikiAliasCandidate {
+    pub path: String,
+    pub title: String,
+    pub title_key: String,
+    pub daily_date: Option<String>,
+    /// File modification time (epoch ms).
+    pub mtime: i64,
+    pub alias: String,
+    pub alias_key: String,
+    /// The number of links that point at a key the note claims.
+    pub link_count: u32,
+}
+
+/// The notes that a wiki link query can suggest, before ranking.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct WikiCandidates {
+    pub titles: Vec<WikiTitleCandidate>,
+    pub aliases: Vec<WikiAliasCandidate>,
+}
+
+/// The note that wins one wiki key.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct WikiKeyWinner {
+    pub key: String,
+    pub path: String,
+    pub daily_date: Option<String>,
+    /// The number of notes that claim the key in the winning tier.
+    pub claim_count: i64,
+}
+
+/// One alias that resolves to its own note and to no other.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct WikiWinningAlias {
+    pub note_path: String,
+    pub alias: String,
+}

@@ -27,6 +27,7 @@ use super::read::notes::{
     pinned_notes, random_note, resolve_target, templates,
 };
 use super::read::stats::graph_stats;
+use super::read::suggest::{key_winners, tags as suggest_tags, wiki_candidates, winning_aliases};
 use super::read::tasks::tasks;
 use super::read::wiki::{
     address_note, claim_match, link_sources, notes_by_path_key, path_link_sources, resolve,
@@ -2704,4 +2705,84 @@ fn backlink_pages_run_newest_source_first_and_resume_after_a_cursor() {
     assert!(lonely.sources.is_empty());
     assert!(lonely.target_keys.contains(&"lonely".to_string()));
     assert!(backlink_page(&conn, "notes/target.md", 0, None).is_err());
+}
+
+#[test]
+fn suggestions_rank_exact_titles_first_and_escape_like_wildcards() {
+    let conn = migrated();
+    apply_note(
+        &conn,
+        &tagged_note("notes/rust.md", "Rust", &["Lang", "100%"]),
+    )
+    .unwrap();
+    apply_note(
+        &conn,
+        &tagged_note("notes/rusty.md", "Rusty nail", &["lang"]),
+    )
+    .unwrap();
+    apply_note(&conn, &aliased_note("notes/crab.md", "Crab", "Rustacean")).unwrap();
+    apply_note(
+        &conn,
+        &note("notes/linker.md", "Linker", vec![wiki("Rusty nail")]),
+    )
+    .unwrap();
+    apply_note(&conn, &daily_note("daily/2026-01-02.md", "2026-01-02")).unwrap();
+    let mut template = note("templates/rust.md", "Rust template", vec![]);
+    template.kind = NoteKind::Template;
+    apply_note(&conn, &template).unwrap();
+
+    let found = wiki_candidates(&conn, "rust").unwrap();
+    let titles: Vec<&str> = found.titles.iter().map(|row| row.path.as_str()).collect();
+    // The exact title leads, though the other note has a link.
+    assert_eq!(titles, ["notes/rust.md", "notes/rusty.md"]);
+    assert_eq!(found.titles[1].link_count, 1);
+    assert_eq!(found.aliases.len(), 1);
+    assert_eq!(found.aliases[0].alias, "Rustacean");
+
+    // An empty key lists notes, without days and without aliases.
+    let unqueried = wiki_candidates(&conn, "").unwrap();
+    assert!(unqueried.titles.iter().all(|row| row.daily_date.is_none()));
+    assert_eq!(unqueried.titles.len(), 4);
+    assert_eq!(unqueried.aliases, []);
+    // `%` is a literal, not a wildcard.
+    assert_eq!(wiki_candidates(&conn, "%").unwrap().titles, []);
+
+    let names = |key: &str, limit| -> Vec<(String, u32)> {
+        suggest_tags(&conn, key, limit)
+            .unwrap()
+            .into_iter()
+            .map(|facet| (facet.tag, facet.count))
+            .collect()
+    };
+    assert_eq!(names("", 1), [("Lang".to_string(), 2)]);
+    assert_eq!(names("0%", 5), [("100%".to_string(), 1)]);
+    assert_eq!(names("_", 5), []);
+
+    let keys = [
+        "rust".to_string(),
+        "rustacean".to_string(),
+        "none".to_string(),
+    ];
+    let mut winners = key_winners(&conn, &keys).unwrap();
+    winners.sort_by(|left, right| left.key.cmp(&right.key));
+    let won: Vec<(&str, &str, i64)> = winners
+        .iter()
+        .map(|winner| {
+            (
+                winner.key.as_str(),
+                winner.path.as_str(),
+                winner.claim_count,
+            )
+        })
+        .collect();
+    assert_eq!(
+        won,
+        [
+            ("rust", "notes/rust.md", 1),
+            ("rustacean", "notes/crab.md", 1)
+        ]
+    );
+    let aliases = winning_aliases(&conn, &["notes/crab.md".to_string()]).unwrap();
+    assert_eq!(aliases.len(), 1);
+    assert_eq!(aliases[0].alias, "Rustacean");
 }
