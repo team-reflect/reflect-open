@@ -2,6 +2,53 @@
 
 lockfile_version = 4
 
+[[tools.cargo-binstall]]
+version = "1.27.0"
+backend = "aqua:cargo-bins/cargo-binstall"
+specifiers = ["1.27.0"]
+
+[tools.cargo-binstall."platforms.linux-arm64"]
+checksum = "sha256:d4232f4081ddcb3e9d09493296de5483e9530cf254f7be9df5aa9ccaf034d3de"
+url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.27.0/cargo-binstall-aarch64-unknown-linux-gnu.tgz"
+url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/734983326"
+provenance = "github-attestations"
+
+[tools.cargo-binstall."platforms.linux-arm64-musl"]
+checksum = "sha256:84f2afefd325e52c92702a1f2a396902301ccdafd7614270cbbf46b9cff3accf"
+url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.27.0/cargo-binstall-aarch64-unknown-linux-musl.tgz"
+url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/734983098"
+provenance = "github-attestations"
+
+[tools.cargo-binstall."platforms.linux-x64"]
+checksum = "sha256:4121a0e8c7a97997cb0662859b258f34f3c5cca0d55ebc57d935e3cfcabdc413"
+url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.27.0/cargo-binstall-x86_64-unknown-linux-gnu.tgz"
+url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/734981484"
+provenance = "github-attestations"
+
+[tools.cargo-binstall."platforms.linux-x64-musl"]
+checksum = "sha256:b2e4b70fcddc5bd6fd90c5cf8dc17b4cf0ea54a3db16c65ee0307f42c9bd3187"
+url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.27.0/cargo-binstall-x86_64-unknown-linux-musl.tgz"
+url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/734981208"
+provenance = "github-attestations"
+
+[tools.cargo-binstall."platforms.macos-arm64"]
+checksum = "sha256:69cfe1156ad39e91f4e6802db1ce1e2f02ac926452d6c20fd14a328c68f676c8"
+url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.27.0/cargo-binstall-aarch64-apple-darwin.zip"
+url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/734983777"
+provenance = "github-attestations"
+
+[tools.cargo-binstall."platforms.macos-x64"]
+checksum = "sha256:1bb92ce2e92b32db64c4f4f9c29c836991ff7b37bf4be1f227334f596c287b1b"
+url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.27.0/cargo-binstall-x86_64-apple-darwin.zip"
+url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/734981986"
+provenance = "github-attestations"
+
+[tools.cargo-binstall."platforms.windows-x64"]
+checksum = "sha256:624ae880d18eb0ee8c7934982e52b2aca23998cb87a01b1e59223083b6ee5dae"
+url = "https://github.com/cargo-bins/cargo-binstall/releases/download/v1.27.0/cargo-binstall-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/cargo-bins/cargo-binstall/releases/assets/734981764"
+provenance = "github-attestations"
+
 [[tools."cargo:cbindgen"]]
 version = "0.29.4"
 backend = "cargo:cbindgen"
