@@ -19,6 +19,7 @@ use super::read::assets::note_paths;
 use super::read::chat::{conversations, messages};
 use super::read::daily::{dates_in_range, notes_in_range};
 use super::read::embed::chunk_hashes;
+use super::read::lists::{list_notes, note_tags, recent_notes};
 use super::read::meta::meta;
 use super::read::notes::{
     embeddable_paths, file_facts, note as note_row, note_ids, path_taken, person_owners,
@@ -2489,4 +2490,80 @@ fn owner_reads_find_notes_by_asset_and_by_person_email() {
         ["notes/ada.md", "notes/other.md"]
     );
     assert_eq!(chunk_hashes(&conn, "notes/ada.md").unwrap(), []);
+}
+
+#[test]
+fn note_lists_order_pins_first_and_attach_tags() {
+    let conn = migrated();
+    let mut old_pinned = tagged_note("notes/pinned.md", "Pinned", &["Zeta", "alpha"]);
+    old_pinned.is_pinned = true;
+    old_pinned.mtime = 1;
+    let mut newer = tagged_note("notes/newer.md", "Newer", &["alpha"]);
+    newer.mtime = 30;
+    let mut older = note("notes/older.md", "Older", vec![]);
+    older.mtime = 20;
+    let mut secret = tagged_note("notes/secret.md", "Secret", &["alpha"]);
+    secret.is_private = true;
+    secret.mtime = 40;
+    let mut daily = daily_note("daily/2026-01-02.md", "2026-01-02");
+    daily.tags = vec![IndexedTag {
+        tag: "Alpha".to_string(),
+        tag_key: "alpha".to_string(),
+    }];
+    daily.mtime = 10;
+    for indexed in [&old_pinned, &newer, &older, &secret, &daily] {
+        apply_note(&conn, indexed).unwrap();
+    }
+    let paths = |tag: Option<&str>| -> Vec<String> {
+        list_notes(&conn, tag)
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.path)
+            .collect()
+    };
+
+    assert_eq!(
+        paths(None),
+        [
+            "notes/pinned.md",
+            "notes/secret.md",
+            "notes/newer.md",
+            "notes/older.md"
+        ]
+    );
+    // A tag also lists the daily notes that carry it.
+    assert_eq!(
+        paths(Some("alpha")),
+        [
+            "notes/pinned.md",
+            "notes/secret.md",
+            "notes/newer.md",
+            "daily/2026-01-02.md"
+        ]
+    );
+    assert_eq!(paths(Some("nothing")), Vec::<String>::new());
+    let all = list_notes(&conn, None).unwrap();
+    assert!(all[0].is_pinned);
+    assert_eq!(all[0].tags, ["alpha", "Zeta"]);
+    assert_eq!(all[3].tags, Vec::<String>::new());
+
+    let recent = |limit, tag: Option<&str>| -> Vec<String> {
+        recent_notes(&conn, limit, tag)
+            .unwrap()
+            .into_iter()
+            .map(|row| row.path)
+            .collect()
+    };
+    assert_eq!(recent(2, None), ["notes/newer.md", "notes/older.md"]);
+    assert_eq!(
+        recent(5, Some("alpha")),
+        ["notes/newer.md", "notes/pinned.md"]
+    );
+
+    let facets: Vec<(String, u32)> = note_tags(&conn)
+        .unwrap()
+        .into_iter()
+        .map(|facet| (facet.tag, facet.count))
+        .collect();
+    assert_eq!(facets, [("alpha".to_string(), 3), ("Zeta".to_string(), 1)]);
 }

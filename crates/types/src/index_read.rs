@@ -113,3 +113,33 @@ pub struct ChunkHash {
     pub content_hash: String,
     pub model_id: String,
 }
+
+/// One row of the All Notes list.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct NoteListEntry {
+    pub path: String,
+    pub title: String,
+    /// The indexed row preview; may be empty.
+    pub snippet: String,
+    /// The display casing of each tag, ordered by tag key.
+    pub tags: Vec<String>,
+    /// File modification time (epoch ms).
+    pub mtime: i64,
+    pub is_pinned: bool,
+}
+
+/// One recently changed note.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct RecentNoteRow {
+    pub path: String,
+    pub title: String,
+    /// The indexed row preview; may be empty.
+    pub preview: String,
+    /// File modification time (epoch ms).
+    pub mtime: i64,
+    pub is_private: bool,
+}

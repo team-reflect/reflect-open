@@ -7,8 +7,8 @@ use serde_json::{Map, Value};
 
 use reflect_types::{
     AppError, AppResult, ChatConversation, ChatMessageRow, ChunkHash, DailyNoteRow, EmbeddedChunk,
-    GraphStats, IndexTouch, IndexedNote, MovedNoteAddress, NoteFileFacts, NoteId, NoteRow,
-    PinnedNoteRow, TemplateEntry,
+    GraphStats, IndexTouch, IndexedNote, MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry,
+    NoteRow, PinnedNoteRow, RecentNoteRow, TagFacet, TemplateEntry,
 };
 
 use crate::read;
@@ -226,6 +226,25 @@ impl<'a> IndexCommands<'a> {
     /// The hash and model of each stored chunk of the note at `path`.
     fn embed_chunk_hashes(&self, path: String) -> AppResult<Vec<ChunkHash>> {
         self.read(|conn| read::embed::chunk_hashes(conn, &path))
+    }
+
+    /// The All Notes list: every note, or the notes and dailies with a tag.
+    fn index_list_notes(&self, tag_key: Option<String>) -> AppResult<Vec<NoteListEntry>> {
+        self.read(|conn| read::lists::list_notes(conn, tag_key.as_deref()))
+    }
+
+    /// The most recently changed non-private notes.
+    fn index_recent_notes(
+        &self,
+        limit: u32,
+        tag_key: Option<String>,
+    ) -> AppResult<Vec<RecentNoteRow>> {
+        self.read(|conn| read::lists::recent_notes(conn, limit, tag_key.as_deref()))
+    }
+
+    /// The tag facets over non-daily notes, by tag key.
+    fn index_note_tags(&self) -> AppResult<Vec<TagFacet>> {
+        self.read(read::lists::note_tags)
     }
 
     /// The dates in `start..=end` whose daily note has content, ascending.

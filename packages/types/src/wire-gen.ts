@@ -1099,6 +1099,23 @@ export type Commands = {
     }
     result: ChunkHash[]
   }
+  index_list_notes: {
+    args: {
+      tagKey: string | null
+    }
+    result: NoteListEntry[]
+  }
+  index_recent_notes: {
+    args: {
+      limit: number
+      tagKey: string | null
+    }
+    result: RecentNoteRow[]
+  }
+  index_note_tags: {
+    args: Record<string, never>
+    result: TagFacet[]
+  }
   index_daily_dates: {
     args: {
       start: string
@@ -1922,6 +1939,19 @@ export type NoteId = {
 /**  What a note file is, from its path. */
 export type NoteKind = 'daily' | 'note' | 'template'
 
+/**  One row of the All Notes list. */
+export type NoteListEntry = {
+  path: string
+  title: string
+  /**  The indexed row preview; may be empty. */
+  snippet: string
+  /**  The display casing of each tag, ordered by tag key. */
+  tags: string[]
+  /**  File modification time (epoch ms). */
+  mtime: number
+  isPinned: boolean
+}
+
 /**
  *  One user-initiated move, with the folded addressing for both directions:
  *  the destination's for the forward row move, the source's for the
@@ -2035,6 +2065,17 @@ export type RecentGraph = {
   root: string
   name: string
   openedMs: number
+}
+
+/**  One recently changed note. */
+export type RecentNoteRow = {
+  path: string
+  title: string
+  /**  The indexed row preview; may be empty. */
+  preview: string
+  /**  File modification time (epoch ms). */
+  mtime: number
+  isPrivate: boolean
 }
 
 /**  The reconcile delta: what changed on disk relative to the index. */
@@ -2417,6 +2458,9 @@ export type IndexReadCommand =
   | 'index_person_owners'
   | 'index_embeddable_paths'
   | 'embed_chunk_hashes'
+  | 'index_list_notes'
+  | 'index_recent_notes'
+  | 'index_note_tags'
   | 'index_daily_dates'
   | 'index_daily_notes'
   | 'chat_conversations'

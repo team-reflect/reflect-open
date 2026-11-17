@@ -9,6 +9,7 @@ pub(crate) mod assets;
 pub(crate) mod chat;
 pub(crate) mod daily;
 pub(crate) mod embed;
+pub(crate) mod lists;
 pub(crate) mod meta;
 pub(crate) mod notes;
 pub(crate) mod stats;

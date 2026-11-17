@@ -3299,6 +3299,54 @@ public enum NoteKind: String, Codable, Sendable, Equatable, CaseIterable {
     case template = "template"
 }
 
+/// One row of the All Notes list.
+public struct NoteListEntry: Codable, Sendable, Equatable {
+    public let path: String
+    public let title: String
+    public let snippet: String
+    public let tags: [String]
+    public let mtime: Int64
+    public let isPinned: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case title = "title"
+        case snippet = "snippet"
+        case tags = "tags"
+        case mtime = "mtime"
+        case isPinned = "isPinned"
+    }
+
+    public init(path: String, title: String, snippet: String, tags: [String], mtime: Int64, isPinned: Bool) {
+        self.path = path
+        self.title = title
+        self.snippet = snippet
+        self.tags = tags
+        self.mtime = mtime
+        self.isPinned = isPinned
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.snippet = try container.decode(String.self, forKey: .snippet)
+        self.tags = try container.decode([String].self, forKey: .tags)
+        self.mtime = try container.decode(Int64.self, forKey: .mtime)
+        self.isPinned = try container.decode(Bool.self, forKey: .isPinned)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(title, forKey: .title)
+        try container.encode(snippet, forKey: .snippet)
+        try container.encode(tags, forKey: .tags)
+        try container.encode(mtime, forKey: .mtime)
+        try container.encode(isPinned, forKey: .isPinned)
+    }
+}
+
 /// One user-initiated move, with the folded addressing for both directions:
 /// the destination's for the forward row move, the source's for the
 /// compensating reverse move when the disk refuses.
@@ -3692,6 +3740,49 @@ public struct RecentGraph: Codable, Sendable, Equatable {
         try container.encode(root, forKey: .root)
         try container.encode(name, forKey: .name)
         try container.encode(openedMs, forKey: .openedMs)
+    }
+}
+
+/// One recently changed note.
+public struct RecentNoteRow: Codable, Sendable, Equatable {
+    public let path: String
+    public let title: String
+    public let preview: String
+    public let mtime: Int64
+    public let isPrivate: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case title = "title"
+        case preview = "preview"
+        case mtime = "mtime"
+        case isPrivate = "isPrivate"
+    }
+
+    public init(path: String, title: String, preview: String, mtime: Int64, isPrivate: Bool) {
+        self.path = path
+        self.title = title
+        self.preview = preview
+        self.mtime = mtime
+        self.isPrivate = isPrivate
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.preview = try container.decode(String.self, forKey: .preview)
+        self.mtime = try container.decode(Int64.self, forKey: .mtime)
+        self.isPrivate = try container.decode(Bool.self, forKey: .isPrivate)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(title, forKey: .title)
+        try container.encode(preview, forKey: .preview)
+        try container.encode(mtime, forKey: .mtime)
+        try container.encode(isPrivate, forKey: .isPrivate)
     }
 }
 
