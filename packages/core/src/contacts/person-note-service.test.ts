@@ -57,7 +57,7 @@ describe('resolvePerson', () => {
       kind: 'missing',
       emails: [],
     })
-    expect(database.getQueries()).toEqual([])
+    expect(database.getReads()).toEqual([])
   })
 
   it('queries all canonical emails and reuses one owner', async () => {
@@ -73,11 +73,10 @@ describe('resolvePerson', () => {
       insertText: 'Ada Lovelace',
     })
 
-    const query = database.getQueries()[0]!
-    expect(query.sql).toContain('note_emails')
-    expect(query.sql).toContain('tags')
-    expect(query.sql).not.toContain('limit')
-    expect(query.params).toEqual(['ada@example.com', 'work@example.com', 'person', 'note'])
+    expect(database.getReads()[0]).toEqual({
+      command: 'index_person_owners',
+      args: { emailKeys: ['ada@example.com', 'work@example.com'], tagKey: 'person' },
+    })
   })
 
   it('deduplicates one owner found through several emails', async () => {
@@ -107,7 +106,8 @@ describe('resolvePerson', () => {
       reason: 'identity-conflict',
     })
     // The owner query alone: a conflict never asks for a wiki address.
-    expect(database.getQueries()).toHaveLength(1)
+    expect(database.getReads().map((read) => read.command)).toEqual(['index_person_owners'])
+    expect(database.getQueries()).toEqual([])
   })
 
   it('blocks a unique owner without a safe wiki address', async () => {

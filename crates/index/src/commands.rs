@@ -6,9 +6,9 @@ use rusqlite::Connection;
 use serde_json::{Map, Value};
 
 use reflect_types::{
-    AppError, AppResult, ChatConversation, ChatMessageRow, DailyNoteRow, EmbeddedChunk, GraphStats,
-    IndexTouch, IndexedNote, MovedNoteAddress, NoteFileFacts, NoteId, NoteRow, PinnedNoteRow,
-    TemplateEntry,
+    AppError, AppResult, ChatConversation, ChatMessageRow, ChunkHash, DailyNoteRow, EmbeddedChunk,
+    GraphStats, IndexTouch, IndexedNote, MovedNoteAddress, NoteFileFacts, NoteId, NoteRow,
+    PinnedNoteRow, TemplateEntry,
 };
 
 use crate::read;
@@ -197,6 +197,35 @@ impl<'a> IndexCommands<'a> {
         key: String,
     ) -> AppResult<Option<String>> {
         self.read(|conn| read::notes::resolve_target(conn, &target, daily_path, &key))
+    }
+
+    /// Whether a note is indexed at `path`.
+    fn index_path_taken(&self, path: String) -> AppResult<bool> {
+        self.read(|conn| read::notes::path_taken(conn, &path))
+    }
+
+    /// The notes that reference any of `asset_paths`.
+    fn index_asset_owners(&self, asset_paths: Vec<String>) -> AppResult<Vec<String>> {
+        self.read(|conn| read::assets::note_paths(conn, &asset_paths))
+    }
+
+    /// The notes with the tag `tag_key` that carry any of `email_keys`.
+    fn index_person_owners(
+        &self,
+        email_keys: Vec<String>,
+        tag_key: String,
+    ) -> AppResult<Vec<String>> {
+        self.read(|conn| read::notes::person_owners(conn, &email_keys, &tag_key))
+    }
+
+    /// The path of every note that gets embeddings, ascending.
+    fn index_embeddable_paths(&self) -> AppResult<Vec<String>> {
+        self.read(read::notes::embeddable_paths)
+    }
+
+    /// The hash and model of each stored chunk of the note at `path`.
+    fn embed_chunk_hashes(&self, path: String) -> AppResult<Vec<ChunkHash>> {
+        self.read(|conn| read::embed::chunk_hashes(conn, &path))
     }
 
     /// The dates in `start..=end` whose daily note has content, ascending.

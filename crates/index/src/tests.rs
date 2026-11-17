@@ -15,11 +15,14 @@ use super::chat_write::{delete_conversation, save_message};
 use super::connections::{migrate, migrate_to, open_in_memory, open_index_at, validate_migrations};
 use super::embed_write::{apply_chunks, remove_chunks};
 use super::query::run_query;
+use super::read::assets::note_paths;
 use super::read::chat::{conversations, messages};
 use super::read::daily::{dates_in_range, notes_in_range};
+use super::read::embed::chunk_hashes;
 use super::read::meta::meta;
 use super::read::notes::{
-    file_facts, note as note_row, note_ids, pinned_notes, random_note, resolve_target, templates,
+    embeddable_paths, file_facts, note as note_row, note_ids, path_taken, person_owners,
+    pinned_notes, random_note, resolve_target, templates,
 };
 use super::read::stats::graph_stats;
 use super::scan::scan_reconcile;
@@ -2437,4 +2440,53 @@ fn resolve_target_tries_id_then_daily_then_path_title_alias() {
     assert_eq!(resolve("Nickname", None).as_deref(), Some("notes/c.md"));
     assert_eq!(resolve("nothing", None), None);
     assert!(random_note(&conn).unwrap().is_some());
+}
+
+#[test]
+fn owner_reads_find_notes_by_asset_and_by_person_email() {
+    let conn = migrated();
+    let mut person = tagged_note("notes/ada.md", "Ada", &["person"]);
+    person.emails = vec![IndexedEmail {
+        email: "Ada@Example.com".to_string(),
+        email_key: "ada@example.com".to_string(),
+    }];
+    person.assets = vec!["assets/photo.png".to_string()];
+    let mut untagged = note("notes/other.md", "Other", vec![]);
+    untagged.emails = vec![IndexedEmail {
+        email: "ada@example.com".to_string(),
+        email_key: "ada@example.com".to_string(),
+    }];
+    untagged.assets = vec!["photo.png".to_string()];
+    let mut template = note("templates/t.md", "T", vec![]);
+    template.kind = NoteKind::Template;
+    for indexed in [&person, &untagged, &template] {
+        apply_note(&conn, indexed).unwrap();
+    }
+    let keys = [
+        "ada@example.com".to_string(),
+        "nobody@example.com".to_string(),
+    ];
+
+    assert_eq!(
+        person_owners(&conn, &keys, "person").unwrap(),
+        ["notes/ada.md"]
+    );
+    assert_eq!(
+        person_owners(&conn, &[], "person").unwrap(),
+        Vec::<String>::new()
+    );
+    let mut owners = note_paths(
+        &conn,
+        &["assets/photo.png".to_string(), "photo.png".to_string()],
+    )
+    .unwrap();
+    owners.sort();
+    assert_eq!(owners, ["notes/ada.md", "notes/other.md"]);
+    assert!(path_taken(&conn, "notes/ada.md").unwrap());
+    assert!(!path_taken(&conn, "notes/free.md").unwrap());
+    assert_eq!(
+        embeddable_paths(&conn).unwrap(),
+        ["notes/ada.md", "notes/other.md"]
+    );
+    assert_eq!(chunk_hashes(&conn, "notes/ada.md").unwrap(), []);
 }

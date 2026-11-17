@@ -64,7 +64,7 @@ pub use index::{
     NoteKind, NoteMoveRequest, ReconcileScan, ScanCandidate, ScanOrphan,
 };
 pub use index_read::{
-    DailyNoteRow, GraphStats, NoteFileFacts, NoteId, NoteRow, PinnedNoteRow, TagFacet,
+    ChunkHash, DailyNoteRow, GraphStats, NoteFileFacts, NoteId, NoteRow, PinnedNoteRow, TagFacet,
     TemplateEntry,
 };
 pub use link_preview::LinkPreviewHtml;

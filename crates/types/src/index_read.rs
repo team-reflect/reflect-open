@@ -104,3 +104,12 @@ pub struct NoteId {
     pub path: String,
     pub id: Option<String>,
 }
+
+/// The content hash and model of one stored embedding chunk.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct ChunkHash {
+    pub content_hash: String,
+    pub model_id: String,
+}

@@ -379,6 +379,12 @@ export type ChromeTitle =
    */
   | { kind: 'month'; text: string; month: string }
 
+/**  The content hash and model of one stored embedding chunk. */
+export type ChunkHash = {
+  contentHash: string
+  modelId: string
+}
+
 /**
  *  Every command with its arguments and result. A Swift shell command
  *  field is named after its identifier; the codegen renames it after
@@ -1063,6 +1069,35 @@ export type Commands = {
       key: string
     }
     result: string | null
+  }
+  index_path_taken: {
+    args: {
+      path: string
+    }
+    result: boolean
+  }
+  index_asset_owners: {
+    args: {
+      assetPaths: string[]
+    }
+    result: string[]
+  }
+  index_person_owners: {
+    args: {
+      emailKeys: string[]
+      tagKey: string
+    }
+    result: string[]
+  }
+  index_embeddable_paths: {
+    args: Record<string, never>
+    result: string[]
+  }
+  embed_chunk_hashes: {
+    args: {
+      path: string
+    }
+    result: ChunkHash[]
   }
   index_daily_dates: {
     args: {
@@ -2377,6 +2412,11 @@ export type IndexReadCommand =
   | 'index_note_ids'
   | 'index_random_note'
   | 'index_resolve_target'
+  | 'index_path_taken'
+  | 'index_asset_owners'
+  | 'index_person_owners'
+  | 'index_embeddable_paths'
+  | 'embed_chunk_hashes'
   | 'index_daily_dates'
   | 'index_daily_notes'
   | 'chat_conversations'

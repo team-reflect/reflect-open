@@ -5,8 +5,10 @@
 //! [`Connection`]: rusqlite::Connection
 //! [`IndexSession::read`]: crate::IndexSession::read
 
+pub(crate) mod assets;
 pub(crate) mod chat;
 pub(crate) mod daily;
+pub(crate) mod embed;
 pub(crate) mod meta;
 pub(crate) mod notes;
 pub(crate) mod stats;

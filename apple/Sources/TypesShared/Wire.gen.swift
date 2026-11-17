@@ -1326,6 +1326,34 @@ extension ChromeTitle: Codable {
 }
 
 
+/// The content hash and model of one stored embedding chunk.
+public struct ChunkHash: Codable, Sendable, Equatable {
+    public let contentHash: String
+    public let modelId: String
+
+    private enum CodingKeys: String, CodingKey {
+        case contentHash = "contentHash"
+        case modelId = "modelId"
+    }
+
+    public init(contentHash: String, modelId: String) {
+        self.contentHash = contentHash
+        self.modelId = modelId
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.contentHash = try container.decode(String.self, forKey: .contentHash)
+        self.modelId = try container.decode(String.self, forKey: .modelId)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(contentHash, forKey: .contentHash)
+        try container.encode(modelId, forKey: .modelId)
+    }
+}
+
 /// Result of a commit attempt. `committed: false` means the tree was clean.
 public struct CommitOutcome: Codable, Sendable, Equatable {
     public let committed: Bool

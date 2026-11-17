@@ -150,3 +150,40 @@ pub(crate) fn resolve_target(
         key,
     )
 }
+
+/// Whether a note is indexed at `path`.
+pub(crate) fn path_taken(conn: &Connection, path: &str) -> AppResult<bool> {
+    Ok(conn
+        .prepare_cached("SELECT EXISTS(SELECT 1 FROM notes WHERE path = ?1)")?
+        .query_row([path], |row| row.get(0))?)
+}
+
+/// The notes with the tag `tag_key` that carry any of `email_keys`, by path.
+pub(crate) fn person_owners(
+    conn: &Connection,
+    email_keys: &[String],
+    tag_key: &str,
+) -> AppResult<Vec<String>> {
+    let paths = conn
+        .prepare_cached(
+            "SELECT DISTINCT notes.path FROM note_emails
+             JOIN notes ON notes.path = note_emails.note_path
+             JOIN tags ON tags.note_path = notes.path
+             WHERE note_emails.email_key IN (SELECT value FROM json_each(?1))
+               AND tags.tag_key = ?2
+               AND notes.kind = 'note'
+             ORDER BY notes.path",
+        )?
+        .query_map(params![json_list(email_keys)?, tag_key], |row| row.get(0))?
+        .collect::<Result<_, _>>()?;
+    Ok(paths)
+}
+
+/// The path of every note that gets embeddings, ascending: all but templates.
+pub(crate) fn embeddable_paths(conn: &Connection) -> AppResult<Vec<String>> {
+    let paths = conn
+        .prepare_cached("SELECT path FROM notes WHERE kind != 'template' ORDER BY path")?
+        .query_map([], |row| row.get(0))?
+        .collect::<Result<_, _>>()?;
+    Ok(paths)
+}
