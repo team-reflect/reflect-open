@@ -1,3 +1,4 @@
+import type { ChunkHit as ChunkHitRow } from '@reflect/types'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import { literalSearchQuery } from '../indexing/filter-query.ts'
@@ -49,14 +50,7 @@ const KNN_CANDIDATES = 24
  */
 const MAX_COSINE_DISTANCE = 0.7
 
-export interface ChunkHitRow {
-  path: string
-  title: string
-  heading: string | null
-  text: string
-  isPrivate: boolean
-  distance: number
-}
+export type { ChunkHitRow }
 
 /**
  * Collapse KNN chunk rows (ordered nearest-first) into one hit per note —

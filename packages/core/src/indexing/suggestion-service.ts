@@ -1,3 +1,4 @@
+import type { TagFacet as TagSuggestion } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import { foldTag, normalizeWikiTarget } from '../markdown/index.ts'
 import type { DatabaseService } from './database-service.ts'
@@ -9,13 +10,7 @@ import { mergeDateSuggestions, rankWikiSuggestions, type WikiSuggestion } from '
 /**
  * How many ranked-in-SQL rows each candidate query hands to the in-memory ranker.
  */
-/**
- * One `#tag` autocomplete candidate: display casing + how many notes carry it.
- */
-export interface TagSuggestion {
-  tag: string
-  count: number
-}
+export type { TagSuggestion }
 
 interface WikiTargetCandidateResult {
   readonly candidates: readonly WikiSuggestion[]

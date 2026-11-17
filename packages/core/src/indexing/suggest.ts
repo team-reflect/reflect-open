@@ -1,3 +1,7 @@
+import type {
+  WikiTitleCandidate as TitleCandidate,
+  WikiAliasCandidate as AliasCandidate,
+} from '@reflect/types'
 /**
  * Pure ranking for `[[` autocomplete (Plan 07): merges title and alias matches
  * from the index into one ordered candidate list. The SQL layer
@@ -98,22 +102,9 @@ export function serializeWikiSuggestionAddress(
   return display === null ? target : `${target}|${display}`
 }
 
-/** One `notes` row considered for suggestion (a title match or recency fill). */
-export interface TitleCandidate {
-  path: string
-  title: string
-  titleKey: string
-  dailyDate: string | null
-  mtime: number
-  /** How many wiki links in the graph name a spelling this note claims. */
-  linkCount: number
-}
+export type { TitleCandidate }
 
-/** One `aliases ⋈ notes` row (an alias match). */
-export interface AliasCandidate extends TitleCandidate {
-  alias: string
-  aliasKey: string
-}
+export type { AliasCandidate }
 
 const WORD_CHARACTER_AT_END = /[\p{L}\p{N}]$/u
 

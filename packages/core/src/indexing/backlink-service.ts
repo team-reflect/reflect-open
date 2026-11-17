@@ -1,3 +1,4 @@
+import type { Backlink, BacklinkSourceCursor } from '@reflect/types'
 import { requireGraphSession, type GraphSessionSource } from '../graph/graph-session.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import {
@@ -14,19 +15,7 @@ import {
 } from './snippet-tasks.ts'
 import { noop } from '@ocavue/utils'
 
-/**
- * One link that points at a note.
- */
-export interface Backlink {
-  sourcePath: string
-  /**
-   * The link target as written.
-   */
-  targetRaw: string
-  alias: string | null
-  posFrom: number
-  posTo: number
-}
+export type { Backlink }
 
 export interface BacklinkContext {
   sourcePath: string
@@ -47,14 +36,7 @@ export interface BacklinkContext {
   tasks: SnippetTask[]
 }
 
-/**
- * The last source note in a backlink page. Sources are ordered by the same
- * recency key as the panel, with path as the deterministic tiebreak.
- */
-export interface BacklinkSourceCursor {
-  readonly recencyMs: number
-  readonly sourcePath: string
-}
+export type { BacklinkSourceCursor }
 
 /**
  * Keyset page controls for {@link BacklinkService.getBacklinksWithContext}.

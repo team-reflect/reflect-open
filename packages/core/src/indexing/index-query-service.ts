@@ -1,42 +1,13 @@
+import type { PinnedNoteRow as PinnedNote, NoteRow, TemplateEntry } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import { isIsoDate } from '@reflect/utils'
 import { dailyPath } from '../graph/paths.ts'
 import { foldKey } from '../markdown/index.ts'
 import type { DatabaseService } from './database-service.ts'
 
-/**
- * One pinned note, as the sidebar's Pinned section lists it.
- */
-export interface PinnedNote {
-  path: string
-  title: string
-  dailyDate: string | null
-  pinnedOrder?: number | null | undefined
-}
+export type { PinnedNote }
 
-/**
- * Core fields of one note row: identity path, title, daily date, privacy flag.
- */
-export interface NoteRow {
-  path: string
-  title: string
-  dailyDate: string | null
-  /**
-   * The `private: true` frontmatter flag — a hard block on sending content to
-   * external services. SQLite stores it as `0|1`; this getter maps it to a real
-   * boolean at the read boundary so privacy checks can't be tripped up by a
-   * truthy number.
-   */
-  isPrivate: boolean
-  /**
-   * The published gist's html url, or null when the note has none.
-   */
-  gistUrl: string | null
-  /**
-   * The body changed since it was last published — the "Republish" nudge.
-   */
-  gistStale: boolean
-}
+export type { NoteRow }
 
 /**
  * What a pass knows about an indexed note without reading its file.
@@ -52,17 +23,7 @@ export interface IndexedFileFacts {
   readonly mtime: number
 }
 
-/**
- * One template: its file and its display name (H1 or filename-derived title).
- */
-export interface TemplateEntry {
-  path: string
-  title: string
-  /**
-   * File modification time (epoch ms).
-   */
-  mtime: number
-}
+export type { TemplateEntry }
 
 export interface IndexQueryServiceDeps {
   readonly database: DatabaseService

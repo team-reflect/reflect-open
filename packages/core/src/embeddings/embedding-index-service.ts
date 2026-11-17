@@ -1,3 +1,4 @@
+import type { EmbeddedChunk as EmbedChunkPayload } from '@reflect/types'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { LocalNoteRead, NoteFileService } from '../graph/note-file-service.ts'
@@ -44,20 +45,7 @@ export interface EmbedNoteOptions {
   content?: string
 }
 
-/**
-
- * One chunk in the `embed_apply` payload; `vector` only for new/changed.
-
- */
-export interface EmbedChunkPayload {
-  heading: string | null
-  posFrom: number
-  posTo: number
-  text: string
-  contentHash: string
-  modelId: string
-  vector: number[] | null
-}
+export type { EmbedChunkPayload }
 
 /**
 

@@ -1,18 +1,10 @@
+import type { WikiClaimMatch as WikiTargetMatch } from '@reflect/types'
 import { normalizeWikiTarget, resolved, unresolved, type Resolution } from '../markdown/index.ts'
 import type { DatabaseService } from './database-service.ts'
 import { verifyWikiSuggestionAddresses } from './queries-shared.ts'
 import { rankWikiSuggestions, type WikiLinkSuggestion } from './suggest.ts'
 
-/**
- * The winning tier's claimants for a folded key, preserving ambiguity.
- */
-export interface WikiTargetMatch {
-  /**
-   * One of `CLAIM_TIER`, or {@link UNCLAIMED_TIER} with no paths.
-   */
-  readonly tier: number
-  readonly paths: readonly string[]
-}
+export type { WikiTargetMatch }
 
 /**
  * `WikiTargetMatch.tier` when nothing claims the key (never stored).

@@ -69,8 +69,8 @@ describe('useReorderPinnedNotes', () => {
 
   it('renumbers the whole shelf when a neighbour carries no order', async () => {
     const bare = [
-      { dailyDate: null, path: 'a.md', title: 'A' },
-      { dailyDate: null, path: 'b.md', title: 'B' },
+      { dailyDate: null, path: 'a.md', title: 'A', pinnedOrder: null },
+      { dailyDate: null, path: 'b.md', title: 'B', pinnedOrder: null },
     ] satisfies PinnedNote[]
     const hook = await renderReorder(bare)
 
