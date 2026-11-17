@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   createTestNoteCreationService,
   createTestNoteFileService,
   seedNotes,
@@ -41,7 +41,7 @@ function contact(overrides: Partial<ContactMatch> = {}): ContactMatch {
 }
 
 beforeEach(() => {
-  database = createNodeTestDatabaseService()
+  database = createTestDatabaseService()
   noteFile = createTestNoteFileService()
   noteCreation = createTestNoteCreationService({ noteFile })
   personNotes = createPersonNoteService({

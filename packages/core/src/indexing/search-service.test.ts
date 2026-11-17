@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   seedNotes,
   type TestDatabaseService,
   type TestNote,
@@ -18,7 +18,7 @@ function setup(notes: readonly TestNote[]): {
   database: TestDatabaseService
   search: SearchService
 } {
-  const database = createNodeTestDatabaseService()
+  const database = createTestDatabaseService()
   seedNotes(database, notes)
   const wikiResolver = createWikiResolverService({ database })
   return { database, search: createSearchService({ database, wikiResolver }) }

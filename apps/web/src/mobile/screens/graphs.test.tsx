@@ -3,12 +3,12 @@ import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { MobileOnboardingService } from '@reflect/app'
 import type { MobileStorageInfo } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestMobileStorageService,
   createTestPlatformService,
 } from '@reflect/core/testing'
 import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileGraphs } from './graphs.tsx'
 import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
@@ -34,7 +34,7 @@ let completeOnboarding: MockInstance<CompleteOnboarding>
  */
 async function mount(storage: MobileStorageInfo = STORAGE): Promise<void> {
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     platform: createTestPlatformService(MOBILE_PLATFORM),
     mobileStorage: createTestMobileStorageService({ storage }),
   })

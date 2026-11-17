@@ -5,7 +5,7 @@ import type { Unlisten } from '../unlisten.ts'
 import { createIndexQueryService } from '../indexing/index-query-service.ts'
 import { createTestCaptureInboxService } from '../testing/capture.ts'
 import { createTestClockService } from '../testing/clock.ts'
-import { createNodeTestDatabaseService } from '../testing/database.ts'
+import { createTestDatabaseService } from '../testing/database.ts'
 import { createTestDeepLinkIntakeService, createTestDeepLinkSource } from '../testing/deep-link.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createTestProgressPort } from '../testing/ports.ts'
@@ -15,7 +15,7 @@ import { noop } from '@ocavue/utils'
 function setup(overrides?: Partial<DeepLinkIntakeServiceDeps>) {
   const progress = createTestProgressPort()
   const captureInbox = createTestCaptureInboxService()
-  const indexQuery = createIndexQueryService({ database: createNodeTestDatabaseService() })
+  const indexQuery = createIndexQueryService({ database: createTestDatabaseService() })
   const resolveNoteTarget = vi.spyOn(indexQuery, 'resolveNoteTarget')
   const graphSession = createTestGraphSessionService({ graph: { generation: 3 } })
   const service = createTestDeepLinkIntakeService({

@@ -2,11 +2,10 @@ import { createTestAppServices } from '@reflect/app/testing'
 import type { ReactElement } from 'react'
 import { page, userEvent } from 'vitest/browser'
 import { expect, it, vi } from 'vitest'
-import { createTestCoreServices, seedNotes } from '@reflect/core/testing'
+import { createTestDatabaseService, createTestCoreServices, seedNotes } from '@reflect/core/testing'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { NoteTemplatesProvider, useNoteTemplates } from '@/providers/note-templates-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { TemplateCreateDialog } from './template-create-dialog.tsx'
 import { TemplatePicker } from './template-picker.tsx'
 import { noop, returnNull } from '@ocavue/utils'
@@ -21,7 +20,7 @@ function Opener(): ReactElement {
 }
 
 async function renderPicker(): Promise<void> {
-  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  const core = createTestCoreServices({ database: createTestDatabaseService() })
   seedNotes(core.database, [
     { path: 'templates/journal.md', markdown: '# Journal\n' },
     { path: 'templates/person.md', markdown: '# Person\n' },

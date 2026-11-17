@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestWindowService, type TestWindowService } from '@reflect/app/testing'
 import { buildIndexedNote, parseNote } from '@reflect/core'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   createTestCoreServices,
   createTestEmbeddingIndexService,
   createTestEmbeddingRuntimeService,
@@ -26,7 +26,7 @@ function createCore() {
     backfill: () => Promise.resolve('completed'),
   })
   return createTestCoreServices({
-    database: createNodeTestDatabaseService(),
+    database: createTestDatabaseService(),
     embeddingRuntime,
     embeddingIndex,
   })
@@ -438,7 +438,7 @@ describe('app commands', () => {
 
   it('dev.toggleDevtools no-ops without a native shell (plain-browser dev)', async () => {
     const browser = createTestCoreServices({
-      database: createNodeTestDatabaseService(),
+      database: createTestDatabaseService(),
       platform: createTestPlatformService({ isNativeShell: false }),
     })
     const { context } = fakeContext({ services: browser })

@@ -6,7 +6,7 @@ import {
   WritableStore,
 } from '@reflect/core'
 import { createTestSystemPreferencesService } from '@reflect/app/testing'
-import { createTestCoreServices } from '@reflect/core/testing'
+import { createTestDatabaseService, createTestCoreServices } from '@reflect/core/testing'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useQuery } from '@tanstack/react-query'
 import { useNoteRows } from '@/hooks/note-row-overlay.ts'
@@ -16,7 +16,6 @@ import { mouse } from 'vitest-browser-commands/playwright'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
 import { act } from '@/test-utils/act.ts'
 import { scrollElement } from '@/test-utils/scroll.ts'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NoteRowList } from './note-row-list.tsx'
 import { SwipeableNoteRow, type NoteRowModel } from './swipeable-note-row.tsx'
 import { noop } from '@ocavue/utils'
@@ -29,7 +28,7 @@ const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
 function mount(ui: ReactNode): Promise<InAppRenderResult<CoreServices>> {
   const readSource = (): Promise<string> => Promise.resolve('# A\n')
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     noteDocuments: {
       readSource,
       readExisting: readSource,

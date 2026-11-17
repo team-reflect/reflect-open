@@ -8,6 +8,7 @@ import {
   type Settings,
 } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestChatEngineService,
   createTestChatHistoryService,
@@ -26,7 +27,6 @@ import {
   type ChatActions,
 } from '@/providers/chat-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { noop } from '@ocavue/utils'
 
 /**
@@ -91,7 +91,7 @@ async function renderProvider(options?: {
     { type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] },
   ])
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     settings,
     secretStore: createTestSecretStoreService({ [aiKeySecretName(MODEL.id)]: 'sk-test' }),
     chatHistory,

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   createTestCoreServices,
   type TestCoreServices,
 } from '@reflect/core/testing'
@@ -18,7 +18,7 @@ let core: TestCoreServices
 let appLayer: WebTestAppServices
 
 beforeEach(() => {
-  core = createTestCoreServices({ database: createNodeTestDatabaseService() })
+  core = createTestCoreServices({ database: createTestDatabaseService() })
   appLayer = createWebTestAppServices(core)
   core.graphSession.setGraph({ generation: 4 })
 })

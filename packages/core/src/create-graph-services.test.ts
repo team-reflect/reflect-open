@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { ICloudDownloadServiceOptions } from './sync/icloud-download-service.ts'
 import type { ICloudSyncServiceOptions } from './sync/icloud-sync-service.ts'
 import { trackAssetDescriptionSessions } from './testing/assets.ts'
-import { createNodeTestDatabaseService } from './testing/database.ts'
+import { createTestDatabaseService } from './testing/database.ts'
 import { createTestCoreServices, type TestCoreServices } from './testing/services.ts'
 import {
   createTestGitSyncService,
@@ -94,7 +94,7 @@ function sessionDeps(core: TestCoreServices) {
  * One graph session's services over recording doubles.
  */
 function setup(options?: SetupOptions) {
-  const core = createTestCoreServices({ database: createNodeTestDatabaseService() })
+  const core = createTestCoreServices({ database: createTestDatabaseService() })
   const assetSessions = trackAssetDescriptionSessions(core.assetDescription)
   const controller = new AbortController()
   const session = createGraphSession(
@@ -282,7 +282,7 @@ describe('createGraphServices', () => {
   })
 
   it('leaves nothing running for a session that already ended', () => {
-    const core = createTestCoreServices({ database: createNodeTestDatabaseService() })
+    const core = createTestCoreServices({ database: createTestDatabaseService() })
     const controller = new AbortController()
     controller.abort()
     const session = createGraphSession(

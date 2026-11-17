@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { upsertFrontmatter } from '@reflect/core'
 import type { ResolvedArchivedPost } from '@reflect/core/x-archive'
 import {
+  createTestDatabaseService,
   createTestClockService,
   createTestCoreServices,
   createTestIdService,
@@ -18,7 +19,6 @@ import { act } from '@/test-utils/act.ts'
 import '@/test-utils/locator.ts'
 import { hover, unhover } from '@/test-utils/mouse.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NotePane } from './note-pane.tsx'
 import { noop, sleep } from '@ocavue/utils'
 
@@ -70,7 +70,7 @@ async function renderPane(options: RenderPaneOptions) {
   const { files, path, indexed = Object.keys(files), lazy, autoFocus, prepare } = options
   const clock = createTestClockService()
   const noteFile = createTestNoteFileService({ files })
-  const database = createWasmTestDatabaseService()
+  const database = createTestDatabaseService()
   seedNotes(
     database,
     indexed.map((indexedPath) => ({ path: indexedPath, markdown: files[indexedPath] ?? '' })),

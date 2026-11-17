@@ -3,13 +3,13 @@ import { describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import type { GraphImportProgress, GraphImportSummary, GraphInfo } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestGraphSessionService,
   createTestIpcBridgeService,
 } from '@reflect/core/testing'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useStore } from '@/lib/use-store.ts'
 import { useV1Import, V1ImportProvider } from './v1-import-provider.tsx'
 import { noop, sleep, returnNull } from '@ocavue/utils'
@@ -59,7 +59,7 @@ async function renderProvider(result?: GraphImportSummary | Error) {
   const session = createTestGraphSessionService({ state: { status: 'ready', graph: GRAPH } })
   const refreshIndex = vi.spyOn(session, 'refreshIndex').mockImplementation(noop)
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     ipc,
     graphSession: session,
   })

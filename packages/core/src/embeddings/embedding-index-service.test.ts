@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   createTestEmbeddingIndexService,
   createTestEmbeddingRuntimeService,
   createTestIndexLifecycleService,
@@ -58,7 +58,7 @@ function setup(options: {
 }) {
   const path = options.path ?? NOTE_PATH
   const evictedSidecars = options.evictedSidecars ?? []
-  const database = createNodeTestDatabaseService()
+  const database = createTestDatabaseService()
   seedStoredRows(database, options.storedRows)
   const runtime = createTestEmbeddingRuntimeService({ vectors: () => [0.5, 0.5] })
   const index = createTestEmbeddingIndexService({
@@ -362,7 +362,7 @@ const NOTES = [
  * An embedding index whose chunk writes land in a database indexed with {@link NOTES}.
  */
 function setupGraph(options?: { unreadable?: string[] }) {
-  const database = createNodeTestDatabaseService()
+  const database = createTestDatabaseService()
   seedNotes(database, NOTES)
   const unreadable = options?.unreadable ?? []
   /**

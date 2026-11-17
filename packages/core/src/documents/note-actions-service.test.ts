@@ -10,7 +10,7 @@ import {
   type NoteRow,
   type PinnedNote,
 } from '../indexing/index-query-service.ts'
-import { createNodeTestDatabaseService } from '../testing/database.ts'
+import { createTestDatabaseService } from '../testing/database.ts'
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createTestNoteSession, type TestNoteSessionOptions } from '../testing/documents.ts'
 import { createTestFileChangeService } from '../testing/file-change.ts'
@@ -91,7 +91,7 @@ function createNoteActions(deps: {
     openDocuments,
     indexLifecycle: deps.indexLifecycle ?? recordingIndexLifecycle(indexLog),
     indexQuery:
-      deps.indexQuery ?? createIndexQueryService({ database: createNodeTestDatabaseService() }),
+      deps.indexQuery ?? createIndexQueryService({ database: createTestDatabaseService() }),
     noteRows: deps.noteRows ?? createNoteRowService({ graphSession: graph }),
     progress: deps.progress ?? createTestProgressPort(),
     path: createPathService({ transport: createPosixPathTransport('/home/test') }),
@@ -126,7 +126,7 @@ function setup(options?: {
   const graph = createTestGraph()
   const noteRows = createNoteRowService({ graphSession: graph })
   const pinned = options?.pinned ?? []
-  const indexQuery = createIndexQueryService({ database: createNodeTestDatabaseService() })
+  const indexQuery = createIndexQueryService({ database: createTestDatabaseService() })
   vi.spyOn(indexQuery, 'getPinnedNotes').mockImplementation(
     typeof pinned === 'function' ? pinned : () => Promise.resolve([...pinned]),
   )

@@ -17,12 +17,12 @@ import {
   type WikiResolverService,
 } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestClockService,
   createTestActivityPort,
   createTestLoggerService,
 } from '@reflect/core/testing'
 import type { TestDatabaseService } from '@reflect/core/testing'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { buildAllNotesSearch, EMPTY_ALL_NOTES_FILTERS, searchPlanFor } from '@reflect/app'
 import { noop } from '@ocavue/utils'
 
@@ -87,7 +87,7 @@ async function searchTitles(
 }
 
 function openDb(): TestDatabaseService {
-  const db = createWasmTestDatabaseService()
+  const db = createTestDatabaseService()
   onTestFinished(() => {
     db.close()
   })

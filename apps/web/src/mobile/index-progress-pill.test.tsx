@@ -1,8 +1,11 @@
 import type { IndexFileProgress } from '@reflect/core'
-import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  type TestCoreServices,
+} from '@reflect/core/testing'
 import { describe, expect, it } from 'vitest'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { IndexProgressPill } from './index-progress-pill.tsx'
 
 /**
@@ -13,7 +16,7 @@ import { IndexProgressPill } from './index-progress-pill.tsx'
  */
 
 async function mount(progress: IndexFileProgress): Promise<InAppRenderResult<TestCoreServices>> {
-  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  const core = createTestCoreServices({ database: createTestDatabaseService() })
   core.indexLifecycle.setFileProgress(progress)
   return await renderInApp(<IndexProgressPill />, { core })
 }

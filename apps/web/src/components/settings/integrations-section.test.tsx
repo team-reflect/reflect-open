@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Settings } from '@reflect/core'
 import type { TestOpenerService } from '@reflect/app/testing'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestContactsService,
   createTestPlatformService,
@@ -11,7 +12,6 @@ import {
   type TestSettingsService,
 } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { IntegrationsSection } from './integrations-section.tsx'
 
 let contacts: TestContactsService
@@ -27,7 +27,7 @@ let settings: TestSettingsService
  */
 async function renderSection(stored: Partial<Settings> = {}): Promise<void> {
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     contacts,
     platform: createTestPlatformService(platform),
   })

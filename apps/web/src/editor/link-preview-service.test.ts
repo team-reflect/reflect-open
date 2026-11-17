@@ -8,7 +8,7 @@ import {
   AppError,
 } from '@reflect/core'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   createTestCoreServices,
   createTestGraphSessionService,
 } from '@reflect/core/testing'
@@ -43,7 +43,7 @@ function createNoteLinkPreviewResolver(
   dependencies: LinkPreviewResolverDependencies,
 ): LinkPreviewResolver {
   const { noteDocuments, privacy, webFetch } = createTestCoreServices({
-    database: createNodeTestDatabaseService(),
+    database: createTestDatabaseService(),
   })
   vi.spyOn(noteDocuments, 'readExisting').mockImplementation(dependencies.readSource)
   vi.spyOn(webFetch, 'fetchLinkPreviewHtml').mockImplementation(dependencies.fetchHtml)

@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { createTestCoreServices } from '@reflect/core/testing'
+import { createTestDatabaseService, createTestCoreServices } from '@reflect/core/testing'
 import { selectSidebarRow, sidebarVisible, useSyncChatSection } from '@/mobile/sidebar.ts'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 
 const TODAY = '2026-11-13'
 
@@ -38,7 +37,7 @@ describe('selectSidebarRow', () => {
 describe('useSyncChatSection', () => {
   it('puts Chat in its own section only while there is a sidebar', async () => {
     const view = await renderHookInApp(() => useSyncChatSection(), {
-      core: createTestCoreServices({ database: createWasmTestDatabaseService() }),
+      core: createTestCoreServices({ database: createTestDatabaseService() }),
     })
     const { navigation } = view.appServices
     navigation.navigate({ kind: 'chat', conversationId: null })

@@ -10,7 +10,7 @@ import {
 } from '@reflect/core'
 import {
   createTestClockService,
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   createTestLoggerService,
   createTestPlatformService,
   createTestRetrievalService,
@@ -62,7 +62,7 @@ function setup() {
     logger: createTestLoggerService(),
   })
   const service = createPaletteSearchService({
-    suggestions: createSuggestionService({ database: createNodeTestDatabaseService() }),
+    suggestions: createSuggestionService({ database: createTestDatabaseService() }),
     search: {
       searchWithFilters: (parsed) => {
         searches.push(parsed)
@@ -78,7 +78,7 @@ function setup() {
 
 describe('PaletteSearchService', () => {
   it('suggests at most 8 titles, generated date phrases merged in', async () => {
-    const database = createNodeTestDatabaseService()
+    const database = createTestDatabaseService()
     seedNotes(
       database,
       Array.from({ length: 10 }, (_, i) => ({

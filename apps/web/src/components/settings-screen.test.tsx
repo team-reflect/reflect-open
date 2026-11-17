@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import { page, userEvent } from 'vitest/browser'
 import type { Locator } from 'vitest/browser'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestEmbeddingRuntimeService,
   createTestPlatformService,
@@ -22,7 +23,6 @@ import { UpdateProvider } from '@/providers/update-provider.tsx'
 import { V1ImportProvider } from '@/providers/v1-import-provider.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { ShortcutsDialog } from './shortcuts-dialog.tsx'
 import { SettingsScreen } from './settings-screen.tsx'
 
@@ -47,7 +47,7 @@ function saved(): Settings[] {
 // a graph open and its git sync disconnected.
 function createCore() {
   return createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     embeddingRuntime: embedRuntime,
     platform: createTestPlatformService({ isMacosDesktop: false, hasMacosTitleBarOverlay: false }),
     gitSync: createTestGitSyncService({ state: { phase: 'disconnected' } }),

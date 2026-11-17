@@ -21,7 +21,7 @@ import { MAX_NOTE_CONTENT_CHARS, type ReadNoteResult, type ReadNotesOutput } fro
 import { createAssetPrivacyService } from '../../assets/asset-privacy-service.ts'
 import { createPrivacyService } from '../../privacy/privacy-service.ts'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   createTestNoteFileService,
   createTestRetrievalService,
   createTestXArchiveService,
@@ -64,7 +64,7 @@ function buildNoteTools(effects: ToolEffects = {}): NoteTools {
   vi.spyOn(retrieval, 'retrieve').mockImplementation(
     effects.retrieveFn ?? (() => Promise.resolve([])),
   )
-  const noteList = createNoteListService({ database: createNodeTestDatabaseService() })
+  const noteList = createNoteListService({ database: createTestDatabaseService() })
   vi.spyOn(noteList, 'listRecentNotes').mockImplementation(
     effects.listRecentNotesFn ?? (() => Promise.resolve([])),
   )

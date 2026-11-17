@@ -9,6 +9,7 @@ import {
   createSubscriptionService,
 } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestAppStoreService,
   createTestIapService,
@@ -16,7 +17,6 @@ import {
 } from '@reflect/core/testing'
 import { usePaywallRequested } from '@/hooks/use-paywall-requested.ts'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { usePaywallGate } from './use-paywall-gate.ts'
 
 /**
@@ -30,7 +30,7 @@ afterEach(() => {
 
 function iosServices() {
   const services = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     platform: createTestPlatformService({ appPlatform: 'ios' }),
   })
   services.mobile.installClock.setState({ phase: 'required', dayIndex: 3 })

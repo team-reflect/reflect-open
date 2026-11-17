@@ -2,11 +2,14 @@ import { createTestAppServices } from '@reflect/app/testing'
 import type { ReactElement } from 'react'
 import { page } from 'vitest/browser'
 import { expect, it, vi } from 'vitest'
-import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  type TestCoreServices,
+} from '@reflect/core/testing'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { NoteTemplatesProvider, useNoteTemplates } from '@/providers/note-templates-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { TemplateCreateDialog } from './template-create-dialog.tsx'
 import { noop, returnNull } from '@ocavue/utils'
 
@@ -20,7 +23,7 @@ function Opener(): ReactElement {
 }
 
 async function renderDialog(): Promise<{ context: CommandContext; core: TestCoreServices }> {
-  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  const core = createTestCoreServices({ database: createTestDatabaseService() })
   core.graphSession.setGraph({ generation: 1 })
   const context: CommandContext = {
     services: core,

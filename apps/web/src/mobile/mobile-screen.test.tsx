@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { StrictMode, type ReactElement } from 'react'
 import { act } from '@/test-utils/act.ts'
 import {
+  createTestDatabaseService,
   createTestChatEngineService,
   createTestCoreServices,
   createTestSecretStoreService,
@@ -29,7 +30,6 @@ import { dispatchTouch, scrollElement, touch } from '@/test-utils/scroll.ts'
 import { emulateReducedMotion } from '@/test-utils/reduced-motion.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp, type RenderInAppOptions } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileAudioMemoProvider } from './audio-memo-provider.tsx'
 import { AllSearchProvider } from '@/mobile/all-search.tsx'
 import { quickOpenVisible } from '@/mobile/quick-open.tsx'
@@ -122,7 +122,7 @@ let dailyDatesInRange: MockInstance<DailyNoteService['dailyDatesInRange']>
 
 beforeEach(async () => {
   await page.viewport(375, 700)
-  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  core = createTestCoreServices({ database: createTestDatabaseService() })
   appServices = createWebTestAppServices(core)
   // The tests compute dates from the real clock.
   core.clock.setNow(Date.now())
@@ -720,7 +720,7 @@ describe('MobileShell', () => {
       { type: 'complete', messages: [{ role: 'assistant', content: reply }] },
     ])
     core = createTestCoreServices({
-      database: createWasmTestDatabaseService(),
+      database: createTestDatabaseService(),
       secretStore: createTestSecretStoreService({ [aiKeySecretName(model.id)]: 'sk-test' }),
       chatEngine,
     })

@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import type { ImageUrlResolver, WikiEmbedResolver, WikilinkHoverHit } from '@meowdown/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   type TestCoreServices,
   type TestOpenGraph,
 } from '@reflect/core/testing'
 import { renderHookInApp, renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useWikiLinkHoverPreview } from './use-wiki-link-hover-preview.tsx'
 
 const markdownPreview = vi.hoisted(() => vi.fn())
@@ -44,7 +44,7 @@ async function setupRenderer(
 
 describe('useWikiLinkHoverPreview', () => {
   beforeEach(() => {
-    core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+    core = createTestCoreServices({ database: createTestDatabaseService() })
     markdownPreview.mockReset()
   })
 

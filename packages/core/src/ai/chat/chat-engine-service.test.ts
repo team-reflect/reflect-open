@@ -12,7 +12,7 @@ import { createAssetPrivacyService } from '../../assets/asset-privacy-service.ts
 import { createNoteListService } from '../../indexing/note-list-service.ts'
 import { cloudSafeGraphContext, createPrivacyService } from '../../privacy/privacy-service.ts'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   createTestLanguageModelService,
   createTestLoggerService,
   createTestNoteFileService,
@@ -72,7 +72,7 @@ function createNoteTools(effects?: {
   return createNoteToolsService({
     retrieval,
     noteFile,
-    noteList: createNoteListService({ database: createNodeTestDatabaseService() }),
+    noteList: createNoteListService({ database: createTestDatabaseService() }),
     dailyNotes: { listDailyNotes: () => [] },
     assetReferences,
     assetPrivacy: createAssetPrivacyService({ noteFile, xArchive, assetReferences }),

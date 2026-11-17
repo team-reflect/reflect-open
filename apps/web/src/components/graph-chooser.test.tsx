@@ -2,6 +2,7 @@ import { page, userEvent } from 'vitest/browser'
 import { describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { BuildPlatform, GraphSessionService, IcloudStatus, Settings } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestGraphSessionService,
   createTestICloudNativeService,
@@ -9,7 +10,6 @@ import {
 } from '@reflect/core/testing'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { GraphChooser } from './graph-chooser.tsx'
 
 const RECENTS = [
@@ -28,7 +28,7 @@ async function renderChooser(options?: {
   buildPlatform?: BuildPlatform
 }): Promise<void> {
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     platform: createTestPlatformService({ buildPlatform: options?.buildPlatform ?? 'darwin' }),
     graphSession: createTestGraphSessionService({ recents: RECENTS }),
     icloudNative: createTestICloudNativeService(

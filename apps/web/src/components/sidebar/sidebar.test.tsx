@@ -23,14 +23,17 @@ import {
   type TestOpenerService,
   type TestOperationsService,
 } from '@reflect/app/testing'
-import { createTestCoreServices, createTestGitSyncService } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  createTestGitSyncService,
+} from '@reflect/core/testing'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { AudioMemoProvider } from '@/providers/audio-memo-provider.tsx'
 import { SidebarProvider } from '@/providers/sidebar-provider.tsx'
 import { UpdateProvider } from '@/providers/update-provider.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { Sidebar } from './sidebar.tsx'
 import { noop, returnNull } from '@ocavue/utils'
 import { createWebTestAppServices } from '@/test-utils/app-services.ts'
@@ -67,7 +70,7 @@ let operations: TestOperationsService
  */
 function untitledNotePath(): string {
   return createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
   }).noteCreation.untitledNotePath()
 }
 
@@ -90,7 +93,7 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
   const readSource = (): Promise<string> => Promise.resolve('# Rust\n')
   operations = createTestOperationsService()
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     progress: operations,
     noteDocuments: {
       readSource,

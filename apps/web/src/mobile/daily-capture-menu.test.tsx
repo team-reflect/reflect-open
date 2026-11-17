@@ -2,9 +2,13 @@ import { noop } from '@ocavue/utils'
 import type { ReactElement } from 'react'
 import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
-import { createTestCoreServices, makeOpenTask, type TestCoreServices } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  makeOpenTask,
+  type TestCoreServices,
+} from '@reflect/core/testing'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useDailyCapture } from './daily-capture-menu.tsx'
 import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import {
@@ -114,7 +118,7 @@ function renderMenu(): Promise<InAppRenderResult<TestCoreServices>> {
 beforeEach(() => {
   vi.clearAllMocks()
   state.set(INITIAL)
-  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  core = createTestCoreServices({ database: createTestDatabaseService() })
   // Today is 2026-06-14.
   core.clock.setNow(new Date(2026, 5, 14, 12).getTime())
   getOpenTasks = vi.spyOn(core.tasks, 'getOpenTasks').mockResolvedValue([])

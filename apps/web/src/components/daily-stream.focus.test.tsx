@@ -3,14 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useEffect, type ReactElement } from 'react'
 import { act } from '@/test-utils/act.ts'
 import { createSystemClock } from '@reflect/core'
-import { createTestCoreServices } from '@reflect/core/testing'
+import { createTestDatabaseService, createTestCoreServices } from '@reflect/core/testing'
 import { getIsoToday } from '@reflect/utils'
 import { createDayWindow, neighborDate, type NavigateOptions, type Route } from '@reflect/app'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DailyStream } from './daily-stream.tsx'
 import { noop, returnFalse } from '@ocavue/utils'
 
@@ -132,7 +131,7 @@ async function renderStream() {
     {
       // The tests name days by the real date, so the app runs on the system clock.
       core: createTestCoreServices({
-        database: createWasmTestDatabaseService(),
+        database: createTestDatabaseService(),
         clock: createSystemClock(),
       }),
       settings: { dateFormat: 'mdy' },

@@ -50,7 +50,7 @@ export {
   type TestContactsServiceOptions,
 } from './contacts.ts'
 export {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   seedNotes,
   type TestDatabaseService,
   type TestNote,

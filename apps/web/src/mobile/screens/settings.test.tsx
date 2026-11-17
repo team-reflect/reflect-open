@@ -3,6 +3,7 @@ import { page, userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GitSyncState, Settings } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestAppStoreService,
   createTestClassicAccessService,
   createTestCoreServices,
@@ -17,7 +18,6 @@ import {
 import '@/test-utils/locator.ts'
 import { TERMS_OF_USE_URL } from '@/mobile/legal-urls.ts'
 import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileSettings } from './settings.tsx'
 import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
 
@@ -82,7 +82,7 @@ async function mount(options?: MountOptions) {
   const appStore = createTestAppStoreService()
   const core = createTestCoreServices({
     appStore,
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     gitSync,
     gitHostConnector,
     // A note window's graph runs no sync lifecycle.

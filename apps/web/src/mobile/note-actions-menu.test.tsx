@@ -10,12 +10,15 @@ import {
   type NoteRow,
   AppError,
 } from '@reflect/core'
-import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  type TestCoreServices,
+} from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { act } from '@/test-utils/act.ts'
 import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { noop } from '@ocavue/utils'
 import { createTestNativeChromeHost, type TestNativeChromeHost } from '@reflect/app/testing'
 import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
@@ -82,7 +85,7 @@ async function mount(
   nativeHost?: TestNativeChromeHost,
 ) {
   const created = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     noteDocuments: {
       readSource: readNoteSource,
       readExisting: async (notePath) => await readNoteSource(notePath),

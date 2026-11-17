@@ -2,12 +2,12 @@ import { act } from '@/test-utils/act.ts'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { getTaskKey, type OpenTask, type TaskService, type TaskSnapshot } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   makeOpenTask as task,
   type TestCoreServices,
 } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useRecentlyCompleted } from './recently-completed.ts'
 
 /**
@@ -22,7 +22,7 @@ let tasks: TaskService
 
 // A fresh service per test, so its recently-completed set starts empty.
 beforeEach(() => {
-  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  core = createTestCoreServices({ database: createTestDatabaseService() })
   tasks = core.tasks
 })
 

@@ -2,6 +2,7 @@ import { act } from '@/test-utils/act.ts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { upsertFrontmatter, type FileChange } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestClockService,
   createTestIndexStoreService,
@@ -14,7 +15,6 @@ import {
   type TestNoteFileService,
 } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import type { NoteEditorHandle } from './note-editor.tsx'
 import { useNoteDocument } from './use-note-document.ts'
 import { noop, returnFalse } from '@ocavue/utils'
@@ -94,7 +94,7 @@ beforeEach(() => {
   clock = createTestClockService()
   logger = createTestLoggerService()
   noteFile = createTestNoteFileService({ files: { 'notes/a.md': '# Hello\n' } })
-  core = createCore(createWasmTestDatabaseService())
+  core = createCore(createTestDatabaseService())
 })
 
 /**

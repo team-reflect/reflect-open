@@ -8,12 +8,11 @@ import type {
   NoteCreationService,
   NoteLinkResolverService,
 } from '@reflect/core'
-import { createTestCoreServices } from '@reflect/core/testing'
+import { createTestDatabaseService, createTestCoreServices } from '@reflect/core/testing'
 import type { ReactNode } from 'react'
 import { useRouterState } from '@/routing/router.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { BacklinksPanel } from './backlinks-panel.tsx'
 import { deepLinkForRoute } from '@reflect/app'
 
@@ -28,7 +27,7 @@ function wrapBacklinkContexts(contexts: BacklinkContext[]): BacklinkContextPage 
 }
 
 function createCore() {
-  const services = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  const services = createTestCoreServices({ database: createTestDatabaseService() })
   vi.spyOn(services.backlinks, 'getBacklinksWithContext').mockImplementation(
     getBacklinksWithContext,
   )

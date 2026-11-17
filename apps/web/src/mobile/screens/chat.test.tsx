@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRef, useLayoutEffect, useState, type ReactElement, type RefObject } from 'react'
 import { aiKeySecretName, type AiProviderConfig, type ChatStreamEvent } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestChatEngineService,
   createTestSecretStoreService,
@@ -13,7 +14,6 @@ import { createTestNavigationService } from '@reflect/app/testing'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileChat } from './chat.tsx'
 
 /**
@@ -102,7 +102,7 @@ async function renderHarness(route: Route = { kind: 'today' }, chatSection: Sect
   const navigation = createTestNavigationService()
   navigation.setChatSection(chatSection)
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     secretStore: createTestSecretStoreService({ [aiKeySecretName(MODEL.id)]: 'sk-test' }),
     chatEngine,
   })
