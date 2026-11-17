@@ -29,6 +29,14 @@ pub const LATEST_SCHEMA_VERSION: usize = 23;
 /// derivation version, distinct from the schema version above).
 pub const PROJECTION_VERSION_KEY: &str = "projection_version";
 
+/// Makes a double-quoted name that is not a column an error in queries.
+/// By default SQLite reads such a name as a string, so a wrong column name
+/// in a query gives wrong rows and no error.
+pub fn reject_unknown_quoted_names(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
+    conn.set_db_config(rusqlite::config::DbConfig::SQLITE_DBCONFIG_DQS_DML, false)?;
+    Ok(())
+}
+
 #[cfg(feature = "vec")]
 mod schema {
     use std::ffi::{c_char, c_int};
@@ -152,7 +160,9 @@ mod schema {
     /// Opens an in-memory connection with sqlite-vec available.
     pub fn open_in_memory() -> Result<Connection, SchemaError> {
         register_sqlite_vec()?;
-        Ok(Connection::open_in_memory()?)
+        let conn = Connection::open_in_memory()?;
+        super::reject_unknown_quoted_names(&conn)?;
+        Ok(conn)
     }
 
     /// Bring the connection up to the latest schema version (no-op if current).
@@ -177,6 +187,7 @@ mod schema {
         let dir = root.join(super::REFLECT_DIR);
         std::fs::create_dir_all(&dir)?;
         let mut conn = Connection::open(dir.join(super::INDEX_FILE))?;
+        super::reject_unknown_quoted_names(&conn)?;
         // Another PROCESS can hold this database too — a second app flavor on
         // the same graph, or the `reflect` CLI (which sets its own timeout).
         // Wait briefly for a cross-process lock to clear instead of failing
@@ -203,6 +214,7 @@ mod schema {
                 | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
+        super::reject_unknown_quoted_names(&conn)?;
         Ok(conn)
     }
 
@@ -224,6 +236,14 @@ mod schema {
         #[test]
         fn migrations_are_valid() {
             validate().unwrap();
+        }
+
+        #[test]
+        fn a_quoted_name_that_is_no_column_is_an_error() {
+            let mut conn = open_in_memory().unwrap();
+            migrate(&mut conn).unwrap();
+            let error = conn.prepare(r#"SELECT "titel" FROM "notes""#).unwrap_err();
+            assert!(error.to_string().contains("no such column"), "{error}");
         }
 
         #[test]

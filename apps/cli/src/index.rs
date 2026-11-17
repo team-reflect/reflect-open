@@ -54,6 +54,9 @@ pub fn open_read_only(root: &Path) -> IndexOpen {
     if let Err(err) = conn.pragma_update(None, "query_only", true) {
         return IndexOpen::Unusable(format!("could not configure the index connection: {err}"));
     }
+    if let Err(err) = reflect_index_schema::reject_unknown_quoted_names(&conn) {
+        return IndexOpen::Unusable(format!("could not configure the index connection: {err}"));
+    }
     // First actual read — a WAL that needs recovery surfaces here, not at open.
     let version: i64 = match conn.query_row("PRAGMA user_version", [], |row| row.get(0)) {
         Ok(version) => version,
