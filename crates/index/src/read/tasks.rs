@@ -1,22 +1,42 @@
 //! Reads of the `tasks` table.
 
 use rusqlite::Connection;
+use sea_query::{Expr, ExprTrait, Query};
 
 use reflect_types::{AppResult, TaskRow};
+
+use crate::schema::{Notes, Tasks};
+use crate::sql::{self, lit};
 
 /// The open (`checked = false`) or the completed tasks of every note but
 /// templates, in no fixed order.
 pub(crate) fn tasks(conn: &Connection, checked: bool) -> AppResult<Vec<TaskRow>> {
-    let rows = conn
-        .prepare_cached(
-            "SELECT tasks.note_path, tasks.ast_path, tasks.markdown, tasks.breadcrumbs,
-                    tasks.checked, notes.title, notes.daily_date, notes.is_pinned,
-                    notes.pinned_order, notes.updated_at
-             FROM tasks
-             JOIN notes ON notes.path = tasks.note_path
-             WHERE notes.kind != 'template' AND tasks.checked = ?1",
-        )?
-        .query_map([checked], |row| {
+    sql::query(
+        conn,
+        Query::select()
+            .columns([
+                (Tasks::Table, Tasks::NotePath),
+                (Tasks::Table, Tasks::AstPath),
+                (Tasks::Table, Tasks::Markdown),
+                (Tasks::Table, Tasks::Breadcrumbs),
+                (Tasks::Table, Tasks::Checked),
+            ])
+            .columns([
+                (Notes::Table, Notes::Title),
+                (Notes::Table, Notes::DailyDate),
+                (Notes::Table, Notes::IsPinned),
+                (Notes::Table, Notes::PinnedOrder),
+                (Notes::Table, Notes::UpdatedAt),
+            ])
+            .from(Tasks::Table)
+            .inner_join(
+                Notes::Table,
+                Expr::col((Notes::Table, Notes::Path)).equals((Tasks::Table, Tasks::NotePath)),
+            )
+            .and_where(Expr::col((Notes::Table, Notes::Kind)).ne(lit("template")))
+            // In the text, so the partial indexes on `checked` apply.
+            .and_where(Expr::col((Tasks::Table, Tasks::Checked)).eq(lit(i32::from(checked)))),
+        |row| {
             Ok(TaskRow {
                 note_path: row.get(0)?,
                 ast_path: row.get(1)?,
@@ -29,7 +49,6 @@ pub(crate) fn tasks(conn: &Connection, checked: bool) -> AppResult<Vec<TaskRow>>
                 pinned_order: row.get(8)?,
                 updated_at: row.get(9)?,
             })
-        })?
-        .collect::<Result<_, _>>()?;
-    Ok(rows)
+        },
+    )
 }

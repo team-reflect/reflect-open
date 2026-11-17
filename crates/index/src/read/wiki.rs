@@ -1,38 +1,47 @@
 //! Wiki link resolution over `note_keys`, `note_claims` and `links`.
 
-use rusqlite::{Connection, OptionalExtension};
+use rusqlite::Connection;
+use sea_query::{Expr, ExprTrait, Func, Order, Query};
 
 use reflect_types::{AppResult, WikiClaimMatch, WikiTitleCandidate};
 
-fn paths(conn: &Connection, sql: &str, value: &str) -> AppResult<Vec<String>> {
-    let paths = conn
-        .prepare_cached(sql)?
-        .query_map([value], |row| row.get(0))?
-        .collect::<Result<_, _>>()?;
-    Ok(paths)
-}
+use crate::schema::{Links, NoteClaims, NoteKeys, Notes};
+use crate::sql::{self, lit};
 
 /// The note that wins the wiki key `key`: `note_keys` holds one winner per
 /// key.
 pub(crate) fn resolve(conn: &Connection, key: &str) -> AppResult<Option<String>> {
-    Ok(conn
-        .prepare_cached("SELECT note_path FROM note_keys WHERE key = ?1 LIMIT 1")?
-        .query_row([key], |row| row.get(0))
-        .optional()?)
+    sql::query_optional(
+        conn,
+        Query::select()
+            .column(NoteKeys::NotePath)
+            .from(NoteKeys::Table)
+            .and_where(Expr::col(NoteKeys::Key).eq(key))
+            .limit(1),
+        |row| row.get(0),
+    )
 }
 
 /// The notes that claim `key` in its strongest tier, by path. One statement
 /// reads the tier and its notes, so a caller with no transaction still gets
 /// a consistent answer.
 pub fn claim_match(conn: &Connection, key: &str) -> AppResult<Option<WikiClaimMatch>> {
-    let claims: Vec<(String, i64)> = conn
-        .prepare_cached(
-            "SELECT DISTINCT note_path, tier FROM note_claims
-             WHERE key = ?1 AND tier = (SELECT min(tier) FROM note_claims WHERE key = ?1)
-             ORDER BY note_path",
-        )?
-        .query_map([key], |row| Ok((row.get(0)?, row.get(1)?)))?
-        .collect::<Result<_, _>>()?;
+    let strongest_tier = Query::select()
+        .expr(Func::min(Expr::col(NoteClaims::Tier)))
+        .from(NoteClaims::Table)
+        .and_where(Expr::col(NoteClaims::Key).eq(key))
+        .take();
+    let claims: Vec<(String, i64)> = sql::query(
+        conn,
+        Query::select()
+            .distinct()
+            .columns([NoteClaims::NotePath, NoteClaims::Tier])
+            .from(NoteClaims::Table)
+            .and_where(Expr::col(NoteClaims::Key).eq(key))
+            .and_where(Expr::col(NoteClaims::Tier).eq(strongest_tier))
+            .order_by(NoteClaims::NotePath, Order::Asc),
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
     let Some(tier) = claims.first().map(|(_, tier)| *tier) else {
         return Ok(None);
     };
@@ -42,20 +51,35 @@ pub fn claim_match(conn: &Connection, key: &str) -> AppResult<Option<WikiClaimMa
 
 /// The notes whose folded path is `path_key`, by path.
 pub(crate) fn notes_by_path_key(conn: &Connection, path_key: &str) -> AppResult<Vec<String>> {
-    paths(
+    sql::query(
         conn,
-        "SELECT DISTINCT path FROM notes WHERE path_key = ?1 ORDER BY path",
-        path_key,
+        Query::select()
+            .distinct()
+            .column(Notes::Path)
+            .from(Notes::Table)
+            .and_where(Expr::col(Notes::PathKey).eq(path_key))
+            .order_by(Notes::Path, Order::Asc),
+        |row| row.get(0),
+    )
+}
+
+/// The notes with a link whose `column` is `key`, by path.
+fn sources(conn: &Connection, column: Links, key: &str) -> AppResult<Vec<String>> {
+    sql::query(
+        conn,
+        Query::select()
+            .distinct()
+            .column(Links::SourcePath)
+            .from(Links::Table)
+            .and_where(Expr::col(column).eq(key))
+            .order_by(Links::SourcePath, Order::Asc),
+        |row| row.get(0),
     )
 }
 
 /// The notes with a link to the wiki key `target_key`, by path.
 pub(crate) fn link_sources(conn: &Connection, target_key: &str) -> AppResult<Vec<String>> {
-    paths(
-        conn,
-        "SELECT DISTINCT source_path FROM links WHERE target_key = ?1 ORDER BY source_path",
-        target_key,
-    )
+    sources(conn, Links::TargetKey, target_key)
 }
 
 /// The notes with a link to the folded path `target_path_key`, by path.
@@ -63,22 +87,26 @@ pub(crate) fn path_link_sources(
     conn: &Connection,
     target_path_key: &str,
 ) -> AppResult<Vec<String>> {
-    paths(
-        conn,
-        "SELECT DISTINCT source_path FROM links WHERE target_path_key = ?1 ORDER BY source_path",
-        target_path_key,
-    )
+    sources(conn, Links::TargetPathKey, target_path_key)
 }
 
 /// The note at `path` as a suggestion candidate, with no link count.
 /// Templates have none.
 pub(crate) fn address_note(conn: &Connection, path: &str) -> AppResult<Option<WikiTitleCandidate>> {
-    Ok(conn
-        .prepare_cached(
-            "SELECT path, title, title_key, daily_date, mtime FROM notes
-             WHERE path = ?1 AND kind != 'template'",
-        )?
-        .query_row([path], |row| {
+    sql::query_optional(
+        conn,
+        Query::select()
+            .columns([
+                Notes::Path,
+                Notes::Title,
+                Notes::TitleKey,
+                Notes::DailyDate,
+                Notes::Mtime,
+            ])
+            .from(Notes::Table)
+            .and_where(Expr::col(Notes::Path).eq(path))
+            .and_where(Expr::col(Notes::Kind).ne(lit("template"))),
+        |row| {
             Ok(WikiTitleCandidate {
                 path: row.get(0)?,
                 title: row.get(1)?,
@@ -87,6 +115,6 @@ pub(crate) fn address_note(conn: &Connection, path: &str) -> AppResult<Option<Wi
                 mtime: row.get(4)?,
                 link_count: 0,
             })
-        })
-        .optional()?)
+        },
+    )
 }

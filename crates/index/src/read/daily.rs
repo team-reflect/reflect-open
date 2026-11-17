@@ -1,21 +1,27 @@
 //! Reads of the daily notes.
 
-use rusqlite::{Connection, params};
+use rusqlite::Connection;
+use sea_query::{Expr, ExprTrait, Order, Query};
 
 use reflect_types::{AppResult, DailyNoteRow};
 
+use crate::schema::Notes;
+use crate::sql::{self, lit};
+
 /// The dates in `start..=end` whose daily note has content, ascending.
 pub(crate) fn dates_in_range(conn: &Connection, start: &str, end: &str) -> AppResult<Vec<String>> {
-    let dates = conn
-        .prepare_cached(
-            "SELECT daily_date FROM notes
-             WHERE daily_date IS NOT NULL AND daily_date >= ?1 AND daily_date <= ?2
-               AND has_content = 1
-             ORDER BY daily_date",
-        )?
-        .query_map(params![start, end], |row| row.get(0))?
-        .collect::<Result<_, _>>()?;
-    Ok(dates)
+    sql::query(
+        conn,
+        Query::select()
+            .column(Notes::DailyDate)
+            .from(Notes::Table)
+            .and_where(Expr::col(Notes::DailyDate).is_not_null())
+            .and_where(Expr::col(Notes::DailyDate).gte(start))
+            .and_where(Expr::col(Notes::DailyDate).lte(end))
+            .and_where(Expr::col(Notes::HasContent).eq(lit(1)))
+            .order_by(Notes::DailyDate, Order::Asc),
+        |row| row.get(0),
+    )
 }
 
 /// The non-private daily notes in `start..=end`, newest first, at most
@@ -26,15 +32,25 @@ pub(crate) fn notes_in_range(
     end: &str,
     limit: u32,
 ) -> AppResult<Vec<DailyNoteRow>> {
-    let notes = conn
-        .prepare_cached(
-            "SELECT path, title, daily_date, preview, mtime, is_private FROM notes
-             WHERE daily_date IS NOT NULL AND daily_date >= ?1 AND daily_date <= ?2
-               AND is_private = 0
-             ORDER BY daily_date DESC
-             LIMIT ?3",
-        )?
-        .query_map(params![start, end, limit], |row| {
+    sql::query(
+        conn,
+        Query::select()
+            .columns([
+                Notes::Path,
+                Notes::Title,
+                Notes::DailyDate,
+                Notes::Preview,
+                Notes::Mtime,
+                Notes::IsPrivate,
+            ])
+            .from(Notes::Table)
+            .and_where(Expr::col(Notes::DailyDate).is_not_null())
+            .and_where(Expr::col(Notes::DailyDate).gte(start))
+            .and_where(Expr::col(Notes::DailyDate).lte(end))
+            .and_where(Expr::col(Notes::IsPrivate).eq(lit(0)))
+            .order_by(Notes::DailyDate, Order::Desc)
+            .limit(u64::from(limit)),
+        |row| {
             Ok(DailyNoteRow {
                 path: row.get(0)?,
                 title: row.get(1)?,
@@ -43,7 +59,6 @@ pub(crate) fn notes_in_range(
                 mtime: row.get(4)?,
                 is_private: row.get(5)?,
             })
-        })?
-        .collect::<Result<_, _>>()?;
-    Ok(notes)
+        },
+    )
 }
