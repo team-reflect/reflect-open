@@ -122,6 +122,10 @@ macro_rules! commands {
                 db_query(sql: String, params: Vec<serde_json::Value>) -> Vec<serde_json::Map<String, serde_json::Value>>,
                 index_meta_get(key: String) -> Option<String>,
                 index_graph_stats(tag_limit: u32) -> GraphStats,
+                index_daily_dates(start: String, end: String) -> Vec<String>,
+                index_daily_notes(start: String, end: String, limit: u32) -> Vec<DailyNoteRow>,
+                chat_conversations(limit: u32) -> Vec<ChatConversation>,
+                chat_messages(conversation_id: String) -> Vec<ChatMessageRow>,
             }
             desktop {
                 skill::skill_status() -> AgentSkillStatus,

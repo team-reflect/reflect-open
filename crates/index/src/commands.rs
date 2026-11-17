@@ -6,8 +6,8 @@ use rusqlite::Connection;
 use serde_json::{Map, Value};
 
 use reflect_types::{
-    AppError, AppResult, ChatConversation, ChatMessageRow, EmbeddedChunk, GraphStats, IndexTouch,
-    IndexedNote, MovedNoteAddress,
+    AppError, AppResult, ChatConversation, ChatMessageRow, DailyNoteRow, EmbeddedChunk, GraphStats,
+    IndexTouch, IndexedNote, MovedNoteAddress,
 };
 
 use crate::read;
@@ -156,6 +156,31 @@ impl<'a> IndexCommands<'a> {
     /// The aggregates of the graph, private notes excluded.
     fn index_graph_stats(&self, tag_limit: u32) -> AppResult<GraphStats> {
         self.read(|conn| read::stats::graph_stats(conn, tag_limit))
+    }
+
+    /// The dates in `start..=end` whose daily note has content, ascending.
+    fn index_daily_dates(&self, start: String, end: String) -> AppResult<Vec<String>> {
+        self.read(|conn| read::daily::dates_in_range(conn, &start, &end))
+    }
+
+    /// The non-private daily notes in `start..=end`, newest first.
+    fn index_daily_notes(
+        &self,
+        start: String,
+        end: String,
+        limit: u32,
+    ) -> AppResult<Vec<DailyNoteRow>> {
+        self.read(|conn| read::daily::notes_in_range(conn, &start, &end, limit))
+    }
+
+    /// The most recently active conversations first.
+    fn chat_conversations(&self, limit: u32) -> AppResult<Vec<ChatConversation>> {
+        self.read(|conn| read::chat::conversations(conn, limit))
+    }
+
+    /// The messages of one conversation, in order.
+    fn chat_messages(&self, conversation_id: String) -> AppResult<Vec<ChatMessageRow>> {
+        self.read(|conn| read::chat::messages(conn, &conversation_id))
     }
 
     /// Executes a read query that the frontend compiled with Kysely.

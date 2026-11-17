@@ -30,3 +30,18 @@ pub struct GraphStats {
     /// More tags exist than the requested limit.
     pub tags_truncated: bool,
 }
+
+/// One daily note, as a listing shows it.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct DailyNoteRow {
+    pub path: String,
+    pub title: String,
+    pub daily_date: String,
+    /// The indexed row preview; may be empty.
+    pub preview: String,
+    /// File modification time (epoch ms).
+    pub mtime: i64,
+    pub is_private: bool,
+}

@@ -1026,6 +1026,33 @@ export type Commands = {
     }
     result: GraphStats
   }
+  index_daily_dates: {
+    args: {
+      start: string
+      end: string
+    }
+    result: string[]
+  }
+  index_daily_notes: {
+    args: {
+      start: string
+      end: string
+      limit: number
+    }
+    result: DailyNoteRow[]
+  }
+  chat_conversations: {
+    args: {
+      limit: number
+    }
+    result: ChatConversation[]
+  }
+  chat_messages: {
+    args: {
+      conversationId: string
+    }
+    result: ChatMessageRow[]
+  }
   skill_status: {
     args: Record<string, never>
     result: AgentSkillStatus
@@ -1217,6 +1244,18 @@ export type CoreStartConfig = {
   appDataDir: string | null
   documentDir: string | null
   userAgent: string | null
+}
+
+/**  One daily note, as a listing shows it. */
+export type DailyNoteRow = {
+  path: string
+  title: string
+  dailyDate: string
+  /**  The indexed row preview; may be empty. */
+  preview: string
+  /**  File modification time (epoch ms). */
+  mtime: number
+  isPrivate: boolean
 }
 
 /**

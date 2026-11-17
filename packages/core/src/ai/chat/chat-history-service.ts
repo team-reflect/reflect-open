@@ -222,22 +222,12 @@ class ChatHistoryServiceImpl implements ChatHistoryService {
   }
 
   async listRecent(limit = 50): Promise<ChatConversation[]> {
-    return await this.#deps.database.db
-      .selectFrom('chatConversations')
-      .select(['id', 'title', 'createdMs', 'updatedMs'])
-      .orderBy('updatedMs', 'desc')
-      .limit(limit)
-      .execute()
+    return await this.#deps.database.read('chat_conversations', { limit })
   }
 
   async loadConversation(conversationId: string): Promise<ChatTurn[]> {
     const { database, logger } = this.#deps
-    const rows = await database.db
-      .selectFrom('chatMessages')
-      .select(['id', 'userText', 'attachments', 'parts', 'responseMessages'])
-      .where('conversationId', '=', conversationId)
-      .orderBy('seq', 'asc')
-      .execute()
+    const rows = await database.read('chat_messages', { conversationId })
     return rows.flatMap((row) => {
       const turn = parseTurn(row)
       if (turn === null) {

@@ -1451,6 +1451,54 @@ public struct CoreStartConfig: Codable, Sendable, Equatable {
     }
 }
 
+/// One daily note, as a listing shows it.
+public struct DailyNoteRow: Codable, Sendable, Equatable {
+    public let path: String
+    public let title: String
+    public let dailyDate: String
+    public let preview: String
+    public let mtime: Int64
+    public let isPrivate: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case title = "title"
+        case dailyDate = "dailyDate"
+        case preview = "preview"
+        case mtime = "mtime"
+        case isPrivate = "isPrivate"
+    }
+
+    public init(path: String, title: String, dailyDate: String, preview: String, mtime: Int64, isPrivate: Bool) {
+        self.path = path
+        self.title = title
+        self.dailyDate = dailyDate
+        self.preview = preview
+        self.mtime = mtime
+        self.isPrivate = isPrivate
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.dailyDate = try container.decode(String.self, forKey: .dailyDate)
+        self.preview = try container.decode(String.self, forKey: .preview)
+        self.mtime = try container.decode(Int64.self, forKey: .mtime)
+        self.isPrivate = try container.decode(Bool.self, forKey: .isPrivate)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(title, forKey: .title)
+        try container.encode(dailyDate, forKey: .dailyDate)
+        try container.encode(preview, forKey: .preview)
+        try container.encode(mtime, forKey: .mtime)
+        try container.encode(isPrivate, forKey: .isPrivate)
+    }
+}
+
 /// Byte counts for an active model download. Absent until the download
 /// starts (cache probing, or a cached model that skips downloading); after
 /// the last byte it stays at 100% through the model-load phase.

@@ -15,6 +15,8 @@ use super::chat_write::{delete_conversation, save_message};
 use super::connections::{migrate, migrate_to, open_in_memory, open_index_at, validate_migrations};
 use super::embed_write::{apply_chunks, remove_chunks};
 use super::query::run_query;
+use super::read::chat::{conversations, messages};
+use super::read::daily::{dates_in_range, notes_in_range};
 use super::read::meta::meta;
 use super::read::stats::graph_stats;
 use super::scan::scan_reconcile;
@@ -2269,4 +2271,61 @@ fn read_runs_on_the_single_connection_of_a_host_without_a_reader() {
     assert_eq!(value, Some("v".to_string()));
     let stale = session.read(generation + 1, |conn| meta(conn, "k"));
     assert_eq!(stale.unwrap_err().message(), "index reopened during query");
+}
+
+#[test]
+fn daily_reads_keep_the_range_and_skip_empty_and_private_days() {
+    let conn = migrated();
+    let mut empty = daily_note("daily/2026-06-02.md", "2026-06-02");
+    empty.has_content = false;
+    let mut secret = daily_note("daily/2026-06-03.md", "2026-06-03");
+    secret.is_private = true;
+    for daily in [
+        daily_note("daily/2026-05-31.md", "2026-05-31"),
+        daily_note("daily/2026-06-01.md", "2026-06-01"),
+        empty,
+        secret,
+        daily_note("daily/2026-06-30.md", "2026-06-30"),
+    ] {
+        apply_note(&conn, &daily).unwrap();
+    }
+
+    assert_eq!(
+        dates_in_range(&conn, "2026-06-01", "2026-06-30").unwrap(),
+        ["2026-06-01", "2026-06-03", "2026-06-30"]
+    );
+    let dates = |limit| -> Vec<String> {
+        notes_in_range(&conn, "2026-06-01", "2026-06-30", limit)
+            .unwrap()
+            .into_iter()
+            .map(|row| row.daily_date)
+            .collect()
+    };
+    assert_eq!(dates(10), ["2026-06-30", "2026-06-02", "2026-06-01"]);
+    assert_eq!(dates(1), ["2026-06-30"]);
+}
+
+#[test]
+fn chat_reads_order_conversations_by_activity_and_messages_by_seq() {
+    let conn = migrated();
+    let mut newer = conversation("c2");
+    newer.updated_ms = 3_000;
+    save_message(&conn, &conversation("c1"), &chat_message("m1", "c1")).unwrap();
+    save_message(&conn, &newer, &chat_message("m2", "c2")).unwrap();
+    save_message(&conn, &conversation("c1"), &chat_message("m0", "c1")).unwrap();
+
+    let ids = |limit| -> Vec<String> {
+        conversations(&conn, limit)
+            .unwrap()
+            .into_iter()
+            .map(|row| row.id)
+            .collect()
+    };
+    assert_eq!(ids(10), ["c2", "c1"]);
+    assert_eq!(ids(1), ["c2"]);
+    assert_eq!(
+        messages(&conn, "c1").unwrap(),
+        [chat_message("m1", "c1"), chat_message("m0", "c1")]
+    );
+    assert_eq!(messages(&conn, "missing").unwrap(), []);
 }
