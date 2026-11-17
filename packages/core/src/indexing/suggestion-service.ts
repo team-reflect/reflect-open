@@ -67,6 +67,9 @@ class SuggestionServiceImpl implements SuggestionService {
   }
 
   async suggestTags(query: string, limit = 8): Promise<TagSuggestion[]> {
+    if (limit <= 0) {
+      return []
+    }
     return await this.#deps.database.read('index_suggest_tags', {
       tagKey: foldTag(query.trim()),
       limit,
