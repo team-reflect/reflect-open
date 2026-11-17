@@ -137,6 +137,7 @@ macro_rules! commands {
                 index_list_notes(tag_key: Option<String>) -> Vec<NoteListEntry>,
                 index_recent_notes(limit: u32, tag_key: Option<String>) -> Vec<RecentNoteRow>,
                 index_note_tags() -> Vec<TagFacet>,
+                index_tasks(checked: bool) -> Vec<TaskRow>,
                 index_daily_dates(start: String, end: String) -> Vec<String>,
                 index_daily_notes(start: String, end: String, limit: u32) -> Vec<DailyNoteRow>,
                 chat_conversations(limit: u32) -> Vec<ChatConversation>,

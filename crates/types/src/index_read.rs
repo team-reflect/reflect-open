@@ -143,3 +143,24 @@ pub struct RecentNoteRow {
     pub mtime: i64,
     pub is_private: bool,
 }
+
+/// One task row with the fields of its note that the task list shows.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct TaskRow {
+    pub note_path: String,
+    /// The stored address of the task: JSON text that the frontend decodes.
+    pub ast_path: String,
+    pub markdown: String,
+    /// The stored breadcrumbs: JSON text that the frontend decodes.
+    pub breadcrumbs: String,
+    pub checked: bool,
+    pub note_title: String,
+    pub daily_date: Option<String>,
+    pub is_pinned: bool,
+    /// The explicit `pinned: <n>` order of the note.
+    pub pinned_order: Option<f64>,
+    /// When the note's row last changed (epoch ms).
+    pub updated_at: i64,
+}

@@ -1116,6 +1116,12 @@ export type Commands = {
     args: Record<string, never>
     result: TagFacet[]
   }
+  index_tasks: {
+    args: {
+      checked: boolean
+    }
+    result: TaskRow[]
+  }
   index_daily_dates: {
     args: {
       start: string
@@ -2343,6 +2349,24 @@ export type TagFacet = {
   count: number
 }
 
+/**  One task row with the fields of its note that the task list shows. */
+export type TaskRow = {
+  notePath: string
+  /**  The stored address of the task: JSON text that the frontend decodes. */
+  astPath: string
+  markdown: string
+  /**  The stored breadcrumbs: JSON text that the frontend decodes. */
+  breadcrumbs: string
+  checked: boolean
+  noteTitle: string
+  dailyDate: string | null
+  isPinned: boolean
+  /**  The explicit `pinned: <n>` order of the note. */
+  pinnedOrder: number | null
+  /**  When the note's row last changed (epoch ms). */
+  updatedAt: number
+}
+
 /**  One template. */
 export type TemplateEntry = {
   path: string
@@ -2461,6 +2485,7 @@ export type IndexReadCommand =
   | 'index_list_notes'
   | 'index_recent_notes'
   | 'index_note_tags'
+  | 'index_tasks'
   | 'index_daily_dates'
   | 'index_daily_notes'
   | 'chat_conversations'

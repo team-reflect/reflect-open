@@ -4598,6 +4598,74 @@ public struct TagFacet: Codable, Sendable, Equatable {
     }
 }
 
+/// One task row with the fields of its note that the task list shows.
+public struct TaskRow: Codable, Sendable, Equatable {
+    public let notePath: String
+    public let astPath: String
+    public let markdown: String
+    public let breadcrumbs: String
+    public let checked: Bool
+    public let noteTitle: String
+    public let dailyDate: String?
+    public let isPinned: Bool
+    public let pinnedOrder: Double?
+    public let updatedAt: Int64
+
+    private enum CodingKeys: String, CodingKey {
+        case notePath = "notePath"
+        case astPath = "astPath"
+        case markdown = "markdown"
+        case breadcrumbs = "breadcrumbs"
+        case checked = "checked"
+        case noteTitle = "noteTitle"
+        case dailyDate = "dailyDate"
+        case isPinned = "isPinned"
+        case pinnedOrder = "pinnedOrder"
+        case updatedAt = "updatedAt"
+    }
+
+    public init(notePath: String, astPath: String, markdown: String, breadcrumbs: String, checked: Bool, noteTitle: String, dailyDate: String?, isPinned: Bool, pinnedOrder: Double?, updatedAt: Int64) {
+        self.notePath = notePath
+        self.astPath = astPath
+        self.markdown = markdown
+        self.breadcrumbs = breadcrumbs
+        self.checked = checked
+        self.noteTitle = noteTitle
+        self.dailyDate = dailyDate
+        self.isPinned = isPinned
+        self.pinnedOrder = pinnedOrder
+        self.updatedAt = updatedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.notePath = try container.decode(String.self, forKey: .notePath)
+        self.astPath = try container.decode(String.self, forKey: .astPath)
+        self.markdown = try container.decode(String.self, forKey: .markdown)
+        self.breadcrumbs = try container.decode(String.self, forKey: .breadcrumbs)
+        self.checked = try container.decode(Bool.self, forKey: .checked)
+        self.noteTitle = try container.decode(String.self, forKey: .noteTitle)
+        self.dailyDate = try container.decodeIfPresent(String.self, forKey: .dailyDate)
+        self.isPinned = try container.decode(Bool.self, forKey: .isPinned)
+        self.pinnedOrder = try container.decodeIfPresent(Double.self, forKey: .pinnedOrder)
+        self.updatedAt = try container.decode(Int64.self, forKey: .updatedAt)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(notePath, forKey: .notePath)
+        try container.encode(astPath, forKey: .astPath)
+        try container.encode(markdown, forKey: .markdown)
+        try container.encode(breadcrumbs, forKey: .breadcrumbs)
+        try container.encode(checked, forKey: .checked)
+        try container.encode(noteTitle, forKey: .noteTitle)
+        try container.encode(dailyDate, forKey: .dailyDate)
+        try container.encode(isPinned, forKey: .isPinned)
+        try container.encode(pinnedOrder, forKey: .pinnedOrder)
+        try container.encode(updatedAt, forKey: .updatedAt)
+    }
+}
+
 /// One template.
 public struct TemplateEntry: Codable, Sendable, Equatable {
     public let path: String

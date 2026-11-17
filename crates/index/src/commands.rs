@@ -8,7 +8,7 @@ use serde_json::{Map, Value};
 use reflect_types::{
     AppError, AppResult, ChatConversation, ChatMessageRow, ChunkHash, DailyNoteRow, EmbeddedChunk,
     GraphStats, IndexTouch, IndexedNote, MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry,
-    NoteRow, PinnedNoteRow, RecentNoteRow, TagFacet, TemplateEntry,
+    NoteRow, PinnedNoteRow, RecentNoteRow, TagFacet, TaskRow, TemplateEntry,
 };
 
 use crate::read;
@@ -245,6 +245,11 @@ impl<'a> IndexCommands<'a> {
     /// The tag facets over non-daily notes, by tag key.
     fn index_note_tags(&self) -> AppResult<Vec<TagFacet>> {
         self.read(read::lists::note_tags)
+    }
+
+    /// The open or the completed tasks of every note but templates.
+    fn index_tasks(&self, checked: bool) -> AppResult<Vec<TaskRow>> {
+        self.read(|conn| read::tasks::tasks(conn, checked))
     }
 
     /// The dates in `start..=end` whose daily note has content, ascending.

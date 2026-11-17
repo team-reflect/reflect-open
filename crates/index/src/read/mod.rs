@@ -13,3 +13,4 @@ pub(crate) mod lists;
 pub(crate) mod meta;
 pub(crate) mod notes;
 pub(crate) mod stats;
+pub(crate) mod tasks;

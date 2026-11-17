@@ -26,6 +26,7 @@ use super::read::notes::{
     pinned_notes, random_note, resolve_target, templates,
 };
 use super::read::stats::graph_stats;
+use super::read::tasks::tasks;
 use super::scan::scan_reconcile;
 use super::write::{apply_note, claim_tier, clear_index, move_note, touch_note};
 use super::{Applied, FileIndexConnections, IndexConnections, IndexSession};
@@ -2566,4 +2567,26 @@ fn note_lists_order_pins_first_and_attach_tags() {
         .map(|facet| (facet.tag, facet.count))
         .collect();
     assert_eq!(facets, [("alpha".to_string(), 3), ("Zeta".to_string(), 1)]);
+}
+
+#[test]
+fn tasks_split_by_checked_and_skip_templates() {
+    let conn = migrated();
+    let mut with_tasks = note("notes/a.md", "A", vec![]);
+    with_tasks.is_pinned = true;
+    with_tasks.tasks = vec![task(0, "open one", false), task(1, "done one", true)];
+    let mut template = note("templates/t.md", "T", vec![]);
+    template.kind = NoteKind::Template;
+    template.tasks = vec![task(0, "template task", false)];
+    apply_note(&conn, &with_tasks).unwrap();
+    apply_note(&conn, &template).unwrap();
+
+    let open = tasks(&conn, false).unwrap();
+    assert_eq!(open.len(), 1);
+    assert_eq!(open[0].markdown, "open one");
+    assert_eq!(open[0].note_title, "A");
+    assert!(open[0].is_pinned && !open[0].checked);
+    let done = tasks(&conn, true).unwrap();
+    assert_eq!(done.len(), 1);
+    assert_eq!(done[0].markdown, "done one");
 }

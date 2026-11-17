@@ -65,7 +65,7 @@ pub use index::{
 };
 pub use index_read::{
     ChunkHash, DailyNoteRow, GraphStats, NoteFileFacts, NoteId, NoteListEntry, NoteRow,
-    PinnedNoteRow, RecentNoteRow, TagFacet, TemplateEntry,
+    PinnedNoteRow, RecentNoteRow, TagFacet, TaskRow, TemplateEntry,
 };
 pub use link_preview::LinkPreviewHtml;
 pub use settings::SettingsDoc;
