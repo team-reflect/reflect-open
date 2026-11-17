@@ -3028,10 +3028,11 @@ fn layout(sql: &str) -> String {
     out
 }
 
-/// Checks the SQL text of `statement`, one clause per line.
+/// Checks the SQL text of `statement`, one clause per line, and then its
+/// bound values in placeholder order.
 fn check_sql(statement: &impl QueryStatementWriter, expected: Expect) {
-    let (sql, _) = statement.build(SqliteQueryBuilder);
-    expected.assert_eq(&layout(&sql));
+    let (sql, values) = statement.build(SqliteQueryBuilder);
+    expected.assert_eq(&format!("{}\n{:?}", layout(&sql), values.0));
 }
 
 #[test]
@@ -3047,10 +3048,11 @@ fn list_notes_sql_lists_every_note() {
     check_sql(
         &list_notes_query(None),
         expect![[r#"
-        SELECT "notes"."path", "notes"."title", "notes"."mtime", "notes"."preview", "notes"."is_pinned"
-          FROM "notes"
-          WHERE "notes"."kind" = 'note'
-          ORDER BY "notes"."is_pinned" DESC, "notes"."pinned_order" IS NULL ASC, "notes"."pinned_order" ASC, "notes"."mtime" DESC, "notes"."path" ASC"#]],
+            SELECT "notes"."path", "notes"."title", "notes"."mtime", "notes"."preview", "notes"."is_pinned"
+              FROM "notes"
+              WHERE "notes"."kind" = 'note'
+              ORDER BY "notes"."is_pinned" DESC, "notes"."pinned_order" IS NULL ASC, "notes"."pinned_order" ASC, "notes"."mtime" DESC, "notes"."path" ASC
+            []"#]],
     );
 }
 
@@ -3059,12 +3061,13 @@ fn list_notes_sql_lists_the_notes_of_a_tag() {
     check_sql(
         &list_notes_query(Some("a")),
         expect![[r#"
-        SELECT DISTINCT "notes"."path", "notes"."title", "notes"."mtime", "notes"."preview", "notes"."is_pinned", "notes"."pinned_order"
-          FROM "tags"
-          INNER JOIN "notes" ON "notes"."path" = "tags"."note_path"
-          WHERE "tags"."tag_key" = ?
-          AND "notes"."kind" IN ('note', 'daily')
-          ORDER BY "notes"."is_pinned" DESC, "notes"."pinned_order" IS NULL ASC, "notes"."pinned_order" ASC, "notes"."mtime" DESC, "notes"."path" ASC"#]],
+            SELECT DISTINCT "notes"."path", "notes"."title", "notes"."mtime", "notes"."preview", "notes"."is_pinned", "notes"."pinned_order"
+              FROM "tags"
+              INNER JOIN "notes" ON "notes"."path" = "tags"."note_path"
+              WHERE "tags"."tag_key" = ?
+              AND "notes"."kind" IN ('note', 'daily')
+              ORDER BY "notes"."is_pinned" DESC, "notes"."pinned_order" IS NULL ASC, "notes"."pinned_order" ASC, "notes"."mtime" DESC, "notes"."path" ASC
+            [String(Some("a"))]"#]],
     );
 }
 
@@ -3073,11 +3076,12 @@ fn list_tags_sql_reads_the_tags_of_every_note() {
     check_sql(
         &list_tags_query(None),
         expect![[r#"
-        SELECT "tags"."note_path", "tags"."tag"
-          FROM "tags"
-          INNER JOIN "notes" ON "notes"."path" = "tags"."note_path"
-          WHERE "notes"."kind" = 'note'
-          ORDER BY "tags"."tag_key" ASC"#]],
+            SELECT "tags"."note_path", "tags"."tag"
+              FROM "tags"
+              INNER JOIN "notes" ON "notes"."path" = "tags"."note_path"
+              WHERE "notes"."kind" = 'note'
+              ORDER BY "tags"."tag_key" ASC
+            []"#]],
     );
 }
 
@@ -3086,13 +3090,14 @@ fn list_tags_sql_reads_the_tags_of_the_notes_of_a_tag() {
     check_sql(
         &list_tags_query(Some("a")),
         expect![[r#"
-        SELECT DISTINCT "tags"."note_path", "tags"."tag"
-          FROM "tags"
-          INNER JOIN "notes" ON "notes"."path" = "tags"."note_path"
-          INNER JOIN "tags" AS "filter_tags" ON "filter_tags"."note_path" = "notes"."path"
-          WHERE "filter_tags"."tag_key" = ?
-          AND "notes"."kind" IN ('note', 'daily')
-          ORDER BY "tags"."tag_key" ASC"#]],
+            SELECT DISTINCT "tags"."note_path", "tags"."tag"
+              FROM "tags"
+              INNER JOIN "notes" ON "notes"."path" = "tags"."note_path"
+              INNER JOIN "tags" AS "filter_tags" ON "filter_tags"."note_path" = "notes"."path"
+              WHERE "filter_tags"."tag_key" = ?
+              AND "notes"."kind" IN ('note', 'daily')
+              ORDER BY "tags"."tag_key" ASC
+            [String(Some("a"))]"#]],
     );
 }
 
@@ -3101,12 +3106,13 @@ fn recent_notes_sql_lists_every_note() {
     check_sql(
         &recent_notes_query(5, None),
         expect![[r#"
-        SELECT "notes"."path", "notes"."title", "notes"."preview", "notes"."mtime", "notes"."is_private"
-          FROM "notes"
-          WHERE "notes"."kind" = 'note'
-          AND "notes"."is_private" = 0
-          ORDER BY "notes"."mtime" DESC, "notes"."path" ASC
-          LIMIT ?"#]],
+            SELECT "notes"."path", "notes"."title", "notes"."preview", "notes"."mtime", "notes"."is_private"
+              FROM "notes"
+              WHERE "notes"."kind" = 'note'
+              AND "notes"."is_private" = 0
+              ORDER BY "notes"."mtime" DESC, "notes"."path" ASC
+              LIMIT ?
+            [BigUnsigned(Some(5))]"#]],
     );
 }
 
@@ -3115,14 +3121,15 @@ fn recent_notes_sql_lists_the_notes_of_a_tag() {
     check_sql(
         &recent_notes_query(5, Some("a")),
         expect![[r#"
-        SELECT DISTINCT "notes"."path", "notes"."title", "notes"."preview", "notes"."mtime", "notes"."is_private"
-          FROM "tags"
-          INNER JOIN "notes" ON "notes"."path" = "tags"."note_path"
-          WHERE "tags"."tag_key" = ?
-          AND "notes"."kind" = 'note'
-          AND "notes"."is_private" = 0
-          ORDER BY "notes"."mtime" DESC, "notes"."path" ASC
-          LIMIT ?"#]],
+            SELECT DISTINCT "notes"."path", "notes"."title", "notes"."preview", "notes"."mtime", "notes"."is_private"
+              FROM "tags"
+              INNER JOIN "notes" ON "notes"."path" = "tags"."note_path"
+              WHERE "tags"."tag_key" = ?
+              AND "notes"."kind" = 'note'
+              AND "notes"."is_private" = 0
+              ORDER BY "notes"."mtime" DESC, "notes"."path" ASC
+              LIMIT ?
+            [String(Some("a")), BigUnsigned(Some(5))]"#]],
     );
 }
 
@@ -3138,14 +3145,15 @@ fn backlink_page_sql_reads_the_first_page() {
     check_sql(
         &page_sources_query("notes/car.md", 5, None),
         expect![[r#"
-        SELECT DISTINCT "source_path", "source_title", "recency"
-          FROM (SELECT "backlinks"."source_path" AS "source_path", "notes"."title" AS "source_title", COALESCE(strftime('%s', "notes"."daily_date") * 1000, "notes"."updated_at") AS "recency"
-            FROM "backlinks"
-            INNER JOIN "notes" ON "notes"."path" = "backlinks"."source_path"
-            WHERE "backlinks"."target_path" = ?) AS "sources"
-          WHERE TRUE
-          ORDER BY "recency" DESC, "source_path" ASC
-          LIMIT ?"#]],
+            SELECT DISTINCT "source_path", "source_title", "recency"
+              FROM (SELECT "backlinks"."source_path" AS "source_path", "notes"."title" AS "source_title", COALESCE(strftime('%s', "notes"."daily_date") * 1000, "notes"."updated_at") AS "recency"
+                FROM "backlinks"
+                INNER JOIN "notes" ON "notes"."path" = "backlinks"."source_path"
+                WHERE "backlinks"."target_path" = ?) AS "sources"
+              WHERE TRUE
+              ORDER BY "recency" DESC, "source_path" ASC
+              LIMIT ?
+            [String(Some("notes/car.md")), BigUnsigned(Some(6))]"#]],
     );
 }
 
@@ -3163,7 +3171,8 @@ fn backlink_page_sql_reads_the_page_after_a_cursor() {
               OR ("recency" = ?
                 AND "source_path" > ?)
               ORDER BY "recency" DESC, "source_path" ASC
-              LIMIT ?"#]],
+              LIMIT ?
+            [String(Some("notes/car.md")), BigInt(Some(100)), BigInt(Some(100)), String(Some("notes/a.md")), BigUnsigned(Some(6))]"#]],
     );
 }
 
@@ -3180,7 +3189,8 @@ fn backlink_positions_sql_reads_the_first_page() {
               WHERE "recency" > ?
               OR ("recency" = ?
                 AND "source_path" <= ?)
-              ORDER BY "recency" DESC, "source_path" ASC, "pos_from" ASC"#]],
+              ORDER BY "recency" DESC, "source_path" ASC, "pos_from" ASC
+            [String(Some("notes/car.md")), BigInt(Some(100)), BigInt(Some(100)), String(Some("notes/a.md"))]"#]],
     );
 }
 
@@ -3200,7 +3210,8 @@ fn backlink_positions_sql_reads_the_page_after_a_cursor() {
               AND ("recency" > ?
                 OR ("recency" = ?
                   AND "source_path" <= ?))
-              ORDER BY "recency" DESC, "source_path" ASC, "pos_from" ASC"#]],
+              ORDER BY "recency" DESC, "source_path" ASC, "pos_from" ASC
+            [String(Some("notes/car.md")), BigInt(Some(100)), BigInt(Some(100)), String(Some("notes/a.md")), BigInt(Some(100)), BigInt(Some(100)), String(Some("notes/a.md"))]"#]],
     );
 }
 
@@ -3209,13 +3220,14 @@ fn suggest_tags_sql_lists_every_tag() {
     check_sql(
         &tags_query("", 5),
         expect![[r#"
-        SELECT MIN("tags"."tag"), COUNT(*)
-          FROM "tags"
-          INNER JOIN "notes" ON "notes"."path" = "tags"."note_path"
-          WHERE "notes"."kind" <> 'template'
-          GROUP BY "tags"."tag_key"
-          ORDER BY COUNT(*) DESC, MIN("tags"."tag") ASC
-          LIMIT ?"#]],
+            SELECT MIN("tags"."tag"), COUNT(*)
+              FROM "tags"
+              INNER JOIN "notes" ON "notes"."path" = "tags"."note_path"
+              WHERE "notes"."kind" <> 'template'
+              GROUP BY "tags"."tag_key"
+              ORDER BY COUNT(*) DESC, MIN("tags"."tag") ASC
+              LIMIT ?
+            [BigUnsigned(Some(5))]"#]],
     );
 }
 
@@ -3224,14 +3236,15 @@ fn suggest_tags_sql_lists_the_tags_with_a_key() {
     check_sql(
         &tags_query("a", 5),
         expect![[r#"
-        SELECT MIN("tags"."tag"), COUNT(*)
-          FROM "tags"
-          INNER JOIN "notes" ON "notes"."path" = "tags"."note_path"
-          WHERE "notes"."kind" <> 'template'
-          AND "tags"."tag_key" LIKE ? ESCAPE '\'
-          GROUP BY "tags"."tag_key"
-          ORDER BY COUNT(*) DESC, MIN("tags"."tag") ASC
-          LIMIT ?"#]],
+            SELECT MIN("tags"."tag"), COUNT(*)
+              FROM "tags"
+              INNER JOIN "notes" ON "notes"."path" = "tags"."note_path"
+              WHERE "notes"."kind" <> 'template'
+              AND "tags"."tag_key" LIKE ? ESCAPE '\'
+              GROUP BY "tags"."tag_key"
+              ORDER BY COUNT(*) DESC, MIN("tags"."tag") ASC
+              LIMIT ?
+            [String(Some("%a%")), BigUnsigned(Some(5))]"#]],
     );
 }
 
@@ -3240,15 +3253,16 @@ fn title_candidates_sql_lists_notes_for_no_key() {
     check_sql(
         &title_candidates_query(""),
         expect![[r#"
-        SELECT "notes"."path", "notes"."title", "notes"."title_key", "notes"."daily_date", "notes"."mtime", (SELECT COUNT(*)
-            FROM "note_claims"
-            INNER JOIN "links" ON "links"."target_key" = "note_claims"."key"
-            WHERE "note_claims"."note_path" = "notes"."path") AS "link_count"
-          FROM "notes"
-          WHERE "notes"."kind" <> 'template'
-          AND "notes"."daily_date" IS NULL
-          ORDER BY "notes"."title_key" = ? DESC, "notes"."title_key" LIKE ? ESCAPE '\' DESC, "link_count" DESC, "notes"."mtime" DESC
-          LIMIT ?"#]],
+            SELECT "notes"."path", "notes"."title", "notes"."title_key", "notes"."daily_date", "notes"."mtime", (SELECT COUNT(*)
+                FROM "note_claims"
+                INNER JOIN "links" ON "links"."target_key" = "note_claims"."key"
+                WHERE "note_claims"."note_path" = "notes"."path") AS "link_count"
+              FROM "notes"
+              WHERE "notes"."kind" <> 'template'
+              AND "notes"."daily_date" IS NULL
+              ORDER BY "notes"."title_key" = ? DESC, "notes"."title_key" LIKE ? ESCAPE '\' DESC, "link_count" DESC, "notes"."mtime" DESC
+              LIMIT ?
+            [String(Some("")), String(Some("%%")), BigUnsigned(Some(200))]"#]],
     );
 }
 
@@ -3257,18 +3271,19 @@ fn title_candidates_sql_matches_a_key_in_titles_and_the_search_index() {
     check_sql(
         &title_candidates_query("car"),
         expect![[r#"
-        SELECT "notes"."path", "notes"."title", "notes"."title_key", "notes"."daily_date", "notes"."mtime", (SELECT COUNT(*)
-            FROM "note_claims"
-            INNER JOIN "links" ON "links"."target_key" = "note_claims"."key"
-            WHERE "note_claims"."note_path" = "notes"."path") AS "link_count"
-          FROM "notes"
-          WHERE "notes"."kind" <> 'template'
-          AND ("notes"."title_key" LIKE ? ESCAPE '\'
-            OR "notes"."path" IN (SELECT "path"
-              FROM "search_fts"
-              WHERE "search_fts" MATCH ?))
-          ORDER BY "notes"."title_key" = ? DESC, "notes"."title_key" LIKE ? ESCAPE '\' DESC, "link_count" DESC, "notes"."mtime" DESC
-          LIMIT ?"#]],
+            SELECT "notes"."path", "notes"."title", "notes"."title_key", "notes"."daily_date", "notes"."mtime", (SELECT COUNT(*)
+                FROM "note_claims"
+                INNER JOIN "links" ON "links"."target_key" = "note_claims"."key"
+                WHERE "note_claims"."note_path" = "notes"."path") AS "link_count"
+              FROM "notes"
+              WHERE "notes"."kind" <> 'template'
+              AND ("notes"."title_key" LIKE ? ESCAPE '\'
+                OR "notes"."path" IN (SELECT "path"
+                  FROM "search_fts"
+                  WHERE "search_fts" MATCH ?))
+              ORDER BY "notes"."title_key" = ? DESC, "notes"."title_key" LIKE ? ESCAPE '\' DESC, "link_count" DESC, "notes"."mtime" DESC
+              LIMIT ?
+            [String(Some("%car%")), String(Some("title : \"car\"*")), String(Some("car")), String(Some("%car%")), BigUnsigned(Some(200))]"#]],
     );
 }
 
@@ -3277,15 +3292,16 @@ fn title_candidates_sql_matches_a_key_with_no_search_term_in_titles() {
     check_sql(
         &title_candidates_query("%"),
         expect![[r#"
-        SELECT "notes"."path", "notes"."title", "notes"."title_key", "notes"."daily_date", "notes"."mtime", (SELECT COUNT(*)
-            FROM "note_claims"
-            INNER JOIN "links" ON "links"."target_key" = "note_claims"."key"
-            WHERE "note_claims"."note_path" = "notes"."path") AS "link_count"
-          FROM "notes"
-          WHERE "notes"."kind" <> 'template'
-          AND "notes"."title_key" LIKE ? ESCAPE '\'
-          ORDER BY "notes"."title_key" = ? DESC, "notes"."title_key" LIKE ? ESCAPE '\' DESC, "link_count" DESC, "notes"."mtime" DESC
-          LIMIT ?"#]],
+            SELECT "notes"."path", "notes"."title", "notes"."title_key", "notes"."daily_date", "notes"."mtime", (SELECT COUNT(*)
+                FROM "note_claims"
+                INNER JOIN "links" ON "links"."target_key" = "note_claims"."key"
+                WHERE "note_claims"."note_path" = "notes"."path") AS "link_count"
+              FROM "notes"
+              WHERE "notes"."kind" <> 'template'
+              AND "notes"."title_key" LIKE ? ESCAPE '\'
+              ORDER BY "notes"."title_key" = ? DESC, "notes"."title_key" LIKE ? ESCAPE '\' DESC, "link_count" DESC, "notes"."mtime" DESC
+              LIMIT ?
+            [String(Some("%\\%%")), String(Some("%")), String(Some("%\\%%")), BigUnsigned(Some(200))]"#]],
     );
 }
 
@@ -3310,10 +3326,11 @@ fn recall_sql_lists_every_note() {
     check_sql(
         &recall_query(&SearchRequest::default()),
         expect![[r#"
-        SELECT "notes"."path", "notes"."title", "notes"."daily_date", "notes"."preview", "notes"."mtime", "notes"."is_pinned"
-          FROM "notes"
-          WHERE "notes"."kind" <> 'template'
-          ORDER BY "notes"."mtime" DESC, "notes"."path" ASC"#]],
+            SELECT "notes"."path", "notes"."title", "notes"."daily_date", "notes"."preview", "notes"."mtime", "notes"."is_pinned"
+              FROM "notes"
+              WHERE "notes"."kind" <> 'template'
+              ORDER BY "notes"."mtime" DESC, "notes"."path" ASC
+            []"#]],
     );
 }
 
@@ -3326,11 +3343,12 @@ fn recall_sql_lists_daily_notes() {
     check_sql(
         &recall_query(&request),
         expect![[r#"
-        SELECT "notes"."path", "notes"."title", "notes"."daily_date", "notes"."preview", "notes"."mtime", "notes"."is_pinned"
-          FROM "notes"
-          WHERE "notes"."kind" <> 'template'
-          AND "notes"."daily_date" IS NOT NULL
-          ORDER BY "notes"."mtime" DESC, "notes"."path" ASC"#]],
+            SELECT "notes"."path", "notes"."title", "notes"."daily_date", "notes"."preview", "notes"."mtime", "notes"."is_pinned"
+              FROM "notes"
+              WHERE "notes"."kind" <> 'template'
+              AND "notes"."daily_date" IS NOT NULL
+              ORDER BY "notes"."mtime" DESC, "notes"."path" ASC
+            []"#]],
     );
 }
 
@@ -3339,29 +3357,30 @@ fn recall_sql_applies_every_filter() {
     check_sql(
         &recall_query(&filtered_search("")),
         expect![[r#"
-        SELECT DISTINCT "notes"."path", "notes"."title", "notes"."daily_date", "notes"."preview", "notes"."mtime", "notes"."is_pinned"
-          FROM "tags"
-          INNER JOIN "notes" ON "notes"."path" = "tags"."note_path"
-          WHERE "tags"."tag_key" = ?
-          AND "notes"."kind" <> 'template'
-          AND EXISTS(SELECT 1
-            FROM "tags" AS "filter_tags"
-            WHERE "filter_tags"."note_path" = "notes"."path"
-            AND "filter_tags"."tag_key" = ?)
-          AND "notes"."kind" = 'note'
-          AND "notes"."is_pinned" = 1
-          AND EXISTS(SELECT 1
-            FROM "backlinks"
-            WHERE "backlinks"."source_path" = "notes"."path"
-            AND "backlinks"."target_path" = ?)
-          AND EXISTS(SELECT 1
-            FROM "backlinks"
-            WHERE "backlinks"."target_path" = "notes"."path"
-            AND "backlinks"."source_path" = ?)
-          AND "notes"."mtime" >= ?
-          AND "notes"."mtime" < ?
-          ORDER BY "notes"."is_pinned" DESC, "notes"."pinned_order" IS NULL ASC, "notes"."pinned_order" ASC, "notes"."mtime" DESC, "notes"."path" ASC
-          LIMIT ?"#]],
+            SELECT DISTINCT "notes"."path", "notes"."title", "notes"."daily_date", "notes"."preview", "notes"."mtime", "notes"."is_pinned"
+              FROM "tags"
+              INNER JOIN "notes" ON "notes"."path" = "tags"."note_path"
+              WHERE "tags"."tag_key" = ?
+              AND "notes"."kind" <> 'template'
+              AND EXISTS(SELECT 1
+                FROM "tags" AS "filter_tags"
+                WHERE "filter_tags"."note_path" = "notes"."path"
+                AND "filter_tags"."tag_key" = ?)
+              AND "notes"."kind" = 'note'
+              AND "notes"."is_pinned" = 1
+              AND EXISTS(SELECT 1
+                FROM "backlinks"
+                WHERE "backlinks"."source_path" = "notes"."path"
+                AND "backlinks"."target_path" = ?)
+              AND EXISTS(SELECT 1
+                FROM "backlinks"
+                WHERE "backlinks"."target_path" = "notes"."path"
+                AND "backlinks"."source_path" = ?)
+              AND "notes"."mtime" >= ?
+              AND "notes"."mtime" < ?
+              ORDER BY "notes"."is_pinned" DESC, "notes"."pinned_order" IS NULL ASC, "notes"."pinned_order" ASC, "notes"."mtime" DESC, "notes"."path" ASC
+              LIMIT ?
+            [String(Some("a")), String(Some("b")), String(Some("notes/car.md")), String(Some("notes/trip.md")), Double(Some(1.0)), Double(Some(100.0)), BigUnsigned(Some(20))]"#]],
     );
 }
 
@@ -3380,31 +3399,32 @@ fn ranked_sql_matches_text() {
         &text_search("car trip"),
         false,
         expect![[r#"
-        WITH "lexical" AS  MATERIALIZED (SELECT "search_fts"."path" AS "path", highlight("search_fts", 1, ?, ?) AS "fts_highlighted_title", snippet("search_fts", 2, ?, ?, '…', 10) AS "snippet", bm25("search_fts", 0, 10, 1) AS "rank"
-            FROM "search_fts"
-            WHERE "search_fts" MATCH ?)
-          SELECT "fn"."path", "fn"."title", "fn"."daily_date", "fn"."preview", "fn"."mtime", "fn"."is_pinned", "lexical"."fts_highlighted_title", "lexical"."snippet", (CASE
-            WHEN (instr(COALESCE("lexical"."snippet", ''), ?) > 0
-              OR (NOT (instr(' ' || "fn"."title_key", ?) > 0
-                  AND instr(' ' || "fn"."title_key", ?) > 0)))
-            THEN COALESCE("lexical"."rank", 0)
-            ELSE 0 END) AS "score"
-          FROM (SELECT "notes"."path", "notes"."title", "notes"."daily_date", "notes"."preview", "notes"."mtime", "notes"."is_pinned", "notes"."title_key"
-            FROM "notes"
-            WHERE "notes"."kind" <> 'template') AS "fn"
-          LEFT JOIN "lexical" ON "lexical"."path" = "fn"."path"
-          WHERE "lexical"."path" IS NOT NULL
-          OR (instr(' ' || "fn"."title_key", ?) > 0
-            AND instr(' ' || "fn"."title_key", ?) > 0)
-          ORDER BY (CASE
-            WHEN ("fn"."title_key" = ?)
-            THEN 0
-            WHEN (instr("fn"."title_key", ?) = 1)
-            THEN 1
-            WHEN (instr(' ' || "fn"."title_key", ?) > 0
-              AND instr(' ' || "fn"."title_key", ?) > 0)
-            THEN 2
-            ELSE 3 END) ASC, "score" ASC, "fn"."is_pinned" DESC, "fn"."mtime" DESC, "fn"."path" ASC"#]],
+            WITH "lexical" AS  MATERIALIZED (SELECT "search_fts"."path" AS "path", highlight("search_fts", 1, ?, ?) AS "fts_highlighted_title", snippet("search_fts", 2, ?, ?, '…', 10) AS "snippet", bm25("search_fts", 0, 10, 1) AS "rank"
+                FROM "search_fts"
+                WHERE "search_fts" MATCH ?)
+              SELECT "fn"."path", "fn"."title", "fn"."daily_date", "fn"."preview", "fn"."mtime", "fn"."is_pinned", "lexical"."fts_highlighted_title", "lexical"."snippet", (CASE
+                WHEN (instr(COALESCE("lexical"."snippet", ''), ?) > 0
+                  OR (NOT (instr(' ' || "fn"."title_key", ?) > 0
+                      AND instr(' ' || "fn"."title_key", ?) > 0)))
+                THEN COALESCE("lexical"."rank", 0)
+                ELSE 0 END) AS "score"
+              FROM (SELECT "notes"."path", "notes"."title", "notes"."daily_date", "notes"."preview", "notes"."mtime", "notes"."is_pinned", "notes"."title_key"
+                FROM "notes"
+                WHERE "notes"."kind" <> 'template') AS "fn"
+              LEFT JOIN "lexical" ON "lexical"."path" = "fn"."path"
+              WHERE "lexical"."path" IS NOT NULL
+              OR (instr(' ' || "fn"."title_key", ?) > 0
+                AND instr(' ' || "fn"."title_key", ?) > 0)
+              ORDER BY (CASE
+                WHEN ("fn"."title_key" = ?)
+                THEN 0
+                WHEN (instr("fn"."title_key", ?) = 1)
+                THEN 1
+                WHEN (instr(' ' || "fn"."title_key", ?) > 0
+                  AND instr(' ' || "fn"."title_key", ?) > 0)
+                THEN 2
+                ELSE 3 END) ASC, "score" ASC, "fn"."is_pinned" DESC, "fn"."mtime" DESC, "fn"."path" ASC
+            [String(Some("\u{1}")), String(Some("\u{2}")), String(Some("\u{1}")), String(Some("\u{2}")), String(Some("(title : \"car\"* OR body : \"car\"*) AND (title : \"trip\"* OR body : \"trip\"*)")), String(Some("\u{1}")), String(Some(" car")), String(Some(" trip")), String(Some(" car")), String(Some(" trip")), String(Some("car trip")), String(Some("car trip")), String(Some(" car")), String(Some(" trip"))]"#]],
     );
 }
 
@@ -3414,52 +3434,53 @@ fn ranked_sql_applies_every_filter_and_skips_private_notes() {
         &filtered_search("car trip"),
         true,
         expect![[r#"
-        WITH "lexical" AS  MATERIALIZED (SELECT "search_fts"."path" AS "path", highlight("search_fts", 1, ?, ?) AS "fts_highlighted_title", snippet("search_fts", 2, ?, ?, '…', 10) AS "snippet", bm25("search_fts", 0, 10, 1) AS "rank"
-            FROM "search_fts"
-            WHERE "search_fts" MATCH ?)
-          SELECT "fn"."path", "fn"."title", "fn"."daily_date", "fn"."preview", "fn"."mtime", "fn"."is_pinned", "lexical"."fts_highlighted_title", "lexical"."snippet", (CASE
-            WHEN (instr(COALESCE("lexical"."snippet", ''), ?) > 0
-              OR (NOT (instr(' ' || "fn"."title_key", ?) > 0
-                  AND instr(' ' || "fn"."title_key", ?) > 0)))
-            THEN COALESCE("lexical"."rank", 0)
-            ELSE 0 END) AS "score"
-          FROM (SELECT "notes"."path", "notes"."title", "notes"."daily_date", "notes"."preview", "notes"."mtime", "notes"."is_pinned", "notes"."title_key"
-            FROM "notes"
-            WHERE "notes"."kind" <> 'template'
-            AND "notes"."is_private" = 0
-            AND EXISTS(SELECT 1
-              FROM "tags" AS "filter_tags"
-              WHERE "filter_tags"."note_path" = "notes"."path"
-              AND "filter_tags"."tag_key" = ?)
-            AND EXISTS(SELECT 1
-              FROM "tags" AS "filter_tags"
-              WHERE "filter_tags"."note_path" = "notes"."path"
-              AND "filter_tags"."tag_key" = ?)
-            AND "notes"."kind" = 'note'
-            AND "notes"."is_pinned" = 1
-            AND EXISTS(SELECT 1
-              FROM "backlinks"
-              WHERE "backlinks"."source_path" = "notes"."path"
-              AND "backlinks"."target_path" = ?)
-            AND EXISTS(SELECT 1
-              FROM "backlinks"
-              WHERE "backlinks"."target_path" = "notes"."path"
-              AND "backlinks"."source_path" = ?)
-            AND "notes"."mtime" >= ?
-            AND "notes"."mtime" < ?) AS "fn"
-          LEFT JOIN "lexical" ON "lexical"."path" = "fn"."path"
-          WHERE "lexical"."path" IS NOT NULL
-          OR (instr(' ' || "fn"."title_key", ?) > 0
-            AND instr(' ' || "fn"."title_key", ?) > 0)
-          ORDER BY (CASE
-            WHEN ("fn"."title_key" = ?)
-            THEN 0
-            WHEN (instr("fn"."title_key", ?) = 1)
-            THEN 1
-            WHEN (instr(' ' || "fn"."title_key", ?) > 0
-              AND instr(' ' || "fn"."title_key", ?) > 0)
-            THEN 2
-            ELSE 3 END) ASC, "score" ASC, "fn"."is_pinned" DESC, "fn"."mtime" DESC, "fn"."path" ASC
-          LIMIT ?"#]],
+            WITH "lexical" AS  MATERIALIZED (SELECT "search_fts"."path" AS "path", highlight("search_fts", 1, ?, ?) AS "fts_highlighted_title", snippet("search_fts", 2, ?, ?, '…', 10) AS "snippet", bm25("search_fts", 0, 10, 1) AS "rank"
+                FROM "search_fts"
+                WHERE "search_fts" MATCH ?)
+              SELECT "fn"."path", "fn"."title", "fn"."daily_date", "fn"."preview", "fn"."mtime", "fn"."is_pinned", "lexical"."fts_highlighted_title", "lexical"."snippet", (CASE
+                WHEN (instr(COALESCE("lexical"."snippet", ''), ?) > 0
+                  OR (NOT (instr(' ' || "fn"."title_key", ?) > 0
+                      AND instr(' ' || "fn"."title_key", ?) > 0)))
+                THEN COALESCE("lexical"."rank", 0)
+                ELSE 0 END) AS "score"
+              FROM (SELECT "notes"."path", "notes"."title", "notes"."daily_date", "notes"."preview", "notes"."mtime", "notes"."is_pinned", "notes"."title_key"
+                FROM "notes"
+                WHERE "notes"."kind" <> 'template'
+                AND "notes"."is_private" = 0
+                AND EXISTS(SELECT 1
+                  FROM "tags" AS "filter_tags"
+                  WHERE "filter_tags"."note_path" = "notes"."path"
+                  AND "filter_tags"."tag_key" = ?)
+                AND EXISTS(SELECT 1
+                  FROM "tags" AS "filter_tags"
+                  WHERE "filter_tags"."note_path" = "notes"."path"
+                  AND "filter_tags"."tag_key" = ?)
+                AND "notes"."kind" = 'note'
+                AND "notes"."is_pinned" = 1
+                AND EXISTS(SELECT 1
+                  FROM "backlinks"
+                  WHERE "backlinks"."source_path" = "notes"."path"
+                  AND "backlinks"."target_path" = ?)
+                AND EXISTS(SELECT 1
+                  FROM "backlinks"
+                  WHERE "backlinks"."target_path" = "notes"."path"
+                  AND "backlinks"."source_path" = ?)
+                AND "notes"."mtime" >= ?
+                AND "notes"."mtime" < ?) AS "fn"
+              LEFT JOIN "lexical" ON "lexical"."path" = "fn"."path"
+              WHERE "lexical"."path" IS NOT NULL
+              OR (instr(' ' || "fn"."title_key", ?) > 0
+                AND instr(' ' || "fn"."title_key", ?) > 0)
+              ORDER BY (CASE
+                WHEN ("fn"."title_key" = ?)
+                THEN 0
+                WHEN (instr("fn"."title_key", ?) = 1)
+                THEN 1
+                WHEN (instr(' ' || "fn"."title_key", ?) > 0
+                  AND instr(' ' || "fn"."title_key", ?) > 0)
+                THEN 2
+                ELSE 3 END) ASC, "score" ASC, "fn"."is_pinned" DESC, "fn"."mtime" DESC, "fn"."path" ASC
+              LIMIT ?
+            [String(Some("\u{1}")), String(Some("\u{2}")), String(Some("\u{1}")), String(Some("\u{2}")), String(Some("(title : \"car\"* OR body : \"car\"*) AND (title : \"trip\"* OR body : \"trip\"*)")), String(Some("\u{1}")), String(Some(" car")), String(Some(" trip")), String(Some("a")), String(Some("b")), String(Some("notes/car.md")), String(Some("notes/trip.md")), Double(Some(1.0)), Double(Some(100.0)), String(Some(" car")), String(Some(" trip")), String(Some("car trip")), String(Some("car trip")), String(Some(" car")), String(Some(" trip")), BigUnsigned(Some(20))]"#]],
     );
 }
