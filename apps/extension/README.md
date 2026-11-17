@@ -79,15 +79,24 @@ registration only, like Chrome). Firefox reads the add-on ID from
 `browser_specific_settings.gecko.id` (`capture@reflect.app`), so every build
 loads under the ID the host allowlists; there is no `key` dance.
 
-- **Develop:** `pnpm dev:firefox` launches a scratch Firefox profile with the
-  add-on loaded and hot-reloading.
-- **Side-load a build:** `pnpm build:firefox`, then `about:debugging` → This
-  Firefox → **Load Temporary Add-on…** → pick
+- **Develop:** `pnpm dev:firefox` starts the wxt dev server that rebuilds on changes.
+  The output must still be side-loaded manually to test in the browser. If you have
+  `web-ext` installed locally, you can run the following to open an instance of Firefox
+  preloaded with the extension with live-reloading on changes:
+
+  ```
+  web-ext run --target firefox-desktop \
+    --source-dir apps/extension/.output/firefox-mv3-dev \
+    --no-reload
+  ```
+- **Side-load a build:** `pnpm build:firefox`, then navigate to `about:debugging` in
+  your browser → This Firefox → **Load Temporary Add-on…** → pick
   `.output/firefox-mv3/manifest.json`. Temporary add-ons are removed when
   Firefox quits.
 - **Keep it installed:** release Firefox only installs signed add-ons. Either
   sign the `pnpm zip:firefox` artifact as an unlisted add-on on
-  addons.mozilla.org (`web-ext sign --channel=unlisted`), or use Developer
+  addons.mozilla.org `web-ext sign --channel=unlisted`, which also requires
+  installing `web-ext` or use Developer
   Edition / Nightly with `xpinstall.signatures.required` set to `false` in
   `about:config` and install the zip (renamed to `.xpi`) from `about:addons` →
   gear → **Install Add-on From File…**.
@@ -219,15 +228,15 @@ submission.
 
 The store reviews each permission individually:
 
-| Permission | Why it's needed |
-| --- | --- |
-| `activeTab` | Read the URL/title and grab a screenshot + selection of the tab you capture — only at the moment you click the button or press the shortcut. Avoids any broad host permission. |
-| `scripting` | Run a one-line script in the active tab to read the current selection and, when opted in, extract the page's readable text. |
-| `nativeMessaging` | The only output: hand each capture to the local `reflect-capture-host` the desktop app registers. No network is used. |
-| `storage` | Queue captures locally so a capture survives the app being closed and retries until it spools. |
-| `unlimitedStorage` | Queued captures embed a screenshot data URL, which can exceed the default storage quota while waiting for the app. |
-| `alarms` | A coarse retry timer so held captures flush once Reflect is installed/launched later. |
-| `webRequest` + `https://x.com/*` | Observe enabled bookmark and like requests on x.com to save the post to your daily note. |
+| Permission                       | Why it's needed                                                                                                                                                                |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `activeTab`                      | Read the URL/title and grab a screenshot + selection of the tab you capture — only at the moment you click the button or press the shortcut. Avoids any broad host permission. |
+| `scripting`                      | Run a one-line script in the active tab to read the current selection and, when opted in, extract the page's readable text.                                                    |
+| `nativeMessaging`                | The only output: hand each capture to the local `reflect-capture-host` the desktop app registers. No network is used.                                                          |
+| `storage`                        | Queue captures locally so a capture survives the app being closed and retries until it spools.                                                                                 |
+| `unlimitedStorage`               | Queued captures embed a screenshot data URL, which can exceed the default storage quota while waiting for the app.                                                             |
+| `alarms`                         | A coarse retry timer so held captures flush once Reflect is installed/launched later.                                                                                          |
+| `webRequest` + `https://x.com/*` | Observe enabled bookmark and like requests on x.com to save the post to your daily note.                                                                                       |
 
 ### Data-handling disclosures (Privacy practices tab)
 
