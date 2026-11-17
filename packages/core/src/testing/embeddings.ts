@@ -252,7 +252,7 @@ export interface TestEmbeddingIndexServiceOptions {
   noteFile?: NoteFileService
   /**
    * Read lazily, so the default costs nothing until a note is embedded.
-   * Defaults to `storeChunksIn`, else to a new test database.
+   * Defaults to a new test database.
    */
   database?: DatabaseService
   indexLifecycle?: IndexLifecycleService
@@ -261,7 +261,8 @@ export interface TestEmbeddingIndexServiceOptions {
   /**
    * Write applied and removed chunk sets into this database as the native
    * writer does, so later passes and retrieval read them back. Without it,
-   * writes are only recorded.
+   * writes are only recorded. It replaces `database`: reads and writes use
+   * one database.
    */
   storeChunksIn?: TestDatabaseService
   /**
@@ -305,7 +306,7 @@ class TestEmbeddingIndexServiceImpl implements TestEmbeddingIndexService {
 
   constructor(options?: TestEmbeddingIndexServiceOptions) {
     const store = options?.storeChunksIn ?? null
-    const database = options?.database ?? store ?? createTestDatabaseService()
+    const database = store ?? options?.database ?? createTestDatabaseService()
     this.#backfillOverride = options?.backfill
     const ipc = createTestIpcBridgeService({
       commands: {
