@@ -2714,6 +2714,22 @@ export type WindowBootstrap = {
 }
 
 /**
+ * The name of every command that writes the index.
+ */
+export type IndexWriteCommand =
+  | 'index_apply'
+  | 'index_apply_batch'
+  | 'index_remove'
+  | 'index_clear'
+  | 'index_move'
+  | 'index_touch'
+  | 'index_meta_set'
+  | 'chat_message_save'
+  | 'chat_conversation_delete'
+  | 'embed_apply'
+  | 'embed_remove'
+
+/**
  * The name of every command that reads the index.
  */
 export type IndexReadCommand =

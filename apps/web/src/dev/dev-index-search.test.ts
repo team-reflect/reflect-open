@@ -10,6 +10,7 @@ import {
   parseHighlights,
   parseNote,
   parseSearchQuery,
+  type CommandArgs,
   type DailyNoteService,
   type IndexedNote,
   type SearchService,
@@ -18,33 +19,25 @@ import {
 } from '@reflect/core'
 import {
   createTestDatabaseService,
+  createTestIndexedNote,
   createTestClockService,
   createTestActivityPort,
   createTestLoggerService,
 } from '@reflect/core/testing'
-import type { TestDatabaseService } from '@reflect/core/testing'
+import type { IndexCommand, TestDatabaseService } from '@reflect/core/testing'
 import { buildAllNotesSearch, EMPTY_ALL_NOTES_FILTERS, searchPlanFor } from '@reflect/app'
 import { noop } from '@ocavue/utils'
 
 function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
-  return {
+  return createTestIndexedNote({
     path: 'notes/sample.md',
     id: '01hv3xq7c2dm8k4t9w5e6r1n99',
     title: 'Sample Note',
     titleKey: 'sample note',
     pathKey: 'notes/sample.md',
-    kind: 'note',
-    dailyDate: null,
-    isPrivate: false,
-    isPinned: false,
-    pinnedOrder: null,
-    hasContent: true,
-    gistUrl: null,
-    gistStale: false,
     fileHash: 'hash-1',
     mtime: 1_700_000_000_000,
     text: 'Sample Note body about local-first sync',
-    assetText: '',
     preview: 'body about local-first sync',
     links: [
       {
@@ -58,13 +51,11 @@ function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
       },
     ],
     tags: [{ tag: 'book', tagKey: 'book' }],
-    aliases: [],
     claims: [
       { key: 'sample note', tier: 2 },
       { key: 'sample', tier: 4 },
     ],
     emails: [{ email: 'Sample@Example.com', emailKey: 'sample@example.com' }],
-    assets: [],
     tasks: [
       {
         astPath: '[1,0]',
@@ -75,7 +66,7 @@ function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
       },
     ],
     ...overrides,
-  }
+  })
 }
 
 async function searchTitles(
@@ -109,7 +100,8 @@ function connectIndex(db: TestDatabaseService): IndexServices {
     transport: {
       invoke: (command, args) => {
         return Promise.try(() => {
-          return db.invoke(command, args)
+          // The transport gets the command name at run time.
+          return db.invoke(command as IndexCommand, args as CommandArgs<IndexCommand>)
         })
       },
       listen: () => Promise.resolve(noop),

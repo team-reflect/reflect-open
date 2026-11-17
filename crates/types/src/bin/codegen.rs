@@ -52,7 +52,7 @@ fn main() {
 
     write(
         &root.join("packages/types/src/wire-gen.ts"),
-        &(name_shell_commands(&typescript(&ts_types)) + &index_read_commands()),
+        &(name_shell_commands(&typescript(&ts_types)) + &index_commands()),
     );
     write(
         &root.join("apple/Sources/TypesShared/Wire.gen.swift"),
@@ -85,16 +85,20 @@ fn typescript(types: &Types) -> String {
     add_undefined(&out)
 }
 
-/// The union of the commands that read the index.
-fn index_read_commands() -> String {
-    let names: Vec<String> = commands::INDEX_READ_COMMANDS
-        .iter()
-        .map(|name| format!("{name:?}"))
-        .collect();
-    format!(
-        "\n/**\n * The name of every command that reads the index.\n */\nexport type IndexReadCommand = {}\n",
-        names.join(" | ")
-    )
+/// The unions of the commands that write and that read the index.
+fn index_commands() -> String {
+    let union = |verb: &str, name: &str, commands: &[&str]| {
+        let names: Vec<String> = commands.iter().map(|name| format!("{name:?}")).collect();
+        format!(
+            "\n/**\n * The name of every command that {verb} the index.\n */\nexport type {name} = {}\n",
+            names.join(" | ")
+        )
+    };
+    union(
+        "writes",
+        "IndexWriteCommand",
+        commands::INDEX_WRITE_COMMANDS,
+    ) + &union("reads", "IndexReadCommand", commands::INDEX_READ_COMMANDS)
 }
 
 /// Renames each Swift shell command in `Commands` from its identifier to its
