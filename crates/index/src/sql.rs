@@ -104,6 +104,9 @@ pub(crate) fn query_one<T>(
         .query_row(params_from_iter(params), map)?)
 }
 
+/// The row id of a table, which no schema lists.
+pub(crate) const ROWID: &str = "rowid";
+
 /// The table that `json_each` returns.
 #[derive(Iden, Clone, Copy)]
 enum JsonEach {
