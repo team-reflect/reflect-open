@@ -326,26 +326,17 @@ fn recall(conn: &Connection, request: &SearchRequest) -> AppResult<Vec<SearchHit
     sql::query(conn, &query, recall_hit)
 }
 
-/// The text of the ranked search for `request`, with its bound values.
-#[cfg(test)]
-pub(crate) fn ranked_statement(
-    request: &SearchRequest,
-    options: RankedOptions,
-) -> (String, Vec<sql::Param>) {
-    let fts_match = build_fts_match(&request.text).unwrap_or_default();
-    sql::build(&ranked_query(request, fts_match, options))
-}
-
 #[cfg(test)]
 pub(crate) fn ranked_query_plan(
     conn: &Connection,
     request: &SearchRequest,
 ) -> AppResult<Vec<String>> {
+    let fts_match = build_fts_match(&request.text).unwrap_or_default();
     let options = RankedOptions {
         exclude_private: false,
         snippet_tokens: 10,
     };
-    let (sql, params) = ranked_statement(request, options);
+    let (sql, params) = sql::build(&ranked_query(request, fts_match, options));
     let plan = conn
         .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))?
         .query_map(rusqlite::params_from_iter(params), |row| row.get(3))?

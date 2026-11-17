@@ -23,6 +23,8 @@ mod schema;
 mod session;
 mod sql;
 #[cfg(test)]
+mod statements;
+#[cfg(test)]
 mod tests;
 pub mod text;
 mod write;
