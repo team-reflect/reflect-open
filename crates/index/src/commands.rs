@@ -9,8 +9,8 @@ use reflect_types::{
     AppError, AppResult, Backlink, BacklinkPage, BacklinkSourceCursor, ChatConversation,
     ChatMessageRow, ChunkHash, ChunkHit, DailyNoteRow, EmbeddedChunk, GraphStats, IndexTouch,
     IndexedNote, MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry, NotePrivacy, NoteRow,
-    PinnedNoteRow, RecentNoteRow, TagFacet, TaskRow, TemplateEntry, WikiCandidates, WikiClaimMatch,
-    WikiKeyWinner, WikiTitleCandidate, WikiWinningAlias,
+    PinnedNoteRow, RecentNoteRow, SearchHitRow, SearchRequest, TagFacet, TaskRow, TemplateEntry,
+    WikiCandidates, WikiClaimMatch, WikiKeyWinner, WikiTitleCandidate, WikiWinningAlias,
 };
 
 use crate::read;
@@ -337,6 +337,11 @@ impl<'a> IndexCommands<'a> {
     /// The nearest chunks to `vector`, private notes included.
     fn embed_semantic_chunks(&self, vector: Vec<f32>, candidates: u32) -> AppResult<Vec<ChunkHit>> {
         self.read(|conn| read::embed::semantic_chunks(conn, &vector, candidates))
+    }
+
+    /// The notes that match the free text and the filters of `request`.
+    fn index_search(&self, request: SearchRequest) -> AppResult<Vec<SearchHitRow>> {
+        self.read(|conn| read::search::search(conn, &request))
     }
 
     /// The dates in `start..=end` whose daily note has content, ascending.

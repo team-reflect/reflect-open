@@ -13,6 +13,7 @@ pub(crate) mod embed;
 pub(crate) mod lists;
 pub(crate) mod meta;
 pub(crate) mod notes;
+pub(crate) mod search;
 pub(crate) mod stats;
 pub(crate) mod suggest;
 pub(crate) mod tasks;

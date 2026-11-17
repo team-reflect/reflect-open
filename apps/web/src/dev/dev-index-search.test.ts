@@ -94,11 +94,6 @@ function openDb(): TestDatabaseService {
   return db
 }
 
-interface CapturedQuery {
-  readonly sql: string
-  readonly params: readonly unknown[]
-}
-
 interface IndexServices {
   readonly search: SearchService
   readonly dailyNotes: DailyNoteService
@@ -109,16 +104,11 @@ interface IndexServices {
 /**
  * The index read services over a transport that answers index commands from `db`.
  */
-function connectIndex(db: TestDatabaseService, captured: CapturedQuery[] = []): IndexServices {
+function connectIndex(db: TestDatabaseService): IndexServices {
   const ipc = createIpcBridgeService({
     transport: {
       invoke: (command, args) => {
         return Promise.try(() => {
-          if (command === 'db_query') {
-            const sql = String(args['sql'])
-            const params = (args['params'] as readonly unknown[]) ?? []
-            captured.push({ sql, params })
-          }
           return db.invoke(command, args)
         })
       },
@@ -212,8 +202,7 @@ describe('the index read services', () => {
         mtime: 200,
       }),
     )
-    const captured: CapturedQuery[] = []
-    const index = connectIndex(db, captured)
+    const index = connectIndex(db)
 
     const hits = await index.search.searchWithFilters(parseSearchQuery('東京'))
 
@@ -226,11 +215,6 @@ describe('the index read services', () => {
     expect(hits[1]!.highlightedTitle).toBe('別のノート')
     expect(hits[0]!.snippet).toBeNull()
     expect(hits[1]!.snippet).toContain('東京')
-    const plan = db.invoke('db_query', {
-      sql: `EXPLAIN QUERY PLAN ${captured[0]!.sql}`,
-      params: captured[0]!.params,
-    }) as Record<string, unknown>[]
-    expect(plan.some((row) => String(row['detail']).includes('MATERIALIZE lexical'))).toBe(true)
     await expect(searchTitles(index, '東京')).resolves.toEqual([
       { path: 'notes/tokyo-trip.md', title: '来週の東京旅行計画' },
       { path: 'notes/body-hit.md', title: '別のノート' },
