@@ -47,8 +47,12 @@ function checkWasmBindgenVersion(): void {
   }
 }
 
-// A job that downloaded `pkg` has no Rust toolchain.
-if (process.env['REFLECT_INDEX_WASM_PREBUILT'] !== undefined) {
+// A job that downloaded `pkg` has no Rust toolchain. A build for a native
+// shell (`TAURI_ENV_PLATFORM`) leaves the dev bridge out, and the wasm with it.
+if (
+  process.env['REFLECT_INDEX_WASM_PREBUILT'] !== undefined ||
+  process.env['TAURI_ENV_PLATFORM'] !== undefined
+) {
   process.exit(0)
 }
 

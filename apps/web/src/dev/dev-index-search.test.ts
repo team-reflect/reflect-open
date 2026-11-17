@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import {
   buildIndexedNote,
   createDailyNoteService,
@@ -21,7 +21,8 @@ import {
   createTestActivityPort,
   createTestLoggerService,
 } from '@reflect/core/testing'
-import { createDevIndexDb, type DevIndexDb } from '@/dev/dev-index-db.ts'
+import type { TestDatabaseService } from '@reflect/core/testing'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { buildAllNotesSearch, EMPTY_ALL_NOTES_FILTERS, searchPlanFor } from '@reflect/app'
 import { noop } from '@ocavue/utils'
 
@@ -85,8 +86,12 @@ async function searchTitles(
   return hits.map(({ path, title }) => ({ path, title }))
 }
 
-async function openDb(): Promise<DevIndexDb> {
-  return await createDevIndexDb()
+function openDb(): TestDatabaseService {
+  const db = createWasmTestDatabaseService()
+  onTestFinished(() => {
+    db.close()
+  })
+  return db
 }
 
 interface CapturedQuery {
@@ -104,7 +109,7 @@ interface IndexServices {
 /**
  * The index read services over a transport that answers `db_query` from `db`.
  */
-function connectIndex(db: DevIndexDb, captured: CapturedQuery[] = []): IndexServices {
+function connectIndex(db: TestDatabaseService, captured: CapturedQuery[] = []): IndexServices {
   const ipc = createIpcBridgeService({
     transport: {
       invoke: (command, args) => {
@@ -115,7 +120,7 @@ function connectIndex(db: DevIndexDb, captured: CapturedQuery[] = []): IndexServ
           const sql = String(args['sql'])
           const params = (args['params'] as readonly unknown[]) ?? []
           captured.push({ sql, params })
-          return db.query(sql, params)
+          return db.invoke('db_query', { sql, params })
         })
       },
       listen: () => Promise.resolve(noop),
@@ -137,47 +142,16 @@ function connectIndex(db: DevIndexDb, captured: CapturedQuery[] = []): IndexServ
   }
 }
 
-describe('createDevIndexDb', () => {
-  it('applies the real migrations and answers db_query-style reads', async () => {
-    const db = await openDb()
-    const tables = db.query(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('notes', 'tags', 'tasks', 'search_fts') ORDER BY name",
-      [],
-    )
-    expect(tables.map((row) => row['name'])).toEqual(['notes', 'search_fts', 'tags', 'tasks'])
-  })
-
-  it('applies a note projection across notes, tags, tasks, and FTS', async () => {
-    const db = await openDb()
-    db.applyNote(sampleNote())
-
-    const notes = db.query('SELECT path, title, is_pinned FROM notes', [])
-    expect(notes).toEqual([{ path: 'notes/sample.md', title: 'Sample Note', is_pinned: 0 }])
-
-    const tags = db.query('SELECT tag FROM tags WHERE note_path = ?', ['notes/sample.md'])
-    expect(tags).toEqual([{ tag: 'book' }])
-
-    const tasks = db.query('SELECT ast_path, markdown, breadcrumbs, checked FROM tasks', [])
-    expect(tasks).toEqual([
-      { ast_path: '[1,0]', markdown: 'Do the thing', breadcrumbs: '["Project"]', checked: 0 },
-    ])
-
-    const emails = db.query('SELECT email, email_key FROM note_emails', [])
-    expect(emails).toEqual([{ email: 'Sample@Example.com', email_key: 'sample@example.com' }])
-
-    const hits = db.query("SELECT path FROM search_fts WHERE search_fts MATCH 'sync'", [])
-    expect(hits).toEqual([{ path: 'notes/sample.md' }])
-  })
-
+describe('the index read services', () => {
   it('marks only the calendar days whose daily note has content', async () => {
-    const db = await openDb()
+    const db = openDb()
     for (const [path, source] of [
       ['daily/2026-06-01.md', 'Bought milk\n'],
       ['daily/2026-06-02.md', '\n'],
       ['daily/2026-06-03.md', '+ [ ] \n'],
       ['daily/2026-06-04.md', '![](assets/beach.png)\n'],
     ] as const) {
-      db.applyNote(
+      db.applyProjection(
         buildIndexedNote(parseNote({ path, source }), {
           fileHash: `hash-${path}`,
           mtime: 1_700_000_000_000,
@@ -194,12 +168,12 @@ describe('createDevIndexDb', () => {
   })
 
   it('finds a note by a URL it links to', async () => {
-    const db = await openDb()
+    const db = openDb()
     const path = 'notes/field-jacket-hunter.md'
     const source =
       '# Field Jacket Hunter\n\n' +
       '[Field Jacket Hunter](https://www.alfredorifugio.com/products/field-jacket-hunter?utm_source=Meta)\n'
-    db.applyNote(
+    db.applyProjection(
       buildIndexedNote(parseNote({ path, source }), {
         fileHash: 'field-jacket-hunter-hash',
         mtime: 1_700_000_000_000,
@@ -214,8 +188,8 @@ describe('createDevIndexDb', () => {
   })
 
   it('finds a short Japanese term inside a title as well as a note body', async () => {
-    const db = await openDb()
-    db.applyNote(
+    const db = openDb()
+    db.applyProjection(
       sampleNote({
         path: 'notes/tokyo-trip.md',
         id: '01hv3xq7c2dm8k4t9w5e6r1n91',
@@ -227,7 +201,7 @@ describe('createDevIndexDb', () => {
         mtime: 100,
       }),
     )
-    db.applyNote(
+    db.applyProjection(
       sampleNote({
         path: 'notes/body-hit.md',
         id: '01hv3xq7c2dm8k4t9w5e6r1n92',
@@ -253,7 +227,10 @@ describe('createDevIndexDb', () => {
     expect(hits[1]!.highlightedTitle).toBe('別のノート')
     expect(hits[0]!.snippet).toBeNull()
     expect(hits[1]!.snippet).toContain('東京')
-    const plan = db.query(`EXPLAIN QUERY PLAN ${captured[0]!.sql}`, captured[0]!.params)
+    const plan = db.invoke('db_query', {
+      sql: `EXPLAIN QUERY PLAN ${captured[0]!.sql}`,
+      params: captured[0]!.params,
+    }) as Record<string, unknown>[]
     expect(plan.some((row) => String(row['detail']).includes('MATERIALIZE lexical'))).toBe(true)
     await expect(searchTitles(index, '東京')).resolves.toEqual([
       { path: 'notes/tokyo-trip.md', title: '来週の東京旅行計画' },
@@ -274,8 +251,8 @@ describe('createDevIndexDb', () => {
   })
 
   it('matches Latin terms at title word starts only, never mid-word', async () => {
-    const db = await openDb()
-    db.applyNote(
+    const db = openDb()
+    db.applyProjection(
       sampleNote({
         path: 'notes/car-log.md',
         id: '01hv3xq7c2dm8k4t9w5e6r1n93',
@@ -288,7 +265,7 @@ describe('createDevIndexDb', () => {
         mtime: 100,
       }),
     )
-    db.applyNote(
+    db.applyProjection(
       sampleNote({
         path: 'notes/car-wash.md',
         id: '01hv3xq7c2dm8k4t9w5e6r1n94',
@@ -301,7 +278,7 @@ describe('createDevIndexDb', () => {
         mtime: 50,
       }),
     )
-    db.applyNote(
+    db.applyProjection(
       sampleNote({
         path: 'notes/oscar.md',
         id: '01hv3xq7c2dm8k4t9w5e6r1n95',
@@ -314,7 +291,7 @@ describe('createDevIndexDb', () => {
         mtime: 300,
       }),
     )
-    db.applyNote(
+    db.applyProjection(
       sampleNote({
         path: 'notes/garage.md',
         id: '01hv3xq7c2dm8k4t9w5e6r1n96',
@@ -350,8 +327,8 @@ describe('createDevIndexDb', () => {
   })
 
   it('prefix-matches partial terms in note bodies', async () => {
-    const db = await openDb()
-    db.applyNote(
+    const db = openDb()
+    db.applyProjection(
       sampleNote({
         path: 'notes/security-rollout.md',
         id: '01hv3xq7c2dm8k4t9w5e6r1n87',
@@ -388,8 +365,8 @@ describe('createDevIndexDb', () => {
   })
 
   it('ignores a term that tokenizes to nothing instead of emptying the result', async () => {
-    const db = await openDb()
-    db.applyNote(
+    const db = openDb()
+    db.applyProjection(
       sampleNote({
         path: 'notes/meeting-notes.md',
         id: '01hv3xq7c2dm8k4t9w5e6r1n92',
@@ -411,8 +388,8 @@ describe('createDevIndexDb', () => {
   })
 
   it('drops an ignored term from title recall, not just from the FTS match', async () => {
-    const db = await openDb()
-    db.applyNote(
+    const db = openDb()
+    db.applyProjection(
       sampleNote({
         path: 'notes/tokyo-trip.md',
         id: '01hv3xq7c2dm8k4t9w5e6r1n96',
@@ -423,7 +400,7 @@ describe('createDevIndexDb', () => {
         tags: [],
       }),
     )
-    db.applyNote(
+    db.applyProjection(
       sampleNote({
         path: 'notes/dotfiles.md',
         id: '01hv3xq7c2dm8k4t9w5e6r1n97',
@@ -448,8 +425,8 @@ describe('createDevIndexDb', () => {
   })
 
   it('uses pinning to break ties between title-only prefix hits', async () => {
-    const db = await openDb()
-    db.applyNote(
+    const db = openDb()
+    db.applyProjection(
       sampleNote({
         path: 'notes/tim-maccaw-planning.md',
         id: '01hv3xq7c2dm8k4t9w5e6r1n81',
@@ -462,7 +439,7 @@ describe('createDevIndexDb', () => {
         mtime: 100,
       }),
     )
-    db.applyNote(
+    db.applyProjection(
       sampleNote({
         path: 'notes/tim-macrae.md',
         id: '01hv3xq7c2dm8k4t9w5e6r1n82',
@@ -486,8 +463,8 @@ describe('createDevIndexDb', () => {
   })
 
   it('returns title markers from SQLite for tokenizer-normalized matches', async () => {
-    const db = await openDb()
-    db.applyNote(
+    const db = openDb()
+    db.applyProjection(
       sampleNote({
         path: 'notes/cafe-alpha.md',
         id: '01hv3xq7c2dm8k4t9w5e6r1n90',
@@ -498,7 +475,7 @@ describe('createDevIndexDb', () => {
         tags: [],
       }),
     )
-    db.applyNote(
+    db.applyProjection(
       sampleNote({
         path: 'notes/car-punctuation.md',
         id: '01hv3xq7c2dm8k4t9w5e6r1n88',
@@ -509,7 +486,7 @@ describe('createDevIndexDb', () => {
         tags: [],
       }),
     )
-    db.applyNote(
+    db.applyProjection(
       sampleNote({
         path: 'notes/body-cafe.md',
         id: '01hv3xq7c2dm8k4t9w5e6r1n89',
@@ -545,8 +522,8 @@ describe('createDevIndexDb', () => {
   })
 
   it('finds a partial multi-term title through the mobile All search plan', async () => {
-    const db = await openDb()
-    db.applyNote(
+    const db = openDb()
+    db.applyProjection(
       sampleNote({
         path: 'notes/tim-maccaw.md',
         id: '01hv3xq7c2dm8k4t9w5e6r1n97',
@@ -571,8 +548,8 @@ describe('createDevIndexDb', () => {
   })
 
   it('keeps title-recall highlights when the body also creates an FTS hit', async () => {
-    const db = await openDb()
-    db.applyNote(
+    const db = openDb()
+    db.applyProjection(
       sampleNote({
         path: 'notes/tim-maccaw.md',
         id: '01hv3xq7c2dm8k4t9w5e6r1n89',
@@ -595,9 +572,9 @@ describe('createDevIndexDb', () => {
   })
 
   it('serves a rich title end to end: derived alias suggests, inserts, resolves', async () => {
-    const db = await openDb()
+    const db = openDb()
     const source = '# Meeting with [[Ada Lovelace|Ada]]\n'
-    db.applyNote(
+    db.applyProjection(
       buildIndexedNote(parseNote({ path: 'notes/meeting.md', source }), {
         fileHash: 'hash-rich',
         mtime: 1,
@@ -621,105 +598,5 @@ describe('createDevIndexDb', () => {
         ref: 'notes/meeting.md',
       },
     )
-  })
-
-  it('re-applying a note replaces its rows instead of duplicating them', async () => {
-    const db = await openDb()
-    db.applyNote(sampleNote())
-    db.applyNote(sampleNote({ title: 'Renamed Title', titleKey: 'renamed title' }))
-
-    const notes = db.query('SELECT title FROM notes', [])
-    expect(notes).toEqual([{ title: 'Renamed Title' }])
-    const fts = db.query('SELECT count(*) AS hits FROM search_fts', [])
-    expect(fts).toEqual([{ hits: 1 }])
-  })
-
-  it('moves every row to the new path and refuses an occupied destination', async () => {
-    const db = await openDb()
-    db.applyNote(sampleNote())
-    db.moveNote('notes/sample.md', 'notes/renamed.md')
-
-    expect(db.query('SELECT path FROM notes', [])).toEqual([{ path: 'notes/renamed.md' }])
-    expect(db.query('SELECT note_path FROM tags', [])).toEqual([{ note_path: 'notes/renamed.md' }])
-    expect(db.query('SELECT note_path FROM note_emails', [])).toEqual([
-      { note_path: 'notes/renamed.md' },
-    ])
-
-    db.applyNote(sampleNote({ path: 'notes/sample.md', id: '01hv3xq7c2dm8k4t9w5e6r1n98' }))
-    expect(() => db.moveNote('notes/sample.md', 'notes/renamed.md')).toThrowError(/already indexed/)
-    // The refused move must leave both notes' rows untouched.
-    const paths = db.query('SELECT path FROM notes ORDER BY path', [])
-    expect(paths).toEqual([{ path: 'notes/renamed.md' }, { path: 'notes/sample.md' }])
-  })
-
-  it('removes a note and its FTS row', async () => {
-    const db = await openDb()
-    db.applyNote(sampleNote())
-    db.removeNote('notes/sample.md')
-
-    expect(db.query('SELECT count(*) AS rows FROM notes', [])).toEqual([{ rows: 0 }])
-    expect(db.query('SELECT count(*) AS rows FROM tags', [])).toEqual([{ rows: 0 }])
-    expect(db.query('SELECT count(*) AS rows FROM search_fts', [])).toEqual([{ rows: 0 }])
-  })
-
-  it('binds boolean parameters as integers (the json_to_sql contract)', async () => {
-    const db = await openDb()
-    db.applyNote(sampleNote({ isPinned: true, pinnedOrder: 1 }))
-    const pinned = db.query('SELECT path FROM notes WHERE is_pinned = ?', [true])
-    expect(pinned).toEqual([{ path: 'notes/sample.md' }])
-  })
-
-  it('chat writes mirror chat_write.rs: seq assignment, upsert-by-id, cascade delete', async () => {
-    const db = await openDb()
-    const conversation = { id: 'c1', title: 'first question', createdMs: 1, updatedMs: 1 }
-    const message = (id: string, userText: string) => ({
-      id,
-      conversationId: 'c1',
-      userText,
-      attachments: '[]',
-      parts: '[]',
-      responseMessages: '[]',
-      createdMs: 1,
-    })
-
-    db.saveChatMessage(conversation, message('m1', 'one'))
-    db.saveChatMessage({ ...conversation, title: 'renamed?', updatedMs: 9 }, message('m2', 'two'))
-    // A settle-time re-save: conflicts on id, keeps its seq, updates the body.
-    db.saveChatMessage(conversation, { ...message('m1', 'one settled'), parts: '[{"k":1}]' })
-
-    // Title is set once (save 2's rename lost); updated_ms is last-write-wins,
-    // so the settle re-save's stamp is the one that sticks.
-    expect(
-      db.query('SELECT title, updated_ms FROM chat_conversations WHERE id = ?', ['c1']),
-    ).toEqual([{ title: 'first question', updated_ms: 1 }])
-    expect(db.query('SELECT id, seq, user_text FROM chat_messages ORDER BY seq', [])).toEqual([
-      { id: 'm1', seq: 0, user_text: 'one settled' },
-      { id: 'm2', seq: 1, user_text: 'two' },
-    ])
-
-    db.deleteChatConversation('c1')
-    expect(db.query('SELECT count(*) AS rows FROM chat_messages', [])).toEqual([{ rows: 0 }])
-  })
-
-  it('clearing the index leaves chat history alone (the durable-tables rule)', async () => {
-    const db = await openDb()
-    db.applyNote(sampleNote())
-    db.saveChatMessage(
-      { id: 'c1', title: 't', createdMs: 1, updatedMs: 1 },
-      {
-        id: 'm1',
-        conversationId: 'c1',
-        userText: 'hello',
-        attachments: '[]',
-        parts: '[]',
-        responseMessages: '[]',
-        createdMs: 1,
-      },
-    )
-
-    db.clear()
-
-    expect(db.query('SELECT count(*) AS rows FROM notes', [])).toEqual([{ rows: 0 }])
-    expect(db.query('SELECT count(*) AS rows FROM chat_messages', [])).toEqual([{ rows: 1 }])
   })
 })

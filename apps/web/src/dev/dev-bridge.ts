@@ -10,7 +10,7 @@ import type { AssetReadBinaryArgs } from '@reflect/types'
 import { base64ToBytes, bytesToBase64 } from '@reflect/utils'
 import type { DevAssetStore } from '@/dev/dev-asset-store.ts'
 import type { DevFileStore } from '@/dev/dev-file-store.ts'
-import type { DevIndexDb } from '@/dev/dev-index-db.ts'
+import { createWasmIndexBackend, type WasmIndexBackend } from '@reflect/index-wasm'
 import { noop } from '@ocavue/utils'
 
 /**
@@ -23,7 +23,6 @@ export const DEV_GRAPH_ROOT = '/dev-graph'
  */
 export interface DevBridgeBackend {
   readonly files: DevFileStore
-  readonly index: DevIndexDb
   readonly assets: DevAssetStore
 }
 
@@ -43,6 +42,8 @@ const iapProducts = [
 
 class DevBridgeImpl implements IpcBridge {
   readonly #deps: DevBridgeBackend
+  // The Rust index of the native shells, compiled to wasm.
+  readonly #index: WasmIndexBackend
   readonly #graphInfo = { root: DEV_GRAPH_ROOT, name: 'Dev Graph', generation: 1 }
   #settingsDocument: Record<string, unknown> = { mobileOnboarded: true }
   readonly #uploads = new Map<string, Uint8Array<ArrayBuffer>[]>()
@@ -54,6 +55,15 @@ class DevBridgeImpl implements IpcBridge {
 
   constructor(deps: DevBridgeBackend) {
     this.#deps = deps
+    const { files } = deps
+    this.#index = createWasmIndexBackend({
+      list: () => files.list(),
+      move: (from, to) => {
+        if (!files.move(from, to)) {
+          throw new AppError('io', `cannot move note: ${from} to ${to}`)
+        }
+      },
+    })
   }
 
   invoke(command: string, args: Record<string, unknown>): Promise<unknown> {
@@ -79,7 +89,8 @@ class DevBridgeImpl implements IpcBridge {
   }
 
   #runCommand(command: string, args: Record<string, unknown>): unknown {
-    const { files, index, assets } = this.#deps
+    const { files, assets } = this.#deps
+    const index = this.#index
     switch (command) {
       case 'background_task_begin':
         // Browser previews are never suspended like an iOS process, so the
@@ -205,11 +216,9 @@ class DevBridgeImpl implements IpcBridge {
         if (files.exists(to)) {
           throw new AppError('io', `cannot move note: ${to} already exists`)
         }
-        // Index first: it can refuse (occupied path), and a refused move must
-        // leave the file untouched — the in-memory stand-in for Rust's
-        // file+rows transaction.
-        index.moveNote(from, to)
-        files.move(from, to)
+        // The index moves the rows, then the file; a refused file move puts
+        // the rows back.
+        index.invoke('note_move_indexed', args)
         return null
       }
 
@@ -258,49 +267,6 @@ class DevBridgeImpl implements IpcBridge {
       case 'asset_reveal':
         return null
 
-      case 'db_query': {
-        const { sql, params } = argsOf('db_query', args)
-        return index.query(sql, params)
-      }
-      case 'index_open':
-        return 1
-      case 'index_apply': {
-        index.applyNote(argsOf('index_apply', args).note)
-        return null
-      }
-      case 'index_apply_batch': {
-        for (const note of argsOf('index_apply_batch', args).notes) {
-          index.applyNote(note)
-        }
-        return null
-      }
-      case 'index_remove': {
-        index.removeNote(argsOf('index_remove', args).path)
-        return null
-      }
-      case 'index_move': {
-        const { from, to } = argsOf('index_move', args)
-        index.moveNote(from, to)
-        return null
-      }
-      case 'index_touch': {
-        for (const entry of argsOf('index_touch', args).entries) {
-          index.touchNote(entry.path, entry.mtime)
-        }
-        return null
-      }
-      case 'index_reconcile_scan':
-        return reconcileScan(files, index)
-      case 'index_clear': {
-        index.clear()
-        return null
-      }
-      case 'index_meta_set': {
-        const { key, value } = argsOf('index_meta_set', args)
-        index.setMeta(key, value)
-        return null
-      }
-
       case 'settings_load':
         return this.#settingsDocument
       case 'settings_save': {
@@ -337,17 +303,10 @@ class DevBridgeImpl implements IpcBridge {
       case 'contacts_lookup_by_name':
         return []
 
-      case 'chat_message_save': {
-        const { conversation, message } = argsOf('chat_message_save', args)
-        index.saveChatMessage(conversation, message)
-        return null
-      }
-      case 'chat_conversation_delete': {
-        index.deleteChatConversation(argsOf('chat_conversation_delete', args).id)
-        return null
-      }
-
       default:
+        if (index.has(command)) {
+          return index.invoke(command, args)
+        }
         console.error(`[dev-bridge] unimplemented command "${command}"`, args)
         throw new AppError('unknown', `dev bridge: unimplemented command "${command}"`)
     }
@@ -402,7 +361,7 @@ class DevBridgeImpl implements IpcBridge {
 /**
  * The in-browser stand-in for the Rust shell (dev builds only): answers the
  * command surface the desktop and mobile trees exercise from an in-memory
- * file map and the wasm SQLite index. The in-memory graph has one fixed
+ * file map and the Rust index compiled to wasm. The in-memory graph has one fixed
  * generation (`1`); the
  * no-clobber note-create command validates that value before touching the
  * store, matching its native race-safety contract.
@@ -413,47 +372,4 @@ class DevBridgeImpl implements IpcBridge {
  */
 export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
   return new DevBridgeImpl(backend)
-}
-
-/**
- * Mirrors `MTIME_TRUST_AGE_MS` in core's hash.ts and Rust's scan.rs.
- */
-const MTIME_TRUST_AGE_MS = 5_000
-
-/**
- * The `index_reconcile_scan` stand-in: the same listing-vs-rows comparison
- * `crates/index/src/scan.rs` runs natively, over the in-memory store. The
- * dev store never lists placeholders, so that arm has no mirror here.
- */
-function reconcileScan(files: DevFileStore, index: DevIndexDb) {
-  const stored = new Map(
-    index
-      .query('SELECT path, mtime, file_hash FROM notes', [])
-      .map((row) => [
-        String(row['path']),
-        { mtime: Number(row['mtime']), hash: String(row['file_hash']) },
-      ]),
-  )
-  const now = Date.now()
-  const listing = files.list()
-  const onDisk = new Set(listing.map((file) => file.path))
-  const candidates = []
-  for (const file of listing) {
-    const facts = stored.get(file.path)
-    const settled = now - file.modifiedMs >= MTIME_TRUST_AGE_MS
-    if (settled && facts !== undefined && facts.mtime === file.modifiedMs) {
-      continue
-    }
-    candidates.push({
-      path: file.path,
-      modifiedMs: file.modifiedMs,
-      storedMtime: facts?.mtime ?? null,
-      storedHash: facts?.hash ?? null,
-    })
-  }
-  const orphans = [...stored]
-    .filter(([path]) => !onDisk.has(path))
-    .map(([path, facts]) => ({ path, storedMtime: facts.mtime, storedHash: facts.hash }))
-    .sort((first, second) => first.path.localeCompare(second.path))
-  return { total: listing.length, candidates, orphans, stalePlaceholders: [] }
 }
