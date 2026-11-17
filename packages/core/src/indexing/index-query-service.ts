@@ -1,10 +1,8 @@
 import type { MaybePromise } from '@reflect/utils'
 import { isIsoDate } from '@reflect/utils'
-import { sql } from 'kysely'
 import { dailyPath } from '../graph/paths.ts'
 import { foldKey } from '../markdown/index.ts'
 import type { DatabaseService } from './database-service.ts'
-import { inClauseChunks } from './query-utils.ts'
 
 /**
  * One pinned note, as the sidebar's Pinned section lists it.
@@ -141,129 +139,37 @@ class IndexQueryServiceImpl implements IndexQueryService {
   }
 
   async getNote(path: string): Promise<NoteRow | undefined> {
-    const { db } = this.#deps.database
-    const row = await db
-      .selectFrom('notes')
-      .where('path', '=', path)
-      .select(['path', 'title', 'dailyDate', 'isPrivate', 'gistUrl', 'gistStale'])
-      .executeTakeFirst()
-    return row
-      ? {
-          ...row,
-          isPrivate: row.isPrivate !== 0,
-          gistStale: row.gistStale !== 0,
-        }
-      : undefined
+    return (await this.#deps.database.read('index_note', { path })) ?? undefined
   }
 
   async getPinnedNotes(): Promise<PinnedNote[]> {
-    const { db } = this.#deps.database
-    return await db
-      .selectFrom('notes')
-      .where('isPinned', '=', 1)
-      .where('kind', '!=', 'template')
-      .select(['path', 'title', 'dailyDate', 'pinnedOrder'])
-      .orderBy(sql`pinned_order IS NULL`)
-      .orderBy('pinnedOrder')
-      .orderBy('titleKey')
-      .orderBy('path')
-      .execute()
+    return await this.#deps.database.read('index_pinned_notes', {})
   }
 
   async listTemplates(): Promise<TemplateEntry[]> {
-    const { db } = this.#deps.database
-    return await db
-      .selectFrom('notes')
-      .where('kind', '=', 'template')
-      .select(['path', 'title', 'mtime'])
-      .orderBy('titleKey')
-      .orderBy('path')
-      .execute()
+    return await this.#deps.database.read('index_templates', {})
   }
 
   async getIndexedFileFactsByPath(paths: string[]): Promise<Map<string, IndexedFileFacts>> {
-    const { db } = this.#deps.database
-    const facts = new Map<string, IndexedFileFacts>()
-    for (const chunk of inClauseChunks(paths)) {
-      const rows = await db
-        .selectFrom('notes')
-        .where('path', 'in', chunk)
-        .select(['path', 'fileHash', 'mtime'])
-        .execute()
-      for (const row of rows) {
-        facts.set(row.path, { fileHash: row.fileHash, mtime: row.mtime })
-      }
-    }
-    return facts
+    const rows = await this.#deps.database.read('index_file_facts', { paths })
+    return new Map(rows.map(({ path, fileHash, mtime }) => [path, { fileHash, mtime }]))
   }
 
   async getNoteIdsByPath(paths: string[]): Promise<Map<string, string | null>> {
-    const { db } = this.#deps.database
-    const ids = new Map<string, string | null>()
-    for (const chunk of inClauseChunks(paths)) {
-      const rows = await db
-        .selectFrom('notes')
-        .where('path', 'in', chunk)
-        .select(['path', 'id'])
-        .execute()
-      for (const row of rows) {
-        ids.set(row.path, row.id)
-      }
-    }
-    return ids
+    const rows = await this.#deps.database.read('index_note_ids', { paths })
+    return new Map(rows.map(({ path, id }) => [path, id]))
   }
 
   async randomNotePath(): Promise<string | null> {
-    const { db } = this.#deps.database
-    const result = await sql<{ path: string }>`
-      SELECT path FROM notes ORDER BY random() LIMIT 1
-    `.execute(db)
-    return result.rows[0]?.path ?? null
+    return await this.#deps.database.read('index_random_note', {})
   }
 
   async resolveNoteTarget(target: string): Promise<string | null> {
-    const { db } = this.#deps.database
-    const byId = await db
-      .selectFrom('notes')
-      .where('id', '=', target)
-      .select('path')
-      .orderBy('path')
-      .executeTakeFirst()
-    if (byId !== undefined) {
-      return byId.path
-    }
-
-    if (isIsoDate(target)) {
-      return dailyPath(target)
-    }
-
-    const byPath = await db
-      .selectFrom('notes')
-      .where('path', '=', target)
-      .select('path')
-      .executeTakeFirst()
-    if (byPath !== undefined) {
-      return byPath.path
-    }
-
-    const key = foldKey(target)
-    const byTitle = await db
-      .selectFrom('notes')
-      .where('titleKey', '=', key)
-      .select('path')
-      .orderBy('path')
-      .executeTakeFirst()
-    if (byTitle !== undefined) {
-      return byTitle.path
-    }
-
-    const byAlias = await db
-      .selectFrom('aliases')
-      .where('aliasKey', '=', key)
-      .select('notePath')
-      .orderBy('notePath')
-      .executeTakeFirst()
-    return byAlias?.notePath ?? null
+    return await this.#deps.database.read('index_resolve_target', {
+      target,
+      dailyPath: isIsoDate(target) ? dailyPath(target) : null,
+      key: foldKey(target),
+    })
   }
 }
 

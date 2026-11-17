@@ -7,7 +7,8 @@ use serde_json::{Map, Value};
 
 use reflect_types::{
     AppError, AppResult, ChatConversation, ChatMessageRow, DailyNoteRow, EmbeddedChunk, GraphStats,
-    IndexTouch, IndexedNote, MovedNoteAddress,
+    IndexTouch, IndexedNote, MovedNoteAddress, NoteFileFacts, NoteId, NoteRow, PinnedNoteRow,
+    TemplateEntry,
 };
 
 use crate::read;
@@ -156,6 +157,46 @@ impl<'a> IndexCommands<'a> {
     /// The aggregates of the graph, private notes excluded.
     fn index_graph_stats(&self, tag_limit: u32) -> AppResult<GraphStats> {
         self.read(|conn| read::stats::graph_stats(conn, tag_limit))
+    }
+
+    /// The row of the note at `path`.
+    fn index_note(&self, path: String) -> AppResult<Option<NoteRow>> {
+        self.read(|conn| read::notes::note(conn, &path))
+    }
+
+    /// Every pinned note, in shelf order.
+    fn index_pinned_notes(&self) -> AppResult<Vec<PinnedNoteRow>> {
+        self.read(read::notes::pinned_notes)
+    }
+
+    /// Every template, by folded title.
+    fn index_templates(&self) -> AppResult<Vec<TemplateEntry>> {
+        self.read(read::notes::templates)
+    }
+
+    /// The stored hash and mtime of each indexed path in `paths`.
+    fn index_file_facts(&self, paths: Vec<String>) -> AppResult<Vec<NoteFileFacts>> {
+        self.read(|conn| read::notes::file_facts(conn, &paths))
+    }
+
+    /// The frontmatter `id` of each indexed path in `paths`.
+    fn index_note_ids(&self, paths: Vec<String>) -> AppResult<Vec<NoteId>> {
+        self.read(|conn| read::notes::note_ids(conn, &paths))
+    }
+
+    /// The path of a uniformly random note.
+    fn index_random_note(&self) -> AppResult<Option<String>> {
+        self.read(read::notes::random_note)
+    }
+
+    /// Resolves a free-form note target to a path.
+    fn index_resolve_target(
+        &self,
+        target: String,
+        daily_path: Option<String>,
+        key: String,
+    ) -> AppResult<Option<String>> {
+        self.read(|conn| read::notes::resolve_target(conn, &target, daily_path, &key))
     }
 
     /// The dates in `start..=end` whose daily note has content, ascending.

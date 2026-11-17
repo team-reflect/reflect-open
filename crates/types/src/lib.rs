@@ -63,7 +63,10 @@ pub use index::{
     IndexedEmail, IndexedLink, IndexedNote, IndexedTag, IndexedTask, LinkKind, MovedNoteAddress,
     NoteKind, NoteMoveRequest, ReconcileScan, ScanCandidate, ScanOrphan,
 };
-pub use index_read::{DailyNoteRow, GraphStats, TagFacet};
+pub use index_read::{
+    DailyNoteRow, GraphStats, NoteFileFacts, NoteId, NoteRow, PinnedNoteRow, TagFacet,
+    TemplateEntry,
+};
 pub use link_preview::LinkPreviewHtml;
 pub use settings::SettingsDoc;
 #[cfg(feature = "codegen")]

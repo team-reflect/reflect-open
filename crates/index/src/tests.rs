@@ -18,6 +18,9 @@ use super::query::run_query;
 use super::read::chat::{conversations, messages};
 use super::read::daily::{dates_in_range, notes_in_range};
 use super::read::meta::meta;
+use super::read::notes::{
+    file_facts, note as note_row, note_ids, pinned_notes, random_note, resolve_target, templates,
+};
 use super::read::stats::graph_stats;
 use super::scan::scan_reconcile;
 use super::write::{apply_note, claim_tier, clear_index, move_note, touch_note};
@@ -2328,4 +2331,110 @@ fn chat_reads_order_conversations_by_activity_and_messages_by_seq() {
         [chat_message("m1", "c1"), chat_message("m0", "c1")]
     );
     assert_eq!(messages(&conn, "missing").unwrap(), []);
+}
+
+#[test]
+fn note_reads_map_flags_and_order_pins_and_templates() {
+    let conn = migrated();
+    let mut secret = note("notes/secret.md", "Secret", vec![]);
+    secret.is_private = true;
+    secret.gist_url = Some("https://gist.example/1".to_string());
+    secret.gist_stale = true;
+    let mut first = note("notes/first.md", "Zebra", vec![]);
+    first.is_pinned = true;
+    first.pinned_order = Some(1.0);
+    let mut unordered_b = note("notes/b.md", "Beta", vec![]);
+    unordered_b.is_pinned = true;
+    let mut unordered_a = note("notes/a.md", "Alpha", vec![]);
+    unordered_a.is_pinned = true;
+    let mut template_b = note("templates/b.md", "Weekly", vec![]);
+    template_b.kind = NoteKind::Template;
+    template_b.is_pinned = true;
+    let mut template_a = note("templates/a.md", "Daily", vec![]);
+    template_a.kind = NoteKind::Template;
+    for indexed in [
+        &secret,
+        &first,
+        &unordered_b,
+        &unordered_a,
+        &template_b,
+        &template_a,
+    ] {
+        apply_note(&conn, indexed).unwrap();
+    }
+
+    let row = note_row(&conn, "notes/secret.md").unwrap().unwrap();
+    assert!(row.is_private && row.gist_stale);
+    assert_eq!(row.gist_url.as_deref(), Some("https://gist.example/1"));
+    assert_eq!(note_row(&conn, "notes/missing.md").unwrap(), None);
+
+    let pinned: Vec<String> = pinned_notes(&conn)
+        .unwrap()
+        .into_iter()
+        .map(|pinned| pinned.path)
+        .collect();
+    assert_eq!(pinned, ["notes/first.md", "notes/a.md", "notes/b.md"]);
+    let listed: Vec<String> = templates(&conn)
+        .unwrap()
+        .into_iter()
+        .map(|template| template.path)
+        .collect();
+    assert_eq!(listed, ["templates/a.md", "templates/b.md"]);
+}
+
+#[test]
+fn list_reads_take_any_number_of_paths() {
+    let conn = migrated();
+    let mut with_id = note("notes/a.md", "A", vec![]);
+    with_id.id = Some("one".to_string());
+    apply_note(&conn, &with_id).unwrap();
+    apply_note(&conn, &note("notes/b.md", "B", vec![])).unwrap();
+    let mut paths: Vec<String> = (0..2_000)
+        .map(|at| format!("notes/missing-{at}.md"))
+        .collect();
+    paths.push("notes/a.md".to_string());
+    paths.push("notes/b.md".to_string());
+
+    let mut ids = note_ids(&conn, &paths).unwrap();
+    ids.sort_by(|left, right| left.path.cmp(&right.path));
+    assert_eq!(ids.len(), 2);
+    assert_eq!(ids[0].id.as_deref(), Some("one"));
+    assert_eq!(ids[1].id, None);
+    assert_eq!(file_facts(&conn, &paths).unwrap().len(), 2);
+    assert_eq!(file_facts(&conn, &[]).unwrap(), []);
+}
+
+#[test]
+fn resolve_target_tries_id_then_daily_then_path_title_alias() {
+    let conn = migrated();
+    assert_eq!(random_note(&conn).unwrap(), None);
+    let mut with_id = note("notes/renamed.md", "Renamed", vec![]);
+    with_id.id = Some("notes/plain.md".to_string());
+    apply_note(&conn, &with_id).unwrap();
+    apply_note(&conn, &note("notes/plain.md", "Plain", vec![])).unwrap();
+    apply_note(&conn, &aliased_note("notes/c.md", "Cee", "Nickname")).unwrap();
+    let resolve = |target: &str, daily: Option<&str>| {
+        resolve_target(
+            &conn,
+            target,
+            daily.map(String::from),
+            &target.to_lowercase(),
+        )
+        .unwrap()
+    };
+
+    // An id wins over the path of the same text.
+    assert_eq!(
+        resolve("notes/plain.md", None).as_deref(),
+        Some("notes/renamed.md")
+    );
+    assert_eq!(
+        resolve("2026-01-02", Some("daily/2026-01-02.md")).as_deref(),
+        Some("daily/2026-01-02.md")
+    );
+    assert_eq!(resolve("notes/c.md", None).as_deref(), Some("notes/c.md"));
+    assert_eq!(resolve("Plain", None).as_deref(), Some("notes/plain.md"));
+    assert_eq!(resolve("Nickname", None).as_deref(), Some("notes/c.md"));
+    assert_eq!(resolve("nothing", None), None);
+    assert!(random_note(&conn).unwrap().is_some());
 }

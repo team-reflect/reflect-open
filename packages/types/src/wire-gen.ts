@@ -1026,6 +1026,44 @@ export type Commands = {
     }
     result: GraphStats
   }
+  index_note: {
+    args: {
+      path: string
+    }
+    result: NoteRow | null
+  }
+  index_pinned_notes: {
+    args: Record<string, never>
+    result: PinnedNoteRow[]
+  }
+  index_templates: {
+    args: Record<string, never>
+    result: TemplateEntry[]
+  }
+  index_file_facts: {
+    args: {
+      paths: string[]
+    }
+    result: NoteFileFacts[]
+  }
+  index_note_ids: {
+    args: {
+      paths: string[]
+    }
+    result: NoteId[]
+  }
+  index_random_note: {
+    args: Record<string, never>
+    result: string | null
+  }
+  index_resolve_target: {
+    args: {
+      target: string
+      dailyPath: string | null
+      key: string
+    }
+    result: string | null
+  }
   index_daily_dates: {
     args: {
       start: string
@@ -1832,6 +1870,20 @@ export type NoteCreateOutcome =
   /**  A file or iCloud eviction placeholder already owns the path. */
   | { kind: 'collision' }
 
+/**  The stored hash and modification time of one indexed note. */
+export type NoteFileFacts = {
+  path: string
+  fileHash: string
+  /**  File modification time (epoch ms). */
+  mtime: number
+}
+
+/**  The frontmatter `id` of one indexed note. */
+export type NoteId = {
+  path: string
+  id: string | null
+}
+
 /**  What a note file is, from its path. */
 export type NoteKind = 'daily' | 'note' | 'template'
 
@@ -1845,6 +1897,19 @@ export type NoteMoveRequest = {
   to: string
   toAddress: MovedNoteAddress
   fromAddress: MovedNoteAddress
+}
+
+/**  The core fields of one note row. */
+export type NoteRow = {
+  path: string
+  title: string
+  dailyDate: string | null
+  /**  The `private: true` frontmatter flag. */
+  isPrivate: boolean
+  /**  The html url of the published gist. */
+  gistUrl: string | null
+  /**  The body changed since it was last published. */
+  gistStale: boolean
 }
 
 /**  What a note write left on disk. */
@@ -1863,6 +1928,15 @@ export type PinnedNote = {
   path: string
   /**  The name the sidebar shows. */
   title: string
+}
+
+/**  One pinned note. */
+export type PinnedNoteRow = {
+  path: string
+  title: string
+  dailyDate: string | null
+  /**  The explicit `pinned: <n>` order. */
+  pinnedOrder: number | null
 }
 
 /**  A tap on the `+` (`tap`) or on one item of the capture menu. */
@@ -2191,6 +2265,14 @@ export type TagFacet = {
   /**  One display casing of the tag. */
   tag: string
   count: number
+}
+
+/**  One template. */
+export type TemplateEntry = {
+  path: string
+  title: string
+  /**  File modification time (epoch ms). */
+  mtime: number
 }
 
 /**

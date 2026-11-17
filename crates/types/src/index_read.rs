@@ -45,3 +45,62 @@ pub struct DailyNoteRow {
     pub mtime: i64,
     pub is_private: bool,
 }
+
+/// The core fields of one note row.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct NoteRow {
+    pub path: String,
+    pub title: String,
+    pub daily_date: Option<String>,
+    /// The `private: true` frontmatter flag.
+    pub is_private: bool,
+    /// The html url of the published gist.
+    pub gist_url: Option<String>,
+    /// The body changed since it was last published.
+    pub gist_stale: bool,
+}
+
+/// One pinned note.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct PinnedNoteRow {
+    pub path: String,
+    pub title: String,
+    pub daily_date: Option<String>,
+    /// The explicit `pinned: <n>` order.
+    pub pinned_order: Option<f64>,
+}
+
+/// One template.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct TemplateEntry {
+    pub path: String,
+    pub title: String,
+    /// File modification time (epoch ms).
+    pub mtime: i64,
+}
+
+/// The stored hash and modification time of one indexed note.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct NoteFileFacts {
+    pub path: String,
+    pub file_hash: String,
+    /// File modification time (epoch ms).
+    pub mtime: i64,
+}
+
+/// The frontmatter `id` of one indexed note.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct NoteId {
+    pub path: String,
+    pub id: Option<String>,
+}

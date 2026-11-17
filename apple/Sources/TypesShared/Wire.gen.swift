@@ -3203,6 +3203,67 @@ extension NoteCreateOutcome: Codable {
 }
 
 
+/// The stored hash and modification time of one indexed note.
+public struct NoteFileFacts: Codable, Sendable, Equatable {
+    public let path: String
+    public let fileHash: String
+    public let mtime: Int64
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case fileHash = "fileHash"
+        case mtime = "mtime"
+    }
+
+    public init(path: String, fileHash: String, mtime: Int64) {
+        self.path = path
+        self.fileHash = fileHash
+        self.mtime = mtime
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.fileHash = try container.decode(String.self, forKey: .fileHash)
+        self.mtime = try container.decode(Int64.self, forKey: .mtime)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(fileHash, forKey: .fileHash)
+        try container.encode(mtime, forKey: .mtime)
+    }
+}
+
+/// The frontmatter `id` of one indexed note.
+public struct NoteId: Codable, Sendable, Equatable {
+    public let path: String
+    public let id: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case id = "id"
+    }
+
+    public init(path: String, id: String?) {
+        self.path = path
+        self.id = id
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.id = try container.decodeIfPresent(String.self, forKey: .id)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(id, forKey: .id)
+    }
+}
+
 /// What a note file is, from its path.
 public enum NoteKind: String, Codable, Sendable, Equatable, CaseIterable {
     case daily = "daily"
@@ -3247,6 +3308,54 @@ public struct NoteMoveRequest: Codable, Sendable, Equatable {
         try container.encode(to, forKey: .to)
         try container.encode(toAddress, forKey: .toAddress)
         try container.encode(fromAddress, forKey: .fromAddress)
+    }
+}
+
+/// The core fields of one note row.
+public struct NoteRow: Codable, Sendable, Equatable {
+    public let path: String
+    public let title: String
+    public let dailyDate: String?
+    public let isPrivate: Bool
+    public let gistUrl: String?
+    public let gistStale: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case title = "title"
+        case dailyDate = "dailyDate"
+        case isPrivate = "isPrivate"
+        case gistUrl = "gistUrl"
+        case gistStale = "gistStale"
+    }
+
+    public init(path: String, title: String, dailyDate: String?, isPrivate: Bool, gistUrl: String?, gistStale: Bool) {
+        self.path = path
+        self.title = title
+        self.dailyDate = dailyDate
+        self.isPrivate = isPrivate
+        self.gistUrl = gistUrl
+        self.gistStale = gistStale
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.dailyDate = try container.decodeIfPresent(String.self, forKey: .dailyDate)
+        self.isPrivate = try container.decode(Bool.self, forKey: .isPrivate)
+        self.gistUrl = try container.decodeIfPresent(String.self, forKey: .gistUrl)
+        self.gistStale = try container.decode(Bool.self, forKey: .gistStale)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(title, forKey: .title)
+        try container.encode(dailyDate, forKey: .dailyDate)
+        try container.encode(isPrivate, forKey: .isPrivate)
+        try container.encode(gistUrl, forKey: .gistUrl)
+        try container.encode(gistStale, forKey: .gistStale)
     }
 }
 
@@ -3303,6 +3412,44 @@ public struct PinnedNote: Codable, Sendable, Equatable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(path, forKey: .path)
         try container.encode(title, forKey: .title)
+    }
+}
+
+/// One pinned note.
+public struct PinnedNoteRow: Codable, Sendable, Equatable {
+    public let path: String
+    public let title: String
+    public let dailyDate: String?
+    public let pinnedOrder: Double?
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case title = "title"
+        case dailyDate = "dailyDate"
+        case pinnedOrder = "pinnedOrder"
+    }
+
+    public init(path: String, title: String, dailyDate: String?, pinnedOrder: Double?) {
+        self.path = path
+        self.title = title
+        self.dailyDate = dailyDate
+        self.pinnedOrder = pinnedOrder
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.dailyDate = try container.decodeIfPresent(String.self, forKey: .dailyDate)
+        self.pinnedOrder = try container.decodeIfPresent(Double.self, forKey: .pinnedOrder)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(title, forKey: .title)
+        try container.encode(dailyDate, forKey: .dailyDate)
+        try container.encode(pinnedOrder, forKey: .pinnedOrder)
     }
 }
 
@@ -4329,6 +4476,39 @@ public struct TagFacet: Codable, Sendable, Equatable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(tag, forKey: .tag)
         try container.encode(count, forKey: .count)
+    }
+}
+
+/// One template.
+public struct TemplateEntry: Codable, Sendable, Equatable {
+    public let path: String
+    public let title: String
+    public let mtime: Int64
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case title = "title"
+        case mtime = "mtime"
+    }
+
+    public init(path: String, title: String, mtime: Int64) {
+        self.path = path
+        self.title = title
+        self.mtime = mtime
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.mtime = try container.decode(Int64.self, forKey: .mtime)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(title, forKey: .title)
+        try container.encode(mtime, forKey: .mtime)
     }
 }
 

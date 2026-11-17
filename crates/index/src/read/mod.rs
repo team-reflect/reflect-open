@@ -8,4 +8,5 @@
 pub(crate) mod chat;
 pub(crate) mod daily;
 pub(crate) mod meta;
+pub(crate) mod notes;
 pub(crate) mod stats;
