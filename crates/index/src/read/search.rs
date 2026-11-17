@@ -132,7 +132,7 @@ pub struct RankedHit {
 /// newest first. With free text it is ranked, see [`search_ranked`].
 pub(crate) fn search(conn: &Connection, request: &SearchRequest) -> AppResult<Vec<SearchHitRow>> {
     if build_fts_match(&request.text).is_none() {
-        return recall(conn, request);
+        return sql::query(conn, &recall_query(request), recall_hit);
     }
     let options = RankedOptions {
         exclude_private: false,
@@ -209,7 +209,11 @@ fn lexical_hits(fts_match: String, snippet_tokens: u8) -> SelectStatement {
 }
 
 /// The ranked search for free text that compiles to `fts_match`.
-fn ranked_query(request: &SearchRequest, fts_match: String, options: RankedOptions) -> WithQuery {
+pub(crate) fn ranked_query(
+    request: &SearchRequest,
+    fts_match: String,
+    options: RankedOptions,
+) -> WithQuery {
     // SQLite rejects `MATCH ... OR ...`, and a flattened FTS subquery under a
     // notes-first join reruns MATCH for every note. The materialized CTE
     // computes the lexical hits once; the outer join admits rows that only
@@ -293,8 +297,9 @@ fn ranked_query(request: &SearchRequest, fts_match: String, options: RankedOptio
     query.with(Query::with().cte(lexical).to_owned())
 }
 
-/// The recall feed of a search without free text.
-fn recall(conn: &Connection, request: &SearchRequest) -> AppResult<Vec<SearchHitRow>> {
+/// The recall feed of a search without free text: the notes that pass the
+/// filters of `request`, pins first when asked, then newest first.
+pub(crate) fn recall_query(request: &SearchRequest) -> SelectStatement {
     let mut query = Query::select();
     query.columns(HIT_COLUMNS.map(|column| (Notes::Table, column)));
     let not_template = Expr::col((Notes::Table, Notes::Kind)).ne(lit("template"));
@@ -323,7 +328,7 @@ fn recall(conn: &Connection, request: &SearchRequest) -> AppResult<Vec<SearchHit
     if let Some(limit) = request.limit {
         query.limit(u64::from(limit));
     }
-    sql::query(conn, &query, recall_hit)
+    query
 }
 
 #[cfg(test)]

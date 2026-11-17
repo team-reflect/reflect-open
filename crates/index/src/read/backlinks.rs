@@ -84,6 +84,67 @@ pub(crate) fn backlinks(conn: &Connection, path: &str) -> AppResult<Vec<Backlink
     )
 }
 
+/// The path, the title and the recency of each source that links to the note
+/// at `path`, after `cursor`: most recent first, then by path. It has one row
+/// more than `limit`, which shows that another page exists.
+pub(crate) fn page_sources_query(
+    path: &str,
+    limit: i64,
+    cursor: Option<&BacklinkSourceCursor>,
+) -> SelectStatement {
+    Query::select()
+        .distinct()
+        .columns([SOURCE_PATH, SOURCE_TITLE, RECENCY])
+        .from_subquery(
+            links_to(path)
+                .expr_as(
+                    Expr::col((Backlinks::Table, Backlinks::SourcePath)),
+                    SOURCE_PATH,
+                )
+                .expr_as(Expr::col((Notes::Table, Notes::Title)), SOURCE_TITLE)
+                .expr_as(recency(), RECENCY)
+                .take(),
+            SOURCES,
+        )
+        .cond_where(Cond::all().add_option(cursor.map(after)))
+        .order_by(RECENCY, Order::Desc)
+        .order_by(SOURCE_PATH, Order::Asc)
+        .limit(limit.saturating_add(1).unsigned_abs())
+        .take()
+}
+
+/// The position of each link to the note at `path` from the sources after
+/// `cursor` up to the source `last`, in page order.
+pub(crate) fn page_positions_query(
+    path: &str,
+    cursor: Option<&BacklinkSourceCursor>,
+    last: &BacklinkSourceCursor,
+) -> SelectStatement {
+    let through_last = Cond::any().add(Expr::col(RECENCY).gt(last.recency_ms)).add(
+        Cond::all()
+            .add(Expr::col(RECENCY).eq(last.recency_ms))
+            .add(Expr::col(SOURCE_PATH).lte(last.source_path.as_str())),
+    );
+    Query::select()
+        .columns([SOURCE_PATH, POS_FROM])
+        .from_subquery(
+            links_to(path)
+                .expr_as(
+                    Expr::col((Backlinks::Table, Backlinks::SourcePath)),
+                    SOURCE_PATH,
+                )
+                .expr_as(Expr::col((Backlinks::Table, Backlinks::PosFrom)), POS_FROM)
+                .expr_as(recency(), RECENCY)
+                .take(),
+            SOURCES,
+        )
+        .cond_where(Cond::all().add_option(cursor.map(after)).add(through_last))
+        .order_by(RECENCY, Order::Desc)
+        .order_by(SOURCE_PATH, Order::Asc)
+        .order_by(POS_FROM, Order::Asc)
+        .take()
+}
+
 /// One page of the sources that link to the note at `path`: most recent
 /// first, then by path, at most `limit`, after `cursor`. Each source carries
 /// the positions of its links. A `limit` below 1 is an error.
@@ -106,29 +167,10 @@ pub(crate) fn page(
         |row| row.get(0),
     )?;
 
-    // One row past the limit shows that another page exists.
-    let mut candidates: Vec<(String, String, i64)> = sql::query(
-        conn,
-        Query::select()
-            .distinct()
-            .columns([SOURCE_PATH, SOURCE_TITLE, RECENCY])
-            .from_subquery(
-                links_to(path)
-                    .expr_as(
-                        Expr::col((Backlinks::Table, Backlinks::SourcePath)),
-                        SOURCE_PATH,
-                    )
-                    .expr_as(Expr::col((Notes::Table, Notes::Title)), SOURCE_TITLE)
-                    .expr_as(recency(), RECENCY)
-                    .take(),
-                SOURCES,
-            )
-            .cond_where(Cond::all().add_option(cursor.map(after)))
-            .order_by(RECENCY, Order::Desc)
-            .order_by(SOURCE_PATH, Order::Asc)
-            .limit(limit.saturating_add(1).unsigned_abs()),
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-    )?;
+    let mut candidates: Vec<(String, String, i64)> =
+        sql::query(conn, &page_sources_query(path, limit, cursor), |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })?;
     let indexed_link_count = sql::query_one(
         conn,
         links_to(path).expr(Func::count(Expr::col(Asterisk))),
@@ -147,33 +189,14 @@ pub(crate) fn page(
         });
     };
 
-    // The link positions of the whole source range of the page, in one query.
-    let through_last = Cond::any().add(Expr::col(RECENCY).gt(last_recency)).add(
-        Cond::all()
-            .add(Expr::col(RECENCY).eq(last_recency))
-            .add(Expr::col(SOURCE_PATH).lte(last_path.as_str())),
-    );
-    let positions: Vec<(String, i64)> = sql::query(
-        conn,
-        Query::select()
-            .columns([SOURCE_PATH, POS_FROM])
-            .from_subquery(
-                links_to(path)
-                    .expr_as(
-                        Expr::col((Backlinks::Table, Backlinks::SourcePath)),
-                        SOURCE_PATH,
-                    )
-                    .expr_as(Expr::col((Backlinks::Table, Backlinks::PosFrom)), POS_FROM)
-                    .expr_as(recency(), RECENCY)
-                    .take(),
-                SOURCES,
-            )
-            .cond_where(Cond::all().add_option(cursor.map(after)).add(through_last))
-            .order_by(RECENCY, Order::Desc)
-            .order_by(SOURCE_PATH, Order::Asc)
-            .order_by(POS_FROM, Order::Asc),
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    )?;
+    let last = BacklinkSourceCursor {
+        recency_ms: last_recency,
+        source_path: last_path,
+    };
+    let positions: Vec<(String, i64)> =
+        sql::query(conn, &page_positions_query(path, cursor, &last), |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })?;
     let mut positions_by_source: HashMap<String, Vec<i64>> = HashMap::new();
     for (source_path, pos_from) in positions {
         positions_by_source
@@ -192,10 +215,7 @@ pub(crate) fn page(
         .collect();
     Ok(BacklinkPage {
         sources,
-        next_cursor: has_more.then_some(BacklinkSourceCursor {
-            recency_ms: last_recency,
-            source_path: last_path,
-        }),
+        next_cursor: has_more.then_some(last),
         indexed_link_count,
         target_keys,
     })

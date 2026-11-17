@@ -24,7 +24,6 @@ reflect-types = { workspace = true, features = ["rusqlite"] }
 reflect-index-schema = { workspace = true, features = ["default"], optional = true }
 
 [dev-dependencies]
-# `trace` records the statements of the snapshot in `src/statements.sql`.
-rusqlite = { workspace = true, features = ["trace"] }
+expect-test = { workspace = true }
 tempfile = { workspace = true }
 reflect-index-schema = { workspace = true, features = ["default"] }

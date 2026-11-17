@@ -52,14 +52,15 @@ fn list_entry(row: &Row<'_>) -> rusqlite::Result<NoteListEntry> {
     })
 }
 
-/// The All Notes list. Without a tag it holds every non-daily note; with one
-/// it holds the notes and the daily notes that carry the tag.
-pub(crate) fn list_notes(
-    conn: &Connection,
-    tag_key: Option<&str>,
-) -> AppResult<Vec<NoteListEntry>> {
-    let listed_kinds = [lit("note"), lit("daily")];
+/// The kinds of the notes in the All Notes list with a tag.
+fn tagged_kinds() -> [Expr; 2] {
+    [lit("note"), lit("daily")]
+}
 
+/// The rows of the All Notes list, in recall-feed order. Without a tag they
+/// are every non-daily note; with one they are the notes and the daily notes
+/// that carry the tag.
+pub(crate) fn list_notes_query(tag_key: Option<&str>) -> SelectStatement {
     let mut query = Query::select();
     query.columns([
         (Notes::Table, Notes::Path),
@@ -79,17 +80,16 @@ pub(crate) fn list_notes(
             from_tags_join_notes(&mut query);
             query
                 .and_where(Expr::col((Tags::Table, Tags::TagKey)).eq(tag_key))
-                .and_where(Expr::col((Notes::Table, Notes::Kind)).is_in(listed_kinds.clone()));
+                .and_where(Expr::col((Notes::Table, Notes::Kind)).is_in(tagged_kinds()));
         }
     }
     order_pinned_first(&mut query);
-    let mut entries: Vec<NoteListEntry> = sql::query(conn, &query, list_entry)?;
-    if entries.is_empty() {
-        return Ok(entries);
-    }
+    query
+}
 
-    // The tags of the same note set, through the same predicates. The folded
-    // key orders them like the facet list, whatever the display casing.
+/// The path and each tag of the notes that [`list_notes_query`] lists, by
+/// folded tag key.
+pub(crate) fn list_tags_query(tag_key: Option<&str>) -> SelectStatement {
     let mut query = Query::select();
     query.columns([(Tags::Table, Tags::NotePath), (Tags::Table, Tags::Tag)]);
     from_tags_join_notes(&mut query);
@@ -107,13 +107,29 @@ pub(crate) fn list_notes(
                     Expr::col((FILTER_TAGS, Tags::NotePath)).equals((Notes::Table, Notes::Path)),
                 )
                 .and_where(Expr::col((FILTER_TAGS, Tags::TagKey)).eq(tag_key))
-                .and_where(Expr::col((Notes::Table, Notes::Kind)).is_in(listed_kinds));
+                .and_where(Expr::col((Notes::Table, Notes::Kind)).is_in(tagged_kinds()));
         }
     }
     query.order_by((Tags::Table, Tags::TagKey), Order::Asc);
-    let tags: Vec<(String, String)> =
-        sql::query(conn, &query, |row| Ok((row.get(0)?, row.get(1)?)))?;
+    query
+}
 
+/// The All Notes list. Without a tag it holds every non-daily note; with one
+/// it holds the notes and the daily notes that carry the tag.
+pub(crate) fn list_notes(
+    conn: &Connection,
+    tag_key: Option<&str>,
+) -> AppResult<Vec<NoteListEntry>> {
+    let mut entries: Vec<NoteListEntry> = sql::query(conn, &list_notes_query(tag_key), list_entry)?;
+    if entries.is_empty() {
+        return Ok(entries);
+    }
+
+    // The folded key orders the tags like the facet list, whatever the
+    // display casing.
+    let tags: Vec<(String, String)> = sql::query(conn, &list_tags_query(tag_key), |row| {
+        Ok((row.get(0)?, row.get(1)?))
+    })?;
     let mut tags_by_path: HashMap<String, Vec<String>> = HashMap::new();
     for (path, tag) in tags {
         tags_by_path.entry(path).or_default().push(tag);
@@ -126,11 +142,7 @@ pub(crate) fn list_notes(
 
 /// The most recently changed non-private notes, at most `limit`, with the tag
 /// `tag_key` when one is given.
-pub(crate) fn recent_notes(
-    conn: &Connection,
-    limit: u32,
-    tag_key: Option<&str>,
-) -> AppResult<Vec<RecentNoteRow>> {
+pub(crate) fn recent_notes_query(limit: u32, tag_key: Option<&str>) -> SelectStatement {
     let mut query = Query::select();
     query.columns([
         (Notes::Table, Notes::Path),
@@ -154,7 +166,16 @@ pub(crate) fn recent_notes(
         .and_where(Expr::col((Notes::Table, Notes::IsPrivate)).eq(lit(0)));
     order_recent(&mut query);
     query.limit(u64::from(limit));
-    sql::query(conn, &query, |row| {
+    query
+}
+
+/// The rows of [`recent_notes_query`].
+pub(crate) fn recent_notes(
+    conn: &Connection,
+    limit: u32,
+    tag_key: Option<&str>,
+) -> AppResult<Vec<RecentNoteRow>> {
+    sql::query(conn, &recent_notes_query(limit, tag_key), |row| {
         Ok(RecentNoteRow {
             path: row.get(0)?,
             title: row.get(1)?,

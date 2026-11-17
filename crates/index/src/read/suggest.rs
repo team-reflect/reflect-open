@@ -52,7 +52,7 @@ fn like_contains(key: &str) -> LikeExpr {
 
 /// The most used tags whose key contains `tag_key` (every tag when it is
 /// empty), most used first, at most `limit`. Templates do not count.
-pub(crate) fn tags(conn: &Connection, tag_key: &str, limit: u32) -> AppResult<Vec<TagFacet>> {
+pub(crate) fn tags_query(tag_key: &str, limit: u32) -> SelectStatement {
     let mut query = tag_facets();
     query.and_where(Expr::col((Notes::Table, Notes::Kind)).ne(lit("template")));
     if !tag_key.is_empty() {
@@ -65,17 +65,20 @@ pub(crate) fn tags(conn: &Connection, tag_key: &str, limit: u32) -> AppResult<Ve
             Order::Asc,
         )
         .limit(u64::from(limit));
-    sql::query(conn, &query, tag_facet)
+    query
 }
 
-/// The notes whose title or alias matches the folded wiki key `key`.
-///
-/// The pool is cut by usage before recency: a much-linked note stays in it
-/// however long ago its file changed, and an exact hit is always kept. The
-/// search index also admits titles that differ only in accents; those rank
-/// below spelled hits. An empty key lists notes only: days come from the date
-/// generator of the frontend.
-pub(crate) fn wiki_candidates(conn: &Connection, key: &str) -> AppResult<WikiCandidates> {
+/// The rows of [`tags_query`].
+pub(crate) fn tags(conn: &Connection, tag_key: &str, limit: u32) -> AppResult<Vec<TagFacet>> {
+    sql::query(conn, &tags_query(tag_key, limit), tag_facet)
+}
+
+/// The notes whose title matches the folded wiki key `key`, with the number
+/// of links to each, at most [`WIKI_CANDIDATE_LIMIT`]: an exact title first,
+/// then a title that contains the key, then by link count and recency. The
+/// search index also admits titles that differ only in accents. An empty key
+/// lists the notes that are not daily notes.
+pub(crate) fn title_candidates_query(key: &str) -> SelectStatement {
     let title_contains = || Expr::col((Notes::Table, Notes::TitleKey)).like(like_contains(key));
 
     let mut query = Query::select();
@@ -115,7 +118,18 @@ pub(crate) fn wiki_candidates(conn: &Connection, key: &str) -> AppResult<WikiCan
         .order_by(LINK_COUNT, Order::Desc)
         .order_by((Notes::Table, Notes::Mtime), Order::Desc)
         .limit(WIKI_CANDIDATE_LIMIT);
-    let titles = sql::query(conn, &query, |row| {
+    query
+}
+
+/// The notes whose title or alias matches the folded wiki key `key`.
+///
+/// The pool is cut by usage before recency: a much-linked note stays in it
+/// however long ago its file changed, and an exact hit is always kept. The
+/// search index also admits titles that differ only in accents; those rank
+/// below spelled hits. An empty key lists notes only: days come from the date
+/// generator of the frontend.
+pub(crate) fn wiki_candidates(conn: &Connection, key: &str) -> AppResult<WikiCandidates> {
+    let titles = sql::query(conn, &title_candidates_query(key), |row| {
         Ok(WikiTitleCandidate {
             path: row.get(0)?,
             title: row.get(1)?,
