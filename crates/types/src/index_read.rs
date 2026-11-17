@@ -164,3 +164,29 @@ pub struct TaskRow {
     /// When the note's row last changed (epoch ms).
     pub updated_at: i64,
 }
+
+/// The notes that claim a wiki key in its strongest tier.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct WikiClaimMatch {
+    /// The strongest tier that claims the key; a lower number is stronger.
+    pub tier: i64,
+    /// Every note that claims the key in that tier, by path.
+    pub paths: Vec<String>,
+}
+
+/// One note as a wiki link suggestion candidate, found by its title.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct WikiTitleCandidate {
+    pub path: String,
+    pub title: String,
+    pub title_key: String,
+    pub daily_date: Option<String>,
+    /// File modification time (epoch ms).
+    pub mtime: i64,
+    /// The number of links that point at a key the note claims.
+    pub link_count: u32,
+}

@@ -8,7 +8,8 @@ use serde_json::{Map, Value};
 use reflect_types::{
     AppError, AppResult, ChatConversation, ChatMessageRow, ChunkHash, DailyNoteRow, EmbeddedChunk,
     GraphStats, IndexTouch, IndexedNote, MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry,
-    NoteRow, PinnedNoteRow, RecentNoteRow, TagFacet, TaskRow, TemplateEntry,
+    NoteRow, PinnedNoteRow, RecentNoteRow, TagFacet, TaskRow, TemplateEntry, WikiClaimMatch,
+    WikiTitleCandidate,
 };
 
 use crate::read;
@@ -250,6 +251,36 @@ impl<'a> IndexCommands<'a> {
     /// The open or the completed tasks of every note but templates.
     fn index_tasks(&self, checked: bool) -> AppResult<Vec<TaskRow>> {
         self.read(|conn| read::tasks::tasks(conn, checked))
+    }
+
+    /// The note that wins the wiki key `key`.
+    fn index_resolve_wiki(&self, key: String) -> AppResult<Option<String>> {
+        self.read(|conn| read::wiki::resolve(conn, &key))
+    }
+
+    /// The notes that claim `key` in its strongest tier.
+    fn index_wiki_target_match(&self, key: String) -> AppResult<Option<WikiClaimMatch>> {
+        self.read(|conn| read::wiki::claim_match(conn, &key))
+    }
+
+    /// The notes whose folded path is `path_key`, by path.
+    fn index_notes_by_path_key(&self, path_key: String) -> AppResult<Vec<String>> {
+        self.read(|conn| read::wiki::notes_by_path_key(conn, &path_key))
+    }
+
+    /// The notes with a link to the wiki key `target_key`, by path.
+    fn index_link_sources(&self, target_key: String) -> AppResult<Vec<String>> {
+        self.read(|conn| read::wiki::link_sources(conn, &target_key))
+    }
+
+    /// The notes with a link to the folded path `target_path_key`, by path.
+    fn index_path_link_sources(&self, target_path_key: String) -> AppResult<Vec<String>> {
+        self.read(|conn| read::wiki::path_link_sources(conn, &target_path_key))
+    }
+
+    /// The note at `path` as a suggestion candidate; templates have none.
+    fn index_wiki_address_note(&self, path: String) -> AppResult<Option<WikiTitleCandidate>> {
+        self.read(|conn| read::wiki::address_note(conn, &path))
     }
 
     /// The dates in `start..=end` whose daily note has content, ascending.

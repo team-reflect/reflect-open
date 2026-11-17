@@ -4929,6 +4929,82 @@ public struct WebAuthStartArgs: Codable, Sendable, Equatable {
     }
 }
 
+/// The notes that claim a wiki key in its strongest tier.
+public struct WikiClaimMatch: Codable, Sendable, Equatable {
+    public let tier: Int64
+    public let paths: [String]
+
+    private enum CodingKeys: String, CodingKey {
+        case tier = "tier"
+        case paths = "paths"
+    }
+
+    public init(tier: Int64, paths: [String]) {
+        self.tier = tier
+        self.paths = paths
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.tier = try container.decode(Int64.self, forKey: .tier)
+        self.paths = try container.decode([String].self, forKey: .paths)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(tier, forKey: .tier)
+        try container.encode(paths, forKey: .paths)
+    }
+}
+
+/// One note as a wiki link suggestion candidate, found by its title.
+public struct WikiTitleCandidate: Codable, Sendable, Equatable {
+    public let path: String
+    public let title: String
+    public let titleKey: String
+    public let dailyDate: String?
+    public let mtime: Int64
+    public let linkCount: UInt32
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case title = "title"
+        case titleKey = "titleKey"
+        case dailyDate = "dailyDate"
+        case mtime = "mtime"
+        case linkCount = "linkCount"
+    }
+
+    public init(path: String, title: String, titleKey: String, dailyDate: String?, mtime: Int64, linkCount: UInt32) {
+        self.path = path
+        self.title = title
+        self.titleKey = titleKey
+        self.dailyDate = dailyDate
+        self.mtime = mtime
+        self.linkCount = linkCount
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.titleKey = try container.decode(String.self, forKey: .titleKey)
+        self.dailyDate = try container.decodeIfPresent(String.self, forKey: .dailyDate)
+        self.mtime = try container.decode(Int64.self, forKey: .mtime)
+        self.linkCount = try container.decode(UInt32.self, forKey: .linkCount)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(title, forKey: .title)
+        try container.encode(titleKey, forKey: .titleKey)
+        try container.encode(dailyDate, forKey: .dailyDate)
+        try container.encode(mtime, forKey: .mtime)
+        try container.encode(linkCount, forKey: .linkCount)
+    }
+}
+
 /// What a secondary window needs to boot: the open graph's identity (both
 /// session generations, unbumped) and the deep link it was created to show.
 public struct WindowBootstrap: Codable, Sendable, Equatable {

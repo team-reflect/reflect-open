@@ -65,7 +65,8 @@ pub use index::{
 };
 pub use index_read::{
     ChunkHash, DailyNoteRow, GraphStats, NoteFileFacts, NoteId, NoteListEntry, NoteRow,
-    PinnedNoteRow, RecentNoteRow, TagFacet, TaskRow, TemplateEntry,
+    PinnedNoteRow, RecentNoteRow, TagFacet, TaskRow, TemplateEntry, WikiClaimMatch,
+    WikiTitleCandidate,
 };
 pub use link_preview::LinkPreviewHtml;
 pub use settings::SettingsDoc;

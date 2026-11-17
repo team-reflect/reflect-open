@@ -27,6 +27,9 @@ use super::read::notes::{
 };
 use super::read::stats::graph_stats;
 use super::read::tasks::tasks;
+use super::read::wiki::{
+    address_note, claim_match, link_sources, notes_by_path_key, path_link_sources, resolve,
+};
 use super::scan::scan_reconcile;
 use super::write::{apply_note, claim_tier, clear_index, move_note, touch_note};
 use super::{Applied, FileIndexConnections, IndexConnections, IndexSession};
@@ -2589,4 +2592,56 @@ fn tasks_split_by_checked_and_skip_templates() {
     let done = tasks(&conn, true).unwrap();
     assert_eq!(done.len(), 1);
     assert_eq!(done[0].markdown, "done one");
+}
+
+#[test]
+fn wiki_reads_resolve_keys_claims_and_link_sources() {
+    let conn = migrated();
+    apply_note(&conn, &note("notes/rust.md", "Rust", vec![])).unwrap();
+    apply_note(&conn, &aliased_note("notes/other.md", "Other", "Rust")).unwrap();
+    apply_note(&conn, &note("notes/a.md", "A", vec![wiki("Rust")])).unwrap();
+    apply_note(
+        &conn,
+        &note(
+            "notes/b.md",
+            "B",
+            vec![
+                wiki("Rust"),
+                path_link(LinkKind::Wiki, "notes/rust", "notes/rust.md"),
+            ],
+        ),
+    )
+    .unwrap();
+    let mut template = note("templates/t.md", "T", vec![]);
+    template.kind = NoteKind::Template;
+    apply_note(&conn, &template).unwrap();
+
+    // The title claims the key in a stronger tier than the alias.
+    assert_eq!(
+        resolve(&conn, "rust").unwrap().as_deref(),
+        Some("notes/rust.md")
+    );
+    assert_eq!(resolve(&conn, "missing").unwrap(), None);
+    let matched = claim_match(&conn, "rust").unwrap().unwrap();
+    assert_eq!(matched.tier, claim_tier::TITLE);
+    assert_eq!(matched.paths, ["notes/rust.md"]);
+    assert_eq!(claim_match(&conn, "missing").unwrap(), None);
+    assert_eq!(
+        notes_by_path_key(&conn, "notes/rust.md").unwrap(),
+        ["notes/rust.md"]
+    );
+    assert_eq!(
+        link_sources(&conn, "rust").unwrap(),
+        ["notes/a.md", "notes/b.md"]
+    );
+    assert_eq!(
+        path_link_sources(&conn, "notes/rust.md").unwrap(),
+        ["notes/b.md"]
+    );
+    let candidate = address_note(&conn, "notes/rust.md").unwrap().unwrap();
+    assert_eq!(
+        (candidate.title_key.as_str(), candidate.link_count),
+        ("rust", 0)
+    );
+    assert_eq!(address_note(&conn, "templates/t.md").unwrap(), None);
 }

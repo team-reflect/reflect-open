@@ -1122,6 +1122,42 @@ export type Commands = {
     }
     result: TaskRow[]
   }
+  index_resolve_wiki: {
+    args: {
+      key: string
+    }
+    result: string | null
+  }
+  index_wiki_target_match: {
+    args: {
+      key: string
+    }
+    result: WikiClaimMatch | null
+  }
+  index_notes_by_path_key: {
+    args: {
+      pathKey: string
+    }
+    result: string[]
+  }
+  index_link_sources: {
+    args: {
+      targetKey: string
+    }
+    result: string[]
+  }
+  index_path_link_sources: {
+    args: {
+      targetPathKey: string
+    }
+    result: string[]
+  }
+  index_wiki_address_note: {
+    args: {
+      path: string
+    }
+    result: WikiTitleCandidate | null
+  }
   index_daily_dates: {
     args: {
       start: string
@@ -2445,6 +2481,26 @@ export type WebAuthStartArgs = {
   payload: WebAuthOptions
 }
 
+/**  The notes that claim a wiki key in its strongest tier. */
+export type WikiClaimMatch = {
+  /**  The strongest tier that claims the key; a lower number is stronger. */
+  tier: number
+  /**  Every note that claims the key in that tier, by path. */
+  paths: string[]
+}
+
+/**  One note as a wiki link suggestion candidate, found by its title. */
+export type WikiTitleCandidate = {
+  path: string
+  title: string
+  titleKey: string
+  dailyDate: string | null
+  /**  File modification time (epoch ms). */
+  mtime: number
+  /**  The number of links that point at a key the note claims. */
+  linkCount: number
+}
+
 /**
  *  What a secondary window needs to boot: the open graph's identity (both
  *  session generations, unbumped) and the deep link it was created to show.
@@ -2486,6 +2542,12 @@ export type IndexReadCommand =
   | 'index_recent_notes'
   | 'index_note_tags'
   | 'index_tasks'
+  | 'index_resolve_wiki'
+  | 'index_wiki_target_match'
+  | 'index_notes_by_path_key'
+  | 'index_link_sources'
+  | 'index_path_link_sources'
+  | 'index_wiki_address_note'
   | 'index_daily_dates'
   | 'index_daily_notes'
   | 'chat_conversations'

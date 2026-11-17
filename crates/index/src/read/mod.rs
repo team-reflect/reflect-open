@@ -14,3 +14,4 @@ pub(crate) mod meta;
 pub(crate) mod notes;
 pub(crate) mod stats;
 pub(crate) mod tasks;
+pub(crate) mod wiki;
