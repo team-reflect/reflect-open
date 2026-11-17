@@ -11,7 +11,6 @@
  * the user types.
  */
 
-import { sql, type RawBuilder } from 'kysely'
 import { foldKey } from '../markdown/index.ts'
 
 /** Split a free-text query into the terms shared by FTS and title recall. */
@@ -142,44 +141,4 @@ export function titleRecallTerms(query: string): TitleRecallTerm[] {
  */
 export function titleRecallNeedles(query: string): string[] {
   return titleRecallTerms(query).map((term) => (term.anywhere ? term.value : ` ${term.value}`))
-}
-
-export interface TitleMatchSql {
-  /**
-   * True when every query term matches the folded title — at a word start for
-   * space-delimited scripts, anywhere for unsegmented ones.
-   */
-  readonly containsAllTerms: RawBuilder<boolean>
-  /** Exact (0), whole-query prefix (1), all-terms title match (2), else 3. */
-  readonly rank: RawBuilder<number>
-}
-
-/**
- * Build title-recall SQL against a stored, already-folded title-key column.
- * Every query term must match per {@link titleRecallNeedles}, so `東京 旅行`
- * matches `東京旅行計画` even though `unicode61` sees the uninterrupted title
- * as one token, while `car` never matches `Oscar party`.
- */
-export function buildTitleMatchSql(
-  titleKeyColumn: RawBuilder<string>,
-  query: string,
-): TitleMatchSql {
-  const needles = titleRecallNeedles(query)
-  const containsAllTerms =
-    needles.length === 0
-      ? sql<boolean>`0`
-      : sql<boolean>`(${sql.join(
-          needles.map((needle) => sql`instr(' ' || ${titleKeyColumn}, ${needle}) > 0`),
-          sql` and `,
-        )})`
-  const titleKey = foldKey(query)
-  return {
-    containsAllTerms,
-    rank: sql<number>`case
-      when ${titleKeyColumn} = ${titleKey} then 0
-      when instr(${titleKeyColumn}, ${titleKey}) = 1 then 1
-      when ${containsAllTerms} then 2
-      else 3
-    end`,
-  }
 }

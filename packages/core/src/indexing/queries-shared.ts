@@ -1,4 +1,3 @@
-import { sql, type RawBuilder } from 'kysely'
 import { wikiNoteReference } from '../graph/note-reference.ts'
 import { normalizeWikiTarget } from '../markdown/index.ts'
 import type { DatabaseService } from './database-service.ts'
@@ -18,22 +17,6 @@ export interface WikiLinkSuggestionResult {
   readonly claimedTargetKeys: readonly string[]
   /** Whether the raw query produced at least one generated date candidate. */
   readonly queryReadsAsDate: boolean
-}
-
-/**
- * The recall-feed ordering, shared by the filtered search and the All Notes
- * list so the two "V1 list order" implementations can't drift: optionally
- * pinned-first (explicit pin order, then unordered pins), then recency, then
- * path as the stable tiebreaker. Raw fragments because Kysely's typed
- * `orderBy` can't resolve `notes.*` refs across differently-rooted queries.
- */
-export function recallOrder(pinnedFirst: boolean): RawBuilder<unknown>[] {
-  const pinned = [
-    sql`"notes"."is_pinned" desc`,
-    sql`"notes"."pinned_order" is null`,
-    sql`"notes"."pinned_order"`,
-  ]
-  return [...(pinnedFirst ? pinned : []), sql`"notes"."mtime" desc`, sql`"notes"."path"`]
 }
 
 /**

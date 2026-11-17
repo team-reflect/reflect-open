@@ -1267,6 +1267,12 @@ export type Commands = {
     }
     result: ChunkHit[]
   }
+  index_search: {
+    args: {
+      request: SearchRequest
+    }
+    result: SearchHitRow[]
+  }
   index_daily_dates: {
     args: {
       start: string
@@ -2381,6 +2387,50 @@ export type ScanOrphan = {
   storedHash: string
 }
 
+/**  One search hit, before the frontend derives its display fields. */
+export type SearchHitRow = {
+  path: string
+  title: string
+  dailyDate: string | null
+  /**  The indexed row preview; may be empty. */
+  preview: string
+  /**  File modification time (epoch ms). */
+  mtime: number
+  isPinned: boolean
+  /**  The title with FTS5 highlight markers, when the search index matched. */
+  ftsHighlightedTitle: string | null
+  /**  The FTS5 body snippet, when the search index matched. */
+  snippet: string | null
+}
+
+/**  One search over the notes: free text plus filters. */
+export type SearchRequest = {
+  /**  The free text as typed; empty for a filter-only search. */
+  text: string
+  /**  The folded key of `text`, for title recall. */
+  titleKey: string
+  /**  The folded keys of the tags a note must all carry. */
+  tagKeys: string[]
+  /**  Only daily notes. */
+  dailyOnly: boolean
+  /**  Only non-daily notes. */
+  notesOnly: boolean
+  /**  Only pinned notes. */
+  pinnedOnly: boolean
+  /**  Only notes with a link to this path. */
+  linksToPath: string | null
+  /**  Only notes that this path links to. */
+  linkedFromPath: string | null
+  /**  Only notes changed at or after this time (epoch ms). */
+  updatedAfterMs: number | null
+  /**  Only notes changed before this time (epoch ms). */
+  updatedBeforeMs: number | null
+  /**  Lists pinned notes first when there is no free text. */
+  pinnedFirst: boolean
+  /**  The most hits to return; `None` returns all. */
+  limit: number | null
+}
+
 /**  The search field of the top bar. */
 export type SearchState = {
   placeholder: string
@@ -2707,6 +2757,7 @@ export type IndexReadCommand =
   | 'index_note_privacy'
   | 'embed_related_chunks'
   | 'embed_semantic_chunks'
+  | 'index_search'
   | 'index_daily_dates'
   | 'index_daily_notes'
   | 'chat_conversations'

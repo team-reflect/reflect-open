@@ -28,6 +28,7 @@ use super::read::notes::{
     embeddable_paths, file_facts, note as note_row, note_ids, path_taken, person_owners,
     pinned_notes, random_note, resolve_target, templates,
 };
+use super::read::search::{ranked_query_plan, search};
 use super::read::stats::graph_stats;
 use super::read::suggest::{key_winners, tags as suggest_tags, wiki_candidates, winning_aliases};
 use super::read::tasks::tasks;
@@ -37,6 +38,7 @@ use super::read::wiki::{
 use super::scan::scan_reconcile;
 use super::write::{apply_note, claim_tier, clear_index, move_note, touch_note};
 use super::{Applied, FileIndexConnections, IndexConnections, IndexSession};
+use reflect_types::SearchRequest;
 
 fn migrated() -> Connection {
     // Registers sqlite-vec before migrating — the 0002 migration creates a
@@ -2858,4 +2860,156 @@ fn vector_reads_find_the_nearest_chunks_and_keep_private_notes_out_of_related() 
         .map(|flag| (flag.path.as_str(), flag.is_private))
         .collect();
     assert_eq!(flags, [("notes/near.md", false), ("notes/secret.md", true)]);
+}
+
+fn search_paths(conn: &Connection, request: &SearchRequest) -> Vec<String> {
+    search(conn, request)
+        .unwrap()
+        .into_iter()
+        .map(|hit| hit.path)
+        .collect()
+}
+
+fn text_search(text: &str) -> SearchRequest {
+    SearchRequest {
+        text: text.to_string(),
+        title_key: text.to_lowercase(),
+        ..SearchRequest::default()
+    }
+}
+
+#[test]
+fn search_ranks_title_matches_before_body_hits() {
+    let conn = migrated();
+    let mut exact = note("notes/car.md", "Car", vec![]);
+    exact.mtime = 1;
+    let mut prefix = note("notes/car-log.md", "Car log", vec![]);
+    prefix.mtime = 2;
+    let mut word = note("notes/red-car.md", "Red car", vec![]);
+    word.mtime = 3;
+    let mut body = note("notes/trip.md", "Trip", vec![]);
+    body.text = "we took the car".to_string();
+    body.mtime = 4;
+    // `car` never matches inside a word.
+    let mut inside = note("notes/oscar.md", "Oscar party", vec![]);
+    inside.mtime = 5;
+    let mut template = note("templates/car.md", "Car", vec![]);
+    template.kind = NoteKind::Template;
+    for indexed in [&exact, &prefix, &word, &body, &inside, &template] {
+        apply_note(&conn, indexed).unwrap();
+    }
+
+    assert_eq!(
+        search_paths(&conn, &text_search("car")),
+        [
+            "notes/car.md",
+            "notes/car-log.md",
+            "notes/red-car.md",
+            "notes/trip.md"
+        ]
+    );
+    let hits = search(&conn, &text_search("car")).unwrap();
+    // A body hit carries a marked snippet; the marker frames the match.
+    let snippet = hits[3].snippet.as_deref().unwrap();
+    assert!(snippet.contains("\u{1}car\u{2}"), "{snippet:?}");
+    let limited = SearchRequest {
+        limit: Some(2),
+        ..text_search("car")
+    };
+    assert_eq!(search_paths(&conn, &limited).len(), 2);
+    // The FTS pass runs once, not once per note.
+    let plan = ranked_query_plan(&conn, &text_search("car")).unwrap();
+    assert!(
+        plan.iter().any(|step| step.contains("MATERIALIZE lexical")),
+        "{plan:?}"
+    );
+    // User text is a literal: FTS operators and quotes are not syntax.
+    assert_eq!(
+        search_paths(&conn, &text_search("\"car AND NOT (")),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn search_without_text_is_a_filtered_recall_feed() {
+    let conn = migrated();
+    let mut pinned = tagged_note("notes/pinned.md", "Pinned", &["a"]);
+    pinned.is_pinned = true;
+    pinned.mtime = 10;
+    let mut both = tagged_note("notes/both.md", "Both", &["a", "b"]);
+    both.mtime = 30;
+    both.links = vec![wiki("Pinned")];
+    let mut only_b = tagged_note("notes/only-b.md", "Only b", &["b"]);
+    only_b.mtime = 20;
+    let mut daily = daily_note("daily/2026-01-02.md", "2026-01-02");
+    daily.tags = vec![IndexedTag {
+        tag: "a".to_string(),
+        tag_key: "a".to_string(),
+    }];
+    daily.mtime = 40;
+    for indexed in [&pinned, &both, &only_b, &daily] {
+        apply_note(&conn, indexed).unwrap();
+    }
+    let tags = |keys: &[&str]| keys.iter().map(|key| key.to_string()).collect::<Vec<_>>();
+
+    assert_eq!(
+        search_paths(&conn, &SearchRequest::default()),
+        [
+            "daily/2026-01-02.md",
+            "notes/both.md",
+            "notes/only-b.md",
+            "notes/pinned.md"
+        ]
+    );
+    let pinned_first = SearchRequest {
+        pinned_first: true,
+        notes_only: true,
+        ..SearchRequest::default()
+    };
+    assert_eq!(
+        search_paths(&conn, &pinned_first),
+        ["notes/pinned.md", "notes/both.md", "notes/only-b.md"]
+    );
+    // Tags are ANDed.
+    let tagged = |keys: &[&str]| SearchRequest {
+        tag_keys: tags(keys),
+        ..SearchRequest::default()
+    };
+    assert_eq!(
+        search_paths(&conn, &tagged(&["a"])),
+        ["daily/2026-01-02.md", "notes/both.md", "notes/pinned.md"]
+    );
+    assert_eq!(search_paths(&conn, &tagged(&["a", "b"])), ["notes/both.md"]);
+    // The daily filter wins over the notes-only population.
+    let dailies = SearchRequest {
+        daily_only: true,
+        notes_only: true,
+        ..SearchRequest::default()
+    };
+    assert_eq!(search_paths(&conn, &dailies), ["daily/2026-01-02.md"]);
+    let links_to = SearchRequest {
+        links_to_path: Some("notes/pinned.md".to_string()),
+        ..SearchRequest::default()
+    };
+    assert_eq!(search_paths(&conn, &links_to), ["notes/both.md"]);
+    let linked_from = SearchRequest {
+        linked_from_path: Some("notes/both.md".to_string()),
+        ..SearchRequest::default()
+    };
+    assert_eq!(search_paths(&conn, &linked_from), ["notes/pinned.md"]);
+    let window = SearchRequest {
+        updated_after_ms: Some(20.0),
+        updated_before_ms: Some(40.0),
+        pinned_only: false,
+        ..SearchRequest::default()
+    };
+    assert_eq!(
+        search_paths(&conn, &window),
+        ["notes/both.md", "notes/only-b.md"]
+    );
+    let only_pinned = SearchRequest {
+        pinned_only: true,
+        ..tagged(&["a"])
+    };
+    assert_eq!(search_paths(&conn, &only_pinned), ["notes/pinned.md"]);
 }

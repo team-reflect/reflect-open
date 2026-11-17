@@ -4449,6 +4449,142 @@ public struct ScanOrphan: Codable, Sendable, Equatable {
     }
 }
 
+/// One search hit, before the frontend derives its display fields.
+public struct SearchHitRow: Codable, Sendable, Equatable {
+    public let path: String
+    public let title: String
+    public let dailyDate: String?
+    public let preview: String
+    public let mtime: Int64
+    public let isPinned: Bool
+    public let ftsHighlightedTitle: String?
+    public let snippet: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case title = "title"
+        case dailyDate = "dailyDate"
+        case preview = "preview"
+        case mtime = "mtime"
+        case isPinned = "isPinned"
+        case ftsHighlightedTitle = "ftsHighlightedTitle"
+        case snippet = "snippet"
+    }
+
+    public init(path: String, title: String, dailyDate: String?, preview: String, mtime: Int64, isPinned: Bool, ftsHighlightedTitle: String?, snippet: String?) {
+        self.path = path
+        self.title = title
+        self.dailyDate = dailyDate
+        self.preview = preview
+        self.mtime = mtime
+        self.isPinned = isPinned
+        self.ftsHighlightedTitle = ftsHighlightedTitle
+        self.snippet = snippet
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.dailyDate = try container.decodeIfPresent(String.self, forKey: .dailyDate)
+        self.preview = try container.decode(String.self, forKey: .preview)
+        self.mtime = try container.decode(Int64.self, forKey: .mtime)
+        self.isPinned = try container.decode(Bool.self, forKey: .isPinned)
+        self.ftsHighlightedTitle = try container.decodeIfPresent(String.self, forKey: .ftsHighlightedTitle)
+        self.snippet = try container.decodeIfPresent(String.self, forKey: .snippet)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(title, forKey: .title)
+        try container.encode(dailyDate, forKey: .dailyDate)
+        try container.encode(preview, forKey: .preview)
+        try container.encode(mtime, forKey: .mtime)
+        try container.encode(isPinned, forKey: .isPinned)
+        try container.encode(ftsHighlightedTitle, forKey: .ftsHighlightedTitle)
+        try container.encode(snippet, forKey: .snippet)
+    }
+}
+
+/// One search over the notes: free text plus filters.
+public struct SearchRequest: Codable, Sendable, Equatable {
+    public let text: String
+    public let titleKey: String
+    public let tagKeys: [String]
+    public let dailyOnly: Bool
+    public let notesOnly: Bool
+    public let pinnedOnly: Bool
+    public let linksToPath: String?
+    public let linkedFromPath: String?
+    public let updatedAfterMs: Double?
+    public let updatedBeforeMs: Double?
+    public let pinnedFirst: Bool
+    public let limit: UInt32?
+
+    private enum CodingKeys: String, CodingKey {
+        case text = "text"
+        case titleKey = "titleKey"
+        case tagKeys = "tagKeys"
+        case dailyOnly = "dailyOnly"
+        case notesOnly = "notesOnly"
+        case pinnedOnly = "pinnedOnly"
+        case linksToPath = "linksToPath"
+        case linkedFromPath = "linkedFromPath"
+        case updatedAfterMs = "updatedAfterMs"
+        case updatedBeforeMs = "updatedBeforeMs"
+        case pinnedFirst = "pinnedFirst"
+        case limit = "limit"
+    }
+
+    public init(text: String, titleKey: String, tagKeys: [String], dailyOnly: Bool, notesOnly: Bool, pinnedOnly: Bool, linksToPath: String?, linkedFromPath: String?, updatedAfterMs: Double?, updatedBeforeMs: Double?, pinnedFirst: Bool, limit: UInt32?) {
+        self.text = text
+        self.titleKey = titleKey
+        self.tagKeys = tagKeys
+        self.dailyOnly = dailyOnly
+        self.notesOnly = notesOnly
+        self.pinnedOnly = pinnedOnly
+        self.linksToPath = linksToPath
+        self.linkedFromPath = linkedFromPath
+        self.updatedAfterMs = updatedAfterMs
+        self.updatedBeforeMs = updatedBeforeMs
+        self.pinnedFirst = pinnedFirst
+        self.limit = limit
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.text = try container.decode(String.self, forKey: .text)
+        self.titleKey = try container.decode(String.self, forKey: .titleKey)
+        self.tagKeys = try container.decode([String].self, forKey: .tagKeys)
+        self.dailyOnly = try container.decode(Bool.self, forKey: .dailyOnly)
+        self.notesOnly = try container.decode(Bool.self, forKey: .notesOnly)
+        self.pinnedOnly = try container.decode(Bool.self, forKey: .pinnedOnly)
+        self.linksToPath = try container.decodeIfPresent(String.self, forKey: .linksToPath)
+        self.linkedFromPath = try container.decodeIfPresent(String.self, forKey: .linkedFromPath)
+        self.updatedAfterMs = try container.decodeIfPresent(Double.self, forKey: .updatedAfterMs)
+        self.updatedBeforeMs = try container.decodeIfPresent(Double.self, forKey: .updatedBeforeMs)
+        self.pinnedFirst = try container.decode(Bool.self, forKey: .pinnedFirst)
+        self.limit = try container.decodeIfPresent(UInt32.self, forKey: .limit)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(text, forKey: .text)
+        try container.encode(titleKey, forKey: .titleKey)
+        try container.encode(tagKeys, forKey: .tagKeys)
+        try container.encode(dailyOnly, forKey: .dailyOnly)
+        try container.encode(notesOnly, forKey: .notesOnly)
+        try container.encode(pinnedOnly, forKey: .pinnedOnly)
+        try container.encode(linksToPath, forKey: .linksToPath)
+        try container.encode(linkedFromPath, forKey: .linkedFromPath)
+        try container.encode(updatedAfterMs, forKey: .updatedAfterMs)
+        try container.encode(updatedBeforeMs, forKey: .updatedBeforeMs)
+        try container.encode(pinnedFirst, forKey: .pinnedFirst)
+        try container.encode(limit, forKey: .limit)
+    }
+}
+
 /// The search field of the top bar.
 public struct SearchState: Codable, Sendable, Equatable {
     public let placeholder: String

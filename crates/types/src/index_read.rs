@@ -310,3 +310,53 @@ pub struct NotePrivacy {
     pub path: String,
     pub is_private: bool,
 }
+
+/// One search over the notes: free text plus filters.
+#[derive(Debug, Default, serde::Deserialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct SearchRequest {
+    /// The free text as typed; empty for a filter-only search.
+    pub text: String,
+    /// The folded key of `text`, for title recall.
+    pub title_key: String,
+    /// The folded keys of the tags a note must all carry.
+    pub tag_keys: Vec<String>,
+    /// Only daily notes.
+    pub daily_only: bool,
+    /// Only non-daily notes.
+    pub notes_only: bool,
+    /// Only pinned notes.
+    pub pinned_only: bool,
+    /// Only notes with a link to this path.
+    pub links_to_path: Option<String>,
+    /// Only notes that this path links to.
+    pub linked_from_path: Option<String>,
+    /// Only notes changed at or after this time (epoch ms).
+    pub updated_after_ms: Option<f64>,
+    /// Only notes changed before this time (epoch ms).
+    pub updated_before_ms: Option<f64>,
+    /// Lists pinned notes first when there is no free text.
+    pub pinned_first: bool,
+    /// The most hits to return; `None` returns all.
+    pub limit: Option<u32>,
+}
+
+/// One search hit, before the frontend derives its display fields.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct SearchHitRow {
+    pub path: String,
+    pub title: String,
+    pub daily_date: Option<String>,
+    /// The indexed row preview; may be empty.
+    pub preview: String,
+    /// File modification time (epoch ms).
+    pub mtime: i64,
+    pub is_pinned: bool,
+    /// The title with FTS5 highlight markers, when the search index matched.
+    pub fts_highlighted_title: Option<String>,
+    /// The FTS5 body snippet, when the search index matched.
+    pub snippet: Option<String>,
+}

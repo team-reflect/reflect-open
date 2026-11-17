@@ -153,6 +153,7 @@ macro_rules! commands {
                 index_note_privacy(paths: Vec<String>) -> Vec<NotePrivacy>,
                 embed_related_chunks(path: String, seed_limit: u32, candidates: u32) -> Vec<Vec<ChunkHit>>,
                 embed_semantic_chunks(vector: Vec<f32>, candidates: u32) -> Vec<ChunkHit>,
+                index_search(request: SearchRequest) -> Vec<SearchHitRow>,
                 index_daily_dates(start: String, end: String) -> Vec<String>,
                 index_daily_notes(start: String, end: String, limit: u32) -> Vec<DailyNoteRow>,
                 chat_conversations(limit: u32) -> Vec<ChatConversation>,
