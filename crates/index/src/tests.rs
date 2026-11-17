@@ -16,6 +16,7 @@ use super::connections::{migrate, migrate_to, open_in_memory, open_index_at, val
 use super::embed_write::{apply_chunks, remove_chunks};
 use super::query::run_query;
 use super::read::assets::note_paths;
+use super::read::backlinks::{backlinks, page as backlink_page};
 use super::read::chat::{conversations, messages};
 use super::read::daily::{dates_in_range, notes_in_range};
 use super::read::embed::chunk_hashes;
@@ -2644,4 +2645,57 @@ fn wiki_reads_resolve_keys_claims_and_link_sources() {
         ("rust", 0)
     );
     assert_eq!(address_note(&conn, "templates/t.md").unwrap(), None);
+}
+
+#[test]
+fn backlink_pages_run_newest_source_first_and_resume_after_a_cursor() {
+    let conn = migrated();
+    apply_note(&conn, &note("notes/target.md", "Target", vec![])).unwrap();
+    let mut daily = daily_note("daily/2026-03-01.md", "2026-03-01");
+    daily.links = vec![wiki("Target")];
+    apply_note(&conn, &daily).unwrap();
+    let mut twice = note(
+        "notes/twice.md",
+        "Twice",
+        vec![wiki("Target"), wiki("Target")],
+    );
+    twice.links[1].pos_from = 40;
+    twice.links[1].pos_to = 50;
+    apply_note(&conn, &twice).unwrap();
+    apply_note(&conn, &note("notes/once.md", "Once", vec![wiki("Target")])).unwrap();
+    // The two notes share one recency; the path breaks the tie.
+    conn.execute("UPDATE notes SET updated_at = 5000 WHERE kind = 'note'", [])
+        .unwrap();
+
+    let all = backlinks(&conn, "notes/target.md").unwrap();
+    assert_eq!(all.len(), 4);
+    assert_eq!(all[0].source_path, "daily/2026-03-01.md");
+
+    let first = backlink_page(&conn, "notes/target.md", 2, None).unwrap();
+    let paths: Vec<&str> = first
+        .sources
+        .iter()
+        .map(|source| source.source_path.as_str())
+        .collect();
+    assert_eq!(paths, ["daily/2026-03-01.md", "notes/once.md"]);
+    assert_eq!(first.indexed_link_count, 4);
+    assert!(first.target_keys.contains(&"target".to_string()));
+    let cursor = first.next_cursor.unwrap();
+    assert_eq!(
+        (cursor.recency_ms, cursor.source_path.as_str()),
+        (5000, "notes/once.md")
+    );
+
+    let second = backlink_page(&conn, "notes/target.md", 2, Some(&cursor)).unwrap();
+    assert_eq!(second.sources.len(), 1);
+    assert_eq!(second.sources[0].source_path, "notes/twice.md");
+    assert_eq!(second.sources[0].positions.len(), 2);
+    assert_eq!(second.sources[0].positions[1], 40);
+    assert_eq!(second.next_cursor, None);
+
+    let unlimited = backlink_page(&conn, "notes/target.md", i64::MAX, None).unwrap();
+    assert_eq!(unlimited.sources.len(), 3);
+    assert_eq!(unlimited.next_cursor, None);
+    let none = backlink_page(&conn, "notes/missing.md", 5, None).unwrap();
+    assert_eq!((none.sources.len(), none.indexed_link_count), (0, 0));
 }

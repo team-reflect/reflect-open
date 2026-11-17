@@ -83,6 +83,43 @@ export type AudioPhase = 'idle' | 'requesting' | 'recording' | 'transcribing' | 
 /**  The phase of a user back swipe. */
 export type BackSwipePhase = 'start' | 'cancel'
 
+/**  One link that points at a note. */
+export type Backlink = {
+  sourcePath: string
+  /**  The link target as written. */
+  targetRaw: string
+  alias: string | null
+  /**  The UTF-16 offsets of the link in the source body. */
+  posFrom: number
+  posTo: number
+}
+
+/**  One page of the sources that link to a note, most recent first. */
+export type BacklinkPage = {
+  sources: BacklinkSource[]
+  /**  Where the next page starts; `None` on the last page. */
+  nextCursor: BacklinkSourceCursor | null
+  /**  The number of links to the target, over all pages. */
+  indexedLinkCount: number
+  /**  Every wiki key that resolves to the target. */
+  targetKeys: string[]
+}
+
+/**  One source note of a backlink page. */
+export type BacklinkSource = {
+  sourcePath: string
+  sourceTitle: string
+  /**  The start offset of each link to the target, ascending. */
+  positions: number[]
+}
+
+/**  The position after one source in a backlink listing. */
+export type BacklinkSourceCursor = {
+  /**  The recency of the source: its daily date, else its last change (epoch ms). */
+  recencyMs: number
+  sourcePath: string
+}
+
 /**
  *  A button of the native top bar. A tap opens
  *  `menu` when it has one, and sends an `action` intent with `id` otherwise.
@@ -1157,6 +1194,20 @@ export type Commands = {
       path: string
     }
     result: WikiTitleCandidate | null
+  }
+  index_backlinks: {
+    args: {
+      path: string
+    }
+    result: Backlink[]
+  }
+  index_backlink_page: {
+    args: {
+      path: string
+      limit: number
+      cursor: BacklinkSourceCursor | null
+    }
+    result: BacklinkPage
   }
   index_daily_dates: {
     args: {
@@ -2548,6 +2599,8 @@ export type IndexReadCommand =
   | 'index_link_sources'
   | 'index_path_link_sources'
   | 'index_wiki_address_note'
+  | 'index_backlinks'
+  | 'index_backlink_page'
   | 'index_daily_dates'
   | 'index_daily_notes'
   | 'chat_conversations'

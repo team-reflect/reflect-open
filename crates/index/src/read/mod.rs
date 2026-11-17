@@ -6,6 +6,7 @@
 //! [`IndexSession::read`]: crate::IndexSession::read
 
 pub(crate) mod assets;
+pub(crate) mod backlinks;
 pub(crate) mod chat;
 pub(crate) mod daily;
 pub(crate) mod embed;

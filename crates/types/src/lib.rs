@@ -64,9 +64,9 @@ pub use index::{
     NoteKind, NoteMoveRequest, ReconcileScan, ScanCandidate, ScanOrphan,
 };
 pub use index_read::{
-    ChunkHash, DailyNoteRow, GraphStats, NoteFileFacts, NoteId, NoteListEntry, NoteRow,
-    PinnedNoteRow, RecentNoteRow, TagFacet, TaskRow, TemplateEntry, WikiClaimMatch,
-    WikiTitleCandidate,
+    Backlink, BacklinkPage, BacklinkSource, BacklinkSourceCursor, ChunkHash, DailyNoteRow,
+    GraphStats, NoteFileFacts, NoteId, NoteListEntry, NoteRow, PinnedNoteRow, RecentNoteRow,
+    TagFacet, TaskRow, TemplateEntry, WikiClaimMatch, WikiTitleCandidate,
 };
 pub use link_preview::LinkPreviewHtml;
 pub use settings::SettingsDoc;

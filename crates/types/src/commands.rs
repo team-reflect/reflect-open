@@ -144,6 +144,8 @@ macro_rules! commands {
                 index_link_sources(target_key: String) -> Vec<String>,
                 index_path_link_sources(target_path_key: String) -> Vec<String>,
                 index_wiki_address_note(path: String) -> Option<WikiTitleCandidate>,
+                index_backlinks(path: String) -> Vec<Backlink>,
+                index_backlink_page(path: String, limit: i64, cursor: Option<BacklinkSourceCursor>) -> BacklinkPage,
                 index_daily_dates(start: String, end: String) -> Vec<String>,
                 index_daily_notes(start: String, end: String, limit: u32) -> Vec<DailyNoteRow>,
                 chat_conversations(limit: u32) -> Vec<ChatConversation>,

@@ -6,10 +6,10 @@ use rusqlite::Connection;
 use serde_json::{Map, Value};
 
 use reflect_types::{
-    AppError, AppResult, ChatConversation, ChatMessageRow, ChunkHash, DailyNoteRow, EmbeddedChunk,
-    GraphStats, IndexTouch, IndexedNote, MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry,
-    NoteRow, PinnedNoteRow, RecentNoteRow, TagFacet, TaskRow, TemplateEntry, WikiClaimMatch,
-    WikiTitleCandidate,
+    AppError, AppResult, Backlink, BacklinkPage, BacklinkSourceCursor, ChatConversation,
+    ChatMessageRow, ChunkHash, DailyNoteRow, EmbeddedChunk, GraphStats, IndexTouch, IndexedNote,
+    MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry, NoteRow, PinnedNoteRow, RecentNoteRow,
+    TagFacet, TaskRow, TemplateEntry, WikiClaimMatch, WikiTitleCandidate,
 };
 
 use crate::read;
@@ -281,6 +281,21 @@ impl<'a> IndexCommands<'a> {
     /// The note at `path` as a suggestion candidate; templates have none.
     fn index_wiki_address_note(&self, path: String) -> AppResult<Option<WikiTitleCandidate>> {
         self.read(|conn| read::wiki::address_note(conn, &path))
+    }
+
+    /// Every link that points at the note at `path`, by source path.
+    fn index_backlinks(&self, path: String) -> AppResult<Vec<Backlink>> {
+        self.read(|conn| read::backlinks::backlinks(conn, &path))
+    }
+
+    /// One page of the sources that link to the note at `path`.
+    fn index_backlink_page(
+        &self,
+        path: String,
+        limit: i64,
+        cursor: Option<BacklinkSourceCursor>,
+    ) -> AppResult<BacklinkPage> {
+        self.read(|conn| read::backlinks::page(conn, &path, limit, cursor.as_ref()))
     }
 
     /// The dates in `start..=end` whose daily note has content, ascending.

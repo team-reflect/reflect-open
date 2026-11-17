@@ -342,6 +342,148 @@ public enum BackSwipePhase: String, Codable, Sendable, Equatable, CaseIterable {
     case cancel = "cancel"
 }
 
+/// One link that points at a note.
+public struct Backlink: Codable, Sendable, Equatable {
+    public let sourcePath: String
+    public let targetRaw: String
+    public let alias: String?
+    public let posFrom: Int64
+    public let posTo: Int64
+
+    private enum CodingKeys: String, CodingKey {
+        case sourcePath = "sourcePath"
+        case targetRaw = "targetRaw"
+        case alias = "alias"
+        case posFrom = "posFrom"
+        case posTo = "posTo"
+    }
+
+    public init(sourcePath: String, targetRaw: String, alias: String?, posFrom: Int64, posTo: Int64) {
+        self.sourcePath = sourcePath
+        self.targetRaw = targetRaw
+        self.alias = alias
+        self.posFrom = posFrom
+        self.posTo = posTo
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.sourcePath = try container.decode(String.self, forKey: .sourcePath)
+        self.targetRaw = try container.decode(String.self, forKey: .targetRaw)
+        self.alias = try container.decodeIfPresent(String.self, forKey: .alias)
+        self.posFrom = try container.decode(Int64.self, forKey: .posFrom)
+        self.posTo = try container.decode(Int64.self, forKey: .posTo)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(sourcePath, forKey: .sourcePath)
+        try container.encode(targetRaw, forKey: .targetRaw)
+        try container.encode(alias, forKey: .alias)
+        try container.encode(posFrom, forKey: .posFrom)
+        try container.encode(posTo, forKey: .posTo)
+    }
+}
+
+/// One page of the sources that link to a note, most recent first.
+public struct BacklinkPage: Codable, Sendable, Equatable {
+    public let sources: [BacklinkSource]
+    public let nextCursor: BacklinkSourceCursor?
+    public let indexedLinkCount: UInt32
+    public let targetKeys: [String]
+
+    private enum CodingKeys: String, CodingKey {
+        case sources = "sources"
+        case nextCursor = "nextCursor"
+        case indexedLinkCount = "indexedLinkCount"
+        case targetKeys = "targetKeys"
+    }
+
+    public init(sources: [BacklinkSource], nextCursor: BacklinkSourceCursor?, indexedLinkCount: UInt32, targetKeys: [String]) {
+        self.sources = sources
+        self.nextCursor = nextCursor
+        self.indexedLinkCount = indexedLinkCount
+        self.targetKeys = targetKeys
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.sources = try container.decode([BacklinkSource].self, forKey: .sources)
+        self.nextCursor = try container.decodeIfPresent(BacklinkSourceCursor.self, forKey: .nextCursor)
+        self.indexedLinkCount = try container.decode(UInt32.self, forKey: .indexedLinkCount)
+        self.targetKeys = try container.decode([String].self, forKey: .targetKeys)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(sources, forKey: .sources)
+        try container.encode(nextCursor, forKey: .nextCursor)
+        try container.encode(indexedLinkCount, forKey: .indexedLinkCount)
+        try container.encode(targetKeys, forKey: .targetKeys)
+    }
+}
+
+/// One source note of a backlink page.
+public struct BacklinkSource: Codable, Sendable, Equatable {
+    public let sourcePath: String
+    public let sourceTitle: String
+    public let positions: [Int64]
+
+    private enum CodingKeys: String, CodingKey {
+        case sourcePath = "sourcePath"
+        case sourceTitle = "sourceTitle"
+        case positions = "positions"
+    }
+
+    public init(sourcePath: String, sourceTitle: String, positions: [Int64]) {
+        self.sourcePath = sourcePath
+        self.sourceTitle = sourceTitle
+        self.positions = positions
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.sourcePath = try container.decode(String.self, forKey: .sourcePath)
+        self.sourceTitle = try container.decode(String.self, forKey: .sourceTitle)
+        self.positions = try container.decode([Int64].self, forKey: .positions)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(sourcePath, forKey: .sourcePath)
+        try container.encode(sourceTitle, forKey: .sourceTitle)
+        try container.encode(positions, forKey: .positions)
+    }
+}
+
+/// The position after one source in a backlink listing.
+public struct BacklinkSourceCursor: Codable, Sendable, Equatable {
+    public let recencyMs: Int64
+    public let sourcePath: String
+
+    private enum CodingKeys: String, CodingKey {
+        case recencyMs = "recencyMs"
+        case sourcePath = "sourcePath"
+    }
+
+    public init(recencyMs: Int64, sourcePath: String) {
+        self.recencyMs = recencyMs
+        self.sourcePath = sourcePath
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.recencyMs = try container.decode(Int64.self, forKey: .recencyMs)
+        self.sourcePath = try container.decode(String.self, forKey: .sourcePath)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(recencyMs, forKey: .recencyMs)
+        try container.encode(sourcePath, forKey: .sourcePath)
+    }
+}
+
 /// A button of the native top bar. A tap opens
 /// `menu` when it has one, and sends an `action` intent with `id` otherwise.
 public struct BarButton: Codable, Sendable, Equatable {

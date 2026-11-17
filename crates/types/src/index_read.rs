@@ -190,3 +190,52 @@ pub struct WikiTitleCandidate {
     /// The number of links that point at a key the note claims.
     pub link_count: u32,
 }
+
+/// One link that points at a note.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct Backlink {
+    pub source_path: String,
+    /// The link target as written.
+    pub target_raw: String,
+    pub alias: Option<String>,
+    /// The UTF-16 offsets of the link in the source body.
+    pub pos_from: i64,
+    pub pos_to: i64,
+}
+
+/// The position after one source in a backlink listing.
+#[derive(Clone, Debug, serde::Deserialize, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct BacklinkSourceCursor {
+    /// The recency of the source: its daily date, else its last change (epoch ms).
+    pub recency_ms: i64,
+    pub source_path: String,
+}
+
+/// One source note of a backlink page.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct BacklinkSource {
+    pub source_path: String,
+    pub source_title: String,
+    /// The start offset of each link to the target, ascending.
+    pub positions: Vec<i64>,
+}
+
+/// One page of the sources that link to a note, most recent first.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct BacklinkPage {
+    pub sources: Vec<BacklinkSource>,
+    /// Where the next page starts; `None` on the last page.
+    pub next_cursor: Option<BacklinkSourceCursor>,
+    /// The number of links to the target, over all pages.
+    pub indexed_link_count: u32,
+    /// Every wiki key that resolves to the target.
+    pub target_keys: Vec<String>,
+}
