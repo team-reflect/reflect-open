@@ -242,7 +242,7 @@ function row(path: string, distance: number, overrides?: Partial<ChunkHitRow>): 
     title: path,
     heading: null,
     text: ` about ${path} `,
-    isPrivate: 0,
+    isPrivate: false,
     distance,
     ...overrides,
   }
@@ -278,7 +278,7 @@ describe('bestChunkPerNote', () => {
   })
 
   it('trims snippets and converts the private flag', () => {
-    const hits = bestChunkPerNote([row('notes/p.md', 0.1, { isPrivate: 1 })], 12)
+    const hits = bestChunkPerNote([row('notes/p.md', 0.1, { isPrivate: true })], 12)
     expect(hits[0]!.snippet).toBe('about notes/p.md')
     expect(hits[0]!.isPrivate).toBe(true)
   })

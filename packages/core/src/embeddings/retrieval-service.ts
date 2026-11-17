@@ -1,4 +1,3 @@
-import { sql } from 'kysely'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import { literalSearchQuery } from '../indexing/filter-query.ts'
@@ -55,7 +54,7 @@ export interface ChunkHitRow {
   title: string
   heading: string | null
   text: string
-  isPrivate: number
+  isPrivate: boolean
   distance: number
 }
 
@@ -85,7 +84,7 @@ export function bestChunkPerNote(
       score: 1 - row.distance,
       snippet: row.text.trim(),
       heading: row.heading,
-      isPrivate: row.isPrivate !== 0,
+      isPrivate: row.isPrivate,
     })
   }
   return [...byNote.values()].slice(0, limit)
@@ -218,48 +217,22 @@ class RetrievalServiceImpl implements RetrievalService {
 
   async relatedNotes(path: string, limit = 10): Promise<RetrievalHit[]> {
     const { database } = this.#deps
-    const seeds = await sql<{ vec: string }>`
-      SELECT vec_to_json(v.embedding) AS vec
-      FROM embedding_chunks c
-      JOIN embedding_vectors v ON v.rowid = c.id
-      WHERE c.note_path = ${path}
-      ORDER BY c.pos_from
-      LIMIT ${MAX_RELATED_SEEDS}
-    `.execute(database.db)
-    if (seeds.rows.length === 0) {
-      return []
-    }
-    const neighborLists = await Promise.all(
-      seeds.rows.map(async (seed) => {
-        const result = await sql<ChunkHitRow>`
-          SELECT c.note_path AS path, n.title, c.heading, c.text,
-                 n.is_private AS isPrivate, v.distance
-          FROM embedding_vectors v
-          JOIN embedding_chunks c ON c.id = v.rowid
-          JOIN notes n ON n.path = c.note_path
-          WHERE v.embedding MATCH ${seed.vec} AND k = ${KNN_CANDIDATES}
-            AND n.is_private = 0
-          ORDER BY v.distance
-        `.execute(database.db)
-        return result.rows
-      }),
-    )
+    const neighborLists = await database.read('embed_related_chunks', {
+      path,
+      seedLimit: MAX_RELATED_SEEDS,
+      candidates: KNN_CANDIDATES,
+    })
     return bestChunkPerNote(mergeNearestFirst(neighborLists), limit, path)
   }
 
   async #semanticHits(query: string, limit: number): Promise<RetrievalHit[]> {
     const { database, embeddingRuntime } = this.#deps
     const [vector] = await embeddingRuntime.embedTexts([query])
-    const result = await sql<ChunkHitRow>`
-      SELECT c.note_path AS path, n.title, c.heading, c.text,
-             n.is_private AS isPrivate, v.distance
-      FROM embedding_vectors v
-      JOIN embedding_chunks c ON c.id = v.rowid
-      JOIN notes n ON n.path = c.note_path
-      WHERE v.embedding MATCH ${JSON.stringify(vector)} AND k = ${KNN_CANDIDATES}
-      ORDER BY v.distance
-    `.execute(database.db)
-    return bestChunkPerNote(result.rows, limit)
+    const rows = await database.read('embed_semantic_chunks', {
+      vector: vector ?? [],
+      candidates: KNN_CANDIDATES,
+    })
+    return bestChunkPerNote(rows, limit)
   }
 
   async #lexicalHits(query: string, limit: number): Promise<RetrievalHit[]> {
@@ -271,16 +244,10 @@ class RetrievalServiceImpl implements RetrievalService {
     if (hits.length === 0) {
       return []
     }
-    const flags = await database.db
-      .selectFrom('notes')
-      .where(
-        'path',
-        'in',
-        hits.map((hit) => hit.path),
-      )
-      .select(['path', 'isPrivate'])
-      .execute()
-    const privateByPath = new Map(flags.map((row) => [row.path, row.isPrivate !== 0]))
+    const flags = await database.read('index_note_privacy', {
+      paths: hits.map((hit) => hit.path),
+    })
+    const privateByPath = new Map(flags.map((row) => [row.path, row.isPrivate]))
     return hits.map((hit, index) => ({
       path: hit.path,
       title: hit.title,

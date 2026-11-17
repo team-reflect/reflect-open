@@ -20,8 +20,10 @@ use super::read::backlinks::{backlinks, page as backlink_page};
 use super::read::chat::{conversations, messages};
 use super::read::daily::{dates_in_range, notes_in_range};
 use super::read::embed::chunk_hashes;
+use super::read::embed::{related_chunks, semantic_chunks};
 use super::read::lists::{list_notes, note_tags, recent_notes};
 use super::read::meta::meta;
+use super::read::notes::privacy;
 use super::read::notes::{
     embeddable_paths, file_facts, note as note_row, note_ids, path_taken, person_owners,
     pinned_notes, random_note, resolve_target, templates,
@@ -2785,4 +2787,50 @@ fn suggestions_rank_exact_titles_first_and_escape_like_wildcards() {
     let aliases = winning_aliases(&conn, &["notes/crab.md".to_string()]).unwrap();
     assert_eq!(aliases.len(), 1);
     assert_eq!(aliases[0].alias, "Rustacean");
+}
+
+#[test]
+fn vector_reads_find_the_nearest_chunks_and_keep_private_notes_out_of_related() {
+    let conn = migrated();
+    index_note(&conn, "notes/self.md");
+    index_note(&conn, "notes/near.md");
+    let mut secret = note("notes/secret.md", "Secret", vec![]);
+    secret.is_private = true;
+    apply_note(&conn, &secret).unwrap();
+    let mut far = vec384(0.0);
+    far[0] = 1.0;
+    apply_chunks(&conn, "notes/self.md", &[chunk("s1", Some(vec384(0.5)))]).unwrap();
+    let mut near = vec384(0.5);
+    near[0] = 0.1;
+    apply_chunks(&conn, "notes/near.md", &[chunk("n1", Some(near))]).unwrap();
+    apply_chunks(&conn, "notes/secret.md", &[chunk("x1", Some(far.clone()))]).unwrap();
+
+    let related = related_chunks(&conn, "notes/self.md", 16, 24).unwrap();
+    assert_eq!(related.len(), 1);
+    let paths: Vec<&str> = related[0].iter().map(|hit| hit.path.as_str()).collect();
+    assert_eq!(paths, ["notes/self.md", "notes/near.md"]);
+    assert!(related[0][0].distance.abs() < 1e-6);
+    assert_eq!(
+        related_chunks(&conn, "notes/missing.md", 16, 24)
+            .unwrap()
+            .len(),
+        0
+    );
+
+    let nearest = semantic_chunks(&conn, &far, 1).unwrap();
+    assert_eq!(nearest.len(), 1);
+    assert_eq!(nearest[0].path, "notes/secret.md");
+    assert!(nearest[0].is_private);
+
+    let mut flags = privacy(
+        &conn,
+        &["notes/secret.md".to_string(), "notes/near.md".to_string()],
+    )
+    .unwrap();
+    flags.sort_by(|left, right| left.path.cmp(&right.path));
+    let flags: Vec<(&str, bool)> = flags
+        .iter()
+        .map(|flag| (flag.path.as_str(), flag.is_private))
+        .collect();
+    assert_eq!(flags, [("notes/near.md", false), ("notes/secret.md", true)]);
 }

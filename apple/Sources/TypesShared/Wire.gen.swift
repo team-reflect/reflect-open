@@ -1496,6 +1496,54 @@ public struct ChunkHash: Codable, Sendable, Equatable {
     }
 }
 
+/// One embedding chunk near a query vector.
+public struct ChunkHit: Codable, Sendable, Equatable {
+    public let path: String
+    public let title: String
+    public let heading: String?
+    public let text: String
+    public let isPrivate: Bool
+    public let distance: Double
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case title = "title"
+        case heading = "heading"
+        case text = "text"
+        case isPrivate = "isPrivate"
+        case distance = "distance"
+    }
+
+    public init(path: String, title: String, heading: String?, text: String, isPrivate: Bool, distance: Double) {
+        self.path = path
+        self.title = title
+        self.heading = heading
+        self.text = text
+        self.isPrivate = isPrivate
+        self.distance = distance
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.heading = try container.decodeIfPresent(String.self, forKey: .heading)
+        self.text = try container.decode(String.self, forKey: .text)
+        self.isPrivate = try container.decode(Bool.self, forKey: .isPrivate)
+        self.distance = try container.decode(Double.self, forKey: .distance)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(title, forKey: .title)
+        try container.encode(heading, forKey: .heading)
+        try container.encode(text, forKey: .text)
+        try container.encode(isPrivate, forKey: .isPrivate)
+        try container.encode(distance, forKey: .distance)
+    }
+}
+
 /// Result of a commit attempt. `committed: false` means the tree was clean.
 public struct CommitOutcome: Codable, Sendable, Equatable {
     public let committed: Bool
@@ -3526,6 +3574,34 @@ public struct NoteMoveRequest: Codable, Sendable, Equatable {
         try container.encode(to, forKey: .to)
         try container.encode(toAddress, forKey: .toAddress)
         try container.encode(fromAddress, forKey: .fromAddress)
+    }
+}
+
+/// The `private` flag of one indexed note.
+public struct NotePrivacy: Codable, Sendable, Equatable {
+    public let path: String
+    public let isPrivate: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case isPrivate = "isPrivate"
+    }
+
+    public init(path: String, isPrivate: Bool) {
+        self.path = path
+        self.isPrivate = isPrivate
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.isPrivate = try container.decode(Bool.self, forKey: .isPrivate)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(isPrivate, forKey: .isPrivate)
     }
 }
 
