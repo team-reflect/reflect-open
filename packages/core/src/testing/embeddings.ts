@@ -252,17 +252,18 @@ export interface TestEmbeddingIndexServiceOptions {
   noteFile?: NoteFileService
   /**
    * Read lazily, so the default costs nothing until a note is embedded.
+   * Defaults to `storeChunksIn`, else to a new test database.
    */
-  database?: DatabaseService | TestDatabaseService
+  database?: DatabaseService
   indexLifecycle?: IndexLifecycleService
   logger?: LoggerService
   clock?: ClockService
   /**
-   * Write applied and removed chunk sets into `database` as the native
-   * writer does, so later passes and retrieval read them back. Needs a test
-   * database. Defaults to `false`: writes are only recorded.
+   * Write applied and removed chunk sets into this database as the native
+   * writer does, so later passes and retrieval read them back. Without it,
+   * writes are only recorded.
    */
-  storeChunks?: boolean
+  storeChunksIn?: TestDatabaseService
   /**
    * Answers `backfill` calls in place of the real pass; a `follow` still runs the real one.
    */
@@ -294,13 +295,6 @@ export interface TestEmbeddingIndexService extends EmbeddingIndexService {
   follows(): readonly { readonly generation: number; readonly modelId: string }[]
 }
 
-function writableDatabase(database: DatabaseService | TestDatabaseService): TestDatabaseService {
-  if (!('invoke' in database)) {
-    throw new TypeError('storeChunks needs a test database')
-  }
-  return database
-}
-
 class TestEmbeddingIndexServiceImpl implements TestEmbeddingIndexService {
   readonly #inner: EmbeddingIndexService
   readonly #backfillOverride: TestEmbeddingIndexServiceOptions['backfill']
@@ -310,8 +304,8 @@ class TestEmbeddingIndexServiceImpl implements TestEmbeddingIndexService {
   readonly #followLog: { generation: number; modelId: string }[] = []
 
   constructor(options?: TestEmbeddingIndexServiceOptions) {
-    const database = options?.database ?? createTestDatabaseService()
-    const store = options?.storeChunks === true ? writableDatabase(database) : null
+    const store = options?.storeChunksIn ?? null
+    const database = options?.database ?? store ?? createTestDatabaseService()
     this.#backfillOverride = options?.backfill
     const ipc = createTestIpcBridgeService({
       commands: {
