@@ -20,9 +20,8 @@ export interface DetectedMove {
 /**
  * Pair vanished rows with appeared files by frontmatter id. Only non-null
  * ids participate, and an id claimed by more than one path on either side
- * never pairs — that's a rename/rename fork or a hand-copied id, which the
- * duplicate-id surface reports for review; guessing a move there could wire
- * one note's history to another's file.
+ * never pairs — that's a rename/rename fork or a hand-copied id; guessing a
+ * move there could wire one note's history to another's file.
  *
  * ```ts
  * pairMovesById(

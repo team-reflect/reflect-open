@@ -52,31 +52,6 @@ describe('getNote', () => {
   })
 })
 
-describe('getDuplicateNoteIds', () => {
-  it('returns empty without a second query when no id is duplicated', async () => {
-    const database = seeded([
-      { path: 'notes/a.md', markdown: '---\nid: one\n---\n# A\n' },
-      { path: 'notes/b.md', markdown: '---\nid: two\n---\n# B\n' },
-      { path: 'notes/c.md', markdown: '# C\n' },
-    ])
-
-    await expect(createIndexQueryService({ database }).getDuplicateNoteIds()).resolves.toEqual([])
-    expect(database.getQueries()).toHaveLength(1)
-  })
-
-  it('groups every path claiming a duplicated id, ordered', async () => {
-    const database = seeded([
-      { path: 'notes/b.md', markdown: '---\nid: dup-1\n---\n# B\n' },
-      { path: 'notes/a.md', markdown: '---\nid: dup-1\n---\n# A\n' },
-      { path: 'notes/c.md', markdown: '---\nid: unique\n---\n# C\n' },
-    ])
-
-    await expect(createIndexQueryService({ database }).getDuplicateNoteIds()).resolves.toEqual([
-      { id: 'dup-1', paths: ['notes/a.md', 'notes/b.md'] },
-    ])
-  })
-})
-
 describe('getNoteIdsByPath', () => {
   it('asks nothing for no paths', async () => {
     const database = createNodeTestDatabaseService()
