@@ -28,7 +28,7 @@ use super::read::notes::{
     embeddable_paths, file_facts, note as note_row, note_ids, path_taken, person_owners,
     pinned_notes, random_note, resolve_target, templates,
 };
-use super::read::search::{ranked_query_plan, search};
+use super::read::search::{RankedOptions, ranked_query_plan, ranked_statement, search};
 use super::read::stats::graph_stats;
 use super::read::suggest::{key_winners, tags as suggest_tags, wiki_candidates, winning_aliases};
 use super::read::tasks::tasks;
@@ -2885,6 +2885,48 @@ fn search_ranks_title_matches_before_body_hits() {
         search_paths(&conn, &text_search("\"car AND NOT (")),
         Vec::<String>::new()
     );
+}
+
+#[test]
+fn ranked_search_builds_one_stable_statement() {
+    let request = SearchRequest {
+        tag_keys: vec!["a".to_string()],
+        pinned_only: true,
+        updated_after_ms: Some(1.0),
+        limit: Some(20),
+        ..text_search("car trip")
+    };
+    let options = RankedOptions {
+        exclude_private: true,
+        snippet_tokens: 10,
+    };
+    let (sql, params) = ranked_statement(&request, options);
+    assert_eq!(
+        sql,
+        concat!(
+            r#"WITH "lexical" AS  MATERIALIZED (SELECT "search_fts"."path" AS "path", highlight("search_fts", 1, ?, ?) AS "fts_highlighted_title","#,
+            r#" snippet("search_fts", 2, ?, ?, '…', 10) AS "snippet", bm25("search_fts", 0, 10, 1) AS "rank""#,
+            r#" FROM "search_fts" WHERE "search_fts" MATCH ?)"#,
+            r#" SELECT "fn"."path", "fn"."title", "fn"."daily_date", "fn"."preview", "fn"."mtime", "fn"."is_pinned","#,
+            r#" "lexical"."fts_highlighted_title", "lexical"."snippet","#,
+            r#" (CASE WHEN (instr(COALESCE("lexical"."snippet", ''), ?) > 0"#,
+            r#" OR (NOT (instr(' ' || "fn"."title_key", ?) > 0 AND instr(' ' || "fn"."title_key", ?) > 0)))"#,
+            r#" THEN COALESCE("lexical"."rank", 0) ELSE 0 END) AS "score""#,
+            r#" FROM (SELECT "notes"."path", "notes"."title", "notes"."daily_date", "notes"."preview", "notes"."mtime", "notes"."is_pinned", "notes"."title_key" FROM "notes""#,
+            r#" WHERE "notes"."kind" <> 'template' AND "notes"."is_private" = 0"#,
+            r#" AND EXISTS(SELECT 1 FROM "tags" AS "filter_tags" WHERE "filter_tags"."note_path" = "notes"."path" AND "filter_tags"."tag_key" = ?)"#,
+            r#" AND "notes"."is_pinned" = 1 AND "notes"."mtime" >= ?) AS "fn""#,
+            r#" LEFT JOIN "lexical" ON "lexical"."path" = "fn"."path""#,
+            r#" WHERE "lexical"."path" IS NOT NULL"#,
+            r#" OR (instr(' ' || "fn"."title_key", ?) > 0 AND instr(' ' || "fn"."title_key", ?) > 0)"#,
+            r#" ORDER BY (CASE WHEN ("fn"."title_key" = ?) THEN 0"#,
+            r#" WHEN (instr("fn"."title_key", ?) = 1) THEN 1"#,
+            r#" WHEN (instr(' ' || "fn"."title_key", ?) > 0 AND instr(' ' || "fn"."title_key", ?) > 0) THEN 2 ELSE 3 END) ASC,"#,
+            r#" "score" ASC, "fn"."is_pinned" DESC, "fn"."mtime" DESC, "fn"."path" ASC"#,
+            r#" LIMIT ?"#,
+        )
+    );
+    assert_eq!(params.len(), 17);
 }
 
 #[test]

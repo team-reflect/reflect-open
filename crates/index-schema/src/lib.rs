@@ -29,11 +29,17 @@ pub const LATEST_SCHEMA_VERSION: usize = 23;
 /// derivation version, distinct from the schema version above).
 pub const PROJECTION_VERSION_KEY: &str = "projection_version";
 
-/// Makes a double-quoted name that is not a column an error in queries.
-/// By default SQLite reads such a name as a string, so a wrong column name
-/// in a query gives wrong rows and no error.
-pub fn reject_unknown_quoted_names(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
-    conn.set_db_config(rusqlite::config::DbConfig::SQLITE_DBCONFIG_DQS_DML, false)?;
+/// Applies the settings that every connection to the index uses.
+pub fn configure_connection(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
+    use rusqlite::config::DbConfig;
+    // A double-quoted name that is not a column is an error. By default
+    // SQLite reads it as a string, so a wrong column name gives wrong rows.
+    conn.set_db_config(DbConfig::SQLITE_DBCONFIG_DQS_DML, false)?;
+    conn.set_db_config(DbConfig::SQLITE_DBCONFIG_DQS_DDL, false)?;
+    // SQL cannot write the shadow tables or `sqlite_master`.
+    conn.set_db_config(DbConfig::SQLITE_DBCONFIG_DEFENSIVE, true)?;
+    // The schema of the file cannot call functions with side effects.
+    conn.set_db_config(DbConfig::SQLITE_DBCONFIG_TRUSTED_SCHEMA, false)?;
     Ok(())
 }
 
@@ -161,7 +167,7 @@ mod schema {
     pub fn open_in_memory() -> Result<Connection, SchemaError> {
         register_sqlite_vec()?;
         let conn = Connection::open_in_memory()?;
-        super::reject_unknown_quoted_names(&conn)?;
+        super::configure_connection(&conn)?;
         Ok(conn)
     }
 
@@ -187,7 +193,7 @@ mod schema {
         let dir = root.join(super::REFLECT_DIR);
         std::fs::create_dir_all(&dir)?;
         let mut conn = Connection::open(dir.join(super::INDEX_FILE))?;
-        super::reject_unknown_quoted_names(&conn)?;
+        super::configure_connection(&conn)?;
         // Another PROCESS can hold this database too — a second app flavor on
         // the same graph, or the `reflect` CLI (which sets its own timeout).
         // Wait briefly for a cross-process lock to clear instead of failing
@@ -214,7 +220,7 @@ mod schema {
                 | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
-        super::reject_unknown_quoted_names(&conn)?;
+        super::configure_connection(&conn)?;
         Ok(conn)
     }
 
@@ -244,6 +250,26 @@ mod schema {
             migrate(&mut conn).unwrap();
             let error = conn.prepare(r#"SELECT "titel" FROM "notes""#).unwrap_err();
             assert!(error.to_string().contains("no such column"), "{error}");
+        }
+
+        #[test]
+        fn a_quoted_name_in_an_index_that_is_no_column_is_an_error() {
+            let mut conn = open_in_memory().unwrap();
+            migrate(&mut conn).unwrap();
+            let error = conn
+                .execute_batch(r#"CREATE INDEX probe ON notes(path) WHERE kind = "note""#)
+                .unwrap_err();
+            assert!(error.to_string().contains("no such column"), "{error}");
+        }
+
+        #[test]
+        fn a_write_to_a_shadow_table_is_an_error() {
+            let mut conn = open_in_memory().unwrap();
+            migrate(&mut conn).unwrap();
+            let error = conn
+                .execute_batch("DELETE FROM search_fts_data")
+                .unwrap_err();
+            assert!(error.to_string().contains("may not be modified"), "{error}");
         }
 
         #[test]

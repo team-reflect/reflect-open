@@ -16,6 +16,10 @@ pub(crate) fn lit(value: impl Into<Value>) -> Expr {
 }
 
 /// A bound value of a statement.
+///
+/// TODO: Replace this type with `sea-query-rusqlite` when it supports the
+/// `rusqlite` version of this workspace:
+/// https://github.com/SeaQL/sea-query/issues/1130
 pub(crate) struct Param(Value);
 
 impl ToSql for Param {
