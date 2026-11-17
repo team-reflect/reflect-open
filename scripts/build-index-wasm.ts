@@ -2,7 +2,6 @@
 // JavaScript bindings to `packages/index-wasm/pkg`.
 
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 const root = path.join(import.meta.dirname, '..')
@@ -31,22 +30,6 @@ function findLlvmAr(): string {
   return path.join(sysroot, 'lib/rustlib', host, 'bin', `llvm-ar${extension}`)
 }
 
-/**
- * Checks that the wasm-bindgen CLI has the version of the `wasm-bindgen`
- * crate: the CLI rejects the output of any other version.
- */
-function checkWasmBindgenVersion(): void {
-  const lock = readFileSync(path.join(root, 'Cargo.lock'), 'utf8')
-  const wanted = /name = "wasm-bindgen"\nversion = "([^"]+)"/.exec(lock)?.[1]
-  const installed = read('wasm-bindgen', ['--version']).split(' ')[1]
-  if (wanted === undefined || installed !== wanted) {
-    throw new Error(
-      `The wasm-bindgen CLI is ${installed}, and Cargo.lock has the crate at ${wanted}. ` +
-        `Run "mise install", or "cargo install --locked wasm-bindgen-cli --version ${wanted}".`,
-    )
-  }
-}
-
 // A job that downloaded `pkg` has no Rust toolchain. A build for a native
 // shell (`TAURI_ENV_PLATFORM`) leaves the dev bridge out, and the wasm with it.
 if (
@@ -56,7 +39,6 @@ if (
   process.exit(0)
 }
 
-checkWasmBindgenVersion()
 run(
   'cargo',
   [
@@ -70,4 +52,4 @@ run(
   ],
   { AR_wasm32_unknown_unknown: findLlvmAr() },
 )
-run('wasm-bindgen', [wasmPath, '--target', 'web', '--no-typescript', '--out-dir', outDir])
+run('cargo', ['run', '--quiet', '--package', 'reflect-wasm-bindgen', '--', wasmPath, outDir])

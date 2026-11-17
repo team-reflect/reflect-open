@@ -87,21 +87,33 @@ const CargoAboutSchema = z.object({
   ),
 })
 
+/**
+ * The Rust packages that ship: the desktop app, its sidecars, and the iOS library.
+ */
+const SHIPPED_CRATES = ['apps/tauri', 'apps/cli', 'apps/native-host', 'crates/ffi']
+
 async function collectCargo(): Promise<Entry[]> {
   // Reads `about.toml` at the repo root. `--fail` exits non-zero when a crate's
   // license cannot be determined.
-  const { stdout } = await exec('cargo', ['about', 'generate', '--format', 'json', '--fail'], {
-    throwOnError: true,
-    nodeOptions: { cwd: ROOT_DIR },
-  })
-  return CargoAboutSchema.parse(JSON.parse(stdout)).licenses.flatMap((license) => {
-    return license.used_by.map(({ crate }) => ({
-      name: crate.name,
-      ecosystem: 'cargo' as const,
-      license: license.id,
-      url: crate.repository ?? `https://crates.io/crates/${crate.name}`,
-      texts: [license.text.trim()],
-    }))
+  const outputs = await Promise.all(
+    SHIPPED_CRATES.map((dir) => {
+      const args = ['about', 'generate', '--format', 'json', '--fail']
+      return exec('cargo', [...args, '--manifest-path', join(dir, 'Cargo.toml')], {
+        throwOnError: true,
+        nodeOptions: { cwd: ROOT_DIR },
+      })
+    }),
+  )
+  return outputs.flatMap(({ stdout }) => {
+    return CargoAboutSchema.parse(JSON.parse(stdout)).licenses.flatMap((license) => {
+      return license.used_by.map(({ crate }) => ({
+        name: crate.name,
+        ecosystem: 'cargo' as const,
+        license: license.id,
+        url: crate.repository ?? `https://crates.io/crates/${crate.name}`,
+        texts: [license.text.trim()],
+      }))
+    })
   })
 }
 

@@ -79,10 +79,10 @@ jobs:
             'crates/index-schema/*'
             'crates/index-wasm/*'
             'crates/types/*'
+            'crates/wasm-bindgen/*'
             'Cargo.lock'
             'Cargo.toml'
             'rust-toolchain.toml'
-            'mise.toml'
           )
           swift_files=(
             '.github/*'
@@ -158,8 +158,6 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-key: index-wasm
-
-      - uses: ./.github/actions/setup-mise
 
       - name: Build
         run: pnpm build:index-wasm

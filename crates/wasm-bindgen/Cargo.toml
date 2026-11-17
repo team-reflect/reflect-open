@@ -1,0 +1,11 @@
+[package]
+name = "reflect-wasm-bindgen"
+version = "0.0.0"
+description = "The wasm-bindgen CLI step of the index wasm build, at the wasm-bindgen version of `Cargo.lock`."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+wasm-bindgen-cli-support = { workspace = true }
