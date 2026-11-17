@@ -52,9 +52,16 @@ the service plus members that seed, drive or observe it.
 - Do not use `vi.useFakeTimers`. The test clock starts at epoch 0, and
   `clock.advance(ms)` runs the due timers.
 - `createNodeTestDatabaseService()` (Node.js) and `createWasmTestDatabaseService()`
-  (desktop browser tests, `@/test-utils/test-database.ts`) are real in-memory
-  SQLite indexes built from the production migrations. Seed notes and assert
-  query results, not SQL.
+  (desktop browser tests, `@/test-utils/test-database.ts`) are the Rust index
+  of the native shells, compiled to wasm, over an in-memory SQLite database.
+  Seed notes and assert query results, not SQL. `database.invoke(command, args)`
+  runs a native index command, for rows that `seedNotes` cannot write (chat
+  history, embeddings, `index_meta`).
+- The tests need the wasm build of the index. `pnpm test` builds it first; it
+  needs the Rust toolchain and the `wasm-bindgen` CLI (`mise install`). After a
+  change in `crates/index`, `crates/index-schema`, `crates/index-wasm` or
+  `crates/types`, run `pnpm build:index-wasm` before a test that is already in
+  watch mode.
 
 ## The service containers
 

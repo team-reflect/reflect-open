@@ -187,9 +187,6 @@ importers:
       '@reflect/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@reflect/db':
-        specifier: workspace:*
-        version: link:../../packages/db
       '@reflect/design-system':
         specifier: workspace:*
         version: link:../../design-system
@@ -415,12 +412,12 @@ importers:
       '@ocavue/tsconfig':
         specifier: ^0.7.1
         version: 0.7.1
+      '@reflect/index-wasm':
+        specifier: workspace:*
+        version: link:../index-wasm
       jsdom:
         specifier: ^31.0.0
         version: 31.0.0
-      sqlite-vec:
-        specifier: ^0.1.9
-        version: 0.1.9
       typescript:
         specifier: ~6.0.3
         version: 6.0.3

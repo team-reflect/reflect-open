@@ -11,7 +11,7 @@
     "./testing": "./src/testing/index.ts"
   },
   "scripts": {
-    "test": "vitest run --config ../../vitest.config.ts --project core"
+    "test": "node ../../scripts/build-index-wasm.ts && vitest run --config ../../vitest.config.ts --project core"
   },
   "dependencies": {
     "@meowdown/markdown": "^0.78.0",
@@ -33,8 +33,8 @@
   "devDependencies": {
     "@ai-sdk/provider": "^4.0.38",
     "@ocavue/tsconfig": "^0.7.1",
+    "@reflect/index-wasm": "workspace:*",
     "jsdom": "^31.0.0",
-    "sqlite-vec": "^0.1.9",
     "typescript": "~6.0.3",
     "vitest": "^5.1.0",
     "vitest-fail-on-console": "^0.10.1"

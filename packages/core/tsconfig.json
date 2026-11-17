@@ -13,6 +13,9 @@
       "path": "../db/tsconfig.json"
     },
     {
+      "path": "../index-wasm/tsconfig.json"
+    },
+    {
       "path": "../modules/tsconfig.json"
     },
     {

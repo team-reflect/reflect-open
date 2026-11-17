@@ -30,9 +30,9 @@ import {
 import { AppError } from '../errors.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
-import type { DatabaseService } from '../indexing/database-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
-import { createNodeTestDatabaseService } from './database.ts'
+import type { DatabaseService } from '../indexing/database-service.ts'
+import { createNodeTestDatabaseService, type TestDatabaseService } from './database.ts'
 import { createTestNoteFileService } from './graph.ts'
 import { createTestGraphSessionService } from './graph-session.ts'
 import { createTestIndexLifecycleService } from './index-lifecycle.ts'
@@ -251,17 +251,16 @@ export interface TestEmbeddingIndexServiceOptions {
   embeddingRuntime?: EmbeddingRuntimeService
   noteFile?: NoteFileService
   /**
-   * Read lazily, so the default (Node only) costs nothing until a note is embedded.
+   * Read lazily, so the default costs nothing until a note is embedded.
    */
-  database?: DatabaseService
+  database?: DatabaseService | TestDatabaseService
   indexLifecycle?: IndexLifecycleService
   logger?: LoggerService
   clock?: ClockService
   /**
    * Write applied and removed chunk sets into `database` as the native
-   * writer does, so later passes and retrieval read them back. Needs a
-   * database that accepts writes (the Node test database). Defaults to
-   * `false`: writes are only recorded.
+   * writer does, so later passes and retrieval read them back. Needs a test
+   * database. Defaults to `false`: writes are only recorded.
    */
   storeChunks?: boolean
   /**
@@ -295,80 +294,11 @@ export interface TestEmbeddingIndexService extends EmbeddingIndexService {
   follows(): readonly { readonly generation: number; readonly modelId: string }[]
 }
 
-interface StoredChunkRow {
-  id: number
-  content_hash: string
-}
-
-/**
-
- * `apply_chunks` of the native writer, over `database`.
-
- */
-async function storeChunks(
-  database: DatabaseService,
-  path: string,
-  chunks: readonly EmbedChunkPayload[],
-): Promise<void> {
-  const notes = (await database.runQuery('SELECT 1 FROM notes WHERE path = ?', [path])) as unknown[]
-  if (notes.length === 0) {
-    await dropChunks(database, path)
-    return
+function writableDatabase(database: DatabaseService | TestDatabaseService): TestDatabaseService {
+  if (!('invoke' in database)) {
+    throw new TypeError('storeChunks needs a test database')
   }
-  const existing = (await database.runQuery(
-    'SELECT id, content_hash FROM embedding_chunks WHERE note_path = ? ORDER BY pos_from',
-    [path],
-  )) as StoredChunkRow[]
-  for (const chunk of chunks) {
-    if (chunk.vector === null) {
-      const at = existing.findIndex((row) => row.content_hash === chunk.contentHash)
-      const row = existing[at]
-      if (row === undefined) {
-        throw new AppError('parse', `unchanged chunk has no stored row (hash ${chunk.contentHash})`)
-      }
-      existing.splice(at, 1)
-      await database.runQuery(
-        'UPDATE embedding_chunks SET heading = ?, pos_from = ?, pos_to = ?, model_id = ? WHERE id = ?',
-        [chunk.heading, chunk.posFrom, chunk.posTo, chunk.modelId, row.id],
-      )
-      continue
-    }
-    const inserted = (await database.runQuery(
-      `INSERT INTO embedding_chunks
-         (note_path, heading, pos_from, pos_to, text, content_hash, model_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-      [
-        path,
-        chunk.heading,
-        chunk.posFrom,
-        chunk.posTo,
-        chunk.text,
-        chunk.contentHash,
-        chunk.modelId,
-      ],
-    )) as { id: number }[]
-    await database.runQuery('INSERT INTO embedding_vectors(rowid, embedding) VALUES (?, ?)', [
-      BigInt(inserted[0]!.id),
-      JSON.stringify(chunk.vector),
-    ])
-  }
-  for (const row of existing) {
-    await database.runQuery('DELETE FROM embedding_vectors WHERE rowid = ?', [row.id])
-    await database.runQuery('DELETE FROM embedding_chunks WHERE id = ?', [row.id])
-  }
-}
-
-/**
-
- * `remove_chunks` of the native writer, over `database`.
-
- */
-async function dropChunks(database: DatabaseService, path: string): Promise<void> {
-  await database.runQuery(
-    'DELETE FROM embedding_vectors WHERE rowid IN (SELECT id FROM embedding_chunks WHERE note_path = ?)',
-    [path],
-  )
-  await database.runQuery('DELETE FROM embedding_chunks WHERE note_path = ?', [path])
+  return database
 }
 
 class TestEmbeddingIndexServiceImpl implements TestEmbeddingIndexService {
@@ -381,27 +311,28 @@ class TestEmbeddingIndexServiceImpl implements TestEmbeddingIndexService {
 
   constructor(options?: TestEmbeddingIndexServiceOptions) {
     const database = options?.database ?? createNodeTestDatabaseService()
+    const store = options?.storeChunks === true ? writableDatabase(database) : null
     this.#backfillOverride = options?.backfill
     const ipc = createTestIpcBridgeService({
       commands: {
-        embed_apply: async (args) => {
+        embed_apply: (args) => {
           const apply = args as unknown as TestEmbeddingApply
           const failure = options?.failApply?.(apply)
           if (failure !== undefined) {
             throw failure
           }
           this.#applyLog.push(apply)
-          if (options?.storeChunks === true) {
-            await storeChunks(database, apply.path, apply.chunks)
-          }
+          store?.invoke('embed_apply', {
+            path: apply.path,
+            chunks: apply.chunks,
+            generation: store.generation(),
+          })
           return null
         },
-        embed_remove: async (args) => {
+        embed_remove: (args) => {
           const remove = args as unknown as TestEmbeddingRemove
           this.#removeLog.push(remove)
-          if (options?.storeChunks === true) {
-            await dropChunks(database, remove.path)
-          }
+          store?.invoke('embed_remove', { path: remove.path, generation: store.generation() })
           return null
         },
       },

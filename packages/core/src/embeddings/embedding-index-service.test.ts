@@ -13,18 +13,27 @@ import { sleep } from '@ocavue/utils'
 
 const NOTE_PATH = 'notes/a.md'
 
-async function seedStoredRows(
+function seedStoredRows(
   database: TestDatabaseService,
   rows: ReadonlyArray<{ content_hash: string; model_id: string }>,
-): Promise<void> {
-  for (const row of rows) {
-    await database.runQuery(
-      `INSERT INTO embedding_chunks
-         (note_path, heading, pos_from, pos_to, text, content_hash, model_id)
-       VALUES (?, NULL, 0, 0, '', ?, ?)`,
-      [NOTE_PATH, row.content_hash, row.model_id],
-    )
+): void {
+  if (rows.length === 0) {
+    return
   }
+  seedNotes(database, [{ path: NOTE_PATH, markdown: '' }])
+  database.invoke('embed_apply', {
+    path: NOTE_PATH,
+    chunks: rows.map((row) => ({
+      heading: null,
+      posFrom: 0,
+      posTo: 0,
+      text: '',
+      contentHash: row.content_hash,
+      modelId: row.model_id,
+      vector: Array.from({ length: 384 }, () => 0),
+    })),
+    generation: database.generation(),
+  })
 }
 
 /**
@@ -33,7 +42,7 @@ async function seedStoredRows(
  * the embedded texts and the chunk writes. `descriptions` are the
  * `<asset>.reflect.md` sidecars; any other sidecar read is a `notFound`.
  */
-async function setup(options: {
+function setup(options: {
   content: string
   storedRows: Array<{ content_hash: string; model_id: string }>
   path?: string
@@ -50,7 +59,7 @@ async function setup(options: {
   const path = options.path ?? NOTE_PATH
   const evictedSidecars = options.evictedSidecars ?? []
   const database = createNodeTestDatabaseService()
-  await seedStoredRows(database, options.storedRows)
+  seedStoredRows(database, options.storedRows)
   const runtime = createTestEmbeddingRuntimeService({ vectors: () => [0.5, 0.5] })
   const index = createTestEmbeddingIndexService({
     database,
@@ -76,7 +85,7 @@ const MODEL = 'all-MiniLM-L6-v2'
 
 describe('embedNote', () => {
   it('never embeds a template — boilerplate must not reach retrieval', async () => {
-    const { index, embedded, applied, removed } = await setup({
+    const { index, embedded, applied, removed } = setup({
       path: 'templates/journal.md',
       content: '# Journal\n\nMood:\n\nGratitude:\n',
       storedRows: [],
@@ -97,7 +106,7 @@ describe('embedNote', () => {
     // Reading an evicted note would force a blocking on-demand download —
     // the backfill must skip it, and must not embed_remove: the
     // pre-eviction vectors stay valid until new content materializes.
-    const { index, embedded, applied, removed } = await setup({
+    const { index, embedded, applied, removed } = setup({
       content: '# One\n\nAlpha text.\n',
       storedRows: [],
       evicted: true,
@@ -115,7 +124,7 @@ describe('embedNote', () => {
   })
 
   it('embeds everything for a brand-new note', async () => {
-    const { index, embedded, applied } = await setup({
+    const { index, embedded, applied } = setup({
       content: '# One\n\nAlpha text.\n\n# Two\n\nBeta text.\n',
       storedRows: [],
     })
@@ -133,7 +142,7 @@ describe('embedNote', () => {
   it('the hash-skip embeds nothing when stored hashes match', async () => {
     const content = '# One\n\nAlpha text.\n'
     // First pass captures the chunk hash the second pass will find "stored".
-    const first = await setup({ content, storedRows: [] })
+    const first = setup({ content, storedRows: [] })
     await first.index.embedNote({
       path: 'notes/a.md',
       generation: 1,
@@ -142,7 +151,7 @@ describe('embedNote', () => {
     })
     const hash = first.applied()[0]!.chunks[0]!.contentHash
 
-    const second = await setup({
+    const second = setup({
       content,
       storedRows: [{ content_hash: hash, model_id: MODEL }],
     })
@@ -159,7 +168,7 @@ describe('embedNote', () => {
 
   it('a model change re-embeds chunks whose hashes are unchanged', async () => {
     const content = '# One\n\nAlpha text.\n'
-    const first = await setup({ content, storedRows: [] })
+    const first = setup({ content, storedRows: [] })
     await first.index.embedNote({
       path: 'notes/a.md',
       generation: 1,
@@ -168,7 +177,7 @@ describe('embedNote', () => {
     })
     const hash = first.applied()[0]!.chunks[0]!.contentHash
 
-    const second = await setup({
+    const second = setup({
       content,
       storedRows: [{ content_hash: hash, model_id: 'old-model' }],
     })
@@ -187,7 +196,7 @@ describe('embedNote', () => {
     // two chunks with one hash.
     const section = `# A\n\n${'The same sentence again. '.repeat(12)}\n`
     const dup = section + section
-    const first = await setup({ content: dup, storedRows: [] })
+    const first = setup({ content: dup, storedRows: [] })
     await first.index.embedNote({
       path: 'notes/a.md',
       generation: 1,
@@ -199,7 +208,7 @@ describe('embedNote', () => {
 
     // Only ONE stored row for that hash: exactly one chunk may skip; the
     // other must re-embed (vector present), or apply_chunks errors loudly.
-    const second = await setup({
+    const second = setup({
       content: dup,
       storedRows: [{ content_hash: hashes[0]!, model_id: MODEL }],
     })
@@ -216,7 +225,7 @@ describe('embedNote', () => {
   })
 
   it('an emptied note drops its chunks via embed_remove', async () => {
-    const { index, applied, removed } = await setup({ content: '\n', storedRows: [] })
+    const { index, applied, removed } = setup({ content: '\n', storedRows: [] })
     const count = await index.embedNote({
       path: 'notes/a.md',
       generation: 1,
@@ -233,7 +242,7 @@ describe('embedNote', () => {
     '---\nreflectAsset: true\nsource: assets/pic.png\n---\n\nA red bridge over a misty river at dawn.\n'
 
   it('embeds asset description chunks after the note’s own chunks', async () => {
-    const { index, applied } = await setup({
+    const { index, applied } = setup({
       content: IMAGE_NOTE,
       storedRows: [],
       descriptions: { 'assets/pic.png.reflect.md': PIC_DESCRIPTION },
@@ -260,7 +269,7 @@ describe('embedNote', () => {
     // embed_apply replaces the note's entire chunk set; applying without the
     // evicted sidecar's body would silently drop its previously embedded()
     // chunks, and sidecars are untracked so nothing would restore them.
-    const { index, embedded, applied, removed } = await setup({
+    const { index, embedded, applied, removed } = setup({
       content: IMAGE_NOTE,
       storedRows: [{ content_hash: 'previously-stored', model_id: MODEL }],
       evictedSidecars: ['assets/pic.png.reflect.md'],
@@ -278,14 +287,14 @@ describe('embedNote', () => {
   })
 
   it('a note without a description for its asset embeds only its own text', async () => {
-    const { index, applied } = await setup({ content: IMAGE_NOTE, storedRows: [] })
+    const { index, applied } = setup({ content: IMAGE_NOTE, storedRows: [] })
     await index.embedNote({ path: 'notes/a.md', generation: 1, fileGeneration: 1, modelId: MODEL })
     expect(applied()[0]!.chunks.every((chunk) => chunk.posFrom < IMAGE_NOTE.length)).toBe(true)
   })
 
   it('the hash-skip covers unchanged asset description chunks', async () => {
     const descriptions = { 'assets/pic.png.reflect.md': PIC_DESCRIPTION }
-    const first = await setup({ content: IMAGE_NOTE, storedRows: [], descriptions })
+    const first = setup({ content: IMAGE_NOTE, storedRows: [], descriptions })
     await first.index.embedNote({
       path: 'notes/a.md',
       generation: 1,
@@ -297,7 +306,7 @@ describe('embedNote', () => {
       model_id: MODEL,
     }))
 
-    const second = await setup({ content: IMAGE_NOTE, storedRows, descriptions })
+    const second = setup({ content: IMAGE_NOTE, storedRows, descriptions })
     const count = await second.index.embedNote({
       path: 'notes/a.md',
       generation: 1,
@@ -309,7 +318,7 @@ describe('embedNote', () => {
   })
 
   it('a rewritten description re-embeds only the asset chunk', async () => {
-    const first = await setup({
+    const first = setup({
       content: IMAGE_NOTE,
       storedRows: [],
       descriptions: { 'assets/pic.png.reflect.md': PIC_DESCRIPTION },
@@ -325,7 +334,7 @@ describe('embedNote', () => {
       model_id: MODEL,
     }))
 
-    const second = await setup({
+    const second = setup({
       content: IMAGE_NOTE,
       storedRows,
       descriptions: {
