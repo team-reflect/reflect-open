@@ -93,14 +93,14 @@ export interface IndexQueryService {
   /**
    * Stored `path → {fileHash, mtime}` facts for a specific path set, so
    * applying a large `index:changed` batch can skip already-indexed files
-   * without a full-table load. Chunked past SQLite's bound-variable budget.
+   * without a full-table load. One query takes any number of paths.
    */
   getIndexedFileFactsByPath(paths: string[]): Promise<Map<string, IndexedFileFacts>>
   /**
    * Frontmatter `id`s of the given indexed paths (a path with no row is
    * simply absent; a row without an id maps to `null`). The move-detection
-   * input. Chunked — a mass external move can orphan thousands of paths at
-   * once, beyond SQLite's bound-variable budget.
+   * input. One query takes any number of paths: a mass external move can
+   * orphan thousands at once.
    */
   getNoteIdsByPath(paths: string[]): Promise<Map<string, string | null>>
   /**
