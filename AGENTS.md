@@ -237,7 +237,8 @@ and the existing local patterns over new abstractions.
   unless the data comes from disk or the network.
 - Normalize casing once at the boundary; TypeScript types are camelCase.
 - Every runtime SQL statement of the index is in `crates/index`; its schema
-  migrations are in `crates/index-schema`. TypeScript reads the index with `DatabaseService.read(command, args)`; a new query is a row in the
+  migrations are in `crates/index-schema`. TypeScript reads the index with
+  `DatabaseService.read(command, args)`; a new query is a row in the
   `index_read` block of the command table
   ([adding a command](docs/contributing/adding-a-command.md)).
 - Handle Promise rejections properly, but do not add broad defensive error
