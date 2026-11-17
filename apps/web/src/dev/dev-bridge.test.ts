@@ -75,6 +75,26 @@ describe('dev bridge index_reconcile_scan', () => {
   })
 })
 
+describe('dev bridge index events', () => {
+  it('announces a committed index write and stays silent for a stale one', async () => {
+    const bridge = createDevBridge({ files: createDevFileStore({}), assets: createDevAssetStore() })
+    const written = vi.fn()
+    const unlisten = await bridge.listen('index:written', written)
+    const generation = (await bridge.invoke('index_open', {})) as number
+    const note = projection('notes/a.md', 1, 'hash')
+
+    await bridge.invoke('index_apply', { note, generation: generation + 1 })
+    expect(written).not.toHaveBeenCalled()
+
+    await bridge.invoke('index_apply', { note, generation })
+    expect(written).toHaveBeenCalledExactlyOnceWith(null)
+
+    unlisten()
+    await bridge.invoke('index_apply', { note, generation })
+    expect(written).toHaveBeenCalledOnce()
+  })
+})
+
 describe('dev bridge desktop boot surface', () => {
   it('answers the desktop chooser and workspace queries with honest stand-ins', async () => {
     const files = createDevFileStore({

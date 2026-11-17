@@ -11,7 +11,6 @@ import { base64ToBytes, bytesToBase64 } from '@reflect/utils'
 import type { DevAssetStore } from '@/dev/dev-asset-store.ts'
 import type { DevFileStore } from '@/dev/dev-file-store.ts'
 import { createWasmIndexBackend, type WasmIndexBackend } from '@reflect/index-wasm'
-import { noop } from '@ocavue/utils'
 
 /**
  * The fixed fake graph root the dev bridge reports (mirrors `mobile_storage`).
@@ -52,18 +51,24 @@ class DevBridgeImpl implements IpcBridge {
   // In-memory keychain stand-in so the AI-provider settings flow (and chat,
   // against a CORS-permissive provider) works end-to-end in the harness.
   readonly #secrets = new Map<string, string>()
+  readonly #listeners = new Map<string, Set<(payload: unknown) => void>>()
 
   constructor(deps: DevBridgeBackend) {
     this.#deps = deps
     const { files } = deps
-    this.#index = createWasmIndexBackend({
-      list: () => files.list(),
-      move: (from, to) => {
-        if (!files.move(from, to)) {
-          throw new AppError('io', `cannot move note: ${from} to ${to}`)
-        }
+    this.#index = createWasmIndexBackend(
+      {
+        list: () => files.list(),
+        move: (from, to) => {
+          if (!files.move(from, to)) {
+            throw new AppError('io', `cannot move note: ${from} to ${to}`)
+          }
+        },
       },
-    })
+      (event, payload) => {
+        this.#emit(event, payload)
+      },
+    )
   }
 
   invoke(command: string, args: Record<string, unknown>): Promise<unknown> {
@@ -346,13 +351,30 @@ class DevBridgeImpl implements IpcBridge {
     return bytes
   }
 
-  // Native event streams (watcher, embeddings, EventKit) don't exist in the
-  // browser; subscriptions succeed and simply never fire. Local writes still
-  // refresh the UI through core's in-process local-write echo. Plugin event
-  // registrations get the same treatment, so the keyboard and recorder
-  // hooks mount cleanly in the harness.
-  listen(): Promise<() => void> {
-    return Promise.resolve(noop)
+  // The index events (`index:written`, `note:moved`) fire like the native
+  // broadcast. The other native event streams (watcher, embeddings, EventKit)
+  // do not exist in the browser: those subscriptions succeed and never fire.
+  // Plugin event registrations do the same, so the keyboard and recorder
+  // hooks mount in the harness.
+  listen(event: string, handler: (payload: unknown) => void): Promise<() => void> {
+    const handlers = this.#listeners.get(event) ?? new Set()
+    this.#listeners.set(event, handlers)
+    handlers.add(handler)
+    return Promise.resolve(() => {
+      handlers.delete(handler)
+    })
+  }
+
+  /**
+   * Deliver an event after the command that caused it has replied, like the
+   * native broadcast.
+   */
+  #emit(event: string, payload: unknown): void {
+    queueMicrotask(() => {
+      for (const handler of this.#listeners.get(event) ?? []) {
+        handler(payload)
+      }
+    })
   }
 
   async listenPlugin(): Promise<void> {}
