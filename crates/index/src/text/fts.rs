@@ -54,6 +54,13 @@ fn quote_fts_literal(term: &str) -> String {
     format!("\"{}\"", term.replace('"', "\"\""))
 }
 
+/// Whether JavaScript's `\\s` matches `character`. The twin splits terms
+/// with it, and it differs from Unicode `White_Space` in two codepoints:
+/// U+FEFF is whitespace only here, U+0085 only there.
+fn is_js_whitespace(character: char) -> bool {
+    (character.is_whitespace() && character != '\u{85}') || character == '\u{FEFF}'
+}
+
 /// The terms a search constrains on, the twin of `searchTerms`
 /// (`search-query.ts`): a term of pure punctuation tokenizes to an empty
 /// phrase, which as an operand of the explicit `AND` matches no rows and would
@@ -61,7 +68,10 @@ fn quote_fts_literal(term: &str) -> String {
 /// nor title recall. When no term survives, the originals are kept: the query
 /// is punctuation only, and title recall can still match it literally.
 fn search_terms(query: &str) -> Vec<&str> {
-    let terms: Vec<&str> = query.split_whitespace().collect();
+    let terms: Vec<&str> = query
+        .split(is_js_whitespace)
+        .filter(|term| !term.is_empty())
+        .collect();
     let tokenizable: Vec<&str> = terms
         .iter()
         .copied()
@@ -219,5 +229,15 @@ mod tests {
         assert_eq!(title_recall_needles("tokyo -"), vec![" tokyo"]);
         // Punctuation only: recall still matches it literally.
         assert_eq!(title_recall_needles("-"), vec![" -"]);
+    }
+
+    #[test]
+    fn terms_split_on_javascript_whitespace() {
+        assert_eq!(build_fts_match("\u{FEFF}"), None);
+        assert_eq!(
+            build_fts_match("a\u{FEFF}b").as_deref(),
+            Some("(title : \"a\"* OR body : \"a\"*) AND (title : \"b\"* OR body : \"b\"*)")
+        );
+        assert_eq!(title_recall_needles("a\u{85}b"), vec![" a\u{85}b"]);
     }
 }
