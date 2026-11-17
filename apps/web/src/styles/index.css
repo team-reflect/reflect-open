@@ -24,20 +24,33 @@ Cascade layer order, low to high priority.
 /* `tailwindcss-safe-area` knows neither the software keyboard nor the tab bar.
    These clear the home indicator, or the keyboard while it is up
    (`--keyboard-height`, mobile/use-keyboard.ts), or the tab bar
-   (`--mobile-tab-bar-height`, mobile/chrome/web/web-chrome-renderer.tsx). */
+   (`--mobile-tab-bar-height`, mobile/chrome/web/web-chrome-renderer.tsx).
+   The keyboard covers the bottom of the mobile shell, so a scroller clears it
+   with padding and scroll padding. */
 @utility pb-above-keyboard {
   padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--keyboard-height, 0px));
 }
+@utility pb-safe-plus-keyboard {
+  padding-bottom: calc(var(--twsa-safe-area-inset-bottom) + var(--keyboard-height, 0px));
+  scroll-padding-bottom: calc(var(--twsa-safe-area-inset-bottom) + var(--keyboard-height, 0px));
+}
+/* Centers content in the part of the shell above the keyboard. */
+@utility pb-keyboard {
+  padding-bottom: var(--keyboard-height, 0px);
+}
 /* The chrome renderer of the shell (mobile/chrome/) sets the bottom safe
    area the page must clear itself (`--chrome-safe-bottom`). Edge-to-edge
-   content clears it, and, with `-unless-keyboard`, only while the keyboard is
-   down: the shell root then already ends at the keyboard's top. */
+   content clears it, and, with `-or-keyboard`, the keyboard while it is up. */
 @utility pb-chrome-safe-offset-* {
   padding-bottom: calc(var(--chrome-safe-bottom, 0px) + var(--spacing) * --value(integer));
 }
-@utility pb-chrome-safe-unless-keyboard-offset-* {
+@utility pb-chrome-safe-or-keyboard-offset-* {
   padding-bottom: calc(
-    max(var(--chrome-safe-bottom, 0px) - var(--keyboard-height, 0px), 0px) + var(--spacing) *
+    max(var(--chrome-safe-bottom, 0px), var(--keyboard-height, 0px)) + var(--spacing) *
+      --value(integer)
+  );
+  scroll-padding-bottom: calc(
+    max(var(--chrome-safe-bottom, 0px), var(--keyboard-height, 0px)) + var(--spacing) *
       --value(integer)
   );
 }

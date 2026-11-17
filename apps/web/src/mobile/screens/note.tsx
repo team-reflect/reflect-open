@@ -29,10 +29,9 @@ export function MobileNote({ path }: { path: string }): ReactElement {
     <div className="flex h-full w-full flex-col pt-safe">
       <MobileNoteHeader path={path} untitled={untitled} close={close} />
       <main
-        // Keyboard avoidance is the shell root's job (it ends at the
-        // keyboard's top); `pb-safe` only clears the home indicator when the
-        // keyboard is down.
-        className="min-h-0 flex-1 overflow-y-auto pb-safe"
+        // The keyboard covers the bottom of the scroller; the padding lets the
+        // last lines scroll above it, and clears the home indicator.
+        className="min-h-0 flex-1 overflow-y-auto pb-safe-plus-keyboard"
       >
         {/* A column at least as tall as the scroll area, with the editor
             taking the slack: the backlinks sit right below the note's own

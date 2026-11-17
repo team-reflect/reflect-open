@@ -181,6 +181,12 @@ importers:
       '@post-embed/types':
         specifier: ^0.5.0
         version: 0.5.0
+      '@prosekit/core':
+        specifier: ^0.13.5
+        version: 0.13.5(prosemirror-model@1.25.13)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.5)
+      '@prosekit/pm':
+        specifier: ^0.1.21
+        version: 0.1.21
       '@reflect/app':
         specifier: workspace:*
         version: link:../../packages/app
