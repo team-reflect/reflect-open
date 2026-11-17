@@ -1,21 +1,11 @@
+import type { WikiClaimMatch } from '@reflect/types'
 import { normalizeWikiTarget, resolved, unresolved, type Resolution } from '../markdown/index.ts'
 import type { DatabaseService } from './database-service.ts'
 import { verifyWikiSuggestionAddresses } from './queries-shared.ts'
 import { rankWikiSuggestions, type WikiLinkSuggestion } from './suggest.ts'
 
 /**
- * The winning tier's claimants for a folded key, preserving ambiguity.
- */
-export interface WikiTargetMatch {
-  /**
-   * One of `CLAIM_TIER`, or {@link UNCLAIMED_TIER} with no paths.
-   */
-  readonly tier: number
-  readonly paths: readonly string[]
-}
-
-/**
- * `WikiTargetMatch.tier` when nothing claims the key (never stored).
+ * `WikiClaimMatch.tier` when nothing claims the key (never stored).
  */
 export const UNCLAIMED_TIER = 0
 
@@ -44,7 +34,7 @@ export interface WikiResolverService {
    * miss need to distinguish one existing note from several notes claiming
    * the same spelling.
    */
-  findWikiTargetMatch(key: string): Promise<WikiTargetMatch>
+  findWikiTargetMatch(key: string): Promise<WikiClaimMatch>
   /**
    * Every indexed note whose folded path matches, sorted.
    */
@@ -81,7 +71,7 @@ class WikiResolverServiceImpl implements WikiResolverService {
     return path === null || path === '' ? unresolved(normalized.raw) : resolved(path)
   }
 
-  async findWikiTargetMatch(key: string): Promise<WikiTargetMatch> {
+  async findWikiTargetMatch(key: string): Promise<WikiClaimMatch> {
     if (key === '') {
       return { tier: UNCLAIMED_TIER, paths: [] }
     }

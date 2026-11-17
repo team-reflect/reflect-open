@@ -1,3 +1,4 @@
+import type { NoteListEntry, RecentNoteRow, TagFacet } from '@reflect/types'
 import { foldTag } from '../markdown/index.ts'
 import type { DatabaseService } from './database-service.ts'
 
@@ -11,52 +12,11 @@ import type { DatabaseService } from './database-service.ts'
  * neither query carries a per-row parameter, so list size has no SQL ceiling.
  */
 
-/**
- * One row of the All Notes list.
- */
-export interface NoteListEntry {
-  path: string
-  title: string
-  /**
-   * The indexed row preview (`buildIndexedNote`; may be empty).
-   */
-  snippet: string
-  /**
-   * The note's body tags (first-seen casing), alphabetical.
-   */
-  tags: string[]
-  /**
-   * File modification time (epoch ms) — the list's recency sort key.
-   */
-  mtime: number
-  /**
-   * Pinned notes lead the list (V1 order) and show a pin marker.
-   */
-  isPinned: boolean
-}
-
 export interface NoteListOptions {
   /**
    * Only notes carrying this tag (case-insensitive). `null` lists all.
    */
   tag?: string | null
-}
-
-/**
- * One row of the recent-notes listing (the AI chat's recents tool).
- */
-export interface RecentNoteRow {
-  path: string
-  title: string
-  /**
-   * The indexed row preview (`buildIndexedNote`; may be empty).
-   */
-  preview: string
-  /**
-   * File modification time (epoch ms).
-   */
-  mtime: number
-  isPrivate: boolean
 }
 
 export interface RecentNotesOptions {
@@ -68,14 +28,6 @@ export interface RecentNotesOptions {
    * Only notes carrying this tag (case-insensitive). `null` lists all.
    */
   tag?: string | null
-}
-
-/**
- * One tag facet over the note list: display casing + non-daily note count.
- */
-export interface NoteTagFacet {
-  tag: string
-  count: number
 }
 
 export interface NoteListServiceDeps {
@@ -107,7 +59,7 @@ export interface NoteListService {
    * filter (and the `#tag` search token): `#Book` and `#book` are one facet,
    * displayed with one deterministic casing.
    */
-  listNoteTags(): Promise<NoteTagFacet[]>
+  listNoteTags(): Promise<TagFacet[]>
 }
 
 class NoteListServiceImpl implements NoteListService {
@@ -128,7 +80,7 @@ class NoteListServiceImpl implements NoteListService {
     })
   }
 
-  async listNoteTags(): Promise<NoteTagFacet[]> {
+  async listNoteTags(): Promise<TagFacet[]> {
     return await this.#deps.database.read('index_note_tags', {})
   }
 }

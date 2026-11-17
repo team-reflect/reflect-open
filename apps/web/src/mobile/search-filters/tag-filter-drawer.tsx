@@ -1,6 +1,7 @@
+import type { TagFacet } from '@reflect/types'
 import type { ReactElement } from 'react'
 import { Check } from 'lucide-react'
-import { foldTag, type NoteTagFacet } from '@reflect/core'
+import { foldTag } from '@reflect/core'
 import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { cn } from '@/lib/utils.ts'
 
@@ -8,7 +9,7 @@ interface TagFilterDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   /** Every tag in the graph (display casing + note count). */
-  facets: NoteTagFacet[]
+  facets: TagFacet[]
   /** The selected folded tag keys. */
   selected: string[]
   /** Toggle one folded tag key in or out of the selection. */

@@ -1,5 +1,6 @@
+import type { TagFacet } from '@reflect/types'
 import { useState, type ReactElement } from 'react'
-import { foldTag, isTagName, type NoteTagFacet } from '@reflect/core'
+import { foldTag, isTagName } from '@reflect/core'
 import {
   Combobox,
   ComboboxContent,
@@ -13,7 +14,7 @@ import { cn } from '@/lib/utils.ts'
 
 interface CustomFilterMenuProps {
   /** Tags not pinned as their own tab, with non-daily note counts. */
-  facets: NoteTagFacet[]
+  facets: TagFacet[]
   /** The active tag when it isn't pinned (the menu owns it), else null. */
   activeTag: string | null
   onSelect: (tag: string) => void

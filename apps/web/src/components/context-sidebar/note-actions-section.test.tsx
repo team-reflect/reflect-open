@@ -1,3 +1,4 @@
+import type { NoteRow } from '@reflect/types'
 import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import {
@@ -7,7 +8,6 @@ import {
   type IndexQueryService,
   type NoteActionsService,
   type NoteDocumentService,
-  type NoteRow,
   AppError,
 } from '@reflect/core'
 import {
@@ -118,7 +118,12 @@ describe('NoteActionsSection pin toggle', () => {
 
   it('offers Un-pin this note when the index lists the note as pinned', async () => {
     getPinnedNotes.mockResolvedValue([
-      { path: 'daily/2026-06-10.md', title: 'June 10th, 2026', dailyDate: '2026-06-10' },
+      {
+        path: 'daily/2026-06-10.md',
+        title: 'June 10th, 2026',
+        dailyDate: '2026-06-10',
+        pinnedOrder: null,
+      },
     ])
     noteSource = '---\npinned: true\n---\n# A\n'
     const view = await renderSection('daily/2026-06-10.md')

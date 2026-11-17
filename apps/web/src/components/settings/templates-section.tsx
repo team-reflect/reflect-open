@@ -1,6 +1,7 @@
+import type { TemplateEntry } from '@reflect/types'
 import { useCallback, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { displayNoteTitle, errorMessage, type TemplateEntry } from '@reflect/core'
+import { displayNoteTitle, errorMessage } from '@reflect/core'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import {

@@ -1,11 +1,12 @@
+import type { PinnedNoteRow } from '@reflect/types'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { arrayMove } from '@dnd-kit/sortable'
-import { updatePinOrder, type PinnedNote } from '@reflect/core'
+import { updatePinOrder } from '@reflect/core'
 import { useCallback } from 'react'
 import { noop } from '@ocavue/utils'
 
 export function useReorderPinnedNotes(
-  pinned: readonly PinnedNote[],
+  pinned: readonly PinnedNoteRow[],
 ): (activePath: string, overPath: string) => void {
   const { noteActions } = useCoreServices()
 
@@ -18,10 +19,10 @@ export function useReorderPinnedNotes(
       }
 
       // Move the note in the array.
-      const moved: PinnedNote[] = arrayMove([...pinned], activeIndex, overIndex)
+      const moved: PinnedNoteRow[] = arrayMove([...pinned], activeIndex, overIndex)
 
       // Update `note.pinnedOrder` in the moved note to maintain the correct order.
-      const renumbered: PinnedNote[] = updatePinOrder(moved, activePath)
+      const renumbered: PinnedNoteRow[] = updatePinOrder(moved, activePath)
 
       // All notes that changed `note.pinnedOrder`
       const updated = renumbered.filter((a, index) => {

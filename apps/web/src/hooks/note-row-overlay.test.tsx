@@ -1,6 +1,6 @@
+import type { NoteRow } from '@reflect/types'
 import { act } from '@/test-utils/act.ts'
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { NoteRow } from '@reflect/core'
 import {
   createTestDatabaseService,
   createTestCoreServices,

@@ -1,8 +1,8 @@
+import type { MenuConfirm } from '@reflect/types'
 import { useState, type ReactElement } from 'react'
 import type { MaybePromise } from '@reflect/utils'
 import { Button } from '@/components/ui/button.tsx'
 import { describeActionError } from '@/mobile/chrome/chrome-action.ts'
-import type { ChromeConfirm } from '@/mobile/chrome/screen-chrome.ts'
 import {
   Drawer,
   DrawerBody,
@@ -12,7 +12,7 @@ import {
 } from '@/mobile/scroll-drawer.tsx'
 
 interface ConfirmDrawerProps {
-  confirm: ChromeConfirm
+  confirm: MenuConfirm
   open: boolean
   onOpenChange: (open: boolean) => void
   /**

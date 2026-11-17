@@ -1,7 +1,8 @@
+import type { NoteRow } from '@reflect/types'
 import { userEvent } from 'vitest/browser'
 import type { QueryClient } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
-import type { GistPublishService, NoteRow } from '@reflect/core'
+import type { GistPublishService } from '@reflect/core'
 import {
   createTestDatabaseService,
   createTestCoreServices,

@@ -1,10 +1,6 @@
+import type { NoteRow } from '@reflect/types'
 import { type MaybePromise, getYearMonth } from '@reflect/utils'
-import {
-  type DailyNoteService,
-  type NoteRow,
-  type RetrievalService,
-  formatDayLabel,
-} from '@reflect/core'
+import { type DailyNoteService, type RetrievalService, formatDayLabel } from '@reflect/core'
 import { deepLinkForRoute, formatMonthLabel } from '@reflect/app'
 import { createTestWindowService } from '@reflect/app/testing'
 import { page, userEvent } from 'vitest/browser'

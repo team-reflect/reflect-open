@@ -1,6 +1,7 @@
+import type { NoteRow } from '@reflect/types'
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { type NoteRow, applyNoteRowOverlay } from '@reflect/core'
+import { applyNoteRowOverlay } from '@reflect/core'
 import { useNoteRowOverlay } from '@/hooks/note-row-overlay.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'

@@ -1,3 +1,4 @@
+import type { EmbeddedChunk } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
@@ -6,7 +7,6 @@ import type { StorageService } from '../ports/storage-service.ts'
 import type { GraphRole } from '../graph/graph-session.ts'
 import {
   createEmbeddingIndexService,
-  type EmbedChunkPayload,
   type EmbedNoteOptions,
   type EmbeddingBackfillOptions,
   type EmbeddingBackfillResult,
@@ -228,7 +228,7 @@ export function createTestRetrievalService(
  */
 export interface TestEmbeddingApply {
   readonly path: string
-  readonly chunks: readonly EmbedChunkPayload[]
+  readonly chunks: readonly EmbeddedChunk[]
   readonly generation: number
 }
 

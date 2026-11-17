@@ -1,3 +1,4 @@
+import type { ChunkHit } from '@reflect/types'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import { literalSearchQuery } from '../indexing/filter-query.ts'
@@ -49,15 +50,6 @@ const KNN_CANDIDATES = 24
  */
 const MAX_COSINE_DISTANCE = 0.7
 
-export interface ChunkHitRow {
-  path: string
-  title: string
-  heading: string | null
-  text: string
-  isPrivate: boolean
-  distance: number
-}
-
 /**
  * Collapse KNN chunk rows (ordered nearest-first) into one hit per note —
  * the best chunk wins. Rows past {@link MAX_COSINE_DISTANCE} are dropped
@@ -66,7 +58,7 @@ export interface ChunkHitRow {
  * (the vec0 table's metric is cosine) for callers that want magnitudes.
  */
 export function bestChunkPerNote(
-  rows: readonly ChunkHitRow[],
+  rows: readonly ChunkHit[],
   limit: number,
   excludePath?: string,
 ): RetrievalHit[] {
@@ -135,7 +127,7 @@ function withPrivacy(hits: RetrievalHit[], excludePrivateContent: boolean): Retr
  * KNN result lists from several seed vectors, merged nearest-first so
  * {@link bestChunkPerNote} keeps each note's best distance across seeds.
  */
-export function mergeNearestFirst(lists: ReadonlyArray<readonly ChunkHitRow[]>): ChunkHitRow[] {
+export function mergeNearestFirst(lists: ReadonlyArray<readonly ChunkHit[]>): ChunkHit[] {
   return lists.flat().sort((a, b) => a.distance - b.distance)
 }
 

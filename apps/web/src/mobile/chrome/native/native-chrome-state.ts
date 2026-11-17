@@ -1,6 +1,6 @@
+import type { ToolbarState } from '@reflect/types'
 import { formatMonthLabel, type Route } from '@reflect/app'
 import type { ThemePreference } from '@reflect/core'
-import type { FormattingToolbarCapabilities } from '@/editor/formatting-toolbar-store.ts'
 import { toWireButtons } from '@/mobile/chrome/native/sf-symbols.ts'
 import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 import {
@@ -57,7 +57,7 @@ export interface ShellChromeInput {
   bar: ScreenBar | undefined
   keyboardVisible: boolean
   modal: boolean
-  toolbar: FormattingToolbarCapabilities | null
+  toolbar: ToolbarState | null
   sidebar: NativeSidebarState | null
   history: NativeChromeState['history']
   fullscreen: boolean

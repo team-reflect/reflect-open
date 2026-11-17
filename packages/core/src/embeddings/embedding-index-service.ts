@@ -1,3 +1,4 @@
+import type { EmbeddedChunk } from '@reflect/types'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { LocalNoteRead, NoteFileService } from '../graph/note-file-service.ts'
@@ -42,21 +43,6 @@ export interface EmbedNoteOptions {
    * Pre-loaded content (the watcher path has it); read from disk if absent.
    */
   content?: string
-}
-
-/**
-
- * One chunk in the `embed_apply` payload; `vector` only for new/changed.
-
- */
-export interface EmbedChunkPayload {
-  heading: string | null
-  posFrom: number
-  posTo: number
-  text: string
-  contentHash: string
-  modelId: string
-  vector: number[] | null
 }
 
 /**
@@ -224,7 +210,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
         : []
     let vectorAt = 0
 
-    const payload: EmbedChunkPayload[] = chunks.map((chunk, i) => ({
+    const payload: EmbeddedChunk[] = chunks.map((chunk, i) => ({
       heading: chunk.heading,
       posFrom: chunk.posFrom,
       posTo: chunk.posTo,
@@ -326,7 +312,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
   /**
    * Replace a note's chunk set (hash-diff applied in Rust; generation-pinned).
    */
-  async #applyChunks(path: string, chunks: EmbedChunkPayload[], generation: number): Promise<void> {
+  async #applyChunks(path: string, chunks: EmbeddedChunk[], generation: number): Promise<void> {
     await this.#deps.ipc.call('embed_apply', { path, chunks, generation })
   }
 

@@ -1,15 +1,11 @@
+import type { MenuConfirm } from '@reflect/types'
 import { useState, type ReactElement } from 'react'
 import { Check } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import { useToastController } from '@/lib/use-toasts.ts'
 import { cn } from '@/lib/utils.ts'
 import { runChromeAction } from '@/mobile/chrome/chrome-action.ts'
-import type {
-  ChromeButton,
-  ChromeConfirm,
-  ChromeMenuItem,
-  ScreenChrome,
-} from '@/mobile/chrome/screen-chrome.ts'
+import type { ChromeButton, ChromeMenuItem, ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
 import { WEB_ICONS } from '@/mobile/chrome/web/web-icons.ts'
 import { ConfirmDrawer } from '@/mobile/confirm-drawer.tsx'
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/mobile/scroll-drawer.tsx'
@@ -34,7 +30,7 @@ export function ChromeMenuDrawer({ button, chrome, trigger }: ChromeMenuDrawerPr
   const [open, setOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   // Kept after the drawer closes, so its content stays during the exit.
-  const [confirming, setConfirming] = useState<{ id: string; confirm: ChromeConfirm } | null>(null)
+  const [confirming, setConfirming] = useState<{ id: string; confirm: MenuConfirm } | null>(null)
 
   const select = (item: ActionItem): void => {
     setOpen(false)

@@ -1,26 +1,9 @@
+import type { DailyNoteRow } from '@reflect/types'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import type { Unlisten } from '../unlisten.ts'
 import { formatIsoDate } from '@reflect/utils'
-
-/**
- * One daily-note row of a date-ranged listing (the AI chat's daily tool).
- */
-export interface DailyNoteRow {
-  path: string
-  title: string
-  dailyDate: string
-  /**
-   * The indexed row preview (`buildIndexedNote`; may be empty).
-   */
-  preview: string
-  /**
-   * File modification time (epoch ms).
-   */
-  mtime: number
-  isPrivate: boolean
-}
 
 export interface DailyNotesRange {
   /**

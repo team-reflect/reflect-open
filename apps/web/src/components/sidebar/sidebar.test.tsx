@@ -1,3 +1,4 @@
+import type { PinnedNoteRow } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import type { ReactNode } from 'react'
 import { page, userEvent } from 'vitest/browser'
@@ -8,7 +9,6 @@ import {
   type AiProviderConfig,
   type GraphSessionService,
   type NoteDocumentService,
-  type PinnedNote,
   type SettingsService,
 } from '@reflect/core'
 import {
@@ -57,7 +57,7 @@ const OPENAI: AiProviderConfig = {
 }
 
 // What the app's fakes answer; each test sets them before `renderSidebar`.
-const getPinnedNotes = vi.fn<() => Promise<PinnedNote[]>>()
+const getPinnedNotes = vi.fn<() => Promise<PinnedNoteRow[]>>()
 const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
 const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
 let aiProviders: AiProviderConfig[]
@@ -274,7 +274,7 @@ describe('Sidebar', () => {
 
   it('pinned notes render their own section', async () => {
     getPinnedNotes.mockResolvedValue([
-      { path: 'notes/roadmap.md', title: 'Roadmap', dailyDate: null },
+      { path: 'notes/roadmap.md', title: 'Roadmap', dailyDate: null, pinnedOrder: null },
     ])
     const { view } = await renderSidebar()
 
@@ -294,7 +294,7 @@ describe('Sidebar', () => {
 
   it('modifier-click opens a pinned note in a new window without changing routes', async () => {
     getPinnedNotes.mockResolvedValue([
-      { path: 'notes/roadmap.md', title: 'Roadmap', dailyDate: null },
+      { path: 'notes/roadmap.md', title: 'Roadmap', dailyDate: null, pinnedOrder: null },
     ])
     const { view } = await renderSidebar()
     const roadmap = view.getByRole('button', { name: 'Roadmap' })
@@ -315,7 +315,12 @@ describe('Sidebar', () => {
 
   it('renders wiki links in pinned note titles as display text', async () => {
     getPinnedNotes.mockResolvedValue([
-      { path: 'notes/meeting.md', title: 'Meeting with [[Ada Lovelace|Ada]]', dailyDate: null },
+      {
+        path: 'notes/meeting.md',
+        title: 'Meeting with [[Ada Lovelace|Ada]]',
+        dailyDate: null,
+        pinnedOrder: null,
+      },
     ])
     const { view } = await renderSidebar()
 
@@ -327,7 +332,7 @@ describe('Sidebar', () => {
 
   it('All notes is inactive while the active note is pinned', async () => {
     getPinnedNotes.mockResolvedValue([
-      { path: 'notes/roadmap.md', title: 'Roadmap', dailyDate: null },
+      { path: 'notes/roadmap.md', title: 'Roadmap', dailyDate: null, pinnedOrder: null },
     ])
     const { view } = await renderSidebar(undefined, { kind: 'note', path: 'notes/roadmap.md' })
 
@@ -346,7 +351,9 @@ describe('Sidebar', () => {
   })
 
   it('right-click unpins a pinned row through the native context menu', async () => {
-    getPinnedNotes.mockResolvedValue([{ path: 'notes/rust.md', title: 'Rust', dailyDate: null }])
+    getPinnedNotes.mockResolvedValue([
+      { path: 'notes/rust.md', title: 'Rust', dailyDate: null, pinnedOrder: null },
+    ])
     const { view } = await renderSidebar()
     const rust = view.getByRole('button', { name: 'Rust' })
 
@@ -367,7 +374,9 @@ describe('Sidebar', () => {
 
   it('restores an optimistically removed pinned row when unpin fails', async () => {
     commitNoteFrontmatter.mockRejectedValueOnce(new Error('disk failed'))
-    getPinnedNotes.mockResolvedValue([{ path: 'notes/rust.md', title: 'Rust', dailyDate: null }])
+    getPinnedNotes.mockResolvedValue([
+      { path: 'notes/rust.md', title: 'Rust', dailyDate: null, pinnedOrder: null },
+    ])
     const { view } = await renderSidebar()
     const rust = view.getByRole('button', { name: 'Rust' })
 
@@ -383,7 +392,9 @@ describe('Sidebar', () => {
   })
 
   it('history arrows walk the router stack and disable at its edges', async () => {
-    getPinnedNotes.mockResolvedValue([{ path: 'notes/rust.md', title: 'Rust', dailyDate: null }])
+    getPinnedNotes.mockResolvedValue([
+      { path: 'notes/rust.md', title: 'Rust', dailyDate: null, pinnedOrder: null },
+    ])
     const { view } = await renderSidebar()
     const backButton = view.getByRole('button', { name: 'Go back' })
     const forwardButton = view.getByRole('button', { name: 'Go forward' })

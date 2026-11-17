@@ -1,42 +1,9 @@
+import type { NoteRow, PinnedNoteRow, TemplateEntry } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import { isIsoDate } from '@reflect/utils'
 import { dailyPath } from '../graph/paths.ts'
 import { foldKey } from '../markdown/index.ts'
 import type { DatabaseService } from './database-service.ts'
-
-/**
- * One pinned note, as the sidebar's Pinned section lists it.
- */
-export interface PinnedNote {
-  path: string
-  title: string
-  dailyDate: string | null
-  pinnedOrder?: number | null | undefined
-}
-
-/**
- * Core fields of one note row: identity path, title, daily date, privacy flag.
- */
-export interface NoteRow {
-  path: string
-  title: string
-  dailyDate: string | null
-  /**
-   * The `private: true` frontmatter flag — a hard block on sending content to
-   * external services. SQLite stores it as `0|1`; this getter maps it to a real
-   * boolean at the read boundary so privacy checks can't be tripped up by a
-   * truthy number.
-   */
-  isPrivate: boolean
-  /**
-   * The published gist's html url, or null when the note has none.
-   */
-  gistUrl: string | null
-  /**
-   * The body changed since it was last published — the "Republish" nudge.
-   */
-  gistStale: boolean
-}
 
 /**
  * What a pass knows about an indexed note without reading its file.
@@ -50,18 +17,6 @@ export interface IndexedFileFacts {
    * The mtime stamped on the row — lets a pass skip reading untouched files.
    */
   readonly mtime: number
-}
-
-/**
- * One template: its file and its display name (H1 or filename-derived title).
- */
-export interface TemplateEntry {
-  path: string
-  title: string
-  /**
-   * File modification time (epoch ms).
-   */
-  mtime: number
 }
 
 export interface IndexQueryServiceDeps {
@@ -82,7 +37,7 @@ export interface IndexQueryService {
    * alphabetically by case-folded title (path as the tiebreak). Stable order is
    * the point of pinning: the list must not reshuffle as notes are edited.
    */
-  getPinnedNotes(): Promise<PinnedNote[]>
+  getPinnedNotes(): Promise<PinnedNoteRow[]>
   /**
    * Every template in the graph (`templates/*.md`), A→Z by folded title
    * (matching v1's menu order). Templates are indexed like notes but carry
@@ -142,7 +97,7 @@ class IndexQueryServiceImpl implements IndexQueryService {
     return (await this.#deps.database.read('index_note', { path })) ?? undefined
   }
 
-  async getPinnedNotes(): Promise<PinnedNote[]> {
+  async getPinnedNotes(): Promise<PinnedNoteRow[]> {
     return await this.#deps.database.read('index_pinned_notes', {})
   }
 

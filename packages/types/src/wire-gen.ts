@@ -2599,6 +2599,7 @@ export type ToolbarState = {
   canDedent: boolean
   canMoveUp: boolean
   canMoveDown: boolean
+  /**  Whether the editor can save files. */
   canAttachFiles: boolean
 }
 

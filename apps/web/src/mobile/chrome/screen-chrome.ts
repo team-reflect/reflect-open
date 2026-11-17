@@ -1,3 +1,4 @@
+import type { MenuConfirm } from '@reflect/types'
 import type { RefObject } from 'react'
 import type { AudioMemoPhase } from '@reflect/core'
 import type { MaybePromise } from '@reflect/utils'
@@ -72,19 +73,6 @@ export interface ChromeSearch {
 }
 
 /**
- * A confirmation shown before a menu item runs, with one destructive button
- * and Cancel.
- */
-export interface ChromeConfirm {
-  title: string
-  message?: string | undefined
-  /**
-   * The label of the destructive button.
-   */
-  action: string
-}
-
-/**
  * One row of a corner button's menu, in the order the menu shows it.
  */
 export type ChromeMenuItem =
@@ -99,7 +87,7 @@ export type ChromeMenuItem =
        * Shows a checkmark.
        */
       checked?: boolean | undefined
-      confirm?: ChromeConfirm | undefined
+      confirm?: MenuConfirm | undefined
     }
   | {
       type: 'section'

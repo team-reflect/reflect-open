@@ -1,3 +1,4 @@
+import type { ChunkHit } from '@reflect/types'
 import { describe, expect, it } from 'vitest'
 import {
   createTestDatabaseService,
@@ -16,7 +17,6 @@ import {
   createRetrievalService,
   fuseRanked,
   mergeNearestFirst,
-  type ChunkHitRow,
   type RetrievalHit,
 } from './retrieval-service.ts'
 
@@ -235,7 +235,7 @@ function hit(path: string, overrides?: Partial<RetrievalHit>): RetrievalHit {
   }
 }
 
-function row(path: string, distance: number, overrides?: Partial<ChunkHitRow>): ChunkHitRow {
+function row(path: string, distance: number, overrides?: Partial<ChunkHit>): ChunkHit {
   return {
     path,
     title: path,

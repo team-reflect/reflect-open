@@ -1,7 +1,8 @@
+import type { NoteRow } from '@reflect/types'
 import { userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { MIN_VISIBLE_MS } from '@reflect/app'
-import type { GistPublishService, NoteRow } from '@reflect/core'
+import type { GistPublishService } from '@reflect/core'
 import {
   createTestOperationsService,
   type TestClipboardService,
