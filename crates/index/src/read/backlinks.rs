@@ -4,7 +4,9 @@ use std::collections::HashMap;
 
 use rusqlite::{Connection, ToSql, params};
 
-use reflect_types::{AppResult, Backlink, BacklinkPage, BacklinkSource, BacklinkSourceCursor};
+use reflect_types::{
+    AppError, AppResult, Backlink, BacklinkPage, BacklinkSource, BacklinkSourceCursor,
+};
 
 /// The recency of a source note: its daily date, else its last change, in
 /// epoch ms.
@@ -33,13 +35,17 @@ pub(crate) fn backlinks(conn: &Connection, path: &str) -> AppResult<Vec<Backlink
 
 /// One page of the sources that link to the note at `path`: most recent
 /// first, then by path, at most `limit`, after `cursor`. Each source carries
-/// the positions of its links.
+/// the positions of its links. A `limit` below 1 is an error.
 pub(crate) fn page(
     conn: &Connection,
     path: &str,
     limit: i64,
     cursor: Option<&BacklinkSourceCursor>,
 ) -> AppResult<BacklinkPage> {
+    if limit <= 0 {
+        return Err(AppError::parse("the backlink page limit must be positive"));
+    }
+
     // Sources strictly after the cursor in (recency DESC, path) order.
     let after = "(?2 IS NULL OR recency < ?2 OR (recency = ?2 AND source_path > ?3))";
     let cursor_recency = cursor.map(|cursor| cursor.recency_ms);
@@ -79,7 +85,7 @@ pub(crate) fn page(
             sources: Vec::new(),
             next_cursor: None,
             indexed_link_count,
-            target_keys: Vec::new(),
+            target_keys,
         });
     };
 
@@ -114,10 +120,6 @@ pub(crate) fn page(
             .push(pos_from);
     }
 
-    let target_keys = conn
-        .prepare_cached("SELECT key FROM note_keys WHERE note_path = ?1 AND key IS NOT NULL")?
-        .query_map([path], |row| row.get(0))?
-        .collect::<Result<_, _>>()?;
     let sources = candidates
         .into_iter()
         .map(|(source_path, source_title, _)| BacklinkSource {

@@ -2698,4 +2698,10 @@ fn backlink_pages_run_newest_source_first_and_resume_after_a_cursor() {
     assert_eq!(unlimited.next_cursor, None);
     let none = backlink_page(&conn, "notes/missing.md", 5, None).unwrap();
     assert_eq!((none.sources.len(), none.indexed_link_count), (0, 0));
+    // A page with no source still names the keys of its target.
+    apply_note(&conn, &note("notes/lonely.md", "Lonely", vec![])).unwrap();
+    let lonely = backlink_page(&conn, "notes/lonely.md", 5, None).unwrap();
+    assert!(lonely.sources.is_empty());
+    assert!(lonely.target_keys.contains(&"lonely".to_string()));
+    assert!(backlink_page(&conn, "notes/target.md", 0, None).is_err());
 }
