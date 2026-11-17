@@ -1,4 +1,4 @@
-import type { IndexReadCommand } from '@reflect/types'
+import type { IndexReadCommand, IndexWriteCommand } from '@reflect/types'
 import { createWasmIndexBackend, type WasmIndexBackend } from '@reflect/index-wasm'
 import { toAppError } from '../errors.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
@@ -14,6 +14,11 @@ export interface TestDatabaseRead {
   readonly args: Readonly<Record<string, unknown>>
 }
 
+/**
+ * The name of every command that writes or reads the index.
+ */
+export type IndexCommand = IndexWriteCommand | IndexReadCommand
+
 export interface TestDatabaseService extends DatabaseService {
   /**
    * Replace every projected row of `note.path` with `note`, like `index_apply`.
@@ -27,7 +32,7 @@ export interface TestDatabaseService extends DatabaseService {
   /**
    * Run one index command on the database, like the native shell.
    */
-  invoke(command: string, args: Record<string, unknown>): unknown
+  invoke<C extends IndexCommand>(command: C, args: CommandArgs<C>): CommandResult<C>
   /**
    * The generation of the open index, which a write command must carry.
    */
@@ -49,13 +54,13 @@ class TestDatabaseServiceImpl implements TestDatabaseService {
   #closed = false
 
   query(sql: string, params: readonly unknown[] = []): Record<string, unknown>[] {
-    return this.invoke('test_query', { sql, params: [...params] }) as Record<string, unknown>[]
+    return this.#invoke('test_query', { sql, params: [...params] }) as Record<string, unknown>[]
   }
 
   read<C extends IndexReadCommand>(command: C, args: CommandArgs<C>): Promise<CommandResult<C>> {
     return Promise.try(() => {
       this.#reads.push({ command, args: structuredClone(args) })
-      return this.invoke(command, args) as CommandResult<C>
+      return this.invoke(command, args)
     })
   }
 
@@ -63,16 +68,8 @@ class TestDatabaseServiceImpl implements TestDatabaseService {
     this.invoke('index_apply', { note, generation: this.generation() })
   }
 
-  invoke(command: string, args: Record<string, unknown>): unknown {
-    try {
-      const result = this.#open().invoke(command, args)
-      if (command === 'index_open') {
-        this.#generation = result as number
-      }
-      return result
-    } catch (error) {
-      throw toAppError(error)
-    }
+  invoke<C extends IndexCommand>(command: C, args: CommandArgs<C>): CommandResult<C> {
+    return this.#invoke(command, args) as CommandResult<C>
   }
 
   generation(): number {
@@ -88,6 +85,14 @@ class TestDatabaseServiceImpl implements TestDatabaseService {
     this.#closed = true
     this.#index?.close()
     this.#index = null
+  }
+
+  #invoke(command: string, args: Readonly<Record<string, unknown>>): unknown {
+    try {
+      return this.#open().invoke(command, args)
+    } catch (error) {
+      throw toAppError(error)
+    }
   }
 
   #open(): WasmIndexBackend {

@@ -53,6 +53,7 @@ export {
 export {
   createTestDatabaseService,
   seedNotes,
+  type IndexCommand,
   type TestDatabaseService,
   type TestNote,
 } from './database.ts'

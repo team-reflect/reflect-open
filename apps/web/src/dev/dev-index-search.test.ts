@@ -10,6 +10,7 @@ import {
   parseHighlights,
   parseNote,
   parseSearchQuery,
+  type CommandArgs,
   type DailyNoteService,
   type IndexedNote,
   type SearchService,
@@ -23,7 +24,7 @@ import {
   createTestActivityPort,
   createTestLoggerService,
 } from '@reflect/core/testing'
-import type { TestDatabaseService } from '@reflect/core/testing'
+import type { IndexCommand, TestDatabaseService } from '@reflect/core/testing'
 import { buildAllNotesSearch, EMPTY_ALL_NOTES_FILTERS, searchPlanFor } from '@reflect/app'
 import { noop } from '@ocavue/utils'
 
@@ -99,7 +100,8 @@ function connectIndex(db: TestDatabaseService): IndexServices {
     transport: {
       invoke: (command, args) => {
         return Promise.try(() => {
-          return db.invoke(command, args)
+          // The transport gets the command name at run time.
+          return db.invoke(command as IndexCommand, args as CommandArgs<IndexCommand>)
         })
       },
       listen: () => Promise.resolve(noop),

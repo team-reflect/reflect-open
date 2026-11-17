@@ -238,6 +238,10 @@ macro_rules! define_commands {
             $( pub $shell: $shell::Signature, )*
         }
 
+        /// The name of every command that writes the index.
+        #[cfg(feature = "codegen")]
+        pub const INDEX_WRITE_COMMANDS: &[&str] = &[$( stringify!($write) ),*];
+
         /// The name of every command that reads the index.
         #[cfg(feature = "codegen")]
         pub const INDEX_READ_COMMANDS: &[&str] = &[$( stringify!($read) ),*];
