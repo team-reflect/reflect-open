@@ -150,6 +150,8 @@ mod capability_tests {
 macro_rules! desktop_handler {
     (
         core { $( $core:tt )* }
+        index_write { $( $index_write:tt )* }
+        index_read { $( $index_read:tt )* }
         desktop { $( $module:ident :: $method:ident ( $( $arg:ident : $ty:ty ),* ) -> $ret:ty ),* $(,)? }
         shell { $( $shell:tt )* }
     ) => {
