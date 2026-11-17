@@ -13,6 +13,7 @@
 //! the session only reports whether a write committed.
 
 mod chat_write;
+mod commands;
 #[cfg(any(feature = "native", test))]
 mod connections;
 mod embed_write;
@@ -23,6 +24,9 @@ mod session;
 mod tests;
 mod write;
 
+pub use commands::{
+    INDEX_READ_COMMANDS, INDEX_WRITE_COMMANDS, IndexCommands, IndexEvents, is_index_command,
+};
 #[cfg(any(feature = "native", test))]
 pub use connections::FileIndexConnections;
 pub use session::{Applied, IndexConnections, IndexSession};

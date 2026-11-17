@@ -172,7 +172,9 @@ impl Core {
 
     /// Whether [`Core::dispatch`] has `command`.
     pub fn has_command(command: &str) -> bool {
-        BINARY_COMMANDS.contains(&command) || JSON_COMMANDS.contains(&command)
+        BINARY_COMMANDS.contains(&command)
+            || JSON_COMMANDS.contains(&command)
+            || reflect_index::is_index_command(command)
     }
 
     /// Runs `command` with `args_json`, a JSON object of camelCase arguments.
@@ -208,6 +210,9 @@ impl Core {
                 return json_reply(&());
             }
             _ => {}
+        }
+        if reflect_index::is_index_command(command) {
+            return self.dispatch_index(command, args_json).await;
         }
         dispatch_json(self, command, args_json).await
     }
@@ -247,6 +252,8 @@ fn json_reply<T: Serialize>(value: &T) -> AppResult<Reply> {
 macro_rules! dispatch_table {
     (
         core { $( $method:ident ( $( $arg:ident : $ty:ty ),* ) $( . $await:tt )? $( $infallible:ident )? -> $ret:ty ),* $(,)? }
+        index_write { $( $index_write:tt )* }
+        index_read { $( $index_read:tt )* }
         desktop { $( $desktop:tt )* }
         shell { $( $shell:tt )* }
     ) => {

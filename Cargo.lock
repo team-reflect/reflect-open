@@ -4674,6 +4674,7 @@ dependencies = [
  "reflect-index-schema",
  "reflect-types",
  "rusqlite",
+ "serde",
  "serde_json",
  "tempfile",
  "tracing",

@@ -628,103 +628,15 @@ export type Commands = {
     args: Record<string, never>
     result: number
   }
-  index_apply: {
-    args: {
-      note: IndexedNote
-      generation: number
-    }
-    result: null
-  }
-  index_apply_batch: {
-    args: {
-      notes: IndexedNote[]
-      generation: number
-    }
-    result: null
-  }
-  index_remove: {
-    args: {
-      path: string
-      generation: number
-    }
-    result: null
-  }
-  index_clear: {
-    args: {
-      generation: number
-    }
-    result: null
-  }
-  index_move: {
-    args: {
-      from: string
-      to: string
-      generation: number
-      toAddress: MovedNoteAddress
-    }
-    result: null
-  }
   index_reconcile_scan: {
     args: {
       generation: number
     }
     result: ReconcileScan
   }
-  index_touch: {
-    args: {
-      entries: IndexTouch[]
-      generation: number
-    }
-    result: null
-  }
   note_move_indexed: {
     args: {
       request: NoteMoveRequest
-      generation: number
-    }
-    result: null
-  }
-  index_meta_set: {
-    args: {
-      key: string
-      value: string
-      generation: number
-    }
-    result: null
-  }
-  db_query: {
-    args: {
-      sql: string
-      params: unknown[]
-    }
-    result: { [key in string]: unknown }[]
-  }
-  chat_message_save: {
-    args: {
-      conversation: ChatConversation
-      message: ChatMessageRow
-      generation: number
-    }
-    result: null
-  }
-  chat_conversation_delete: {
-    args: {
-      id: string
-      generation: number
-    }
-    result: null
-  }
-  embed_apply: {
-    args: {
-      path: string
-      chunks: EmbeddedChunk[]
-      generation: number
-    }
-    result: null
-  }
-  embed_remove: {
-    args: {
-      path: string
       generation: number
     }
     result: null
@@ -1013,6 +925,94 @@ export type Commands = {
       postId: string
     }
     result: unknown | null
+  }
+  index_apply: {
+    args: {
+      note: IndexedNote
+      generation: number
+    }
+    result: null
+  }
+  index_apply_batch: {
+    args: {
+      notes: IndexedNote[]
+      generation: number
+    }
+    result: null
+  }
+  index_remove: {
+    args: {
+      path: string
+      generation: number
+    }
+    result: null
+  }
+  index_clear: {
+    args: {
+      generation: number
+    }
+    result: null
+  }
+  index_move: {
+    args: {
+      from: string
+      to: string
+      generation: number
+      toAddress: MovedNoteAddress
+    }
+    result: null
+  }
+  index_touch: {
+    args: {
+      entries: IndexTouch[]
+      generation: number
+    }
+    result: null
+  }
+  index_meta_set: {
+    args: {
+      key: string
+      value: string
+      generation: number
+    }
+    result: null
+  }
+  chat_message_save: {
+    args: {
+      conversation: ChatConversation
+      message: ChatMessageRow
+      generation: number
+    }
+    result: null
+  }
+  chat_conversation_delete: {
+    args: {
+      id: string
+      generation: number
+    }
+    result: null
+  }
+  embed_apply: {
+    args: {
+      path: string
+      chunks: EmbeddedChunk[]
+      generation: number
+    }
+    result: null
+  }
+  embed_remove: {
+    args: {
+      path: string
+      generation: number
+    }
+    result: null
+  }
+  db_query: {
+    args: {
+      sql: string
+      params: unknown[]
+    }
+    result: { [key in string]: unknown }[]
   }
   skill_status: {
     args: Record<string, never>

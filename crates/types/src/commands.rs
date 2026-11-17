@@ -7,7 +7,9 @@ use crate::*;
 /// Calls `$callback!` with the command table.
 ///
 /// A `core` row names a `Core` method; `.await` marks an async method and
-/// `infallible` one that returns its value without `AppResult`. A `desktop`
+/// `infallible` one that returns its value without `AppResult`. An
+/// `index_write` or `index_read` row names a method of
+/// `reflect_index::IndexCommands`. A `desktop`
 /// row names a Tauri command by its module path and lists only the arguments
 /// the frontend sends. A `shell` row maps a Swift shell command name to an
 /// identifier, its arguments type and its result.
@@ -59,20 +61,8 @@ macro_rules! commands {
                 watch_start() -> (),
                 watch_stop() -> (),
                 index_open() -> u64,
-                index_apply(note: IndexedNote, generation: u64) -> (),
-                index_apply_batch(notes: Vec<IndexedNote>, generation: u64) -> (),
-                index_remove(path: String, generation: u64) -> (),
-                index_clear(generation: u64) -> (),
-                index_move(from: String, to: String, generation: u64, to_address: MovedNoteAddress) -> (),
                 index_reconcile_scan(generation: u64).await -> ReconcileScan,
-                index_touch(entries: Vec<IndexTouch>, generation: u64) -> (),
                 note_move_indexed(request: NoteMoveRequest, generation: u64) -> (),
-                index_meta_set(key: String, value: String, generation: u64) -> (),
-                db_query(sql: String, params: Vec<serde_json::Value>).await -> Vec<serde_json::Map<String, serde_json::Value>>,
-                chat_message_save(conversation: ChatConversation, message: ChatMessageRow, generation: u64) -> (),
-                chat_conversation_delete(id: String, generation: u64) -> (),
-                embed_apply(path: String, chunks: Vec<EmbeddedChunk>, generation: u64) -> (),
-                embed_remove(path: String, generation: u64) -> (),
                 git_status(generation: u64).await -> GitStatus,
                 git_setup(remote_url: Option<String>, branch: Option<String>, generation: u64).await -> GitStatus,
                 git_disconnect(generation: u64).await -> GitStatus,
@@ -114,6 +104,22 @@ macro_rules! commands {
                 x_archive_resolve(generation: u64, post_id: String).await -> Option<serde_json::Value>,
                 x_archive_owners(asset_path: String, generation: Option<u64>).await -> Vec<String>,
                 x_syndication_fetch(post_id: String).await -> Option<serde_json::Value>,
+            }
+            index_write {
+                index_apply(note: IndexedNote, generation: u64) -> (),
+                index_apply_batch(notes: Vec<IndexedNote>, generation: u64) -> (),
+                index_remove(path: String, generation: u64) -> (),
+                index_clear(generation: u64) -> (),
+                index_move(from: String, to: String, generation: u64, to_address: MovedNoteAddress) -> (),
+                index_touch(entries: Vec<IndexTouch>, generation: u64) -> (),
+                index_meta_set(key: String, value: String, generation: u64) -> (),
+                chat_message_save(conversation: ChatConversation, message: ChatMessageRow, generation: u64) -> (),
+                chat_conversation_delete(id: String, generation: u64) -> (),
+                embed_apply(path: String, chunks: Vec<EmbeddedChunk>, generation: u64) -> (),
+                embed_remove(path: String, generation: u64) -> (),
+            }
+            index_read {
+                db_query(sql: String, params: Vec<serde_json::Value>) -> Vec<serde_json::Map<String, serde_json::Value>>,
             }
             desktop {
                 skill::skill_status() -> AgentSkillStatus,
@@ -160,10 +166,14 @@ macro_rules! commands {
 macro_rules! define_commands {
     (
         core { $( $method:ident ( $( $arg:ident : $ty:ty ),* ) $( . $await:tt )? $( $infallible:ident )? -> $ret:ty ),* $(,)? }
+        index_write { $( $write:ident ( $( $write_arg:ident : $write_ty:ty ),* ) -> $write_ret:ty ),* $(,)? }
+        index_read { $( $read:ident ( $( $read_arg:ident : $read_ty:ty ),* ) -> $read_ret:ty ),* $(,)? }
         desktop { $( $module:ident :: $desktop:ident ( $( $desktop_arg:ident : $desktop_ty:ty ),* ) -> $desktop_ret:ty ),* $(,)? }
         shell { $( $name:literal => $shell:ident ( $shell_args:ty ) -> $shell_ret:ty ),* $(,)? }
     ) => {
         $( define_commands!(@one $method ( $( $arg : $ty ),* ) -> $ret); )*
+        $( define_commands!(@one $write ( $( $write_arg : $write_ty ),* ) -> $write_ret); )*
+        $( define_commands!(@one $read ( $( $read_arg : $read_ty ),* ) -> $read_ret); )*
         $( define_commands!(@one $desktop ( $( $desktop_arg : $desktop_ty ),* ) -> $desktop_ret); )*
         $( define_commands!(@shell $shell ( $shell_args ) -> $shell_ret); )*
 
@@ -172,6 +182,8 @@ macro_rules! define_commands {
         pub fn register(types: specta::Types) -> specta::Types {
             types
                 $( .register::<$method::Signature>() )*
+                $( .register::<$write::Signature>() )*
+                $( .register::<$read::Signature>() )*
                 $( .register::<$desktop::Signature>() )*
                 $( .register::<$shell::Signature>() )*
         }
@@ -183,6 +195,8 @@ macro_rules! define_commands {
         #[derive(specta::Type)]
         pub struct Commands {
             $( pub $method: $method::Signature, )*
+            $( pub $write: $write::Signature, )*
+            $( pub $read: $read::Signature, )*
             $( pub $desktop: $desktop::Signature, )*
             $( pub $shell: $shell::Signature, )*
         }
