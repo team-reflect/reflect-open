@@ -1,6 +1,8 @@
 [tools]
 cargo-binstall = "1.27.0"
 "cargo:cbindgen" = "0.29.4"
+# Must equal the version of the `wasm-bindgen` crate in `Cargo.lock`.
+"cargo:wasm-bindgen-cli" = "0.2.126"
 "github:Boshen/cargo-shear" = "1.14.0"
 "github:EmbarkStudios/cargo-about" = "0.9.3"
 

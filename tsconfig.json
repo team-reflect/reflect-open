@@ -23,6 +23,9 @@
       "path": "./packages/db/tsconfig.json"
     },
     {
+      "path": "./packages/index-wasm/tsconfig.json"
+    },
+    {
       "path": "./packages/modules/tsconfig.json"
     },
     {

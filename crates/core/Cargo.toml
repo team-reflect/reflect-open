@@ -21,7 +21,7 @@ dirs = { workspace = true }
 keyring-core = { workspace = true }
 reflect-git = { workspace = true }
 reflect-graph-io = { workspace = true }
-reflect-index = { workspace = true }
+reflect-index = { workspace = true, features = ["native"] }
 reflect-types = { workspace = true }
 reqwest = { workspace = true }
 image = { workspace = true, features = ["gif", "ico", "jpeg", "png", "webp"] }
