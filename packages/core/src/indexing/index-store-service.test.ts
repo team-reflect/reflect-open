@@ -123,7 +123,7 @@ describe('createIndexStoreService', () => {
 
   it('reads `index_meta` through the database', async () => {
     const database = createNodeTestDatabaseService()
-    await database.runQuery('INSERT INTO index_meta(key, value) VALUES (?, ?)', ['k', 'v'])
+    database.invoke('index_meta_set', { key: 'k', value: 'v', generation: database.generation() })
     const store = createIndexStoreService({ ipc: createTestIpcBridgeService(), database })
     try {
       await expect(store.getMeta('k')).resolves.toBe('v')

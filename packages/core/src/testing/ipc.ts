@@ -10,6 +10,7 @@ import {
   type PluginSubscription,
 } from '../ipc/ipc-service.ts'
 import type { Unlisten } from '../unlisten.ts'
+import type { TestDatabaseService } from './database.ts'
 
 type CommandHandler = (args: Record<string, unknown>) => unknown
 type BinaryCommandHandler = (body: Uint8Array, headers: Record<string, string>) => unknown
@@ -32,6 +33,10 @@ export interface TestIpcBridgeService extends IpcBridgeService {
 export interface TestIpcBridgeServiceOptions {
   commands?: Record<string, CommandHandler> | undefined
   /**
+   * Answers every index command that has no handler, like the native shell.
+   */
+  index?: TestDatabaseService | undefined
+  /**
    * Give the transport a binary path. Defaults to `true`.
    */
   binary?: boolean | undefined
@@ -44,6 +49,7 @@ export interface TestIpcBridgeServiceOptions {
 
 class TestIpcTransport implements IpcBridge {
   readonly #commands: Map<string, CommandHandler>
+  readonly #index: TestDatabaseService | undefined
   readonly #binaryCommands = new Map<string, BinaryCommandHandler>()
   readonly #eventHandlers = new Map<string, Set<(payload: unknown) => void>>()
   readonly #pluginHandlers = new Map<string, Set<(payload: unknown) => void>>()
@@ -62,6 +68,7 @@ class TestIpcTransport implements IpcBridge {
 
   constructor(options: TestIpcBridgeServiceOptions | undefined) {
     this.#commands = new Map<string, CommandHandler>(Object.entries(options?.commands ?? {}))
+    this.#index = options?.index
     if (options?.binary ?? true) {
       this.invokeBinary = async (command, body, headers) => {
         this.#log.push({ command, args: { headers } })
@@ -83,10 +90,13 @@ class TestIpcTransport implements IpcBridge {
   async invoke(command: string, args: Record<string, unknown>): Promise<unknown> {
     this.#log.push({ command, args })
     const handler = this.#commands.get(command)
-    if (handler === undefined) {
-      throw new AppError('unknown', `test bridge: unimplemented command "${command}"`)
+    if (handler !== undefined) {
+      return await handler(args)
     }
-    return await handler(args)
+    if (this.#index?.has(command) === true) {
+      return this.#index.invoke(command, args)
+    }
+    throw new AppError('unknown', `test bridge: unimplemented command "${command}"`)
   }
 
   listen(event: string, handler: (payload: unknown) => void): Promise<Unlisten> {

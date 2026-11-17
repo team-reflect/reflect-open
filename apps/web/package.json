@@ -27,7 +27,6 @@
     "@post-embed/types": "^0.5.0",
     "@reflect/app": "workspace:*",
     "@reflect/core": "workspace:*",
-    "@reflect/db": "workspace:*",
     "@reflect/design-system": "workspace:*",
     "@reflect/types": "workspace:*",
     "@reflect/utils": "workspace:*",
