@@ -1,7 +1,7 @@
 import { returnNull } from '@ocavue/utils'
 import { describe, expect, it } from 'vitest'
 import { createTestChatHistoryService } from '../../testing/chat.ts'
-import { createNodeTestDatabaseService } from '../../testing/database.ts'
+import { createTestDatabaseService } from '../../testing/database.ts'
 import { createTestIpcBridgeService } from '../../testing/ipc.ts'
 import { createTestLoggerService } from '../../testing/logger.ts'
 import { createChatHistoryService } from './chat-history-service.ts'
@@ -41,7 +41,7 @@ const conversation = { id: 'conv-1', title: 'what is this?', createdMs: 1_000, u
 
 function setup() {
   const ipc = createTestIpcBridgeService()
-  const database = createNodeTestDatabaseService()
+  const database = createTestDatabaseService()
   const logger = createTestLoggerService()
   const history = createChatHistoryService({ ipc, database, logger })
 

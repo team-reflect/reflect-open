@@ -8,6 +8,7 @@ import {
   type IcloudStatus,
 } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestICloudNativeService,
   createTestPlatformService,
@@ -18,7 +19,6 @@ import {
 } from '@reflect/core/testing'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { SyncSection } from './sync-section.tsx'
 
 const ICLOUD_DOCUMENTS = '/Users/alex/Library/Mobile Documents/iCloud~app/Documents'
@@ -56,7 +56,7 @@ async function renderSection(): Promise<void> {
   }
   gitSync.setState(gitSyncState)
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     icloudNative,
     gitSync,
     platform: createTestPlatformService(platform),

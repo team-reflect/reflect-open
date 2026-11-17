@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { ReactElement } from 'react'
 import { act } from '@/test-utils/act.ts'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestIdService,
   createTestNoteFileService,
@@ -16,7 +17,6 @@ import { V1ImportProvider } from '@/providers/v1-import-provider.tsx'
 import type { Route } from '@reflect/app'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import '@/test-utils/locator.ts'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { RouteContent } from './route-content.tsx'
 
 /**
@@ -49,7 +49,7 @@ function PaletteProbe(): ReactElement {
 async function renderRoute(route: Route) {
   noteFile = createTestNoteFileService({ files })
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     noteFile,
     // A seeded id service mints note ids that read as ULIDs, not as numbers.
     id: createTestIdService({ seed: 'route-content' }),

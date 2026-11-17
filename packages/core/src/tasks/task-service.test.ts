@@ -25,7 +25,7 @@ import type { SnippetTask } from '../indexing/snippet-tasks.ts'
 import { WritableStore } from '../store.ts'
 import { createTestClockService, type TestClockService } from '../testing/clock.ts'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   seedNotes,
   type TestDatabaseService,
 } from '../testing/database.ts'
@@ -139,7 +139,7 @@ function openSession(session: TestNoteSession): void {
 }
 
 beforeEach(() => {
-  database = createNodeTestDatabaseService()
+  database = createTestDatabaseService()
   noteFile = createTestNoteFileService()
   openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
   progress = createTestProgressPort()

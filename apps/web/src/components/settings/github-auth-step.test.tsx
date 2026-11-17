@@ -9,6 +9,7 @@ import {
   type TestOpenerService,
 } from '@reflect/app/testing'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestHttpService,
   createTestPlatformService,
@@ -19,7 +20,6 @@ import {
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { GithubAuthStep } from './github-auth-step.tsx'
 import { noop, sleep } from '@ocavue/utils'
 
@@ -52,7 +52,7 @@ beforeEach(() => {
  */
 async function renderStep(step: ReactNode): Promise<void> {
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     http,
     secretStore: keychain,
     platform: createTestPlatformService({ isMacosDesktop: false, hasMacosTitleBarOverlay: false }),

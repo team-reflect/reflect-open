@@ -1,13 +1,16 @@
 import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { BacklinkContext, BacklinkService } from '@reflect/core'
-import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  type TestCoreServices,
+} from '@reflect/core/testing'
 import type { ReactNode } from 'react'
 import { useRouterState } from '@/routing/router.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { IncomingBacklinks } from './incoming-backlinks.tsx'
 
 let core: TestCoreServices
@@ -51,7 +54,7 @@ function renderSection(path: string) {
 
 beforeEach(async () => {
   await page.viewport(375, 700)
-  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  core = createTestCoreServices({ database: createTestDatabaseService() })
   getBacklinksWithContext = vi.spyOn(core.backlinks, 'getBacklinksWithContext')
 })
 

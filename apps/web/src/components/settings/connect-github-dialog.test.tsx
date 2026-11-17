@@ -8,6 +8,7 @@ import {
 } from '@reflect/core'
 import { createTestOpenerService, type TestOpenerService } from '@reflect/app/testing'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestHttpService,
   createTestPlatformService,
@@ -16,7 +17,6 @@ import {
   createTestSecretStoreService,
 } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { ConnectGithubDialog } from './connect-github-dialog.tsx'
 
 // The connect actions of the graph's GitHub connector, scripted per test.
@@ -82,7 +82,7 @@ async function renderWizard(onClose = vi.fn()): Promise<ReturnType<typeof vi.fn>
   githubConnector.onConnectNewRepo(sync.connectNewRepo)
   githubConnector.onConnectExistingRepo(sync.connectExistingRepo)
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     gitSync,
     githubConnector,
     // The wizard polls on the clock: real time, so `pollIntervalMs` elapses.

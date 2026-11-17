@@ -107,7 +107,7 @@ class TestDatabaseServiceImpl implements TestDatabaseService {
  * wasm, with a new in-memory database. The database opens on first use, so
  * building one is cheap.
  */
-export function createNodeTestDatabaseService(): TestDatabaseService {
+export function createTestDatabaseService(): TestDatabaseService {
   return new TestDatabaseServiceImpl()
 }
 

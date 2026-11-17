@@ -1,12 +1,15 @@
 import { page } from 'vitest/browser'
 import { describe, expect, it } from 'vitest'
 import { useEffect, useRef, type ReactElement } from 'react'
-import { createTestCoreServices, createTestNoteFileService } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  createTestNoteFileService,
+} from '@reflect/core/testing'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import type { NavigateOptions } from '@reflect/app'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileNote } from './note.tsx'
 
 const pmRoot = page.locate('.ProseMirror')
@@ -37,7 +40,7 @@ function Arrival({
 
 async function renderArrival(path: string, options?: NavigateOptions): Promise<void> {
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     noteFile: createTestNoteFileService({ files: { 'notes/target.md': '# Target\n' } }),
   })
   await renderInApp(<Arrival path={path} options={options} />, { core })
@@ -68,7 +71,7 @@ describe('MobileNote focus contract', () => {
   it('autofocuses a fresh untitled note (the + flow)', async () => {
     await renderArrival(
       createTestCoreServices({
-        database: createWasmTestDatabaseService(),
+        database: createTestDatabaseService(),
       }).noteCreation.untitledNotePath(),
     )
     await expect.element(page.getByRole('heading', { name: 'New note' })).toBeVisible()

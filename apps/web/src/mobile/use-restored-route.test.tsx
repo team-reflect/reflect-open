@@ -1,4 +1,5 @@
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestPlatformService,
   createTestStorageService,
@@ -6,7 +7,6 @@ import {
 import type { Route, Section } from '@reflect/app'
 import { describe, expect, it } from 'vitest'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useRestoredRoute } from './use-restored-route.ts'
 
 const STORAGE_KEY = 'reflect.mobile.route'
@@ -17,7 +17,7 @@ async function renderRestoredRoute(stored: unknown, isSwiftMobile = true) {
   storage.session.set(STORAGE_KEY, JSON.stringify(stored))
   const core = createTestCoreServices({
     storage,
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     platform: createTestPlatformService({ isSwiftMobile }),
   })
   const view = await renderHookInApp(() => useRestoredRoute('/graph'), { core })

@@ -13,6 +13,7 @@ import type {
   Settings,
 } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestClockService,
   createTestCoreServices,
   createTestPlatformService,
@@ -34,7 +35,6 @@ import { GraphProvider } from '@/providers/graph-provider.tsx'
 import { RouterProvider } from '@/routing/router.tsx'
 import { AppServicesProvider, CoreServicesProvider } from '@/services/services-provider.tsx'
 import { createWebTestAppServices, type WebTestAppServices } from '@/test-utils/app-services.ts'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 
 /**
  * The platform facts of the mobile app: pass as `platform` to render a mobile surface.
@@ -193,7 +193,7 @@ async function prepare(options: AnyOptions | undefined): Promise<
   let database: TestDatabaseService | null = null
   let core: CoreServices
   if (options?.core === undefined) {
-    database = createWasmTestDatabaseService()
+    database = createTestDatabaseService()
     core = createCore(database, sync, options?.platform)
   } else {
     core = options.core

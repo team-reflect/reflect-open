@@ -3,12 +3,11 @@ import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { createTestWindowService } from '@reflect/app/testing'
-import { createTestCoreServices } from '@reflect/core/testing'
+import { createTestDatabaseService, createTestCoreServices } from '@reflect/core/testing'
 import { deepLinkForRoute } from '@reflect/app'
 import { NoteTemplatesProvider } from '@/providers/note-templates-provider.tsx'
 import { useRouterState } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { TemplatesSection } from './templates-section.tsx'
 
 const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
@@ -23,7 +22,7 @@ function RouteProbe(): ReactElement {
 }
 
 async function renderSection(): Promise<ReturnType<typeof createTestCoreServices>> {
-  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  const core = createTestCoreServices({ database: createTestDatabaseService() })
   vi.spyOn(core.indexQuery, 'listTemplates').mockResolvedValue([
     { path: 'templates/weekly-review.md', title: 'Weekly review', mtime: 1 },
   ])

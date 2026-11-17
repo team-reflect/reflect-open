@@ -1,9 +1,12 @@
 import { act } from '@/test-utils/act.ts'
 import { describe, expect, it } from 'vitest'
 import { Suspense, use, useEffect, type ReactElement } from 'react'
-import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  type TestCoreServices,
+} from '@reflect/core/testing'
 import { renderHookInApp, renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import type { Route } from '@reflect/app'
 import { RouterFreeze, useRouterActions, useRouterHandlers, useRouterState } from './router.tsx'
 import { noop } from '@ocavue/utils'
@@ -14,7 +17,7 @@ import { noop } from '@ocavue/utils'
  */
 function routerHook(
   initialRoute?: Route,
-  core: TestCoreServices = createTestCoreServices({ database: createWasmTestDatabaseService() }),
+  core: TestCoreServices = createTestCoreServices({ database: createTestDatabaseService() }),
 ) {
   return renderHookInApp(
     () => ({

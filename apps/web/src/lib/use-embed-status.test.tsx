@@ -1,12 +1,15 @@
 import { expect, it, vi } from 'vitest'
-import { createTestCoreServices, createTestEmbeddingRuntimeService } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  createTestEmbeddingRuntimeService,
+} from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useEmbedStatus } from './use-embed-status.ts'
 
 it('starts a later mount from the last status an earlier mount received', async () => {
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     embeddingRuntime: createTestEmbeddingRuntimeService({ status: { status: 'unsupported' } }),
   })
   const first = await renderHookInApp(() => useEmbedStatus(), { core })
@@ -29,7 +32,7 @@ it('starts a later mount from the last status an earlier mount received', async 
 it('tracks status changes while mounted', async () => {
   const runtime = createTestEmbeddingRuntimeService({ status: { status: 'loading' } })
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     embeddingRuntime: runtime,
   })
   const view = await renderHookInApp(() => useEmbedStatus(), { core })

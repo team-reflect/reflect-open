@@ -1,8 +1,7 @@
 import { act } from '@/test-utils/act.ts'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createTestCoreServices } from '@reflect/core/testing'
+import { createTestDatabaseService, createTestCoreServices } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useNoteAttachments, type NoteAttachments } from './use-note-attachments.ts'
 
 function assetUrl(generation: number, path: string): string {
@@ -19,7 +18,7 @@ afterEach(() => {
 
 describe('useNoteAttachments', () => {
   it('resolves from the note it renders', async () => {
-    const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+    const core = createTestCoreServices({ database: createTestDatabaseService() })
     core.attachments.setCatalog([
       { path: 'Projects/attachments/plan.png', size: 1 },
       { path: 'attachments/plan.png', size: 1 },

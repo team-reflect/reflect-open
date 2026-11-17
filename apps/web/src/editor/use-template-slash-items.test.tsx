@@ -1,21 +1,21 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestGraphSessionService,
   createTestNoteFileService,
   createTestProgressPort,
 } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import type { NoteEditorHandle } from './note-editor.tsx'
 import { useTemplateSlashItems } from './use-template-slash-items.ts'
 import { noop, returnFalse, returnNull } from '@ocavue/utils'
 
 function setup() {
   const operations = createTestProgressPort()
-  const base = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  const base = createTestCoreServices({ database: createTestDatabaseService() })
   const { templates } = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     graphSession: createTestGraphSessionService({ graph: {} }),
     noteFile: createTestNoteFileService({
       files: {
@@ -33,7 +33,7 @@ function setup() {
     progress: operations,
   })
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     templates,
     progress: operations,
   })

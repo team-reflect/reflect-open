@@ -1,9 +1,12 @@
 import { act } from '@/test-utils/act.ts'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { BacklinkContext, BacklinkContextPage, BacklinkService } from '@reflect/core'
-import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  type TestCoreServices,
+} from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useBacklinkSources } from './use-backlink-sources.ts'
 
 let core: TestCoreServices
@@ -30,7 +33,7 @@ async function mount() {
 }
 
 beforeEach(() => {
-  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  core = createTestCoreServices({ database: createTestDatabaseService() })
   getBacklinksWithContext = vi.spyOn(core.backlinks, 'getBacklinksWithContext')
 })
 

@@ -2,6 +2,7 @@ import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { CalendarEvent, MeetingService, Settings } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestCalendarService,
   createTestContactsService,
@@ -13,7 +14,6 @@ import {
 } from '@reflect/core/testing'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DailyEventsSection } from './daily-events-section.tsx'
 import { sleep } from '@ocavue/utils'
 
@@ -60,7 +60,7 @@ beforeEach(() => {
   stored = { calendarEnabled: true, calendarIds: ['cal-work'] }
   calendar = createTestCalendarService()
   contacts = createTestContactsService({ status: 'unavailable' })
-  database = createWasmTestDatabaseService()
+  database = createTestDatabaseService()
   core = createTestCoreServices({ calendar, contacts, database })
   addMeetingToDaily = vi.spyOn(core.meetings, 'addMeetingToDaily')
   return () => database.close()

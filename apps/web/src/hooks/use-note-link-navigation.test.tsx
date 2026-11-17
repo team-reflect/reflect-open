@@ -3,10 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { isModEvent } from '@meowdown/core'
 import { createTestWindowService } from '@reflect/app/testing'
-import { createTestCoreServices } from '@reflect/core/testing'
+import { createTestDatabaseService, createTestCoreServices } from '@reflect/core/testing'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useNoteLinkNavigation } from './use-note-link-navigation.ts'
 import { sleep, noop } from '@ocavue/utils'
 
@@ -82,7 +81,7 @@ function Harness({ scopeKey, visible = true }: HarnessProps): ReactElement {
  * Render `ui` on the All Notes route of an app whose note windows go to `openNoteWindow`.
  */
 async function mount(ui: ReactElement) {
-  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  const core = createTestCoreServices({ database: createTestDatabaseService() })
   return await renderInApp(ui, {
     core,
     appServices: { window: createTestWindowService({ openNoteWindow }) },

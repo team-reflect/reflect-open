@@ -1,11 +1,14 @@
 import { page, userEvent } from 'vitest/browser'
 import { describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { GithubAuthService } from '@reflect/core'
-import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  type TestCoreServices,
+} from '@reflect/core/testing'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { GithubAccountField } from './github-account-field.tsx'
 
 // The account row belongs to the machine, not to the open graph: it renders
@@ -16,7 +19,7 @@ async function renderField(options: { signedIn: boolean }): Promise<{
   core: TestCoreServices
   clear: MockInstance<GithubAuthService['clear']>
 }> {
-  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  const core = createTestCoreServices({ database: createTestDatabaseService() })
   if (options.signedIn) {
     await core.githubAuth.save({ kind: 'pat', token: 'ghp_test' })
   }

@@ -1,9 +1,12 @@
 import { page, type Locator } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createTestCoreServices, type TestAiKeyValidationService } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  type TestAiKeyValidationService,
+} from '@reflect/core/testing'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { AddAiProviderDrawer } from './add-ai-provider-drawer.tsx'
 
 /**
@@ -24,7 +27,7 @@ beforeEach(() => {
 })
 
 async function renderSheet(): Promise<void> {
-  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  const core = createTestCoreServices({ database: createTestDatabaseService() })
   keyValidation = core.aiKeyValidation
   await renderInApp(<AddAiProviderDrawer open onOpenChange={onOpenChange} onAdd={onAdd} />, {
     core,

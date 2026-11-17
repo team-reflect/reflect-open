@@ -7,6 +7,7 @@ import {
 } from '@reflect/core'
 import type { LinkNavigationService } from '@reflect/app'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestPlatformService,
   type TestCoreServices,
@@ -33,7 +34,6 @@ import { ShortcutsProvider, useShortcuts } from '@/providers/shortcuts-provider.
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider.tsx'
 import { MOD_KEY, NON_MOD_KEY } from '@/test-utils/mod-key.ts'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useAppShortcuts } from './app-shortcuts.ts'
 import { useRouterActions, useRouterHandlers, useRouterState } from './router.tsx'
 import { noop, returnFalse } from '@ocavue/utils'
@@ -90,7 +90,7 @@ beforeEach(() => {
 async function shortcutsHook() {
   const readSource = (): Promise<string> => Promise.resolve('# A\n')
   const services = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     platform: createTestPlatformService(platform),
     noteDocuments: {
       readSource,
@@ -238,7 +238,7 @@ describe('app shortcuts', () => {
 
   it('registers the command keybindings in the central keymap registry', () => {
     const { keymap } = createWebTestAppServices(
-      createTestCoreServices({ database: createWasmTestDatabaseService() }),
+      createTestCoreServices({ database: createTestDatabaseService() }),
     )
     registerAppKeymaps(keymap)
     const bindings = keymap.list()

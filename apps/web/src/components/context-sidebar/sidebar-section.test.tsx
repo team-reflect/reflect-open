@@ -1,12 +1,12 @@
 import { userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestStorageService,
   type TestStorageService,
 } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { SidebarSection } from './sidebar-section.tsx'
 
 // One session per test: every mount reads the same storage.
@@ -17,7 +17,7 @@ async function renderSection() {
     <SidebarSection storageKey="probe" title="Probe">
       <p>section body</p>
     </SidebarSection>,
-    { core: createTestCoreServices({ database: createWasmTestDatabaseService(), storage }) },
+    { core: createTestCoreServices({ database: createTestDatabaseService(), storage }) },
   )
 }
 

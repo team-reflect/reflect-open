@@ -10,11 +10,14 @@ import {
   type NoteRow,
   AppError,
 } from '@reflect/core'
-import { createTestCoreServices, createTestPlatformService } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  createTestPlatformService,
+} from '@reflect/core/testing'
 import { createTestOperationsService, type TestOperationsService } from '@reflect/app/testing'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NoteActionsSection } from './note-actions-section.tsx'
 
 // What the app's fakes answer; each test sets them before `renderSection`.
@@ -43,7 +46,7 @@ function pinnedTitles(): string | null {
 async function renderSection(path: string, showTrash = false, copies = 1) {
   operations = createTestOperationsService()
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     progress: operations,
     noteDocuments: {
       readSource: readNoteSource,

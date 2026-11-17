@@ -3,6 +3,7 @@ import { page } from 'vitest/browser'
 import { describe, expect, it, vi } from 'vitest'
 import type { CoreServices } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestHttpService,
   createTestPlatformService,
@@ -13,7 +14,6 @@ import {
 } from '@reflect/core/testing'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { ConnectGithubDrawer } from './connect-github-drawer.tsx'
 
 /**
@@ -36,7 +36,7 @@ async function mount(
   const connector = createTestGithubConnector()
   script?.(connector)
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     platform: createTestPlatformService({ isMacosDesktop: false, hasMacosTitleBarOverlay: false }),
     // A stored PAT + GitHub accepting it ("alex") makes the auth step skip
     // itself, so a Continue lands straight on the finish step.

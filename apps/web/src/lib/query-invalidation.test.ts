@@ -5,7 +5,7 @@ import {
   type TestWindowService,
 } from '@reflect/app/testing'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   createTestCoreServices,
   createTestCaptureService,
   createTestGraphSessionService,
@@ -20,7 +20,7 @@ import { installQueryInvalidation } from './query-invalidation.ts'
 import { noop } from '@ocavue/utils'
 
 const app = {
-  embedMedia: createTestCoreServices({ database: createNodeTestDatabaseService() }).embedMedia,
+  embedMedia: createTestCoreServices({ database: createTestDatabaseService() }).embedMedia,
 }
 const url = 'https://x.com/jack/status/123'
 const post: XPost = {
@@ -42,8 +42,7 @@ function installApp(core: TestCoreServices, window: TestWindowService = createTe
 }
 
 function install(capture: ReturnType<typeof createTestCaptureService>): () => void {
-  return installApp(createTestCoreServices({ database: createNodeTestDatabaseService(), capture }))
-    .stop
+  return installApp(createTestCoreServices({ database: createTestDatabaseService(), capture })).stop
 }
 
 function cachePost(): void {
@@ -98,7 +97,7 @@ describe('installQueryInvalidation for the index and the graph', () => {
   it('invalidates the index queries once a pass commits and after a rebuild', async () => {
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
     const { core, stop } = installApp(
-      createTestCoreServices({ database: createNodeTestDatabaseService() }),
+      createTestCoreServices({ database: createTestDatabaseService() }),
     )
     core.graphSession.setGraph({ indexGeneration: 5 })
 
@@ -120,7 +119,7 @@ describe('installQueryInvalidation for the index and the graph', () => {
       graphSession: createTestGraphSessionService({ graph: { indexGeneration: 5 } }),
     })
     const { stop } = installApp(
-      createTestCoreServices({ database: createNodeTestDatabaseService(), indexLifecycle }),
+      createTestCoreServices({ database: createTestDatabaseService(), indexLifecycle }),
     )
 
     await indexLifecycle.rebuildVisibly()
@@ -132,7 +131,7 @@ describe('installQueryInvalidation for the index and the graph', () => {
   it('refreshes the chat history queries after a saved turn', () => {
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
     const listeners: Array<() => void> = []
-    const core = createTestCoreServices({ database: createNodeTestDatabaseService() })
+    const core = createTestCoreServices({ database: createTestDatabaseService() })
     vi.spyOn(core.chatSessions, 'onConversationsChanged').mockImplementation((listener) => {
       listeners.push(listener)
       return noop
@@ -149,7 +148,7 @@ describe('installQueryInvalidation for the index and the graph', () => {
 
   it('drops the similar notes on a graph switch and the iCloud listing on a delete', async () => {
     const { core, stop } = installApp(
-      createTestCoreServices({ database: createNodeTestDatabaseService() }),
+      createTestCoreServices({ database: createTestDatabaseService() }),
     )
     core.graphSession.setGraph({ root: '/known' })
     queryClient.setQueryData([...queryKeys.similar.all, '/known', 'notes/a.md'], [])
@@ -171,7 +170,7 @@ describe('installQueryInvalidation for the index and the graph', () => {
 
   it('drops the archived X posts whenever the graph session ends', async () => {
     const { core, stop } = installApp(
-      createTestCoreServices({ database: createNodeTestDatabaseService() }),
+      createTestCoreServices({ database: createTestDatabaseService() }),
     )
     core.graphSession.setGraph({ root: '/known' })
     cachePost()
@@ -189,14 +188,14 @@ describe('installQueryInvalidation for the index and the graph', () => {
     // The throttle may hold the call until its window ends.
     vi.useFakeTimers()
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
-    const main = installApp(createTestCoreServices({ database: createNodeTestDatabaseService() }))
+    const main = installApp(createTestCoreServices({ database: createTestDatabaseService() }))
     main.window.emitIndexWritten()
     expect(invalidate).not.toHaveBeenCalled()
     main.stop()
     main.core.database.close()
 
     const note = installApp(
-      createTestCoreServices({ database: createNodeTestDatabaseService(), role: 'note-window' }),
+      createTestCoreServices({ database: createTestDatabaseService(), role: 'note-window' }),
       createTestWindowService({ label: 'note-1' }),
     )
     note.window.emitIndexWritten()

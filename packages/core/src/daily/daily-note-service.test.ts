@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createTestClockService } from '../testing/clock.ts'
-import { createNodeTestDatabaseService, seedNotes } from '../testing/database.ts'
+import { createTestDatabaseService, seedNotes } from '../testing/database.ts'
 import { createTestActivityPort } from '../testing/shell.ts'
 import { createDailyNoteService, type DailyNoteService } from './daily-note-service.ts'
 
@@ -8,7 +8,7 @@ function createTestDailyNoteService(
   deps?: Partial<Parameters<typeof createDailyNoteService>[0]>,
 ): DailyNoteService {
   return createDailyNoteService({
-    database: deps?.database ?? createNodeTestDatabaseService(),
+    database: deps?.database ?? createTestDatabaseService(),
     clock: deps?.clock ?? createTestClockService(),
     activity: deps?.activity ?? createTestActivityPort(),
   })
@@ -16,7 +16,7 @@ function createTestDailyNoteService(
 
 describe('dailyDatesInRange', () => {
   it('lists the dates with content within inclusive bounds', async () => {
-    const database = createNodeTestDatabaseService()
+    const database = createTestDatabaseService()
     seedNotes(database, [
       { path: 'daily/2026-05-31.md', markdown: 'Before\n' },
       { path: 'daily/2026-06-01.md', markdown: 'Bought milk\n' },
@@ -35,7 +35,7 @@ describe('dailyDatesInRange', () => {
   })
 
   it('returns an empty list when no daily notes exist in the range', async () => {
-    const database = createNodeTestDatabaseService()
+    const database = createTestDatabaseService()
     seedNotes(database, [{ path: 'daily/2026-06-01.md', markdown: 'Bought milk\n' }])
     const dailyNotes = createTestDailyNoteService({ database })
     await expect(dailyNotes.dailyDatesInRange('2025-01-01', '2025-01-31')).resolves.toEqual([])
@@ -44,7 +44,7 @@ describe('dailyDatesInRange', () => {
 
 describe('listDailyNotes', () => {
   it('selects public dailies in the inclusive range, most recent first, capped', async () => {
-    const database = createNodeTestDatabaseService()
+    const database = createTestDatabaseService()
     seedNotes(database, [
       { path: 'daily/2026-06-01.md', markdown: 'Older.\n', mtime: 1000 },
       { path: 'daily/2026-06-09.md', markdown: 'Stand-up notes.\n', mtime: 2000 },
@@ -72,7 +72,7 @@ describe('listDailyNotes', () => {
   })
 
   it('returns an empty list when no daily notes exist in the range', async () => {
-    const database = createNodeTestDatabaseService()
+    const database = createTestDatabaseService()
     seedNotes(database, [{ path: 'daily/2026-06-01.md', markdown: 'Older.\n' }])
     const dailyNotes = createTestDailyNoteService({ database })
     await expect(

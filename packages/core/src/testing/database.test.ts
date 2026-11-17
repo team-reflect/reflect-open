@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { createNodeTestDatabaseService, seedNotes } from './database.ts'
+import { createTestDatabaseService, seedNotes } from './database.ts'
 
-describe('createNodeTestDatabaseService', () => {
+describe('createTestDatabaseService', () => {
   it('reads back seeded notes', () => {
-    const database = createNodeTestDatabaseService()
+    const database = createTestDatabaseService()
     seedNotes(database, [
       { path: 'notes/b.md', markdown: '# B\n' },
       { path: 'notes/a.md', markdown: '# A\n' },
@@ -15,7 +15,7 @@ describe('createNodeTestDatabaseService', () => {
   })
 
   it('rejects queries and seeding after close', () => {
-    const database = createNodeTestDatabaseService()
+    const database = createTestDatabaseService()
     database.close()
 
     expect(() => database.query('select 1')).toThrow('the test database is closed')

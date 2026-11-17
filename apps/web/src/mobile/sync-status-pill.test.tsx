@@ -1,9 +1,12 @@
 import { page } from 'vitest/browser'
 import { describe, expect, it } from 'vitest'
 import type { GitSyncState } from '@reflect/core'
-import { createTestCoreServices, createTestGitSyncService } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  createTestGitSyncService,
+} from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { SyncStatusPill } from './sync-status-pill.tsx'
 
 /**
@@ -23,7 +26,7 @@ function connected(status: Extract<GitSyncState, { phase: 'connected' }>['status
 
 async function mount(gitSync: GitSyncState = connected({ state: 'idle' })): Promise<void> {
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     gitSync: createTestGitSyncService({ state: gitSync }),
   })
   await renderInApp(<SyncStatusPill />, { core, graph: { root: '/g', name: 'G', generation: 3 } })

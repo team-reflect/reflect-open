@@ -1,9 +1,12 @@
 import { act } from '@/test-utils/act.ts'
 import { describe, expect, it } from 'vitest'
 import { StrictMode, type ReactNode } from 'react'
-import { createTestCoreServices, createTestSettingsService } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  createTestSettingsService,
+} from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import {
   useEditorFullWidth,
   useEditorMarkdownSyntax,
@@ -13,7 +16,7 @@ import {
 describe('settings field hooks', () => {
   it('render the settings of the app services and follow updates', async () => {
     const settings = createTestSettingsService({ editorMarkdownSyntax: 'show' })
-    const core = createTestCoreServices({ database: createWasmTestDatabaseService(), settings })
+    const core = createTestCoreServices({ database: createTestDatabaseService(), settings })
     const { result } = await renderHookInApp(
       () => ({
         editorMarkdownSyntax: useEditorMarkdownSyntax(),
@@ -45,7 +48,7 @@ describe('settings field hooks', () => {
 
   it('loads once in StrictMode', async () => {
     const settings = createTestSettingsService()
-    const core = createTestCoreServices({ database: createWasmTestDatabaseService(), settings })
+    const core = createTestCoreServices({ database: createTestDatabaseService(), settings })
     await renderHookInApp(() => useEditorFullWidth(), {
       core,
       wrapper: (children: ReactNode) => <StrictMode>{children}</StrictMode>,
@@ -61,7 +64,7 @@ describe('settings field hooks', () => {
 describe('useEditorFullWidth', () => {
   it('re-renders only when its field changes', async () => {
     const settings = createTestSettingsService()
-    const core = createTestCoreServices({ database: createWasmTestDatabaseService(), settings })
+    const core = createTestCoreServices({ database: createTestDatabaseService(), settings })
     let renders = 0
     const { result } = await renderHookInApp(
       () => {

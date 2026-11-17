@@ -24,7 +24,7 @@ import {
   type WikiResolverService,
 } from '../indexing/wiki-resolver-service.ts'
 import { bytesToBase64, base64ToBytes } from '@reflect/utils'
-import { createNodeTestDatabaseService } from './database.ts'
+import { createTestDatabaseService } from './database.ts'
 import { createTestIdService } from './id.ts'
 
 function notFound(what: string): AppError {
@@ -693,7 +693,7 @@ export function createTestNoteLinkResolverService(
     createNoteLinkResolverService({
       wikiResolver:
         options?.wikiResolver ??
-        createWikiResolverService({ database: createNodeTestDatabaseService() }),
+        createWikiResolverService({ database: createTestDatabaseService() }),
       noteFile: options?.noteFile ?? createTestNoteFileService(),
     }),
   )

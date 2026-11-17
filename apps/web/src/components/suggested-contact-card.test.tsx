@@ -1,6 +1,7 @@
 import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestContactsService,
   createTestNoteFileService,
@@ -9,7 +10,6 @@ import {
 } from '@reflect/core/testing'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { SuggestedContactCard } from './suggested-contact-card.tsx'
 
 const PATH = 'notes/Ada Lovelace.md'
@@ -30,7 +30,7 @@ let contacts: TestContactsService
  */
 async function renderCard(contactsEnabled = true): Promise<void> {
   await renderInApp(<SuggestedContactCard path={PATH} />, {
-    core: createTestCoreServices({ database: createWasmTestDatabaseService(), noteFile, contacts }),
+    core: createTestCoreServices({ database: createTestDatabaseService(), noteFile, contacts }),
     // The card writes with the generation of the open graph.
     graph: { root: '/g', generation: 3 },
     settings: { contactsEnabled },

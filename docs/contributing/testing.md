@@ -51,9 +51,9 @@ the service plus members that seed, drive or observe it.
   use the real `NoteDocumentService` and fake only the files.
 - Do not use `vi.useFakeTimers`. The test clock starts at epoch 0, and
   `clock.advance(ms)` runs the due timers.
-- `createNodeTestDatabaseService()` (Node.js) and `createWasmTestDatabaseService()`
-  (desktop browser tests, `@/test-utils/test-database.ts`) are the Rust index
-  of the native shells, compiled to wasm, over an in-memory SQLite database.
+- `createTestDatabaseService()` is the Rust index of the native shells,
+  compiled to wasm, over an in-memory SQLite database. Node.js tests and
+  browser tests use the same one.
   Seed notes and assert the results of the services. `database.invoke(command,
   args)` runs a native index command, for rows that `seedNotes` cannot write
   (chat history, embeddings, `index_meta`). `database.query(sql, params)` runs
@@ -113,7 +113,7 @@ the function the component calls. So build your own `core`, spy on it, and pass
 it in:
 
 ```tsx
-const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+const core = createTestCoreServices({ database: createTestDatabaseService() })
 const rebuild = Promise.withResolvers<void>()
 vi.spyOn(core.indexLifecycle, 'rebuildVisibly').mockReturnValueOnce(rebuild.promise)
 await renderInApp(<RebuildIndexField />, { core, graph: { indexGeneration: 7 } })
@@ -123,9 +123,8 @@ With your own `core`, put the platform, the git sync service and the
 connectors in it yourself. The helper throws if you also pass `platform` or
 `sync`.
 
-`database` is required: a Node.js test passes
-`createNodeTestDatabaseService()`, a desktop browser test passes
-`createWasmTestDatabaseService()`. `renderInApp` passes a wasm database when it
+`database` is required: pass `createTestDatabaseService()`. `renderInApp`
+passes one when it
 builds the app itself.
 
 ## `vi.mock`

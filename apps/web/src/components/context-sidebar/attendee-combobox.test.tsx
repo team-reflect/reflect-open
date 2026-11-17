@@ -8,13 +8,13 @@ import type {
   WikiSuggestion,
 } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestContactsService,
   type TestContactsService,
 } from '@reflect/core/testing'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { AttendeeCombobox } from './attendee-combobox.tsx'
 import { noop } from '@ocavue/utils'
 
@@ -46,12 +46,12 @@ function InDialog({ attendees }: { attendees: MeetingAttendee[] }): ReactElement
 }
 
 async function renderCombobox(attendees: MeetingAttendee[] = []): Promise<Locator> {
-  const base = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  const base = createTestCoreServices({ database: createTestDatabaseService() })
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     contacts,
     meetings: createTestCoreServices({
-      database: createWasmTestDatabaseService(),
+      database: createTestDatabaseService(),
       suggestions: { ...base.suggestions, suggestWikiTargets },
       contacts,
     }).meetings,

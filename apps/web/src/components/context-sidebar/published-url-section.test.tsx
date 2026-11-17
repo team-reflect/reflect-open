@@ -8,10 +8,9 @@ import {
   type TestOpenerService,
   type TestOperationsService,
 } from '@reflect/app/testing'
-import { createTestCoreServices } from '@reflect/core/testing'
+import { createTestDatabaseService, createTestCoreServices } from '@reflect/core/testing'
 import { queryKeys } from '@/lib/query-client.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { PublishedUrlSection } from './published-url-section.tsx'
 import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
@@ -41,7 +40,7 @@ function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
 async function renderSection(path = 'notes/a.md') {
   operations = createTestOperationsService()
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     progress: operations,
   })
   vi.spyOn(core.indexQuery, 'getNote').mockImplementation(() => Promise.resolve(row ?? undefined))

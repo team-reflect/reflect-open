@@ -3,6 +3,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentSkillService, AgentSkillStatus } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestPlatformService,
   type TestCoreServices,
@@ -10,7 +11,6 @@ import {
 } from '@reflect/core/testing'
 import { queryKeys } from '@/lib/query-client.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { AgentsSection } from './agents-section.tsx'
 import { noop } from '@ocavue/utils'
 
@@ -52,7 +52,7 @@ interface SectionView {
 
 async function renderSection(platform?: TestPlatformOptions): Promise<SectionView> {
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     agentSkill,
     platform: createTestPlatformService(platform),
   })

@@ -4,6 +4,7 @@ import { createTestOpenerService, type TestOpenerService } from '@reflect/app/te
 import type { OpenerService } from '@reflect/app'
 import type { GitSyncState } from '@reflect/core'
 import {
+  createTestDatabaseService,
   type TestOpenGraph,
   createTestCoreServices,
   createTestGitSyncService,
@@ -14,7 +15,6 @@ import {
 } from '@reflect/core/testing'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { GitSyncSettingsField } from './git-sync-section.tsx'
 import { noop } from '@ocavue/utils'
 
@@ -41,7 +41,7 @@ async function renderSection(
 ): Promise<TestCoreServices> {
   gitSync.setState(state)
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     gitSync,
     gitHostConnector,
   })

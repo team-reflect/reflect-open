@@ -5,6 +5,7 @@ import type {
   WikiLinkSuggestionResult,
 } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestContactsService,
   createTestGraphSessionService,
@@ -13,7 +14,6 @@ import {
 import { createTestOperationsService } from '@reflect/app/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useEditorAutocomplete } from './use-editor-autocomplete.ts'
 import { sleep } from '@ocavue/utils'
 
@@ -62,7 +62,7 @@ async function setup(options?: SetupOptions) {
     status: options?.authorization ?? 'authorized',
     contacts: [ADA],
   })
-  const base = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  const base = createTestCoreServices({ database: createTestDatabaseService() })
   const personNotes: typeof base.personNotes = {
     ...base.personNotes,
     resolvePersonContact: (contact) => ({
@@ -76,7 +76,7 @@ async function setup(options?: SetupOptions) {
   }
   const graphSession = createTestGraphSessionService()
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     graphSession,
     suggestions: {
       ...base.suggestions,
