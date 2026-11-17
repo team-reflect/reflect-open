@@ -10,13 +10,6 @@ use reflect_types::{AppResult, NoteListEntry, RecentNoteRow, TagFacet};
 use crate::schema::{Notes, Tags};
 use crate::sql::{self, lit};
 
-/// The recall-feed order: pins first (an explicit order before unordered
-/// pins), then recency, with the path as the stable tiebreak.
-pub(crate) const PINNED_FIRST_ORDER: &str = "notes.is_pinned DESC, notes.pinned_order IS NULL, notes.pinned_order, notes.mtime DESC, notes.path";
-
-/// The recall-feed order without pins: recency, then the path.
-pub(crate) const RECENT_ORDER: &str = "notes.mtime DESC, notes.path";
-
 /// The alias of `tags` in a tag filter.
 pub(crate) const FILTER_TAGS: &str = "filter_tags";
 

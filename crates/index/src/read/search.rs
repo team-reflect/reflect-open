@@ -1,84 +1,98 @@
 //! Search over the notes: a filtered recall feed without free text, a ranked
 //! lexical search with it.
 
-use rusqlite::types::Value;
-use rusqlite::{Connection, Row, params_from_iter};
+use rusqlite::{Connection, Row};
+use sea_query::extension::sqlite::SqliteBinOper;
+use sea_query::{
+    BinOper, CommonTableExpression, Cond, Condition, Expr, ExprTrait, Func, Order, Query,
+    SelectStatement, WithQuery,
+};
 
 use reflect_types::{AppResult, SearchHitRow, SearchRequest};
 
-use super::lists::{PINNED_FIRST_ORDER, RECENT_ORDER};
+use super::lists::{FILTER_TAGS, from_tags_join_notes, order_pinned_first, order_recent};
+use crate::schema::{Backlinks, Notes, SearchFts, Tags};
+use crate::sql::{self, lit};
 use crate::text::fts::{
-    HIGHLIGHT_END, HIGHLIGHT_START, RANK_EXPR, build_fts_match, title_recall_needles,
+    HIGHLIGHT_END, HIGHLIGHT_START, RANK_WEIGHTS, build_fts_match, title_recall_needles,
 };
 
-const HIT_COLUMNS: &str =
-    "notes.path, notes.title, notes.daily_date, notes.preview, notes.mtime, notes.is_pinned";
+/// The columns of a hit, in the order `recall_hit` reads them.
+const HIT_COLUMNS: [Notes; 6] = [
+    Notes::Path,
+    Notes::Title,
+    Notes::DailyDate,
+    Notes::Preview,
+    Notes::Mtime,
+    Notes::IsPinned,
+];
 
-/// SQL text with its bound parameters, built from constant fragments.
-#[derive(Default)]
-struct Sql {
-    text: String,
-    params: Vec<Value>,
-}
+/// The alias of the lexical hits.
+const LEXICAL: &str = "lexical";
+/// The alias of the filtered notes.
+const FILTERED: &str = "fn";
+const FTS_HIGHLIGHTED_TITLE: &str = "fts_highlighted_title";
+const SNIPPET: &str = "snippet";
+const RANK: &str = "rank";
+const SCORE: &str = "score";
 
-impl Sql {
-    fn push(&mut self, fragment: &str) {
-        self.text.push_str(fragment);
-    }
-
-    fn bind(&mut self, fragment: &str, value: impl Into<Value>) {
-        self.text.push_str(fragment);
-        self.params.push(value.into());
-    }
-
-    fn limit(&mut self, limit: Option<u32>) {
-        if let Some(limit) = limit {
-            self.bind(" LIMIT ?", i64::from(limit));
-        }
-    }
-}
-
-/// The filter predicates on `notes`, each as ` AND ...`. `tag_keys` are
-/// folded keys, matched against the stored `tag_key`.
-fn push_filters(sql: &mut Sql, request: &SearchRequest, tag_keys: &[String]) {
+/// The filter predicates on `notes`. `tag_keys` are folded keys, matched
+/// against the stored `tag_key`.
+fn filters(request: &SearchRequest, tag_keys: &[String]) -> Condition {
+    let note_path = || Expr::col((Notes::Table, Notes::Path));
+    let mut filters = Cond::all();
     for tag_key in tag_keys {
-        sql.bind(
-            " AND EXISTS (SELECT 1 FROM tags AS filter_tags
-               WHERE filter_tags.note_path = notes.path AND filter_tags.tag_key = ?)",
-            tag_key.clone(),
-        );
+        filters = filters.add(Expr::exists(
+            Query::select()
+                .expr(lit(1))
+                .from_as(Tags::Table, FILTER_TAGS)
+                .and_where(Expr::col((FILTER_TAGS, Tags::NotePath)).eq(note_path()))
+                .and_where(Expr::col((FILTER_TAGS, Tags::TagKey)).eq(tag_key.as_str()))
+                .take(),
+        ));
     }
     if request.daily_only {
-        sql.push(" AND notes.daily_date IS NOT NULL");
+        filters = filters.add(Expr::col((Notes::Table, Notes::DailyDate)).is_not_null());
     }
     // An explicit daily filter and the notes-only population contradict; the
     // filter wins.
     if request.notes_only && !request.daily_only {
-        sql.push(" AND notes.kind = 'note'");
+        filters = filters.add(Expr::col((Notes::Table, Notes::Kind)).eq(lit("note")));
     }
     if request.pinned_only {
-        sql.push(" AND notes.is_pinned = 1");
+        filters = filters.add(Expr::col((Notes::Table, Notes::IsPinned)).eq(lit(1)));
     }
     if let Some(target) = &request.links_to_path {
-        sql.bind(
-            " AND EXISTS (SELECT 1 FROM backlinks
-               WHERE backlinks.source_path = notes.path AND backlinks.target_path = ?)",
-            target.clone(),
-        );
+        filters = filters.add(Expr::exists(
+            Query::select()
+                .expr(lit(1))
+                .from(Backlinks::Table)
+                .and_where(Expr::col((Backlinks::Table, Backlinks::SourcePath)).eq(note_path()))
+                .and_where(Expr::col((Backlinks::Table, Backlinks::TargetPath)).eq(target.as_str()))
+                .take(),
+        ));
     }
     if let Some(source) = &request.linked_from_path {
-        sql.bind(
-            " AND EXISTS (SELECT 1 FROM backlinks
-               WHERE backlinks.target_path = notes.path AND backlinks.source_path = ?)",
-            source.clone(),
-        );
+        filters = filters.add(Expr::exists(
+            Query::select()
+                .expr(lit(1))
+                .from(Backlinks::Table)
+                .and_where(Expr::col((Backlinks::Table, Backlinks::TargetPath)).eq(note_path()))
+                .and_where(Expr::col((Backlinks::Table, Backlinks::SourcePath)).eq(source.as_str()))
+                .take(),
+        ));
     }
-    if let Some(after) = request.updated_after_ms {
-        sql.bind(" AND notes.mtime >= ?", after);
-    }
-    if let Some(before) = request.updated_before_ms {
-        sql.bind(" AND notes.mtime < ?", before);
-    }
+    filters
+        .add_option(
+            request
+                .updated_after_ms
+                .map(|after| Expr::col((Notes::Table, Notes::Mtime)).gte(after)),
+        )
+        .add_option(
+            request
+                .updated_before_ms
+                .map(|before| Expr::col((Notes::Table, Notes::Mtime)).lt(before)),
+        )
 }
 
 fn recall_hit(row: &Row<'_>) -> rusqlite::Result<SearchHitRow> {
@@ -142,139 +156,174 @@ pub fn search_ranked(
     let Some(fts_match) = build_fts_match(&request.text) else {
         return Ok(Vec::new());
     };
-    let sql = ranked_sql(request, fts_match, options);
-    let hits = conn
-        .prepare_cached(&sql.text)?
-        .query_map(params_from_iter(sql.params), |row| {
-            Ok(RankedHit {
-                hit: SearchHitRow {
-                    fts_highlighted_title: row.get(6)?,
-                    snippet: row.get(7)?,
-                    ..recall_hit(row)?
-                },
-                score: row.get(8)?,
-            })
-        })?
-        .collect::<Result<_, _>>()?;
-    Ok(hits)
+    sql::query(conn, &ranked_query(request, fts_match, options), |row| {
+        Ok(RankedHit {
+            hit: SearchHitRow {
+                fts_highlighted_title: row.get(6)?,
+                snippet: row.get(7)?,
+                ..recall_hit(row)?
+            },
+            score: row.get(8)?,
+        })
+    })
+}
+
+/// The lexical hits of `fts_match`: the path, the marked title and snippet,
+/// and the title-boosted bm25 rank.
+fn lexical_hits(fts_match: String, snippet_tokens: u8) -> SelectStatement {
+    let fts = || Expr::col(SearchFts::Fts);
+    let start = String::from(HIGHLIGHT_START);
+    let end = String::from(HIGHLIGHT_END);
+    let [path_weight, title_weight, body_weight] = RANK_WEIGHTS;
+    Query::select()
+        .expr_as(Expr::col((SearchFts::Table, SearchFts::Path)), Notes::Path)
+        .expr_as(
+            Func::cust("highlight")
+                .arg(fts())
+                .arg(lit(1))
+                .arg(start.as_str())
+                .arg(end.as_str()),
+            FTS_HIGHLIGHTED_TITLE,
+        )
+        .expr_as(
+            Func::cust("snippet")
+                .arg(fts())
+                .arg(lit(2))
+                .arg(start)
+                .arg(end)
+                .arg(lit("…"))
+                .arg(lit(i32::from(snippet_tokens))),
+            SNIPPET,
+        )
+        .expr_as(
+            Func::cust("bm25")
+                .arg(fts())
+                .arg(lit(path_weight))
+                .arg(lit(title_weight))
+                .arg(lit(body_weight)),
+            RANK,
+        )
+        .from(SearchFts::Table)
+        .and_where(fts().binary(SqliteBinOper::Match, fts_match))
+        .take()
 }
 
 /// The ranked search for free text that compiles to `fts_match`.
-fn ranked_sql(request: &SearchRequest, fts_match: String, options: RankedOptions) -> Sql {
+fn ranked_query(request: &SearchRequest, fts_match: String, options: RankedOptions) -> WithQuery {
     // SQLite rejects `MATCH ... OR ...`, and a flattened FTS subquery under a
     // notes-first join reruns MATCH for every note. The materialized CTE
     // computes the lexical hits once; the outer join admits rows that only
     // title recall finds and keeps the FTS snippets.
-    let mut sql = Sql::default();
-    sql.bind(
-        "WITH lexical AS MATERIALIZED (
-           SELECT search_fts.path AS path,
-                  highlight(search_fts, 1, ?",
-        String::from(HIGHLIGHT_START),
-    );
-    sql.bind(
-        ", ?) AS fts_highlighted_title,",
-        String::from(HIGHLIGHT_END),
-    );
-    sql.bind(" snippet(search_fts, 2, ?", String::from(HIGHLIGHT_START));
-    sql.bind(
-        &format!(", ?, '…', {}) AS snippet,", options.snippet_tokens),
-        String::from(HIGHLIGHT_END),
-    );
-    sql.push(&format!(" {RANK_EXPR} AS rank FROM search_fts"));
-    sql.bind(" WHERE search_fts MATCH ?)", fts_match);
+    let lexical = CommonTableExpression::new()
+        .query(lexical_hits(fts_match, options.snippet_tokens))
+        .table_name(LEXICAL)
+        .materialized(true)
+        .to_owned();
 
+    let title_key = || Expr::col((FILTERED, Notes::TitleKey));
+    let instr = |text: Expr, needle: &str| Expr::from(Func::cust("instr").arg(text).arg(needle));
     // Every term matches the folded title: at a word start for scripts with
     // spaces, anywhere for scripts without.
     let needles = title_recall_needles(&request.title_key);
-    let push_contains_all_terms = |sql: &mut Sql| {
+    let contains_all_terms = || -> Expr {
         if needles.is_empty() {
-            sql.push("0");
-            return;
+            return lit(0);
         }
-        sql.push("(");
-        for (at, needle) in needles.iter().enumerate() {
-            if at > 0 {
-                sql.push(" AND ");
-            }
-            sql.bind("instr(' ' || fn.title_key, ?) > 0", needle.clone());
+        let mut all = Cond::all();
+        for needle in &needles {
+            let spaced_title = lit(" ").binary(BinOper::Custom("||"), title_key());
+            all = all.add(instr(spaced_title, needle).gt(lit(0)));
         }
-        sql.push(")");
+        all.into()
     };
+
+    let mut filtered = Query::select();
+    filtered
+        .columns(HIT_COLUMNS.map(|column| (Notes::Table, column)))
+        .column((Notes::Table, Notes::TitleKey))
+        .from(Notes::Table)
+        .and_where(Expr::col((Notes::Table, Notes::Kind)).ne(lit("template")));
+    if options.exclude_private {
+        filtered.and_where(Expr::col((Notes::Table, Notes::IsPrivate)).eq(lit(0)));
+    }
+    filtered.cond_where(filters(request, &request.tag_keys));
+
     // A title-only hit that title recall admits keeps score 0. A title that
     // only the tokenizer matches (`cafe` finds `Café`) keeps its bm25 rank, so
     // it still leads body hits.
-    sql.bind(
-        " SELECT fn.path, fn.title, fn.daily_date, fn.preview, fn.mtime, fn.is_pinned,
-                 lexical.fts_highlighted_title, lexical.snippet,
-                 CASE WHEN instr(coalesce(lexical.snippet, ''), ?) > 0 OR NOT (",
-        String::from(HIGHLIGHT_START),
-    );
-    push_contains_all_terms(&mut sql);
-    sql.push(&format!(
-        ") THEN coalesce(lexical.rank, 0) ELSE 0 END AS score
-          FROM (SELECT {HIT_COLUMNS}, notes.title_key FROM notes
-                WHERE notes.kind != 'template'"
-    ));
-    if options.exclude_private {
-        sql.push(" AND notes.is_private = 0");
-    }
-    push_filters(&mut sql, request, &request.tag_keys);
-    sql.push(
-        ") AS fn LEFT JOIN lexical ON lexical.path = fn.path
-          WHERE (lexical.path IS NOT NULL OR ",
-    );
-    push_contains_all_terms(&mut sql);
+    let snippet_has_match = instr(
+        Func::coalesce([Expr::col((LEXICAL, SNIPPET)), lit("")]).into(),
+        &String::from(HIGHLIGHT_START),
+    )
+    .gt(lit(0));
+    let score = Expr::case(
+        snippet_has_match.or(contains_all_terms().not()),
+        Func::coalesce([Expr::col((LEXICAL, RANK)), lit(0)]),
+    )
+    .finally(lit(0));
     // The title rank: exact (0), whole-query prefix (1), all terms (2).
-    sql.bind(
-        ") ORDER BY CASE WHEN fn.title_key = ? THEN 0",
-        request.title_key.clone(),
-    );
-    sql.bind(
-        " WHEN instr(fn.title_key, ?) = 1 THEN 1 WHEN ",
-        request.title_key.clone(),
-    );
-    push_contains_all_terms(&mut sql);
-    sql.push(" THEN 2 ELSE 3 END, score, fn.is_pinned DESC, fn.mtime DESC, fn.path ASC");
-    sql.limit(request.limit);
-    sql
+    let title_rank = Expr::case(title_key().eq(request.title_key.as_str()), lit(0))
+        .case(instr(title_key(), &request.title_key).eq(lit(1)), lit(1))
+        .case(contains_all_terms(), lit(2))
+        .finally(lit(3));
+
+    let mut query = Query::select();
+    query
+        .columns(HIT_COLUMNS.map(|column| (FILTERED, column)))
+        .columns([(LEXICAL, FTS_HIGHLIGHTED_TITLE), (LEXICAL, SNIPPET)])
+        .expr_as(score, SCORE)
+        .from_subquery(filtered, FILTERED)
+        .left_join(
+            LEXICAL,
+            Expr::col((LEXICAL, Notes::Path)).equals((FILTERED, Notes::Path)),
+        )
+        .cond_where(
+            Cond::any()
+                .add(Expr::col((LEXICAL, Notes::Path)).is_not_null())
+                .add(contains_all_terms()),
+        )
+        .order_by_expr(title_rank.into(), Order::Asc)
+        .order_by(SCORE, Order::Asc)
+        .order_by((FILTERED, Notes::IsPinned), Order::Desc)
+        .order_by((FILTERED, Notes::Mtime), Order::Desc)
+        .order_by((FILTERED, Notes::Path), Order::Asc);
+    if let Some(limit) = request.limit {
+        query.limit(u64::from(limit));
+    }
+    query.with(Query::with().cte(lexical).to_owned())
 }
 
 /// The recall feed of a search without free text.
 fn recall(conn: &Connection, request: &SearchRequest) -> AppResult<Vec<SearchHitRow>> {
-    let mut sql = Sql::default();
+    let mut query = Query::select();
+    query.columns(HIT_COLUMNS.map(|column| (Notes::Table, column)));
+    let not_template = Expr::col((Notes::Table, Notes::Kind)).ne(lit("template"));
     match request.tag_keys.split_first() {
         // Start from the rows of the first tag instead of every note.
         Some((first, rest)) => {
-            sql.push(&format!(
-                "SELECT DISTINCT {HIT_COLUMNS} FROM tags
-                 JOIN notes ON notes.path = tags.note_path"
-            ));
-            sql.bind(
-                " WHERE tags.tag_key = ? AND notes.kind != 'template'",
-                first.clone(),
-            );
-            push_filters(&mut sql, request, rest);
+            query.distinct();
+            from_tags_join_notes(&mut query);
+            query
+                .and_where(Expr::col((Tags::Table, Tags::TagKey)).eq(first.as_str()))
+                .and_where(not_template)
+                .cond_where(filters(request, rest));
         }
         None => {
-            sql.push(&format!(
-                "SELECT {HIT_COLUMNS} FROM notes WHERE notes.kind != 'template'"
-            ));
-            push_filters(&mut sql, request, &[]);
+            query
+                .from(Notes::Table)
+                .and_where(not_template)
+                .cond_where(filters(request, &[]));
         }
     }
-    sql.push(" ORDER BY ");
-    sql.push(if request.pinned_first {
-        PINNED_FIRST_ORDER
+    if request.pinned_first {
+        order_pinned_first(&mut query);
     } else {
-        RECENT_ORDER
-    });
-    sql.limit(request.limit);
-    let hits = conn
-        .prepare_cached(&sql.text)?
-        .query_map(params_from_iter(sql.params), recall_hit)?
-        .collect::<Result<_, _>>()?;
-    Ok(hits)
+        order_recent(&mut query);
+    }
+    if let Some(limit) = request.limit {
+        query.limit(u64::from(limit));
+    }
+    sql::query(conn, &query, recall_hit)
 }
 
 #[cfg(test)]
@@ -287,10 +336,10 @@ pub(crate) fn ranked_query_plan(
         exclude_private: false,
         snippet_tokens: 10,
     };
-    let sql = ranked_sql(request, fts_match, options);
+    let (sql, params) = sql::build(&ranked_query(request, fts_match, options));
     let plan = conn
-        .prepare(&format!("EXPLAIN QUERY PLAN {}", sql.text))?
-        .query_map(params_from_iter(sql.params), |row| row.get(3))?
+        .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))?
+        .query_map(rusqlite::params_from_iter(params), |row| row.get(3))?
         .collect::<Result<_, _>>()?;
     Ok(plan)
 }

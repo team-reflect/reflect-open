@@ -16,7 +16,7 @@ pub(crate) fn lit(value: impl Into<Value>) -> Expr {
 }
 
 /// A bound value of a statement.
-struct Param(Value);
+pub(crate) struct Param(Value);
 
 impl ToSql for Param {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
@@ -60,7 +60,7 @@ impl ToSql for Param {
 
 /// The SQLite text of `statement` and its bound values, in placeholder
 /// order.
-fn build(statement: &impl QueryStatementWriter) -> (String, Vec<Param>) {
+pub(crate) fn build(statement: &impl QueryStatementWriter) -> (String, Vec<Param>) {
     let (sql, values) = statement.build(SqliteQueryBuilder);
     (sql, values.into_iter().map(Param).collect())
 }
