@@ -31,13 +31,6 @@ describe('createSecretStoreService', () => {
     await expect(createSecretStoreService({ ipc }).get('a')).resolves.toBeNull()
   })
 
-  it('rejects a malformed response with a parse error', async () => {
-    const ipc = createTestIpcBridgeService({ commands: { secret_get: () => 42 } })
-    await expect(createSecretStoreService({ ipc }).get('a')).rejects.toMatchObject({
-      kind: 'parse',
-    })
-  })
-
   it('rejects a failed command with its app error', async () => {
     const ipc = createTestIpcBridgeService({
       commands: {

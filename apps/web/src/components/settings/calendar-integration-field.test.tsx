@@ -3,13 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Settings } from '@reflect/core'
 import type { TestOpenerService } from '@reflect/app/testing'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestCalendarService,
   type TestCalendarService,
   type TestSettingsService,
 } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { CalendarIntegrationField } from './calendar-integration-field.tsx'
 import { noop } from '@ocavue/utils'
 
@@ -27,7 +27,7 @@ let settings: TestSettingsService
 
 // The field renders only on macOS desktop, which is the test platform.
 async function renderSection(): Promise<void> {
-  const core = createTestCoreServices({ database: createWasmTestDatabaseService(), calendar })
+  const core = createTestCoreServices({ database: createTestDatabaseService(), calendar })
   settings = core.settings
   const view = await renderInApp(<CalendarIntegrationField />, { core, settings: stored })
   opener = view.appServices.opener

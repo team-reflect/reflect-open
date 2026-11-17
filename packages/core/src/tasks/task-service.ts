@@ -375,10 +375,10 @@ interface TaskRecord {
   astPath: string
   markdown: string
   breadcrumbs: string
-  checked: number
+  checked: boolean
   noteTitle: string
   dailyDate: string | null
-  isPinned: number
+  isPinned: boolean
   pinnedOrder: number | null
   updatedAt: number
 }
@@ -479,12 +479,12 @@ class TaskServiceImpl implements TaskService {
   }
 
   async getOpenTasks(): Promise<OpenTask[]> {
-    const rows = await this.#taskRowsQuery().where('tasks.checked', '=', 0).execute()
+    const rows = await this.#deps.database.read('index_tasks', { checked: false })
     return this.#toTaskRows(rows).sort(compareTasksByNote)
   }
 
   async getCompletedTasks(): Promise<OpenTask[]> {
-    const rows = await this.#taskRowsQuery().where('tasks.checked', '=', 1).execute()
+    const rows = await this.#deps.database.read('index_tasks', { checked: true })
     return this.#toTaskRows(rows).sort(
       (left, right) => right.updatedAt - left.updatedAt || compareTasksByNote(left, right),
     )
@@ -829,25 +829,6 @@ class TaskServiceImpl implements TaskService {
     }
   }
 
-  #taskRowsQuery() {
-    return this.#deps.database.db
-      .selectFrom('tasks')
-      .innerJoin('notes', 'notes.path', 'tasks.notePath')
-      .where('notes.kind', '!=', 'template')
-      .select([
-        'tasks.notePath',
-        'tasks.astPath',
-        'tasks.markdown',
-        'tasks.breadcrumbs',
-        'tasks.checked',
-        'notes.title as noteTitle',
-        'notes.dailyDate',
-        'notes.isPinned',
-        'notes.pinnedOrder',
-        'notes.updatedAt',
-      ])
-  }
-
   /**
    * Map stored rows to their domain shape. A row whose address or breadcrumbs
    * do not decode is skipped and reported instead of failing the whole read: the
@@ -856,7 +837,7 @@ class TaskServiceImpl implements TaskService {
   #toTaskRows(rows: readonly TaskRecord[]): OpenTask[] {
     const tasks: OpenTask[] = []
     for (const row of rows) {
-      const { astPath, markdown, breadcrumbs, checked, isPinned, ...rest } = row
+      const { astPath, markdown, breadcrumbs, checked, ...rest } = row
       try {
         tasks.push({
           ...rest,
@@ -864,9 +845,8 @@ class TaskServiceImpl implements TaskService {
             astPath: decodeTaskPath(astPath),
             markdown,
             breadcrumbs: decodeTaskBreadcrumbs(breadcrumbs),
-            checked: checked !== 0,
+            checked,
           }),
-          isPinned: isPinned !== 0,
         })
       } catch (cause) {
         this.#deps.logger.error(

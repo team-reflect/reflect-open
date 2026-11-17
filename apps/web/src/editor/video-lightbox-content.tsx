@@ -26,7 +26,7 @@ export function VideoLightboxContent({
     <div
       className={cn(
         'absolute inset-0 flex items-center justify-center overflow-hidden',
-        mobileSurface ? 'bg-black p-0' : 'p-6',
+        mobileSurface ? 'bg-black px-safe' : 'p-6',
       )}
       onClick={(event) => {
         if (event.target === event.currentTarget) {

@@ -165,6 +165,27 @@ describe('watchScrollSettle', () => {
     expect(onSettle).toHaveBeenCalledTimes(2)
   })
 
+  it('reports a release when the finger lifts from a scrolling touch, and not from a tap', async () => {
+    const element = mountScroller()
+    const onRelease = vi.fn()
+    watchScrollSettle({
+      element,
+      onSettle: vi.fn(),
+      onRelease,
+      signal: listeners.controller.signal,
+    })
+
+    await touch(element, 'start')
+    await touch(element, 'end')
+    expect(onRelease).not.toHaveBeenCalled()
+
+    await touch(element, 'start')
+    await scrollElement({ element, left: 50 })
+    expect(onRelease).not.toHaveBeenCalled()
+    await touch(element, 'end')
+    expect(onRelease).toHaveBeenCalledOnce()
+  })
+
   it('counts a scrolling touch and a wheel as gestures, and a tap or a program scroll as none', async () => {
     const element = mountScroller()
     const watch = watchScrollSettle({

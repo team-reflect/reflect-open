@@ -59,6 +59,7 @@ export function IncomingBacklinkGroup({
       <div className="flex items-center">
         <button
           type="button"
+          data-back-swipe="on"
           onClick={() => onOpen(source.path)}
           className="flex min-h-11 min-w-0 flex-1 items-center text-left text-sm text-accent"
         >

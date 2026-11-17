@@ -1,7 +1,8 @@
+import type { WikiClaimMatch } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import { isAppError } from '../errors.ts'
 import { CLAIM_TIER, projectNoteAliases } from '../indexing/indexed-note.ts'
-import type { WikiResolverService, WikiTargetMatch } from '../indexing/wiki-resolver-service.ts'
+import type { WikiResolverService } from '../indexing/wiki-resolver-service.ts'
 import { parseNote } from '../markdown/extract.ts'
 import { foldFallbackTitleKey, foldKey } from '../markdown/keys.ts'
 import { normalizeWikiTarget } from '../markdown/resolve.ts'
@@ -241,7 +242,7 @@ class NoteLinkResolverServiceImpl implements NoteLinkResolverService {
    * indexed regular title or alias with the same ISO date spelling.
    */
   async #indexedResolution(
-    match: WikiTargetMatch,
+    match: WikiClaimMatch,
     date: string | undefined,
     generation: number,
     listNoteFiles: ListNoteFiles,

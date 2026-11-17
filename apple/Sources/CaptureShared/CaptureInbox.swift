@@ -1,38 +1,11 @@
 import Foundation
+public import TypesShared
 
-/// The capture envelopes the iOS producers spool and the App Group inbox they
-/// spools them into — the iOS half of Plan 11's platform-agnostic capture
-/// contract. The TypeScript zod schema
-/// (`packages/core/src/capture/capture-envelope.ts`) is the source of truth;
-/// these structs must stay in sync with it. A producer never opens the
-/// graph, the Git repo, or SQLite: the inbox is the only contract, and the
-/// main app relays + drains it on next launch/foreground.
-
-/// A shared web page or URL, as `capture-envelope.ts`'s `captureEnvelopeSchema`.
-struct LinkCaptureEnvelope: Encodable {
-  var version = 1
-  var id: String
-  var url: String
-  var title: String
-  var selection: String?
-  var metaDescription: String?
-  var capturedAt: String
-  var source = "ios-share"
-}
-
-/// Shared non-URL text, as `textCaptureEnvelopeSchema`: one folded line the
-/// drain appends to the capture-day daily note as a bullet. `source` names
-/// the producer (`ios-share` / `ios-intent`) — provenance only, one shape.
-struct TextCaptureEnvelope: Encodable {
-  var version = 1
-  var id: String
-  var kind = "append"
-  var text: String
-  /// The top-level bullet the entry nests under; nil appends at the end.
-  var parent: String?
-  var capturedAt: String
-  var source: String
-}
+/// The App Group inbox the iOS producers spool capture envelopes into. The
+/// envelopes are generated from `crates/types/src/capture.rs`. A producer
+/// never opens the graph, the Git repo, or SQLite: the inbox is the only
+/// contract, and the main app relays and drains it on the next launch or
+/// foreground.
 
 public enum CaptureInboxError: Error {
   /// The App Group container is unreachable — an entitlements mismatch, not
@@ -64,17 +37,13 @@ public enum CaptureInbox {
   /// each other's inbox. It matches the
   /// `com.apple.security.application-groups` entitlement, and the app's Rust
   /// relay reads the same key.
-  static let groupId = Bundle.main.object(forInfoDictionaryKey: "ReflectAppGroup") as? String ?? ""
-
-  /// Where envelopes spool inside the container; the Rust relay reads the
-  /// same directory name (`SHARED_INBOX_DIR`).
-  static let inboxDir = "inbox"
+  static let groupId =
+    Bundle.main.object(forInfoDictionaryKey: CaptureConstants.appGroupKey) as? String ?? ""
 
   /// The producers' envelope budget: a share is one short link or line,
-  /// so anything near it is not a capture. Well inside the relay's cap
-  /// (`SHARED_ENVELOPE_MAX_BYTES` in `capture.rs`), which also takes the
-  /// Safari extension's page text.
-  static let spoolMaxBytes = 64 * 1024
+  /// so anything near it is not a capture. Well inside the relay's cap,
+  /// which also takes the Safari extension's page text.
+  static let spoolMaxBytes = CaptureConstants.inboxSpoolMaxBytes
 
   /// Spool a link capture. Empty titles are allowed (the drain falls back
   /// to the URL's host); empty selections and descriptions are dropped.
@@ -100,27 +69,28 @@ public enum CaptureInbox {
     now: Date,
     into inbox: URL
   ) throws {
-    var envelope = LinkCaptureEnvelope(
-      id: id,
-      url: url,
-      title: capped(title, at: FieldCap.title),
-      selection: nonEmpty(capped(selection ?? "", at: FieldCap.selection)),
-      metaDescription: nonEmpty(capped(metaDescription ?? "", at: FieldCap.description)),
-      capturedAt: capturedAt(now)
-    )
+    func encode(selection: String?, metaDescription: String?) throws -> Data {
+      try JSONEncoder().encode(
+        LinkCaptureEnvelope(
+          version: 1, id: id, url: url, title: capped(title, at: FieldCap.title),
+          selection: selection, contentText: nil, metaDescription: metaDescription, note: nil,
+          screenshotRef: nil, capturedAt: capturedAt(now), source: .iosShare))
+    }
+    var selection = nonEmpty(capped(selection ?? "", at: FieldCap.selection))
+    var metaDescription = nonEmpty(capped(metaDescription ?? "", at: FieldCap.description))
     // The URL is the one uncapped field (truncating it would save a
     // broken link): a pathological one can outgrow the spool cap. Shed
     // the optional fields biggest-first; past that the share fails
     // honestly rather than claiming "Saved" for a file the relay can
     // only quarantine.
-    var data = try JSONEncoder().encode(envelope)
-    if data.count > spoolMaxBytes, envelope.selection != nil {
-      envelope.selection = nil
-      data = try JSONEncoder().encode(envelope)
+    var data = try encode(selection: selection, metaDescription: metaDescription)
+    if data.count > spoolMaxBytes, selection != nil {
+      selection = nil
+      data = try encode(selection: selection, metaDescription: metaDescription)
     }
-    if data.count > spoolMaxBytes, envelope.metaDescription != nil {
-      envelope.metaDescription = nil
-      data = try JSONEncoder().encode(envelope)
+    if data.count > spoolMaxBytes, metaDescription != nil {
+      metaDescription = nil
+      data = try encode(selection: selection, metaDescription: metaDescription)
     }
     guard data.count <= spoolMaxBytes else {
       throw CaptureInboxError.envelopeTooLarge
@@ -132,7 +102,9 @@ public enum CaptureInbox {
   /// `parent` when it is set. Returns false (spooling nothing) when the text
   /// folds to empty. `source` and `parent` deliberately have no default, so
   /// the compiler names every producer.
-  public static func spoolText(_ text: String, source: String, parent: String?) throws -> Bool {
+  public static func spoolText(_ text: String, source: TextCaptureSource, parent: String?) throws
+    -> Bool
+  {
     // Blank text returns false before the container lookup can throw.
     guard foldedLine(text) != nil else {
       return false
@@ -144,14 +116,15 @@ public enum CaptureInbox {
   /// `spoolText(_:source:parent:)` into `inbox`, as envelope `id` captured
   /// at `now`.
   static func spoolText(
-    _ text: String, source: String, parent: String?, id: String, now: Date, into inbox: URL
+    _ text: String, source: TextCaptureSource, parent: String?, id: String, now: Date,
+    into inbox: URL
   ) throws -> Bool {
     guard let line = foldedLine(text) else {
       return false
     }
     let envelope = TextCaptureEnvelope(
-      id: id, text: line, parent: parent.flatMap(foldedParent), capturedAt: capturedAt(now),
-      source: source)
+      version: 1, id: id, kind: .append, text: line, parent: parent.flatMap(foldedParent),
+      capturedAt: capturedAt(now), source: source)
     try spool(try JSONEncoder().encode(envelope), id: id, into: inbox)
     return true
   }
@@ -198,7 +171,7 @@ public enum CaptureInbox {
     guard let container = containerUrl() else {
       throw CaptureInboxError.containerUnavailable
     }
-    return container.appendingPathComponent(inboxDir, isDirectory: true)
+    return container.appendingPathComponent(CaptureConstants.sharedInboxDir, isDirectory: true)
   }
 
   /// The flavor's App Group container, or nil when it is unavailable.

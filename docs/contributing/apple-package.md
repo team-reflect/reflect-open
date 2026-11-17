@@ -53,8 +53,6 @@ app, so it does not replace a full iOS app build.
   no new `@MainActor`, `async`, or `Task {}`.
 - **`InternalImportsByDefault` is on.** A module used in a `public` signature
   needs `public import`.
-- **iOS 15 is the floor.** The package declares `.iOS(.v15)`, below the app's
-  deployment targets, so the compiler checks every `#available`.
 - **Wrap iOS-only files in `#if os(iOS)`.** `swift build` and `swift test`
   compile every target for macOS too, and `canImport(ActivityKit)` is true
   there. Keep logic you want to test on the Mac in a separate, unwrapped file.

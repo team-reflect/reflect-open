@@ -1,13 +1,12 @@
 import { isIsoDate } from '@reflect/utils'
-import { AppError } from '../errors.ts'
 import { noteBasenameKey } from '../graph/note-reference.ts'
 import { dateFromDailyPath, foldGraphPath } from '../graph/paths.ts'
-import { CLAIM_TIER, type IndexedNote } from '../indexing/indexed-note.ts'
+import type { IndexedNote } from '../indexing/indexed-note.ts'
 import {
   createIndexApplyBatchWriter,
   createMtimeTouchBatchWriter,
   type IndexApplyBatch,
-  type IndexedNoteTouch,
+  type IndexTouch,
   type IndexStoreService,
   type MtimeTouchBatch,
   type SkippedIndexedNote,
@@ -42,7 +41,7 @@ export type IndexStoreCall =
   | { readonly method: 'reconcileScan'; readonly generation: number }
   | {
       readonly method: 'touch'
-      readonly entries: readonly IndexedNoteTouch[]
+      readonly entries: readonly IndexTouch[]
       readonly generation: number
     }
   | { readonly method: 'clear'; readonly generation: number }
@@ -128,32 +127,42 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
     })
   }
 
-  async apply(note: IndexedNote, writeGeneration: number): Promise<void> {
-    this.#record({ method: 'apply', note, generation: writeGeneration })
-    await this.#writeNotes([note])
+  apply(note: IndexedNote, writeGeneration: number): Promise<void> {
+    return Promise.try(() => {
+      this.#record({ method: 'apply', note, generation: writeGeneration })
+      this.#writeNotes([note])
+    })
   }
 
-  async applyBatch(notes: IndexedNote[], writeGeneration: number): Promise<void> {
-    this.#record({ method: 'applyBatch', notes: [...notes], generation: writeGeneration })
-    await this.#writeNotes(notes)
+  applyBatch(notes: IndexedNote[], writeGeneration: number): Promise<void> {
+    return Promise.try(() => {
+      this.#record({ method: 'applyBatch', notes: [...notes], generation: writeGeneration })
+      this.#writeNotes(notes)
+    })
   }
 
-  async remove(path: string, writeGeneration: number): Promise<void> {
-    this.#record({ method: 'remove', path, generation: writeGeneration })
-    await this.#database?.runQuery('DELETE FROM notes WHERE path = ?', [path])
-    this.#removedPaths.push(path)
+  remove(path: string, writeGeneration: number): Promise<void> {
+    return Promise.try(() => {
+      this.#record({ method: 'remove', path, generation: writeGeneration })
+      this.#database?.invoke('index_remove', { path, generation: this.#database.generation() })
+      this.#removedPaths.push(path)
+    })
   }
 
-  async move(from: string, to: string, writeGeneration: number): Promise<void> {
-    this.#record({ method: 'move', from, to, generation: writeGeneration })
-    await this.#moveRows(from, to)
-    this.#moves.push({ from, to })
+  move(from: string, to: string, writeGeneration: number): Promise<void> {
+    return Promise.try(() => {
+      this.#record({ method: 'move', from, to, generation: writeGeneration })
+      this.#moveRows(from, to)
+      this.#moves.push({ from, to })
+    })
   }
 
-  async moveIndexed(from: string, to: string, fileGeneration: number): Promise<void> {
-    this.#record({ method: 'moveIndexed', from, to, fileGeneration })
-    await this.#moveRows(from, to)
-    this.#moves.push({ from, to })
+  moveIndexed(from: string, to: string, fileGeneration: number): Promise<void> {
+    return Promise.try(() => {
+      this.#record({ method: 'moveIndexed', from, to, fileGeneration })
+      this.#moveRows(from, to)
+      this.#moves.push({ from, to })
+    })
   }
 
   reconcileScan(scanGeneration: number): Promise<ReconcileScan> {
@@ -163,15 +172,17 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
     })
   }
 
-  touch(entries: readonly IndexedNoteTouch[], writeGeneration: number): Promise<void> {
+  touch(entries: readonly IndexTouch[], writeGeneration: number): Promise<void> {
     return Promise.try(() => {
       this.#record({ method: 'touch', entries: [...entries], generation: writeGeneration })
     })
   }
 
-  async clear(writeGeneration: number): Promise<void> {
-    this.#record({ method: 'clear', generation: writeGeneration })
-    await this.#database?.runQuery('DELETE FROM notes', [])
+  clear(writeGeneration: number): Promise<void> {
+    return Promise.try(() => {
+      this.#record({ method: 'clear', generation: writeGeneration })
+      this.#database?.invoke('index_clear', { generation: this.#database.generation() })
+    })
   }
 
   async getMeta(key: string): Promise<string | null> {
@@ -180,19 +191,16 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
     if (database === undefined) {
       return this.#meta.get(key) ?? null
     }
-    await this.#seedMeta()
-    const row = await database.db
-      .selectFrom('indexMeta')
-      .where('key', '=', key)
-      .select('value')
-      .executeTakeFirst()
-    return row?.value ?? null
+    this.#seedMeta()
+    return await database.read('index_meta_get', { key })
   }
 
-  async setMeta(key: string, value: string, writeGeneration: number): Promise<void> {
-    this.#record({ method: 'setMeta', key, value, generation: writeGeneration })
-    await this.#seedMeta()
-    await this.#writeMeta(key, value)
+  setMeta(key: string, value: string, writeGeneration: number): Promise<void> {
+    return Promise.try(() => {
+      this.#record({ method: 'setMeta', key, value, generation: writeGeneration })
+      this.#seedMeta()
+      this.#writeMeta(key, value)
+    })
   }
 
   createApplyBatch(
@@ -237,95 +245,50 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
     }
   }
 
-  async #seedMeta(): Promise<void> {
+  #seedMeta(): void {
     if (this.#metaSeeded || this.#database === undefined) {
       return
     }
     this.#metaSeeded = true
     for (const [key, value] of this.#meta) {
-      await this.#writeMeta(key, value)
+      this.#writeMeta(key, value)
     }
   }
 
-  async #writeMeta(key: string, value: string): Promise<void> {
+  #writeMeta(key: string, value: string): void {
     if (this.#database === undefined) {
       this.#meta.set(key, value)
       return
     }
-    await this.#database.runQuery('INSERT OR REPLACE INTO index_meta(key, value) VALUES (?, ?)', [
+    this.#database.invoke('index_meta_set', {
       key,
       value,
-    ])
+      generation: this.#database.generation(),
+    })
   }
 
-  async #writeNotes(notes: readonly IndexedNote[]): Promise<void> {
+  #writeNotes(notes: readonly IndexedNote[]): void {
     const database = this.#database
     for (const note of notes) {
       if (database !== undefined) {
-        await database.runQuery('DELETE FROM notes WHERE path = ?', [note.path])
         database.applyProjection(note)
       }
       this.#appliedNotes.push(note)
     }
   }
 
-  /**
-   * Re-key every row of `from` to `to`, statement for statement like `index_move`.
-   */
-  async #moveRows(from: string, to: string): Promise<void> {
+  #moveRows(from: string, to: string): void {
     const database = this.#database
     if (database === undefined) {
       return
     }
-    const run = database.runQuery
-    const occupied = await run('SELECT 1 FROM notes WHERE path = ?', [to])
-    if (Array.isArray(occupied) && occupied.length > 0) {
-      throw new AppError('io', `cannot move note: ${to} is already indexed`)
-    }
     const date = dateFromDailyPath(to)
-    const dailyDate = date !== null && isIsoDate(date) ? date : null
-    const restateClaim = `INSERT INTO note_claims(note_path, key, tier)
-      SELECT ?, ?, ?
-      WHERE NOT EXISTS (SELECT 1 FROM note_claims WHERE note_path = ? AND key = ?)`
-    // The child tables reference `notes(path)`, so the parent-key update
-    // needs deferred foreign-key checks, which only apply inside a transaction.
-    await run('BEGIN', [])
-    try {
-      await run('PRAGMA defer_foreign_keys = ON', [])
-      const moved = await run(
-        'UPDATE notes SET path = ?, path_key = ? WHERE path = ? RETURNING path',
-        [to, foldGraphPath(to), from],
-      )
-      await run('UPDATE note_claims SET note_path = ? WHERE note_path = ?', [to, from])
-      if (Array.isArray(moved) && moved.length > 0) {
-        await run('DELETE FROM note_claims WHERE note_path = ? AND tier IN (?, ?)', [
-          to,
-          CLAIM_TIER.dailyDate,
-          CLAIM_TIER.basename,
-        ])
-        if (dailyDate !== null) {
-          await run(restateClaim, [to, dailyDate, CLAIM_TIER.dailyDate, to, dailyDate])
-        }
-        const basenameKey = noteBasenameKey(to)
-        await run(restateClaim, [to, basenameKey, CLAIM_TIER.basename, to, basenameKey])
-      }
-      await run('UPDATE links SET source_path = ? WHERE source_path = ?', [to, from])
-      for (const table of [
-        'tags',
-        'aliases',
-        'note_emails',
-        'assets',
-        'tasks',
-        'embedding_chunks',
-      ]) {
-        await run(`UPDATE ${table} SET note_path = ? WHERE note_path = ?`, [to, from])
-      }
-      await run('UPDATE search_fts SET path = ? WHERE path = ?', [to, from])
-      await run('COMMIT', [])
-    } catch (error) {
-      await run('ROLLBACK', [])
-      throw error
+    const toAddress = {
+      pathKey: foldGraphPath(to),
+      basenameKey: noteBasenameKey(to),
+      dailyDate: date !== null && isIsoDate(date) ? date : null,
     }
+    database.invoke('index_move', { from, to, generation: database.generation(), toAddress })
   }
 }
 

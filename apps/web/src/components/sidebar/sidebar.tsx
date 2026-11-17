@@ -1,7 +1,10 @@
 import type { ReactElement } from 'react'
-import { isUntitledNotePath, type GraphInfo } from '@reflect/core'
+import type { GraphInfo } from '@reflect/core'
 import { ListChecks, MessageSquare, SquarePen } from 'lucide-react'
 import { AudioMemoButton } from '@/components/audio-memo/audio-memo-button.tsx'
+import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
+import { Button } from '@/components/ui/button.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { ListIcon } from '@/components/icons/list-icon.tsx'
 import { PencilIcon } from '@/components/icons/pencil-icon.tsx'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
@@ -9,7 +12,7 @@ import { keybindingFor } from '@/lib/commands/app-commands.ts'
 import { useToday } from '@/lib/use-today.ts'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { cn } from '@/lib/utils.ts'
-import { notePathForRoute } from '@reflect/app'
+import { notePathForRoute, rootSectionForRoute } from '@reflect/app'
 import { useRouterState } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { GraphFooter } from './graph-footer.tsx'
@@ -26,21 +29,28 @@ interface SidebarProps {
 
 /**
  * The workspace sidebar, in the original app's shape: history arrows top
- * right, search, primary navigation with hover-revealed shortcut keycaps, the
- * Pinned shelf, and the graph switcher footer. Most nav rows run registered
- * commands so a binding and its behavior stay one definition; the Daily notes
- * row is a capture gesture like `Mod-D` — it asks the stream to focus today
- * with the caret at the end, ready to append. (Sidebar collapse stays on
+ * right, search with the compose and audio memo buttons, primary navigation with hover-revealed shortcut keycaps, the
+ * Pinned shelf, and the graph switcher footer. Nav rows run registered
+ * commands so a binding and its behavior stay one definition, and light for
+ * the section of the screen on view. Daily notes is the exception: off the
+ * stream it returns to the stream's last day, and on it it is the `Mod-D`
+ * capture gesture (today, caret at the end). (Sidebar collapse stays on
  * `Mod-\` via the command registry.)
  */
 export function Sidebar({ graph, context }: SidebarProps): ReactElement {
   const { platform } = useCoreServices()
-  const { route } = useRouterState()
+  const { route, section } = useRouterState()
+  const onDailySurface = route.kind === 'today' || route.kind === 'daily'
   const today = useToday()
   const pinned = usePinnedNotes()
   const currentNotePath = notePathForRoute(route, today)
   const hasActivePinnedNote =
     currentNotePath !== null && pinned.some((note) => note.path === currentNotePath)
+  // A section row lights for the section of the screen on view. An open
+  // pinned note lights its own row instead; the settings screens light none.
+  const sectionRowsLit =
+    (rootSectionForRoute(route) !== null || route.kind === 'note') && !hasActivePinnedNote
+  const newNoteBinding = keybindingFor('note.new')
 
   // Wrap the 16px Lucide glyphs in the custom icons' 24px box so nav rows
   // share one icon footprint.
@@ -64,6 +74,24 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
           <div className="min-w-0 flex-1">
             <SidebarSearch onOpen={() => context.openPalette()} />
           </div>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="New note"
+                  onClick={() => void context.app.commands.run('note.new', context)}
+                  className="text-text-muted hover:text-text-secondary dark:hover:text-text"
+                >
+                  <SquarePen aria-hidden strokeWidth={1.75} className="size-4" />
+                </Button>
+              }
+            />
+            <TooltipContent side="bottom">
+              New note {newNoteBinding && <ShortcutKeys binding={newNoteBinding} />}
+            </TooltipContent>
+          </Tooltip>
           <AudioMemoButton />
         </div>
 
@@ -72,36 +100,20 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             icon={<PencilIcon className="shrink-0" />}
             label="Daily notes"
             binding={keybindingFor('nav.today') ?? undefined}
-            active={(route.kind === 'today' || route.kind === 'daily') && !hasActivePinnedNote}
-            onClick={() => void context.app.commands.run('nav.today', context)}
-          />
-          <SidebarItem
-            icon={
-              <span className={lucideBox}>
-                <SquarePen aria-hidden strokeWidth={1.75} className="size-4" />
-              </span>
-            }
-            label="New note"
-            binding={keybindingFor('note.new') ?? undefined}
-            // Active while the open note is still on its ULID placeholder
-            // name — the state this row creates. The birth rename onto a
-            // title slug is also what hands the note off to ordinary
-            // navigation, releasing the highlight.
-            active={route.kind === 'note' && isUntitledNotePath(route.path)}
-            onClick={() => void context.app.commands.run('note.new', context)}
+            active={sectionRowsLit && section === 'daily'}
+            onClick={() => {
+              if (onDailySurface) {
+                void context.app.commands.run('nav.today', context)
+              } else {
+                context.selectSection('daily')
+              }
+            }}
           />
           <SidebarItem
             icon={<ListIcon className="shrink-0" />}
             label="All notes"
             binding={keybindingFor('nav.allNotes') ?? undefined}
-            // A named note lives in the All Notes collection, so keep this row
-            // lit while editing one. A brand-new note is still an untitled
-            // placeholder, though, and the "New note" row above owns that
-            // highlight until the birth rename — so the two never light at once.
-            active={
-              route.kind === 'allNotes' ||
-              (route.kind === 'note' && !isUntitledNotePath(route.path) && !hasActivePinnedNote)
-            }
+            active={sectionRowsLit && section === 'all'}
             onClick={() => void context.app.commands.run('nav.allNotes', context)}
           />
           <SidebarItem
@@ -112,7 +124,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             }
             label="Tasks"
             binding={keybindingFor('nav.tasks') ?? undefined}
-            active={route.kind === 'tasks'}
+            active={sectionRowsLit && section === 'tasks'}
             onClick={() => void context.app.commands.run('nav.tasks', context)}
           />
           <SidebarItem
@@ -123,7 +135,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             }
             label="Chat"
             binding={keybindingFor('chat.open') ?? undefined}
-            active={route.kind === 'chat'}
+            active={sectionRowsLit && section === 'chat'}
             onClick={() => void context.app.commands.run('chat.open', context)}
           />
         </nav>

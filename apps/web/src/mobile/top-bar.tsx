@@ -2,25 +2,11 @@ import type { ComponentProps, ReactElement, ReactNode } from 'react'
 import { Button } from '@/components/ui/button.tsx'
 import { cn } from '@/lib/utils.ts'
 
-export function MobileTopBar({ children }: { children: ReactNode }): ReactElement {
-  return <header className="shrink-0 border-b border-border px-safe">{children}</header>
-}
-
-export function MobileTopBarRow({
-  className,
-  children,
-}: {
-  className?: string
-  children: ReactNode
-}): ReactElement {
-  return <div className={cn('flex h-12 items-center gap-1 px-4', className)}>{children}</div>
-}
-
 export function MobileTopBarIconButton({
   edge,
   className,
   ...props
-}: ComponentProps<typeof Button> & { edge?: 'leading' | 'trailing' }): ReactElement {
+}: ComponentProps<typeof Button> & { edge?: 'leading' | 'trailing' | undefined }): ReactElement {
   return (
     <Button
       variant="ghost"

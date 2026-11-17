@@ -2,7 +2,7 @@ import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { describe, expect, it, vi } from 'vitest'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   seedNotes,
   type TestDatabaseService,
   type TestNote,
@@ -11,7 +11,7 @@ import { createTestNoteFileService } from '../testing/graph.ts'
 import { createBacklinkService, type BacklinkService } from './backlink-service.ts'
 
 function seeded(notes: readonly TestNote[]): TestDatabaseService {
-  const database = createNodeTestDatabaseService()
+  const database = createTestDatabaseService()
   seedNotes(database, notes)
   return database
 }
@@ -111,7 +111,7 @@ describe('getBacklinksWithContext', () => {
       await expect(
         backlinks.getBacklinksWithContext('notes/target.md', { cursor: null, limit }),
       ).rejects.toThrow('positive safe integer')
-      expect(database.getQueries()).toEqual([])
+      expect(database.getReads()).toEqual([])
     },
   )
 

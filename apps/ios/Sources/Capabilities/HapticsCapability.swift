@@ -1,3 +1,4 @@
+import TypesShared
 import UIKit
 import WebHostKit
 
@@ -7,8 +8,8 @@ import WebHostKit
 enum HapticsCapability {
   private static let lightImpact = UIImpactFeedbackGenerator(style: .light)
 
-  static let commands: [String: ShellCommand] = [
-    "plugin:mobile-haptics|impact_light": { _ in
+  static let commands: [ShellCommandName: ShellCommand] = [
+    .hapticsImpactLight: { _ in
       lightImpact.impactOccurred()
       return .null
     }

@@ -9,7 +9,6 @@ describe('deepLinkForRoute', () => {
       { kind: 'today' },
       { kind: 'tasks' },
       { kind: 'daily', date: '2026-07-01' },
-      { kind: 'search', query: 'meeting notes & more' },
     ]
     for (const route of routes) {
       const url = deepLinkForRoute(route)
@@ -29,8 +28,8 @@ describe('deepLinkForRoute', () => {
 
   it('returns null for screens the grammar does not address', () => {
     expect(deepLinkForRoute({ kind: 'allNotes', tag: null })).toBeNull()
-    expect(deepLinkForRoute({ kind: 'chat' })).toBeNull()
-    expect(deepLinkForRoute({ kind: 'settings' })).toBeNull()
+    expect(deepLinkForRoute({ kind: 'chat', conversationId: null })).toBeNull()
+    expect(deepLinkForRoute({ kind: 'settings', page: 'main' })).toBeNull()
   })
 })
 

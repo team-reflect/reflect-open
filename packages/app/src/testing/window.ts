@@ -49,8 +49,8 @@ export interface TestWindowService extends WindowService {
 }
 
 export interface TestWindowServiceOptions {
-  label?: string
-  bootstrap?: WindowBootstrap
+  label?: string | undefined
+  bootstrap?: WindowBootstrap | undefined
   openNoteWindow?: (deepLink: string) => MaybePromise<boolean>
 }
 

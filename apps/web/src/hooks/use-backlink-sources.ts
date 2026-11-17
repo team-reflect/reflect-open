@@ -1,6 +1,7 @@
+import type { BacklinkSourceCursor } from '@reflect/types'
 import { useCallback, useMemo } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import type { BacklinkContext, BacklinkContextPage, BacklinkSourceCursor } from '@reflect/core'
+import type { BacklinkContext, BacklinkContextPage } from '@reflect/core'
 import { groupBacklinksBySource, type BacklinkSource } from '@/lib/group-backlinks.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'

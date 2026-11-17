@@ -9,14 +9,11 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use reflect_index::{
-    Applied, ChatConversation, ChatMessageRow, EmbeddedChunk, FileIndexConnections, IndexTouch,
-    IndexedNote, MovedNoteAddress, NoteMoveRequest, ReconcileScan,
-};
-use reflect_types::{AppError, AppResult};
-use serde_json::{Map, Value};
+use reflect_index::{FileIndexConnections, IndexCommands, IndexEvents};
+use reflect_types::{AppError, AppResult, NoteMoveRequest, ReconcileScan};
+use serde_json::Value;
 
-use crate::{Core, background_task};
+use crate::{Core, Reply, background_task};
 
 fn now_ms() -> u64 {
     std::time::SystemTime::now()
@@ -25,15 +22,60 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
+impl IndexEvents for Core {
+    fn index_written(&self) {
+        self.emit_index_written();
+    }
+
+    fn note_moved(&self, from: &str, to: &str) {
+        self.emit_note_moved(from, to);
+    }
+}
+
 impl Core {
+    /// Runs an `index_write` or `index_read` command of the command table.
+    ///
+    /// A read runs on the blocking pool, on the session's read-only
+    /// connection: a long FTS scan on the caller's thread reads as a frozen
+    /// app on iOS, and it never holds the writer lock.
+    pub(crate) async fn dispatch_index(
+        self: &Arc<Self>,
+        command: &str,
+        args_json: &[u8],
+    ) -> AppResult<Reply> {
+        if reflect_index::INDEX_READ_COMMANDS.contains(&command) {
+            // Pin the index session before the hop: a graph switch can rebind
+            // the index between invoke and execution, and a query issued for
+            // graph A must not return graph B's rows.
+            let read_generation = self.index.read_generation()?;
+            let core = Arc::clone(self);
+            let command = command.to_owned();
+            let args_json = args_json.to_vec();
+            return self
+                .spawn_blocking(move || {
+                    IndexCommands::new(&core.index, core.as_ref(), read_generation)
+                        .dispatch(&command, &args_json)
+                })
+                .await
+                .map(Reply::Json);
+        }
+        let _background_task = background_task::scoped(&self.background_tasks, command);
+        // A write takes no reader lock: a long query never delays it.
+        IndexCommands::new(&self.index, self.as_ref(), 0)
+            .dispatch(command, args_json)
+            .map(Reply::Json)
+    }
+
     fn emit_index_written(&self) {
-        self.host()
-            .emit(reflect_types::events::INDEX_WRITTEN, Value::Null);
+        self.host().emit(
+            reflect_types::events::EventName::IndexWritten.as_str(),
+            Value::Null,
+        );
     }
 
     fn emit_note_moved(&self, from: &str, to: &str) {
         self.host().emit(
-            reflect_types::events::NOTE_MOVED,
+            reflect_types::events::EventName::NoteMoved.as_str(),
             serde_json::json!({ "from": from, "to": to }),
         );
     }
@@ -58,39 +100,6 @@ impl Core {
         self.index.open(&root, &FileIndexConnections)
     }
 
-    /// Command: apply one note's extracted projection in a single transaction
-    /// (no-op if the generation is stale).
-    pub fn index_apply(&self, note: IndexedNote, generation: u64) -> AppResult<()> {
-        let _background_task =
-            background_task::scoped(&self.background_tasks, "Reflect index update");
-        if self.index.apply(generation, std::slice::from_ref(&note))? == Applied::Committed {
-            self.emit_index_written();
-        }
-        Ok(())
-    }
-
-    /// Command: apply many notes' projections in one transaction (the
-    /// full-rebuild path).
-    pub fn index_apply_batch(&self, notes: Vec<IndexedNote>, generation: u64) -> AppResult<()> {
-        let _background_task =
-            background_task::scoped(&self.background_tasks, "Reflect index update");
-        if self.index.apply(generation, &notes)? == Applied::Committed {
-            self.emit_index_written();
-        }
-        Ok(())
-    }
-
-    /// Command: remove a note (e.g. deleted on disk) from the index, embedding
-    /// rows included (no-op if stale).
-    pub fn index_remove(&self, path: String, generation: u64) -> AppResult<()> {
-        let _background_task =
-            background_task::scoped(&self.background_tasks, "Reflect index remove");
-        if self.index.remove(generation, &path)? == Applied::Committed {
-            self.emit_index_written();
-        }
-        Ok(())
-    }
-
     /// Command: move a note file **and** its projection in one step (Plan 17).
     /// `generation` is the **graph** generation (the same gate as
     /// `note_write`): a rename is user-initiated file mutation, and a stale UI
@@ -111,24 +120,6 @@ impl Core {
         Ok(())
     }
 
-    /// Command: move a note's projection rows **only** (the id-based
-    /// reconcile, Plan 17); no-op if the index generation is stale.
-    pub fn index_move(
-        &self,
-        from: String,
-        to: String,
-        generation: u64,
-        to_address: MovedNoteAddress,
-    ) -> AppResult<()> {
-        let _background_task =
-            background_task::scoped(&self.background_tasks, "Reflect index move");
-        if self.index.move_rows(generation, &from, &to, &to_address)? == Applied::Committed {
-            self.emit_index_written();
-            self.emit_note_moved(&from, &to);
-        }
-        Ok(())
-    }
-
     /// Command: compute the open-path reconcile delta natively: list the
     /// graph's notes, compare against the stored rows, and return only what
     /// needs work. The walk runs **without** the index lock held, so thousands
@@ -145,7 +136,7 @@ impl Core {
         self.spawn_blocking(move || {
             let started = std::time::Instant::now();
             let Some(root) = core.index.root_for_generation(generation)? else {
-                return Ok(ReconcileScan::empty());
+                return Ok(ReconcileScan::default());
             };
             let walk_started = std::time::Instant::now();
             let files = reflect_graph_io::note_files(&root);
@@ -162,100 +153,6 @@ impl Core {
             Ok(scan)
         })
         .await
-    }
-
-    /// Command: re-stamp stored mtimes for notes whose content already matches
-    /// disk (the reconcile's hash-match skip, no-op if stale).
-    pub fn index_touch(&self, entries: Vec<IndexTouch>, generation: u64) -> AppResult<()> {
-        let _background_task =
-            background_task::scoped(&self.background_tasks, "Reflect index touch");
-        self.index.touch(generation, &entries).map(drop)
-    }
-
-    /// Command: upsert one `index_meta` key (no-op if stale). Reads go through
-    /// `db_query`.
-    pub fn index_meta_set(&self, key: String, value: String, generation: u64) -> AppResult<()> {
-        let _background_task =
-            background_task::scoped(&self.background_tasks, "Reflect index metadata");
-        self.index.set_meta(generation, &key, &value).map(drop)
-    }
-
-    /// Command: wipe all derived tables (the TS layer then re-applies every
-    /// note; no-op if stale). Chat history is untouched.
-    pub fn index_clear(&self, generation: u64) -> AppResult<()> {
-        let _background_task =
-            background_task::scoped(&self.background_tasks, "Reflect index clear");
-        if self.index.clear(generation)? == Applied::Committed {
-            self.emit_index_written();
-        }
-        Ok(())
-    }
-
-    /// Command: upsert one chat message and its conversation row (no-op if
-    /// stale). A turn detached by a graph switch must not land in the new
-    /// graph's history.
-    pub fn chat_message_save(
-        &self,
-        conversation: ChatConversation,
-        message: ChatMessageRow,
-        generation: u64,
-    ) -> AppResult<()> {
-        let _background_task = background_task::scoped(&self.background_tasks, "Reflect chat save");
-        self.index
-            .save_chat_message(generation, &conversation, &message)
-            .map(drop)
-    }
-
-    /// Command: delete a conversation and (via cascade) its messages (no-op if
-    /// stale).
-    pub fn chat_conversation_delete(&self, id: String, generation: u64) -> AppResult<()> {
-        let _background_task =
-            background_task::scoped(&self.background_tasks, "Reflect chat delete");
-        self.index
-            .delete_chat_conversation(generation, &id)
-            .map(drop)
-    }
-
-    /// Command: replace a note's embedding chunk set (no-op if stale).
-    pub fn embed_apply(
-        &self,
-        path: String,
-        chunks: Vec<EmbeddedChunk>,
-        generation: u64,
-    ) -> AppResult<()> {
-        let _background_task =
-            background_task::scoped(&self.background_tasks, "Reflect embeddings update");
-        self.index
-            .apply_embeddings(generation, &path, &chunks)
-            .map(drop)
-    }
-
-    /// Command: drop a deleted note's chunks + vectors (no-op if stale).
-    pub fn embed_remove(&self, path: String, generation: u64) -> AppResult<()> {
-        let _background_task =
-            background_task::scoped(&self.background_tasks, "Reflect embeddings remove");
-        self.index.remove_embeddings(generation, &path).map(drop)
-    }
-
-    /// Command: execute a read query (compiled by Kysely on the frontend) and
-    /// return rows.
-    ///
-    /// Async on purpose: sync commands run on the main thread, which on iOS
-    /// also owns touch delivery — a long FTS scan there reads as a frozen app.
-    /// Runs on the session's read-only connection so it never holds the writer
-    /// lock a sync write command would block the main thread waiting for.
-    pub async fn db_query(
-        self: &Arc<Self>,
-        sql: String,
-        params: Vec<Value>,
-    ) -> AppResult<Vec<Map<String, Value>>> {
-        // Pin the index session before the hop: with no main-thread FIFO, a
-        // graph switch can rebind the index between invoke and execution, and a
-        // query issued for graph A must not return graph B's rows.
-        let requested = self.index.read_generation()?;
-        let core = Arc::clone(self);
-        self.spawn_blocking(move || core.index.query(requested, &sql, &params))
-            .await
     }
 }
 
@@ -292,7 +189,7 @@ mod tests {
     }
 
     #[test]
-    fn dispatch_opens_writes_and_queries_the_index() {
+    fn dispatch_opens_writes_and_reads_the_index() {
         let dir = tempfile::tempdir().unwrap();
         let host = Arc::new(RecordingHost::default());
         let core = Arc::new(Core::new(CoreConfig::default(), host.clone()).unwrap());
@@ -312,14 +209,17 @@ mod tests {
             assert_eq!(
                 *host.events.lock().unwrap(),
                 [(
-                    reflect_types::events::INDEX_WRITTEN.to_string(),
+                    reflect_types::events::EventName::IndexWritten
+                        .as_str()
+                        .to_string(),
                     Value::Null
                 )]
             );
-            let args = br#"{"sql":"select 1 as one","params":[]}"#;
             assert_eq!(
-                core.dispatch("db_query", args, b"{}", None).await.unwrap(),
-                Reply::Json(r#"[{"one":1}]"#.into())
+                core.dispatch("index_meta_get", br#"{"key":"k"}"#, b"{}", None)
+                    .await
+                    .unwrap(),
+                Reply::Json("null".into())
             );
         });
     }

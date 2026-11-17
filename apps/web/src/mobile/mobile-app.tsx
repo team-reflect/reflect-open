@@ -1,11 +1,13 @@
 import { useEffect, type ReactElement, type ReactNode } from 'react'
 import { MobileAudioMemoProvider } from '@/mobile/audio-memo-provider.tsx'
+import { AllSearchProvider } from '@/mobile/all-search.tsx'
 import { MobileDeepLinks } from '@/mobile/mobile-deep-links.tsx'
 import { AppErrorBoundary } from '@/components/app-error-boundary.tsx'
 import { MobileOnboardingScreen } from '@/mobile/onboarding-screen.tsx'
 import { PaywallDrawer } from '@/mobile/paywall-drawer.tsx'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { MobileShell } from '@/mobile/mobile-shell.tsx'
+import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import { MobileStatusLayer } from '@/mobile/status-layer.tsx'
 import { RecordingDrawer } from '@/mobile/recording-drawer.tsx'
 import { WhatsNewDrawer } from '@/mobile/whats-new-drawer.tsx'
@@ -55,10 +57,12 @@ function MobileRouter({
   graphRoot: string
   children: ReactNode
 }): ReactElement {
-  const initialRoute = useRestoredRoute(graphRoot)
+  const restored = useRestoredRoute(graphRoot)
   return (
-    <RouterProvider initialRoute={initialRoute}>
-      <MobileDeepLinks>{children}</MobileDeepLinks>
+    <RouterProvider initialRoute={restored?.route} initialSection={restored?.section}>
+      <AllSearchProvider>
+        <MobileDeepLinks>{children}</MobileDeepLinks>
+      </AllSearchProvider>
     </RouterProvider>
   )
 }
@@ -105,6 +109,7 @@ function MobileSurface(): ReactElement {
   const graph = useGraphInfo()
   const error = useGraphError()
   const needsOnboarding = useNeedsOnboarding()
+  const chromeRenderer = useChromeRenderer()
   useTaskCheckboxHaptics()
 
   // Flush-on-background (Plan 19, decision 6): iOS may suspend or kill the
@@ -118,7 +123,7 @@ function MobileSurface(): ReactElement {
 
   if (status === 'ready' && graph) {
     return (
-      <AppErrorBoundary>
+      <AppErrorBoundary besideFallback={<chromeRenderer.NoChrome />}>
         <MobileRouter key={graph.root} graphRoot={graph.root}>
           {/* Native recording over the shared capture pipeline — the
               mobile leg of desktop's audio memos. Mounted here so the
@@ -140,18 +145,26 @@ function MobileSurface(): ReactElement {
   // until the user chooses how to start (Plan 19, step 6). Checked before the
   // 'choosing' error branch — onboarding parks at 'choosing' deliberately.
   if (needsOnboarding) {
-    return <MobileOnboardingScreen />
+    return (
+      <>
+        <chromeRenderer.NoChrome />
+        <MobileOnboardingScreen />
+      </>
+    )
   }
 
   if (status === 'choosing') {
     return (
       <div className="flex h-dvh w-screen flex-col items-center justify-center gap-2 px-safe-offset-8 text-center">
+        <chromeRenderer.NoChrome />
         <p className="text-sm font-medium">Couldn’t open your notes</p>
         <p className="text-sm text-text-muted">{error ?? 'Unknown error'}</p>
       </div>
     )
   }
 
+  // No `NoChrome`: the shell's bars stay through the loading screen, so the
+  // shell's first paint has its final safe area.
   return <LoadingScreen />
 }
 

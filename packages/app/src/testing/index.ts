@@ -17,6 +17,11 @@ export {
   type TestOperationsService,
 } from './operations.ts'
 export { createTestOpenerService, type TestOpenerService } from './opener.ts'
+export {
+  createTestNativeChromeHost,
+  createTestNativeChromeService,
+  type TestNativeChromeHost,
+} from './native-chrome.ts'
 export { createTestAppHost, createTestAppServices, type TestAppServices } from './services.ts'
 export {
   createTestSystemPreferencesService,

@@ -46,15 +46,4 @@ describe('createAgentSkillService', () => {
     await expect(skill.install()).rejects.toThrow('No graph is open.')
     expect(ipc.calls()).toEqual([])
   })
-
-  it('rejects an unknown install state with a parse error', async () => {
-    const ipc = createTestIpcBridgeService({
-      commands: { skill_status: () => ({ ...STATUS, installState: 'weird' }) },
-    })
-    await expect(
-      createAgentSkillService({ ipc, graphSession: graphAt(1) }).status(),
-    ).rejects.toMatchObject({
-      kind: 'parse',
-    })
-  })
 })

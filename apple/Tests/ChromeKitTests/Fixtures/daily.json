@@ -1,0 +1,60 @@
+{
+  "type": "state",
+  "entryId": 7,
+  "chrome": "shell",
+  "routeKind": "today",
+  "tab": "daily",
+  "canBack": false,
+  "leading": [
+    {
+      "id": "settings",
+      "title": "Settings",
+      "icon": "gearshape"
+    }
+  ],
+  "trailing": [
+    {
+      "id": "today",
+      "title": "Today"
+    }
+  ],
+  "keyboardVisible": false,
+  "modal": false,
+  "toolbar": null,
+  "plus": {
+    "kind": "capture",
+    "audio": "idle"
+  },
+  "sidebar": {
+    "selection": "pinned:reflect-v2.md",
+    "pinned": [
+      {
+        "path": "reflect-v2.md",
+        "title": "Reflect V2"
+      }
+    ],
+    "graphName": "My Graph",
+    "graphColor": "#3b82f6",
+    "graphMenu": [
+      {
+        "type": "action",
+        "id": "graphs",
+        "title": "Switch graph…"
+      }
+    ]
+  },
+  "history": {
+    "back": true,
+    "forward": false
+  },
+  "title": {
+    "kind": "month",
+    "text": "November 2026",
+    "month": "2026-11"
+  },
+  "search": null,
+  "fullscreen": false,
+  "hidesTabBar": false,
+  "theme": "system",
+  "generation": 1
+}

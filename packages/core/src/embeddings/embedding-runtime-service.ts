@@ -1,3 +1,4 @@
+import type { EmbedProgress, EmbedStatus } from '@reflect/types'
 import { z } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
@@ -5,12 +6,14 @@ import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import { isDeepEqual } from '@ocavue/utils'
 
+export type { EmbedProgress, EmbedStatus } from '@reflect/types'
+
 /**
 
  * Byte counts for an active model download; absent until it starts.
 
  */
-export const embedProgressSchema = z.object({
+const embedProgressSchema: z.ZodType<EmbedProgress> = z.object({
   /**
    * Bytes fetched so far.
    */
@@ -20,9 +23,11 @@ export const embedProgressSchema = z.object({
    */
   total: z.number().int().nonnegative(),
 })
-export type EmbedProgress = z.infer<typeof embedProgressSchema>
 
-export const embedStatusSchema = z.discriminatedUnion('status', [
+/**
+ * Validates the `embed:status` event payload.
+ */
+const embedStatusSchema: z.ZodType<EmbedStatus> = z.discriminatedUnion('status', [
   z.object({ status: z.literal('uninitialized') }),
   z.object({
     status: z.literal('loading'),
@@ -32,9 +37,6 @@ export const embedStatusSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('failed'), message: z.string() }),
   z.object({ status: z.literal('unsupported') }),
 ])
-export type EmbedStatus = z.infer<typeof embedStatusSchema>
-
-const vectorsSchema = z.array(z.array(z.number()))
 
 /**
  * The local embedding model (Plan 09): download, load, status, and text
@@ -103,11 +105,11 @@ class EmbeddingRuntimeServiceImpl implements EmbeddingRuntimeService {
   }
 
   async status(): Promise<EmbedStatus> {
-    return this.#observe(await this.#deps.ipc.call('embed_status', {}, embedStatusSchema))
+    return this.#observe(await this.#deps.ipc.call('embed_status', {}))
   }
 
   async ensure(): Promise<EmbedStatus> {
-    return this.#observe(await this.#deps.ipc.call('embed_ensure', {}, embedStatusSchema))
+    return this.#observe(await this.#deps.ipc.call('embed_ensure', {}))
   }
 
   async awaitTerminalStatus(initial: EmbedStatus): Promise<EmbedStatus> {
@@ -150,7 +152,7 @@ class EmbeddingRuntimeServiceImpl implements EmbeddingRuntimeService {
   }
 
   embedTexts(texts: readonly string[]): Promise<number[][]> {
-    return this.#deps.ipc.call('embed_texts', { texts: [...texts] }, vectorsSchema)
+    return this.#deps.ipc.call('embed_texts', { texts: [...texts] })
   }
 
   readonly get = this.#status.get

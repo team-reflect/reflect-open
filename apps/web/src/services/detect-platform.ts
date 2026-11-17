@@ -105,7 +105,10 @@ export function detectPlatformFacts(hostKind: HostKind): PlatformFacts {
     navigator.userAgent.includes('Macintosh') &&
     navigator.maxTouchPoints === 0
 
-  const appPlatform = devPlatformOverride(env) ?? envPlatform(env)
+  // The Swift shell runs only on iPhone and iPad, so a dev server without a
+  // build target (`pnpm dev:ios`) serves it the iOS tree.
+  const appPlatform =
+    devPlatformOverride(env) ?? (env === '' && hostKind === 'swift' ? 'ios' : envPlatform(env))
   const mobile = appPlatform !== 'desktop'
 
   return {

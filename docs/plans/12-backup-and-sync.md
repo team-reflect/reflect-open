@@ -76,19 +76,23 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
   watcher and must not buy a push negotiation each time).
 - **Pull cadence:** on launch, on window resume (focus, visible, back online), on
   Back up now, and on a **non-fast-forward** push rejection: fetch → merge → push
-  again (bounded retries). While the window is visible, a desktop folder graph asks
+  again (bounded retries). While the window is visible, a folder graph asks
   the remote for its branch tip every 90 s (one ref advertisement, no fetch) and runs
   a full cycle only when the tip moved. For a graph in iCloud, see
   [icloud-sync.md](../icloud-sync.md).
 - **Hidden windows (iOS):** a debounced commit that has begun still pushes after the
   app is hidden. A pull's fetch and merge do not start or continue once it is hidden.
+  While hidden, the app never refreshes a token. Hiding the app commits and pushes
+  once with the stored token (no fetch). The push waits for the next resume when the
+  token expires within a minute or another device got ahead. iCloud and local-history
+  graphs only commit.
   Auth, push-protection, and size failures surface immediately — only divergence retries.
 - **Merge, not rebase.** Single branch; merge commits are fine — history is invisible
   product-wise, and rewriting published history breaks multi-device.
 - **Checkpoints = commits.** Plan 10's "checkpoint before AI patch apply" becomes
   "commit dirty files first" — one recovery mechanism; any version recoverable from
   local or remote history.
-- **Mobile (iOS target): foreground-only sync** first wave.
+- **Mobile (iOS target): foreground-only sync** first wave, plus the one push on hide above.
 
 ## Steps
 

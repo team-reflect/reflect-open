@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   seedNotes,
   type TestDatabaseService,
   type TestNote,
@@ -18,7 +18,7 @@ function setup(notes: readonly TestNote[]): {
   database: TestDatabaseService
   search: SearchService
 } {
-  const database = createNodeTestDatabaseService()
+  const database = createTestDatabaseService()
   seedNotes(database, notes)
   const wikiResolver = createWikiResolverService({ database })
   return { database, search: createSearchService({ database, wikiResolver }) }
@@ -283,7 +283,7 @@ describe('searchWithFilters', () => {
     const hits = await search.searchWithFilters(parsed)
 
     expect(hits.map((hit) => hit.path)).toEqual(['notes/hub-2.md'])
-    expect(database.getQueries()).toHaveLength(1)
+    expect(database.getReads().map((read) => read.command)).toEqual(['index_search'])
   })
 
   it('filters by a picker-exact link source without resolving titles', async () => {
@@ -294,7 +294,7 @@ describe('searchWithFilters', () => {
     const hits = await search.searchWithFilters(parsed)
 
     expect(hits.map((hit) => hit.path).toSorted()).toEqual(['notes/alpha-1.md', 'notes/beta.md'])
-    expect(database.getQueries()).toHaveLength(1)
+    expect(database.getReads().map((read) => read.command)).toEqual(['index_search'])
   })
 
   it('lets an exact path win over a title target (duplicate titles cannot retarget)', async () => {
@@ -305,7 +305,7 @@ describe('searchWithFilters', () => {
     const hits = await search.searchWithFilters(parsed)
 
     expect(hits.map((hit) => hit.path)).toEqual(['notes/hub-2.md'])
-    expect(database.getQueries()).toHaveLength(1)
+    expect(database.getReads().map((read) => read.command)).toEqual(['index_search'])
   })
 
   it('applies picker-exact link targets on the tag-first recall path', async () => {

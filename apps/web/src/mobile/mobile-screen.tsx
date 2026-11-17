@@ -42,6 +42,11 @@ interface MobileScreenProps {
   /** The All tab's badge filters (owned by the shell — survive navigation). */
   allFilters: AllNotesFilters
   onAllFiltersChange: (filters: AllNotesFilters) => void
+  /**
+   * The Tasks tab's search text (owned by the shell — survives navigation).
+   */
+  tasksQuery: string
+  onTasksQueryChange: (query: string) => void
 }
 
 /**
@@ -58,6 +63,8 @@ export function MobileScreen({
   onAllQueryChange,
   allFilters,
   onAllFiltersChange,
+  tasksQuery,
+  onTasksQueryChange,
 }: MobileScreenProps): ReactElement {
   const today = useToday()
 
@@ -78,29 +85,19 @@ export function MobileScreen({
           onFiltersChange={onAllFiltersChange}
         />
       )
-    case 'search':
-      // Mobile has no dedicated search surface: a search entry (shared
-      // history shapes with desktop) renders as the All tab; the shell seeds
-      // the live query from the entry.
-      return (
-        <MobileAllNotes
-          query={allQuery}
-          onQueryChange={onAllQueryChange}
-          tag={null}
-          filters={allFilters}
-          onFiltersChange={onAllFiltersChange}
-        />
-      )
     case 'tasks':
-      return <MobileTasks key="tasks" />
+      return <MobileTasks key="tasks" query={tasksQuery} onQueryChange={onTasksQueryChange} />
     case 'chat':
       return <MobileChat key="chat" />
     case 'settings':
-      return <MobileSettings key="settings" />
-    case 'graphs':
-      return <MobileGraphs key="graphs" />
-    case 'licenses':
-      return <MobileLicenses key="licenses" />
+      switch (route.page) {
+        case 'main':
+          return <MobileSettings key="settings" />
+        case 'graphs':
+          return <MobileGraphs key="graphs" />
+        case 'licenses':
+          return <MobileLicenses key="licenses" />
+      }
     default:
       return <MobileDaily key="daily" date={today} />
   }

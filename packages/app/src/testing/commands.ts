@@ -81,7 +81,7 @@ export interface TestNativeMenuServiceOptions {
   /**
    * Defaults to an empty registry.
    */
-  commands?: CommandService
+  commands?: CommandService<string>
   /**
    * Defaults to a focused main window.
    */
@@ -97,7 +97,7 @@ export interface TestNativeMenuServiceOptions {
   logger?: LoggerService
 }
 
-export interface TestNativeMenuService extends NativeMenuService {
+export interface TestNativeMenuService extends NativeMenuService<string> {
   /**
    * The host the service builds its menus on.
    */
@@ -107,15 +107,15 @@ export interface TestNativeMenuService extends NativeMenuService {
 class TestNativeMenuServiceImpl implements TestNativeMenuService {
   readonly host: TestNativeMenuHost
   readonly dispatchCommand: (commandId: string) => void
-  readonly #inner: NativeMenuService
+  readonly #inner: NativeMenuService<string>
 
-  constructor(host: TestNativeMenuHost, inner: NativeMenuService) {
+  constructor(host: TestNativeMenuHost, inner: NativeMenuService<string>) {
     this.host = host
     this.#inner = inner
     this.dispatchCommand = inner.dispatchCommand
   }
 
-  install(layout: readonly AppSubmenuLayout[]): Promise<void> {
+  install(layout: readonly AppSubmenuLayout<string>[]): Promise<void> {
     return this.#inner.install(layout)
   }
 
@@ -123,7 +123,7 @@ class TestNativeMenuServiceImpl implements TestNativeMenuService {
     return this.#inner.isInstalled()
   }
 
-  setCommandDispatch(dispatch: MenuCommandDispatch | null): void {
+  setCommandDispatch(dispatch: MenuCommandDispatch<string> | null): void {
     this.#inner.setCommandDispatch(dispatch)
   }
 

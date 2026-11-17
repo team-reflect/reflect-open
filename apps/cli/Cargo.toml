@@ -15,14 +15,15 @@ path = "src/main.rs"
 rusqlite = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+reflect-index = { workspace = true }
 reflect-index-schema = { workspace = true }
+reflect-types = { workspace = true }
 reflect-graph-paths = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 jiff = { workspace = true, features = ["default"] }
 sha2 = { workspace = true }
 pulldown-cmark = { workspace = true }
 saphyr = { workspace = true }
-unicode-normalization = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

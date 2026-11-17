@@ -24,13 +24,20 @@ Cascade layer order, low to high priority.
 /* `tailwindcss-safe-area` knows neither the software keyboard nor the tab bar.
    These clear the home indicator, or the keyboard while it is up
    (`--keyboard-height`, mobile/use-keyboard.ts), or the tab bar
-   (`--mobile-tab-bar-height`, mobile/mobile-tab-bar.tsx). */
+   (`--mobile-tab-bar-height`, mobile/chrome/web/web-chrome-renderer.tsx). */
 @utility pb-above-keyboard {
   padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--keyboard-height, 0px));
 }
-@utility bottom-above-keyboard-offset-* {
-  bottom: calc(
-    max(env(safe-area-inset-bottom, 0px), var(--keyboard-height, 0px)) + var(--spacing) *
+/* The chrome renderer of the shell (mobile/chrome/) sets the bottom safe
+   area the page must clear itself (`--chrome-safe-bottom`). Edge-to-edge
+   content clears it, and, with `-unless-keyboard`, only while the keyboard is
+   down: the shell root then already ends at the keyboard's top. */
+@utility pb-chrome-safe-offset-* {
+  padding-bottom: calc(var(--chrome-safe-bottom, 0px) + var(--spacing) * --value(integer));
+}
+@utility pb-chrome-safe-unless-keyboard-offset-* {
+  padding-bottom: calc(
+    max(var(--chrome-safe-bottom, 0px) - var(--keyboard-height, 0px), 0px) + var(--spacing) *
       --value(integer)
   );
 }
@@ -38,6 +45,16 @@ Cascade layer order, low to high priority.
   bottom: calc(
     var(--mobile-tab-bar-height, env(safe-area-inset-bottom, 0px)) + var(--spacing) *
       --value(integer)
+  );
+}
+
+/* The iOS shell's native chrome sets how far the iPadOS window controls reach
+   into the top row (`--window-controls-width`,
+   mobile/chrome/native/native-chrome-renderer.tsx). */
+@utility left-window-controls-offset-* {
+  left: calc(
+    var(--twsa-safe-area-inset-left) + var(--spacing) * --value(integer) +
+      var(--window-controls-width, 0px)
   );
 }
 
@@ -274,22 +291,47 @@ body {
     touch-action: manipulation;
   }
 
-  /* Stacked mobile screens pan only vertically, so a horizontal drag reaches
-     the back pager only through its edge strip. The rule has zero
-     specificity, so any touch-* utility still wins. Horizontal scrollers
-     (`data-scroll-x`, also set by meowdown) and everything inside them opt
-     back in; the scrollers keep their own overscroll. */
-  :where(.mobile-pager-content, .mobile-pager-content *) {
+  /* A horizontal drag that starts on the background of a stacked mobile
+     screen chains to the back pager (mobile-stack.tsx). Controls and the
+     editor pan only vertically, unless marked `data-back-swipe="on"` (a row
+     that acts on a tap). The browser intersects `touch-action` with every
+     ancestor up to the nearest scroll container, so their descendants follow
+     without a rule of their own. A horizontal scroller (`data-scroll-x`, also
+     set by meowdown) owns every horizontal drag inside it, so nothing in it
+     is protected, and `contain` keeps a drag past its end from reaching the
+     pager. The specificity beats the `manipulation` rule above, which allows
+     `pan-x`. */
+  .mobile-pager-content
+    :is(
+      [contenteditable='true'],
+      [contenteditable=''],
+      [contenteditable='plaintext-only'],
+      button,
+      a,
+      label,
+      input,
+      textarea,
+      select,
+      summary,
+      video,
+      audio,
+      [role='button'],
+      [role='link'],
+      [role='checkbox'],
+      [role='radio'],
+      [role='switch'],
+      [role='slider'],
+      [role='tab'],
+      [role='option'],
+      [role='menuitem'],
+      [role='combobox'],
+      [data-back-swipe='off']
+    ):not([data-back-swipe='on'], [data-scroll-x], [data-scroll-x] *) {
     touch-action: pan-y;
   }
 
-  :where(.mobile-pager-content) [data-scroll-x] {
-    touch-action: auto;
+  .mobile-pager-content [data-scroll-x] {
     overscroll-behavior-x: contain;
-  }
-
-  :where(.mobile-pager-content) [data-scroll-x] * {
-    touch-action: auto;
   }
 }
 
@@ -401,11 +443,12 @@ html:root {
   padding-inline: var(--editor-content-gutter, max(2rem, calc((100% - 42rem) / 2)));
 }
 
-/* Mobile note-body gutter. This mirrors `.reflect-content-gutter`'s cascade
-   role with a fixed phone-sized inset: the class must be un-layered so it beats
-   `.reflect-editor { padding: 0; }` on the contenteditable itself. */
+/* Mobile note-body gutter: 1rem past the safe area, which on iPad also covers
+   an overlapping sidebar. This mirrors `.reflect-content-gutter`'s cascade
+   role: the class must be un-layered so it beats `.reflect-editor { padding: 0; }`
+   on the contenteditable itself. */
 .reflect-mobile-content-gutter {
-  @apply px-safe-or-4;
+  @apply px-safe-offset-4;
 }
 
 /* Heading weight and spacing override meowdown's `.ProseMirror h*` theme

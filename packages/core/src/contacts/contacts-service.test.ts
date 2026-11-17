@@ -124,7 +124,7 @@ describe('createContactsService', () => {
     const ipc = createTestIpcBridgeService({
       commands: {
         contacts_lookup_by_email: () => [ADA],
-        contacts_lookup_by_name: () => [{ ...ADA, phones: 'odd' }],
+        contacts_lookup_by_name: () => [ADA],
       },
     })
     const contacts = createContactsService({ ipc, logger: createTestLoggerService() })

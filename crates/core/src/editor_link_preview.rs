@@ -3,9 +3,8 @@
 use std::io::Cursor;
 
 use base64::Engine;
-use serde::Serialize;
 
-use reflect_types::{AppError, AppResult};
+use reflect_types::{AppError, AppResult, LinkPreviewHtml};
 
 use crate::Core;
 use crate::web_fetch::{fetch_public_html, fetch_public_image};
@@ -14,13 +13,6 @@ const ICON_FETCH_MAX_BYTES: usize = 512 * 1024;
 const ICON_MAX_DIMENSION: u32 = 1024;
 const ICON_MAX_ALLOC: u64 = 16 * 1024 * 1024;
 const ICON_TARGET_DIMENSION: u32 = 32;
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LinkPreviewHtml {
-    html: String,
-    final_url: String,
-}
 
 impl Core {
     /// Fetch editor link-preview HTML from public internet destinations only.

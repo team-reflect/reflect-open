@@ -1,7 +1,7 @@
 import { useCallback, type ReactElement } from 'react'
 import { useToday } from '@/lib/use-today.ts'
 import { CalendarStrip } from '@/mobile/calendar-strip.tsx'
-import { DailyCaptureMenu } from '@/mobile/daily-capture-menu.tsx'
+import { useDailyCapture } from '@/mobile/daily-capture-menu.tsx'
 import { DayCarousel } from '@/mobile/day-carousel.tsx'
 import { useDailyArrivals } from '@/mobile/use-daily-arrivals.ts'
 import { useSwipeTarget } from '@/mobile/use-swipe-target.ts'
@@ -22,7 +22,7 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
   const { entryId, arrivalSeq, arrivalFocusEditor } = useRouterState()
   const { navigate } = useRouterActions()
   // One live `today` for the whole surface: the strip marks today's cell and
-  // the `select` below decide "is this today?" from the *same* value, so they
+  // `goTo` below decide "is this today?" from the *same* value, so they
   // can't disagree across the midnight rollover (which would otherwise route a
   // tap on the highlighted today cell to a frozen `daily` date). Selecting
   // today routes to the live `today` route, keeping the spine rolling over.
@@ -36,9 +36,12 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
   // its rolling month title) follows it while the carousel still moves,
   // instead of waiting for the settle-time route change.
   const { targetDate, followSwipeTarget } = useSwipeTarget(navigationKey)
-  const select = useCallback(
-    (day: string): void => {
-      navigate(day === today ? { kind: 'today' } : { kind: 'daily', date: day })
+  // A strip tap is a jump and pushes a history entry. A swipe steps one day
+  // and swaps the entry, so Back leaves the stream instead of walking every
+  // day passed.
+  const goTo = useCallback(
+    (day: string, replace: boolean): void => {
+      navigate(day === today ? { kind: 'today' } : { kind: 'daily', date: day }, { replace })
     },
     [navigate, today],
   )
@@ -48,6 +51,7 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
   // surface, and a capture arrival focuses the day's editor; the arrival
   // bookkeeping (including a focus request racing this surface's remount)
   // lives in use-daily-arrivals.ts.
+  const capture = useDailyCapture()
   const { resetSeq, focusDate, consumeFocus } = useDailyArrivals({
     arrivalSeq,
     arrivalFocusEditor,
@@ -55,12 +59,13 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
   })
 
   return (
-    <div className="flex h-full w-screen flex-col">
+    <div className="flex h-full w-full flex-col pt-safe">
       <CalendarStrip
         date={targetDate ?? date}
         today={today}
         resetSeq={resetSeq}
-        onSelect={select}
+        onSelect={(day) => goTo(day, false)}
+        plus={capture.plus}
       />
       <DayCarousel
         date={date}
@@ -69,10 +74,10 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
         navigationKey={navigationKey}
         focusDate={focusDate}
         onFocusConsumed={consumeFocus}
-        onSelect={select}
+        onSelect={(day) => goTo(day, true)}
         onTarget={followSwipeTarget}
       />
-      <DailyCaptureMenu />
+      {capture.sheet}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import Foundation
 import RecordingKit
+import TypesShared
 import WebHostKit
 
 /// The `plugin:recording` commands and events: the shell's face of
@@ -42,70 +43,55 @@ final class RecordingCapability {
     engine.queueAction("recordAudio")
   }
 
-  var commands: [String: ShellCommand] {
+  var commands: [ShellCommandName: ShellCommand] {
     [
-      "plugin:recording|start_recording": { [engine] request in
-        struct Args: Decodable {
-          struct Request: Decodable {
-            var segmentMs: Double
-            var reminderMs: Double
-          }
-          var request: Request
-        }
-        guard let args = request.decodeArgs(Args.self)?.request else {
+      .recordingStart: { [engine] request in
+        guard let args = request.decodeArgs(RecordingStartArgs.self)?.request else {
           return .error(
-            kind: "parse", message: "start_recording takes {request: {segmentMs, reminderMs}}")
+            .parse(.init(message: "start_recording takes {request: {segmentMs, reminderMs}}")))
         }
         return await Self.reply {
           engine.start(segmentMs: args.segmentMs, reminderMs: args.reminderMs, completion: $0)
         }
       },
-      "plugin:recording|stop_recording": { [engine] _ in
+      .recordingStop: { [engine] _ in
         await Self.reply { engine.stop(completion: $0) }
       },
-      "plugin:recording|cancel_recording": { [engine] _ in
-        let result = await withCheckedContinuation {
-          engine.cancel(completion: $0.resume(returning:))
+      .recordingCancel: { [engine] _ in
+        let result = await withCheckedContinuation { continuation in
+          engine.cancel { result in continuation.resume(returning: result) }
         }
         if case .failure(let error) = result {
-          return .error(kind: "io", message: error.message)
+          return .error(.io(.init(message: error.message)))
         }
         return .null
       },
-      "plugin:recording|recording_status": { [engine] _ in .value(engine.status()) },
-      "plugin:recording|list_staged": { [engine] _ in
+      .recordingStatus: { [engine] _ in .value(engine.status()) },
+      .recordingListStaged: { [engine] _ in
         do {
-          return .value(ListStagedResponse(files: try engine.listStaged()))
+          return .value(StagedRecordingList(files: try engine.listStaged()))
         } catch {
           return .error(
-            kind: "io",
-            message: "listing staged recordings failed: \(error.localizedDescription)")
+            .io(.init(message: "listing staged recordings failed: \(error.localizedDescription)")))
         }
       },
-      "plugin:recording|delete_staged": { [engine] request in
-        struct Args: Decodable {
-          struct Request: Decodable {
-            var path: String
-          }
-          var request: Request
-        }
-        guard let path = request.decodeArgs(Args.self)?.request.path else {
-          return .error(kind: "parse", message: "delete_staged takes {request: {path}}")
+      .recordingDeleteStaged: { [engine] request in
+        guard let path = request.decodeArgs(RecordingDeleteStagedArgs.self)?.request.path else {
+          return .error(.parse(.init(message: "delete_staged takes {request: {path}}")))
         }
         do {
           try engine.deleteStaged(path: path)
           return .null
         } catch {
           return .error(
-            kind: "io",
-            message: "deleting staged recording failed: \(error.localizedDescription)")
+            .io(.init(message: "deleting staged recording failed: \(error.localizedDescription)")))
         }
       },
-      "plugin:recording|actions_ready": { [engine] _ in
+      .recordingActionsReady: { [engine] _ in
         engine.actionsReady()
         return .null
       },
-      "plugin:recording|action_performed": { [engine] _ in
+      .recordingActionPerformed: { [engine] _ in
         engine.actionPerformed()
         return .null
       },
@@ -113,7 +99,7 @@ final class RecordingCapability {
   }
 
   /// Runs an engine call that ends with a completion, and answers its result.
-  private static func reply<Response: Encodable>(
+  private static func reply<Response: Encodable & Sendable>(
     _ call: (@escaping (Result<Response, RecordingError>) -> Void) -> Void
   ) async -> CoreReply {
     let result = await withCheckedContinuation { continuation in
@@ -121,7 +107,7 @@ final class RecordingCapability {
     }
     switch result {
     case .success(let response): return .value(response)
-    case .failure(let error): return .error(kind: "io", message: error.message)
+    case .failure(let error): return .error(.io(.init(message: error.message)))
     }
   }
 }

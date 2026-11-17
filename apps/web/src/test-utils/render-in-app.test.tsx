@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
-import { createTestCoreServices } from '@reflect/core/testing'
+import { createTestDatabaseService, createTestCoreServices } from '@reflect/core/testing'
 import {
   useGraphIndexing,
   useGraphInfo,
@@ -14,7 +14,6 @@ import { useDateFormat, useSettingsService } from '@/providers/settings-provider
 import { useGitSyncState } from '@/providers/sync-provider.tsx'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { useGraphServices } from '@/services/services-provider.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MOBILE_PLATFORM, renderHookInApp, renderInApp } from './render-in-app.tsx'
 
 function Probe(): ReactElement {
@@ -93,8 +92,12 @@ describe('renderInApp', () => {
   })
 
   it('starts on the given route and records navigation in the navigation service', async () => {
-    const { appServices } = await renderInApp(<Probe />, { route: { kind: 'settings' } })
-    await expect.element(page.getByTestId('route')).toHaveTextContent('{"kind":"settings"}')
+    const { appServices } = await renderInApp(<Probe />, {
+      route: { kind: 'settings', page: 'main' },
+    })
+    await expect
+      .element(page.getByTestId('route'))
+      .toHaveTextContent('{"kind":"settings","page":"main"}')
 
     await page.getByRole('button', { name: 'tasks' }).click()
 
@@ -125,7 +128,7 @@ describe('renderInApp', () => {
   })
 
   it('uses the given core services, so a test can spy on a service before the first render', async () => {
-    const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+    const core = createTestCoreServices({ database: createTestDatabaseService() })
     const view = await renderInApp(<Probe />, { core })
 
     expect(view.core).toBe(core)

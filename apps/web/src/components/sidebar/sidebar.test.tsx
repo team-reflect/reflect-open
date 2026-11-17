@@ -1,3 +1,4 @@
+import type { PinnedNoteRow } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import type { ReactNode } from 'react'
 import { page, userEvent } from 'vitest/browser'
@@ -8,7 +9,6 @@ import {
   type AiProviderConfig,
   type GraphSessionService,
   type NoteDocumentService,
-  type PinnedNote,
   type SettingsService,
 } from '@reflect/core'
 import {
@@ -18,22 +18,25 @@ import {
   type Route,
 } from '@reflect/app'
 import {
-  createTestAppServices,
   createTestOperationsService,
   createTestWindowService,
   type TestOpenerService,
   type TestOperationsService,
 } from '@reflect/app/testing'
-import { createTestCoreServices, createTestGitSyncService } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  createTestGitSyncService,
+} from '@reflect/core/testing'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { AudioMemoProvider } from '@/providers/audio-memo-provider.tsx'
 import { SidebarProvider } from '@/providers/sidebar-provider.tsx'
 import { UpdateProvider } from '@/providers/update-provider.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { Sidebar } from './sidebar.tsx'
 import { noop, returnNull } from '@ocavue/utils'
+import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
 const openNativeContextMenu = vi.fn((options: NativeContextMenuOptions) => {
   return Promise.try(() => {
@@ -54,7 +57,7 @@ const OPENAI: AiProviderConfig = {
 }
 
 // What the app's fakes answer; each test sets them before `renderSidebar`.
-const getPinnedNotes = vi.fn<() => Promise<PinnedNote[]>>()
+const getPinnedNotes = vi.fn<() => Promise<PinnedNoteRow[]>>()
 const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
 const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
 let aiProviders: AiProviderConfig[]
@@ -67,7 +70,7 @@ let operations: TestOperationsService
  */
 function untitledNotePath(): string {
   return createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
   }).noteCreation.untitledNotePath()
 }
 
@@ -90,7 +93,7 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
   const readSource = (): Promise<string> => Promise.resolve('# Rust\n')
   operations = createTestOperationsService()
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     progress: operations,
     noteDocuments: {
       readSource,
@@ -101,7 +104,7 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
     },
     gitSync: createTestGitSyncService({ state: { phase: 'disconnected' } }),
   })
-  const appLayer = createTestAppServices(core, {
+  const appLayer = createWebTestAppServices(core, {
     window: createTestWindowService({ openNoteWindow }),
   })
   const context: CommandContext = {
@@ -110,6 +113,7 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
     navigate,
     route: () => ({ kind: 'today' }),
     notePath: returnNull,
+    selectSection: (section, options) => appLayer.navigation.selectSection(section, options),
     back: vi.fn(),
     forward: vi.fn(),
     clearScrollState: vi.fn(),
@@ -155,7 +159,7 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
       aiProviders,
       defaultAiProviderId: aiProviders[0]?.id ?? null,
     },
-    ...(initialRoute === undefined ? {} : { route: initialRoute }),
+    route: initialRoute,
     wrapper: (children: ReactNode) => (
       <div style={{ width: 260, height: 560 }}>
         <UpdateProvider autoCheck={false}>
@@ -166,41 +170,57 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
       </div>
     ),
   })
-  return { view, navigate, openPalette, context, core }
+  return { view, navigate, openPalette, context, core, navigation: appLayer.navigation }
 }
 
 describe('Sidebar', () => {
-  it('nav rows navigate, with Daily notes always re-anchoring to today', async () => {
-    const { view, navigate } = await renderSidebar(undefined, { kind: 'settings' })
+  it('section rows return to where their section was left, and light for it', async () => {
+    const { view, navigate, navigation } = await renderSidebar(undefined, { kind: 'tasks' })
+    const tasks = view.getByRole('button', { name: /tasks/i })
 
-    // The Daily row shares the ⌘D capture command: omitting
-    // `restoreSurfaceScroll` makes even an off-surface return discard the
-    // stream's saved position and re-anchor on today.
+    navigation.navigate({ kind: 'note', path: 'notes/meeting.md' })
+    await expect.element(tasks).toHaveAttribute('aria-current', 'page')
+
+    // Off the stream, Daily notes returns to its last day without focus.
+    await view.getByRole('button', { name: /daily notes/i }).click()
+    await vi.waitFor(() => expect(navigation.get().route).toEqual({ kind: 'today' }))
+    expect(navigate).not.toHaveBeenCalled()
+
+    await tasks.click()
+    await vi.waitFor(() => {
+      expect(navigation.get().route).toEqual({ kind: 'note', path: 'notes/meeting.md' })
+    })
+    await expect.element(tasks).toHaveAttribute('aria-current', 'page')
+
+    await view.getByRole('button', { name: /all notes/i }).click()
+    await vi.waitFor(() => {
+      expect(navigation.get().route).toEqual({ kind: 'allNotes', tag: null })
+    })
+
+    await view.getByRole('button', { name: /settings/i }).click()
+    await vi.waitFor(() => {
+      return expect(navigate).toHaveBeenCalledWith({ kind: 'settings', page: 'main' })
+    })
+
+    await view.getByRole('button', { name: /chat/i }).click()
+    await vi.waitFor(() => {
+      return expect(navigate).toHaveBeenCalledWith({ kind: 'chat', conversationId: null })
+    })
+  })
+
+  it('Daily notes on the stream re-anchors to today with focus', async () => {
+    const { view, navigate } = await renderSidebar(undefined, { kind: 'daily', date: '2026-01-02' })
+
     await view.getByRole('button', { name: /daily notes/i }).click()
     await vi.waitFor(() => {
       expect(navigate).toHaveBeenCalledWith({ kind: 'today' }, { focusEditor: true })
     })
-
-    await view.getByRole('button', { name: /settings/i }).click()
-    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'settings' }))
-
-    await view.getByRole('button', { name: /chat/i }).click()
-    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'chat' }))
   })
 
-  it('New note runs its command and shows active while the placeholder note is open', async () => {
-    // The route a ⌘N/new-note click lands on: a fresh ULID placeholder path.
-    const { view, navigate } = await renderSidebar(undefined, {
-      kind: 'note',
-      path: untitledNotePath(),
-    })
-    const newNote = view.getByRole('button', { name: /new note/i })
+  it('the compose button runs the new-note command', async () => {
+    const { view, navigate } = await renderSidebar()
 
-    // Active like every other row whose route is current — until the birth
-    // rename moves the note onto a title slug.
-    await expect.element(newNote).toHaveAttribute('aria-current', 'page')
-
-    await newNote.click()
+    await view.getByRole('button', { name: 'New note' }).click()
     await vi.waitFor(() => {
       expect(navigate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -211,30 +231,20 @@ describe('Sidebar', () => {
     })
   })
 
-  it('New note is inactive on slug-named note routes', async () => {
-    const { view } = await renderSidebar(undefined, { kind: 'note', path: 'notes/meeting.md' })
-    await expect
-      .element(view.getByRole('button', { name: /new note/i }))
-      .not.toHaveAttribute('aria-current')
-  })
-
-  it('All notes stays active while editing a slug-named note', async () => {
-    const { view } = await renderSidebar(undefined, { kind: 'note', path: 'notes/meeting.md' })
+  it('All notes stays active while editing a note opened from it', async () => {
+    const { view, navigation } = await renderSidebar(undefined, { kind: 'allNotes', tag: null })
+    navigation.navigate({ kind: 'note', path: 'notes/meeting.md' })
     await expect
       .element(view.getByRole('button', { name: /all notes/i }))
       .toHaveAttribute('aria-current', 'page')
   })
 
-  it('only "New note" — not "All notes" — lights for the untitled placeholder', async () => {
-    // A brand-new note is still an untitled placeholder, so the two rows must
-    // never light at once.
-    const { view } = await renderSidebar(undefined, { kind: 'note', path: untitledNotePath() })
+  it('a fresh untitled note lights the section it was created from', async () => {
+    const { view, navigation } = await renderSidebar(undefined, { kind: 'today' })
+    navigation.navigate({ kind: 'note', path: untitledNotePath() })
     await expect
-      .element(view.getByRole('button', { name: /new note/i }))
+      .element(view.getByRole('button', { name: /daily notes/i }))
       .toHaveAttribute('aria-current', 'page')
-    await expect
-      .element(view.getByRole('button', { name: /all notes/i }))
-      .not.toHaveAttribute('aria-current')
   })
 
   it('the search affordance opens the palette', async () => {
@@ -264,7 +274,7 @@ describe('Sidebar', () => {
 
   it('pinned notes render their own section', async () => {
     getPinnedNotes.mockResolvedValue([
-      { path: 'notes/roadmap.md', title: 'Roadmap', dailyDate: null },
+      { path: 'notes/roadmap.md', title: 'Roadmap', dailyDate: null, pinnedOrder: null },
     ])
     const { view } = await renderSidebar()
 
@@ -284,7 +294,7 @@ describe('Sidebar', () => {
 
   it('modifier-click opens a pinned note in a new window without changing routes', async () => {
     getPinnedNotes.mockResolvedValue([
-      { path: 'notes/roadmap.md', title: 'Roadmap', dailyDate: null },
+      { path: 'notes/roadmap.md', title: 'Roadmap', dailyDate: null, pinnedOrder: null },
     ])
     const { view } = await renderSidebar()
     const roadmap = view.getByRole('button', { name: 'Roadmap' })
@@ -305,7 +315,12 @@ describe('Sidebar', () => {
 
   it('renders wiki links in pinned note titles as display text', async () => {
     getPinnedNotes.mockResolvedValue([
-      { path: 'notes/meeting.md', title: 'Meeting with [[Ada Lovelace|Ada]]', dailyDate: null },
+      {
+        path: 'notes/meeting.md',
+        title: 'Meeting with [[Ada Lovelace|Ada]]',
+        dailyDate: null,
+        pinnedOrder: null,
+      },
     ])
     const { view } = await renderSidebar()
 
@@ -317,7 +332,7 @@ describe('Sidebar', () => {
 
   it('All notes is inactive while the active note is pinned', async () => {
     getPinnedNotes.mockResolvedValue([
-      { path: 'notes/roadmap.md', title: 'Roadmap', dailyDate: null },
+      { path: 'notes/roadmap.md', title: 'Roadmap', dailyDate: null, pinnedOrder: null },
     ])
     const { view } = await renderSidebar(undefined, { kind: 'note', path: 'notes/roadmap.md' })
 
@@ -336,7 +351,9 @@ describe('Sidebar', () => {
   })
 
   it('right-click unpins a pinned row through the native context menu', async () => {
-    getPinnedNotes.mockResolvedValue([{ path: 'notes/rust.md', title: 'Rust', dailyDate: null }])
+    getPinnedNotes.mockResolvedValue([
+      { path: 'notes/rust.md', title: 'Rust', dailyDate: null, pinnedOrder: null },
+    ])
     const { view } = await renderSidebar()
     const rust = view.getByRole('button', { name: 'Rust' })
 
@@ -357,7 +374,9 @@ describe('Sidebar', () => {
 
   it('restores an optimistically removed pinned row when unpin fails', async () => {
     commitNoteFrontmatter.mockRejectedValueOnce(new Error('disk failed'))
-    getPinnedNotes.mockResolvedValue([{ path: 'notes/rust.md', title: 'Rust', dailyDate: null }])
+    getPinnedNotes.mockResolvedValue([
+      { path: 'notes/rust.md', title: 'Rust', dailyDate: null, pinnedOrder: null },
+    ])
     const { view } = await renderSidebar()
     const rust = view.getByRole('button', { name: 'Rust' })
 
@@ -373,7 +392,9 @@ describe('Sidebar', () => {
   })
 
   it('history arrows walk the router stack and disable at its edges', async () => {
-    getPinnedNotes.mockResolvedValue([{ path: 'notes/rust.md', title: 'Rust', dailyDate: null }])
+    getPinnedNotes.mockResolvedValue([
+      { path: 'notes/rust.md', title: 'Rust', dailyDate: null, pinnedOrder: null },
+    ])
     const { view } = await renderSidebar()
     const backButton = view.getByRole('button', { name: 'Go back' })
     const forwardButton = view.getByRole('button', { name: 'Go forward' })
@@ -417,7 +438,9 @@ describe('Sidebar', () => {
     await view.getByRole('button', { name: /Notes/ }).click()
     await page.getByRole('menuitem', { name: 'Preferences' }).click()
 
-    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'settings' }))
+    await vi.waitFor(() => {
+      return expect(navigate).toHaveBeenCalledWith({ kind: 'settings', page: 'main' })
+    })
   })
 
   it('the graph menu offers the iOS app and browser extension in their stores', async () => {

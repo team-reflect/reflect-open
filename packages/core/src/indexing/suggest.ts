@@ -1,3 +1,4 @@
+import type { WikiAliasCandidate, WikiTitleCandidate } from '@reflect/types'
 /**
  * Pure ranking for `[[` autocomplete (Plan 07): merges title and alias matches
  * from the index into one ordered candidate list. The SQL layer
@@ -98,23 +99,6 @@ export function serializeWikiSuggestionAddress(
   return display === null ? target : `${target}|${display}`
 }
 
-/** One `notes` row considered for suggestion (a title match or recency fill). */
-export interface TitleCandidate {
-  path: string
-  title: string
-  titleKey: string
-  dailyDate: string | null
-  mtime: number
-  /** How many wiki links in the graph name a spelling this note claims. */
-  linkCount: number
-}
-
-/** One `aliases ⋈ notes` row (an alias match). */
-export interface AliasCandidate extends TitleCandidate {
-  alias: string
-  aliasKey: string
-}
-
 const WORD_CHARACTER_AT_END = /[\p{L}\p{N}]$/u
 
 /** Whether `key` occurs in `candidateKey` at the start of a word. */
@@ -174,7 +158,7 @@ interface Scored {
  * deliberately exact, not fold-based: an authored alias differing only by
  * case is a real display preference and keeps its promised text.
  */
-function toScored(row: TitleCandidate, matchedAlias: string | null, rank: number): Scored {
+function toScored(row: WikiTitleCandidate, matchedAlias: string | null, rank: number): Scored {
   const target = row.dailyDate ?? wikiLinkTargetForTitle(row.title)
   const alias = matchedAlias === target ? null : matchedAlias
   return {
@@ -195,8 +179,8 @@ function toScored(row: TitleCandidate, matchedAlias: string | null, rank: number
  */
 export function rankWikiSuggestions(
   key: string,
-  titles: TitleCandidate[],
-  aliases: AliasCandidate[],
+  titles: WikiTitleCandidate[],
+  aliases: WikiAliasCandidate[],
   limit: number,
 ): WikiSuggestion[] {
   const scored: Scored[] = [

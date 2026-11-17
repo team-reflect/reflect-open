@@ -11,8 +11,8 @@ use reflect_graph_paths::{eviction_placeholder, normalize_line_endings};
 
 use crate::error::CliError;
 use crate::frontmatter::{Frontmatter, parse_frontmatter, split_frontmatter};
-use crate::keys::fold_key;
 use crate::paths::date_from_daily_path;
+use reflect_index::text::keys::fold_key;
 
 /// A note's derived metadata, as the TS indexer would compute it.
 #[derive(Debug)]

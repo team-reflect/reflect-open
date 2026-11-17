@@ -1,11 +1,15 @@
+import type { NoteRow } from '@reflect/types'
 import { userEvent } from 'vitest/browser'
 import type { QueryClient } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
-import type { GistPublishService, NoteRow } from '@reflect/core'
-import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
+import type { GistPublishService } from '@reflect/core'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  type TestCoreServices,
+} from '@reflect/core/testing'
 import { queryKeys } from '@/lib/query-client.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NoteGistAction } from './note-gist-action.tsx'
 
 const GIST_URL = 'https://gist.github.com/alex/g1'
@@ -54,7 +58,7 @@ async function waitForReads(queryClient: QueryClient): Promise<void> {
 beforeEach(() => {
   connected = true
   row = null
-  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  core = createTestCoreServices({ database: createTestDatabaseService() })
   vi.spyOn(core.indexQuery, 'getNote').mockImplementation(() => Promise.resolve(row ?? undefined))
   publish = vi.spyOn(core.gistPublish, 'publish').mockResolvedValue({ url: GIST_URL, stale: false })
   unpublish = vi.spyOn(core.gistPublish, 'unpublish').mockResolvedValue({ url: null, stale: false })

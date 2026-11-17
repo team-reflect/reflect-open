@@ -1,0 +1,24 @@
+[package]
+name = "reflect-index-wasm"
+version = "0.0.0"
+description = "The graph index for browsers and tests: `reflect-index` behind wasm-bindgen, over an in-memory database."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+reflect-index = { workspace = true }
+reflect-index-schema = { workspace = true, features = ["default"] }
+reflect-types = { workspace = true, features = ["rusqlite"] }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+console_error_panic_hook = { workspace = true }
+js-sys = { workspace = true }
+wasm-bindgen = { workspace = true }

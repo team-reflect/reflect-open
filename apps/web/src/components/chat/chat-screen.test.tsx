@@ -11,6 +11,7 @@ import {
   type CloudGraphContext,
 } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestChatEngineService,
   createTestChatGraphContextService,
@@ -23,7 +24,6 @@ import {
 import { useChatActions, type ChatActions } from '@/providers/chat-provider.tsx'
 import { useRouterState } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { ChatScreen } from './chat-screen.tsx'
 import { deepLinkForRoute, type Route } from '@reflect/app'
 import { noop, sleep } from '@ocavue/utils'
@@ -138,7 +138,7 @@ async function renderChat() {
   probedSendRef.current = null
   probedRouteRef.current = null
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     secretStore: createTestSecretStoreService(
       settingsState.apiKey === null ? {} : { [aiKeySecretName(MODEL.id)]: settingsState.apiKey },
     ),

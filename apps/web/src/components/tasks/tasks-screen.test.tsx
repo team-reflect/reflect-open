@@ -2,6 +2,7 @@ import { createTestWindowService, type TestWindowService } from '@reflect/app/te
 import { userEvent, type Locator } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   makeOpenTask as task,
   type TestCoreServices,
@@ -14,7 +15,6 @@ import { fireEvent } from '@/test-utils/fire-event.ts'
 import { MOD_KEY } from '@/test-utils/mod-key.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { TasksScreen } from './tasks-screen.tsx'
 import { deepLinkForRoute } from '@reflect/app'
 
@@ -225,7 +225,7 @@ let noteWindows: TestWindowService
 
 beforeEach(() => {
   // A fresh app per test, so its task service's recently-completed set starts empty.
-  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  core = createTestCoreServices({ database: createTestDatabaseService() })
   noteWindows = createTestWindowService()
   operations = core.progress
   storage = core.storage

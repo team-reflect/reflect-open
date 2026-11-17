@@ -7,6 +7,7 @@ import {
   type TestOperationsService,
 } from '@reflect/app/testing'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestGraphSessionService,
   createTestLoggerService,
@@ -15,7 +16,6 @@ import {
 import type { MaybePromise } from '@reflect/utils'
 import { createRef, useLayoutEffect, type ReactNode, type RefObject } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useWikiLinkNavigation, type WikiLinkNavigation } from './use-wiki-link-navigation.ts'
 import { sleep } from '@ocavue/utils'
 
@@ -63,16 +63,16 @@ function RouteProbe(): ReactNode {
  * Render `ui` in an app whose link navigation runs on the scripted resolvers above.
  */
 function renderWithLinkNavigation(ui: ReactNode, graph?: TestOpenGraph | null) {
-  const base = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  const base = createTestCoreServices({ database: createTestDatabaseService() })
   const graphSession = createTestGraphSessionService()
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     progress: operations,
     graphSession,
   })
   const linkNavigation = createTestAppServices(
     createTestCoreServices({
-      database: createWasmTestDatabaseService(),
+      database: createTestDatabaseService(),
       graphSession,
       wikiResolver: { ...base.wikiResolver, resolveWikiTarget },
       noteLinkResolver: {
@@ -413,7 +413,7 @@ describe('useWikiLinkNavigation', () => {
 
     lastHandlerRef.current?.({ target: 'Target', openInNewWindow: false })
     await vi.waitFor(() => expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Target', 1))
-    navigateRef.current?.({ kind: 'settings' })
+    navigateRef.current?.({ kind: 'settings', page: 'main' })
     await vi.waitFor(() => expect(currentRoute(view)).toContain('"settings"'))
 
     pendingResolution.resolve({ kind: 'resolved', path: 'notes/target.md' })
@@ -432,7 +432,7 @@ describe('useWikiLinkNavigation', () => {
     await vi.waitFor(() => {
       expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Brand New', 7)
     })
-    navigateRef.current?.({ kind: 'settings' })
+    navigateRef.current?.({ kind: 'settings', page: 'main' })
     await vi.waitFor(() => expect(currentRoute(view)).toContain('"settings"'))
 
     pendingCreation.resolve({ kind: 'created', path: 'notes/created.md' })

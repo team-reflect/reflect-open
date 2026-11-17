@@ -1,4 +1,5 @@
 import AuthenticationServices
+import TypesShared
 import WebAuthKit
 import WebHostKit
 
@@ -12,35 +13,25 @@ final class WebAuthCapability {
     session = WebAuthSession(anchor: anchor)
   }
 
-  var commands: [String: ShellCommand] {
-    ["plugin:web-auth|start": { [self] request in await start(request) }]
+  var commands: [ShellCommandName: ShellCommand] {
+    [.webAuthStart: { [self] request in await start(request) }]
   }
 
   /// `start {payload: {url, callbackScheme, ephemeral}}`: opens `url` and
   /// answers `{url}` with the callback URL, or `{}` when the user cancels.
   private func start(_ request: ShellRequest) async -> CoreReply {
-    struct Args: Decodable {
-      struct Payload: Decodable {
-        var url: URL
-        var callbackScheme: String
-        var ephemeral: Bool
-      }
-      var payload: Payload
-    }
-    struct Response: Encodable {
-      var url: String?
-    }
-    guard let payload = request.decodeArgs(Args.self)?.payload else {
+    guard let payload = request.decodeArgs(WebAuthStartArgs.self)?.payload,
+      let url = URL(string: payload.url)
+    else {
       return .error(
-        kind: "parse", message: "web-auth start takes {payload: {url, callbackScheme, ephemeral}}")
+        .parse(.init(message: "web-auth start takes {payload: {url, callbackScheme, ephemeral}}")))
     }
     do {
       let callbackURL = try await session.start(
-        url: payload.url, callbackScheme: payload.callbackScheme, ephemeral: payload.ephemeral)
-      return .value(Response(url: callbackURL?.absoluteString))
+        url: url, callbackScheme: payload.callbackScheme, ephemeral: payload.ephemeral)
+      return .value(WebAuthCallback(url: callbackURL?.absoluteString))
     } catch {
-      return .error(
-        kind: "io", message: "web authentication failed: \(error.localizedDescription)")
+      return .error(.io(.init(message: "web authentication failed: \(error.localizedDescription)")))
     }
   }
 }

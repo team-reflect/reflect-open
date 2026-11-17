@@ -2,12 +2,9 @@ import type { ReactElement, ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { onTestFinished } from 'vitest'
 import { render, renderHook, type RenderHookResult, type RenderResult } from 'vitest-browser-react'
-import type { AppServices, MobileOnboardingState, Route } from '@reflect/app'
-import {
-  createTestAppServices,
-  createTestOperationsService,
-  type TestAppServices,
-} from '@reflect/app/testing'
+import type { MobileOnboardingState, Route } from '@reflect/app'
+import type { WebAppServices } from '@/lib/commands/types.ts'
+import { createTestOperationsService } from '@reflect/app/testing'
 import type {
   CoreServices,
   GitSyncState,
@@ -16,6 +13,7 @@ import type {
   Settings,
 } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestClockService,
   createTestCoreServices,
   createTestPlatformService,
@@ -32,10 +30,11 @@ import {
 } from '@reflect/core/testing'
 import { TooltipProvider } from '@/components/ui/tooltip.tsx'
 import { registerAppCommands } from '@/lib/commands/app-commands.ts'
+import { ChromeRendererProvider } from '@/mobile/chrome/chrome-renderer-provider.tsx'
 import { GraphProvider } from '@/providers/graph-provider.tsx'
 import { RouterProvider } from '@/routing/router.tsx'
 import { AppServicesProvider, CoreServicesProvider } from '@/services/services-provider.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { createWebTestAppServices, type WebTestAppServices } from '@/test-utils/app-services.ts'
 
 /**
  * The platform facts of the mobile app: pass as `platform` to render a mobile surface.
@@ -65,7 +64,7 @@ export interface RenderInAppOptions {
   /**
    * The stored settings document, loaded before the first render.
    */
-  settings?: Partial<Settings>
+  settings?: Partial<Settings> | undefined
   /**
    * Reported over the mobile onboarding state, e.g. `{ kind: 'icloud' }`.
    */
@@ -73,7 +72,7 @@ export interface RenderInAppOptions {
   /**
    * The route the router starts on; defaults to today. `null` mounts no router.
    */
-  route?: Route | null
+  route?: Route | null | undefined
   /**
    * Swap the backup service for a scripted one that starts in this state; the
    * result's `backup` drives it. Needs an open graph.
@@ -82,16 +81,16 @@ export interface RenderInAppOptions {
   /**
    * The facts of the test platform. Only without `core`; see {@link MOBILE_PLATFORM}.
    */
-  platform?: TestPlatformOptions
+  platform?: TestPlatformOptions | undefined
   /**
    * Defaults to a fresh client without retries, cleared when the test ends.
    */
-  queryClient?: QueryClient
+  queryClient?: QueryClient | undefined
   /**
    * Replaces fields of the app layer built over `core`, e.g. `{ update }` or a whole
    * `createTestAppServices(core)` a test must share with the render.
    */
-  appServices?: Partial<AppServices>
+  appServices?: Partial<WebAppServices> | undefined
   /**
    * Wraps `ui` inside every provider, for providers this helper does not mount.
    */
@@ -110,7 +109,7 @@ interface InAppHandles<Core extends CoreServices> {
   /**
    * The app layer built over `core`.
    */
-  readonly appServices: TestAppServices
+  readonly appServices: WebTestAppServices
   readonly queryClient: QueryClient
   /**
    * The scripted git sync service when `sync` was a `GitSyncState`, else `null`.
@@ -194,7 +193,7 @@ async function prepare(options: AnyOptions | undefined): Promise<
   let database: TestDatabaseService | null = null
   let core: CoreServices
   if (options?.core === undefined) {
-    database = createWasmTestDatabaseService()
+    database = createTestDatabaseService()
     core = createCore(database, sync, options?.platform)
   } else {
     core = options.core
@@ -229,7 +228,7 @@ async function prepare(options: AnyOptions | undefined): Promise<
 
   const queryClient =
     options?.queryClient ?? new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  const appLayer = createTestAppServices(core, options?.appServices)
+  const appLayer = createWebTestAppServices(core, options?.appServices)
   if (options?.mobile !== undefined) {
     if (!('setState' in appLayer.mobileOnboarding)) {
       throw new Error('renderInApp: `mobile` needs a test mobile onboarding service')
@@ -245,7 +244,9 @@ async function prepare(options: AnyOptions | undefined): Promise<
       return (
         <CoreServicesProvider services={core}>
           <AppServicesProvider services={appLayer}>
-            <QueryClientProvider client={queryClient}>{wrapped}</QueryClientProvider>
+            <ChromeRendererProvider>
+              <QueryClientProvider client={queryClient}>{wrapped}</QueryClientProvider>
+            </ChromeRendererProvider>
           </AppServicesProvider>
         </CoreServicesProvider>
       )
@@ -253,17 +254,19 @@ async function prepare(options: AnyOptions | undefined): Promise<
     return (
       <CoreServicesProvider services={core}>
         <AppServicesProvider services={appLayer}>
-          <QueryClientProvider client={queryClient}>
-            <GraphProvider platform={core.platform.appPlatform}>
-              <TooltipProvider>
-                {route === null ? (
-                  wrapped
-                ) : (
-                  <RouterProvider initialRoute={route}>{wrapped}</RouterProvider>
-                )}
-              </TooltipProvider>
-            </GraphProvider>
-          </QueryClientProvider>
+          <ChromeRendererProvider>
+            <QueryClientProvider client={queryClient}>
+              <GraphProvider platform={core.platform.appPlatform}>
+                <TooltipProvider>
+                  {route === null ? (
+                    wrapped
+                  ) : (
+                    <RouterProvider initialRoute={route}>{wrapped}</RouterProvider>
+                  )}
+                </TooltipProvider>
+              </GraphProvider>
+            </QueryClientProvider>
+          </ChromeRendererProvider>
         </AppServicesProvider>
       </CoreServicesProvider>
     )

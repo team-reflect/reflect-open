@@ -1,3 +1,4 @@
+import type { AppError as AppErrorWire } from '@reflect/types'
 import { z } from 'zod'
 
 /**
@@ -22,7 +23,10 @@ export type AppErrorKind = (typeof appErrorKinds)[number]
  * and reject with `{ kind, message }`. {@link toAppError} turns it into an
  * {@link AppError} at the IPC boundary.
  */
-const appErrorWireSchema = z.object({ kind: z.enum(appErrorKinds), message: z.string() })
+const appErrorWireSchema: z.ZodType<AppErrorWire> = z.object({
+  kind: z.enum(appErrorKinds),
+  message: z.string(),
+})
 
 /**
  * The shared error contract. Rust-originated errors become instances at the

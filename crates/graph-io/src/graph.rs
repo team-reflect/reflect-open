@@ -12,10 +12,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use serde::Serialize;
-
 use reflect_graph_paths::eviction_placeholder;
-use reflect_types::{AppError, AppResult, FileMeta};
+use reflect_types::{AppError, AppResult, FileMeta, GraphInfo, NoteWriteOutcome};
 
 use crate::graph_lock::with_graph_lock;
 use crate::io::{self, atomic_write, modified_ms};
@@ -43,32 +41,6 @@ pub struct GraphInner {
 /// Tauri-managed state holding the currently open graph (root + generation).
 #[derive(Default)]
 pub struct GraphState(pub Mutex<GraphInner>);
-
-/// Identity of an open graph, returned to the frontend.
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GraphInfo {
-    /// Absolute path of the graph root.
-    pub root: String,
-    /// Display name (the root folder name).
-    pub name: String,
-    /// Open-session generation; mutating file commands must echo it back.
-    pub generation: u64,
-}
-
-/// Result of claiming a note path without overwriting an existing file.
-#[derive(Debug, Serialize)]
-#[serde(
-    rename_all = "camelCase",
-    rename_all_fields = "camelCase",
-    tag = "kind"
-)]
-pub enum NoteCreateOutcome {
-    /// The path was free and now contains the supplied bytes.
-    Created { modified_ms: Option<u64> },
-    /// A file or iCloud eviction placeholder already owns the path.
-    Collision,
-}
 
 // ---- state accessors --------------------------------------------------------
 
@@ -162,34 +134,6 @@ pub fn ensure_readable_attachment_path(path: &str) -> AppResult<()> {
     Err(AppError::traversal(format!(
         "not a supported attachment path: {path}"
     )))
-}
-
-/// How a local note read (the desktop `note_read_local` command) found the
-/// note on disk.
-#[derive(Debug, Serialize)]
-#[serde(
-    rename_all = "camelCase",
-    rename_all_fields = "camelCase",
-    tag = "kind"
-)]
-pub enum LocalNoteRead {
-    /// The bytes are local; here they are.
-    Content { content: String },
-    /// The note is iCloud-evicted (a dataless file, or an `.icloud` stub in
-    /// the logical path's place). Reading it would block on an on-demand
-    /// download — this command refuses instead.
-    Evicted,
-}
-
-/// What a note write left on disk.
-#[derive(Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NoteWriteOutcome {
-    /// The note's on-disk mtime (epoch ms) after the call.
-    pub modified_ms: Option<u64>,
-    /// The full note text now on disk, when the note had moved past the
-    /// expected revision and the file holds something other than `contents`.
-    pub merged: Option<String>,
 }
 
 /// A checked write whose file moved past `expected` merges through the
@@ -416,17 +360,6 @@ pub fn move_to_graph_trash(root: &Path, abs: &Path) -> AppResult<()> {
     Ok(())
 }
 
-/// Counts from the vault catalog. `skipped` is what the walk refused or
-/// failed to list (unreadable directories, symlinks, default-pruned trees) —
-/// the number that keeps "why isn't my file showing up" diagnosable.
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct VaultScanStats {
-    pub notes: u32,
-    pub attachments: u32,
-    pub skipped: u32,
-}
-
 /// The same note listing as the desktop `list_files` command, callable with a plain root — the
 /// iCloud conflict sweep and the index reconcile walk the disk fresh, outside
 /// the cache: reconcile's whole job is to re-verify what is actually there.
@@ -638,27 +571,6 @@ mod file_catalog_tests {
                 .map(|file| file.path.as_str())
                 .collect::<Vec<_>>(),
             vec!["README.md", "arrived.md"]
-        );
-    }
-}
-
-#[cfg(test)]
-mod note_create_tests {
-    use super::NoteCreateOutcome;
-    use serde_json::json;
-
-    #[test]
-    fn outcome_serializes_for_the_typescript_boundary() {
-        assert_eq!(
-            serde_json::to_value(NoteCreateOutcome::Created {
-                modified_ms: Some(1_234),
-            })
-            .unwrap(),
-            json!({ "kind": "created", "modifiedMs": 1_234 })
-        );
-        assert_eq!(
-            serde_json::to_value(NoteCreateOutcome::Collision).unwrap(),
-            json!({ "kind": "collision" })
         );
     }
 }

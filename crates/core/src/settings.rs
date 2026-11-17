@@ -11,16 +11,11 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use serde_json::{Map, Value};
 use tempfile::NamedTempFile;
 
-use reflect_types::{AppError, AppResult};
+use reflect_types::{AppError, AppResult, SettingsDoc};
 
 use crate::Core;
-
-/// The settings document: a JSON object keyed by setting name. `Map` (not
-/// `Value`) so a non-object payload is rejected at deserialization.
-pub type SettingsDoc = Map<String, Value>;
 
 fn store_path() -> AppResult<PathBuf> {
     let base = dirs::config_dir().ok_or_else(|| AppError::io("no OS config dir"))?;
@@ -73,7 +68,7 @@ mod tests {
     use super::*;
     use crate::Reply;
     use crate::test_support::core;
-    use serde_json::json;
+    use serde_json::{Value, json};
     use tempfile::tempdir;
 
     fn doc(entries: &[(&str, Value)]) -> SettingsDoc {

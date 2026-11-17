@@ -13,7 +13,7 @@ import { createSuggestionService } from '../indexing/suggestion-service.ts'
 import { createWikiResolverService } from '../indexing/wiki-resolver-service.ts'
 import {
   createTestContactsService,
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   createTestGraphSessionService,
   createTestLoggerService,
   createTestNoteCreationService,
@@ -72,8 +72,8 @@ const JANE_CONTACT: ContactMatch = {
  * The emails of the most recent person-owner query.
  */
 function lastResolvedEmails(): readonly unknown[] {
-  const owners = database.getQueries().filter((query) => query.sql.includes('note_emails'))
-  return owners.at(-1)?.params.slice(0, -2) ?? []
+  const owners = database.getReads().filter((read) => read.command === 'index_person_owners')
+  return (owners.at(-1)?.args['emailKeys'] as readonly unknown[] | undefined) ?? []
 }
 
 /**
@@ -104,7 +104,7 @@ function meetingService(
 }
 
 beforeEach(() => {
-  database = createNodeTestDatabaseService()
+  database = createTestDatabaseService()
   noteFile = createTestNoteFileService()
   noteCreation = createTestNoteCreationService({ noteFile })
   contacts = createTestContactsService()
@@ -411,7 +411,7 @@ describe('addMeetingToDaily', () => {
     })
     expect(noteFile.writes()).toEqual([])
     // No attendee was resolved and no note was created.
-    expect(database.getQueries()).toEqual([])
+    expect(database.getReads()).toEqual([])
     expect(noteCreation.created()).toEqual([])
   })
 

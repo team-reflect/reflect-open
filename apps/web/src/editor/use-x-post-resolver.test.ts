@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { EmbedMediaService, ResolvedArchivedPost } from '@reflect/core'
 import { AppError } from '@reflect/core'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   createTestCoreServices,
   createTestPlatformService,
   createTestXArchiveService,
@@ -20,7 +20,7 @@ let ctx: EmbedMediaService
 
 beforeEach(() => {
   xArchive = createTestXArchiveService()
-  core = createTestCoreServices({ database: createNodeTestDatabaseService(), xArchive, platform })
+  core = createTestCoreServices({ database: createTestDatabaseService(), xArchive, platform })
   core.graphSession.setGraph({ root: ROOT, generation: 7 })
   ctx = core.embedMedia
 })

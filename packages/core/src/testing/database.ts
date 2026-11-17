@@ -1,18 +1,23 @@
-import { createDb } from '@reflect/db'
-import type { DatabaseSync, SQLInputValue } from 'node:sqlite'
-import type { getLoadablePath } from 'sqlite-vec'
+import type { IndexReadCommand, IndexWriteCommand } from '@reflect/types'
+import { createWasmIndexBackend, type WasmIndexBackend } from '@reflect/index-wasm'
 import { toAppError } from '../errors.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import { buildIndexedNote, type IndexedNote } from '../indexing/indexed-note.ts'
+import type { CommandArgs, CommandResult } from '../ipc/ipc-service.ts'
 import { parseNote } from '../markdown/extract.ts'
 
 /**
- * One query the database ran, in its compiled form.
+ * One read command the database ran.
  */
-export interface TestDatabaseQuery {
-  readonly sql: string
-  readonly params: readonly unknown[]
+export interface TestDatabaseRead {
+  readonly command: string
+  readonly args: Readonly<Record<string, unknown>>
 }
+
+/**
+ * The name of every command that writes or reads the index.
+ */
+export type IndexCommand = IndexWriteCommand | IndexReadCommand
 
 export interface TestDatabaseService extends DatabaseService {
   /**
@@ -20,223 +25,95 @@ export interface TestDatabaseService extends DatabaseService {
    */
   applyProjection(note: IndexedNote): void
   /**
-   * Every query run so far, in order.
+   * Run one read-only SQL statement and return its rows, with the column
+   * names of the schema. For assertions on rows that no read command returns.
    */
-  getQueries(): readonly TestDatabaseQuery[]
+  query(sql: string, params?: readonly unknown[]): Record<string, unknown>[]
+  /**
+   * Run one index command on the database, like the native shell.
+   */
+  invoke<C extends IndexCommand>(command: C, args: CommandArgs<C>): CommandResult<C>
+  /**
+   * The generation of the open index, which a write command must carry.
+   */
+  generation(): number
+  /**
+   * Every read command run through `read` so far, in order.
+   */
+  getReads(): readonly TestDatabaseRead[]
   /**
    * Release the database; later queries and seeding throw.
    */
   close(): void
 }
 
-const MIGRATIONS_DIRECTORY = new URL('../../../../crates/index-schema/migrations/', import.meta.url)
-
-function nodeBuiltins(): Pick<NodeJS.Process, 'getBuiltinModule'> {
-  if (typeof process === 'undefined' || typeof process.getBuiltinModule !== 'function') {
-    throw new TypeError(
-      'createNodeTestDatabaseService needs Node.js; browser tests use createWasmTestDatabaseService',
-    )
-  }
-  return process
-}
-
-function openMigratedIndex(): DatabaseSync {
-  const node = nodeBuiltins()
-  const { DatabaseSync } = node.getBuiltinModule('node:sqlite')
-  const { readFileSync, readdirSync } = node.getBuiltinModule('node:fs')
-  const { fileURLToPath } = node.getBuiltinModule('node:url')
-  const { createRequire } = node.getBuiltinModule('node:module')
-  const sqliteVec = createRequire(import.meta.url)('sqlite-vec') as {
-    getLoadablePath: typeof getLoadablePath
-  }
-  const directory = fileURLToPath(MIGRATIONS_DIRECTORY)
-  const database = new DatabaseSync(':memory:', { allowExtension: true })
-  try {
-    // Keep this an exact production migration chain: 0002/0003 create vec0
-    // tables, so their native extension must be available before replay.
-    database.loadExtension(sqliteVec.getLoadablePath())
-    const migrations = readdirSync(directory)
-      .filter((filename) => filename.endsWith('.sql'))
-      .sort()
-    for (const migration of migrations) {
-      database.exec(readFileSync(`${directory}/${migration}`, 'utf8'))
-    }
-    return database
-  } catch (error) {
-    database.close()
-    throw error
-  }
-}
-
-function sqliteParameter(value: unknown): SQLInputValue {
-  if (
-    value === null ||
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'bigint' ||
-    value instanceof Uint8Array
-  ) {
-    return value
-  }
-  throw new TypeError(`unsupported SQLite parameter: ${typeof value}`)
-}
-
-function insertProjection(database: DatabaseSync, indexed: IndexedNote): void {
-  database.prepare('DELETE FROM notes WHERE path = ?').run(indexed.path)
-  database.prepare('DELETE FROM search_fts WHERE path = ?').run(indexed.path)
-  database
-    .prepare(
-      `INSERT INTO notes(
-        path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned,
-        pinned_order, gist_url, gist_stale, file_hash, mtime, updated_at,
-        preview, has_content
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
-      indexed.path,
-      indexed.id,
-      indexed.title,
-      indexed.titleKey,
-      indexed.pathKey,
-      indexed.kind,
-      indexed.dailyDate,
-      Number(indexed.isPrivate),
-      Number(indexed.isPinned),
-      indexed.pinnedOrder,
-      indexed.gistUrl,
-      Number(indexed.gistStale),
-      indexed.fileHash,
-      indexed.mtime,
-      indexed.mtime,
-      indexed.preview,
-      Number(indexed.hasContent),
-    )
-
-  const insertLink = database.prepare(
-    `INSERT INTO links(
-      source_path, kind, target_raw, target_key, target_path_key, alias, pos_from, pos_to
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-  )
-  for (const link of indexed.links) {
-    insertLink.run(
-      indexed.path,
-      link.kind,
-      link.targetRaw,
-      link.targetKey,
-      link.targetPathKey,
-      link.alias,
-      link.posFrom,
-      link.posTo,
-    )
-  }
-
-  const insertTag = database.prepare('INSERT INTO tags(note_path, tag, tag_key) VALUES (?, ?, ?)')
-  for (const tag of indexed.tags) {
-    insertTag.run(indexed.path, tag.tag, tag.tagKey)
-  }
-
-  const insertAlias = database.prepare(
-    'INSERT INTO aliases(note_path, alias, alias_key) VALUES (?, ?, ?)',
-  )
-  for (const alias of indexed.aliases) {
-    insertAlias.run(indexed.path, alias.alias, alias.aliasKey)
-  }
-
-  const insertClaim = database.prepare(
-    'INSERT INTO note_claims(note_path, key, tier) VALUES (?, ?, ?)',
-  )
-  for (const claim of indexed.claims) {
-    insertClaim.run(indexed.path, claim.key, claim.tier)
-  }
-
-  const insertEmail = database.prepare(
-    'INSERT INTO note_emails(note_path, email, email_key) VALUES (?, ?, ?)',
-  )
-  for (const email of indexed.emails) {
-    insertEmail.run(indexed.path, email.email, email.emailKey)
-  }
-
-  const insertAsset = database.prepare('INSERT INTO assets(note_path, asset_path) VALUES (?, ?)')
-  for (const asset of indexed.assets) {
-    insertAsset.run(indexed.path, asset)
-  }
-
-  const insertTask = database.prepare(
-    `INSERT INTO tasks(note_path, ast_path, markdown, breadcrumbs, checked, due_date)
-    VALUES (?, ?, ?, ?, ?, ?)`,
-  )
-  for (const task of indexed.tasks) {
-    insertTask.run(
-      indexed.path,
-      task.astPath,
-      task.markdown,
-      JSON.stringify(task.breadcrumbs),
-      Number(task.checked),
-      task.dueDate,
-    )
-  }
-
-  // The FTS body carries the note text plus its assets' description text.
-  const searchBody =
-    indexed.assetText === '' ? indexed.text : `${indexed.text}\n${indexed.assetText}`
-  database
-    .prepare('INSERT INTO search_fts(path, title, body) VALUES (?, ?, ?)')
-    .run(indexed.path, indexed.title, searchBody)
-}
-
-class NodeTestDatabaseServiceImpl implements TestDatabaseService {
-  readonly db: DatabaseService['db']
-  readonly #queries: TestDatabaseQuery[] = []
-  #database: DatabaseSync | null = null
+class TestDatabaseServiceImpl implements TestDatabaseService {
+  readonly #reads: TestDatabaseRead[] = []
+  #index: WasmIndexBackend | null = null
+  #generation = 0
   #closed = false
 
-  constructor() {
-    this.db = createDb(this.runQuery)
+  query(sql: string, params: readonly unknown[] = []): Record<string, unknown>[] {
+    return this.#invoke('test_query', { sql, params: [...params] }) as Record<string, unknown>[]
   }
 
-  readonly runQuery = (sql: string, params: readonly unknown[]): Promise<unknown> => {
+  read<C extends IndexReadCommand>(command: C, args: CommandArgs<C>): Promise<CommandResult<C>> {
     return Promise.try(() => {
-      this.#queries.push({ sql, params: [...params] })
-      try {
-        return this.#open()
-          .prepare(sql)
-          .all(...params.map(sqliteParameter))
-      } catch (error) {
-        throw toAppError(error)
-      }
+      this.#reads.push({ command, args: structuredClone(args) })
+      return this.invoke(command, args)
     })
   }
 
   applyProjection(note: IndexedNote): void {
-    insertProjection(this.#open(), note)
+    this.invoke('index_apply', { note, generation: this.generation() })
   }
 
-  getQueries(): readonly TestDatabaseQuery[] {
-    return [...this.#queries]
+  invoke<C extends IndexCommand>(command: C, args: CommandArgs<C>): CommandResult<C> {
+    return this.#invoke(command, args) as CommandResult<C>
+  }
+
+  generation(): number {
+    this.#open()
+    return this.#generation
+  }
+
+  getReads(): readonly TestDatabaseRead[] {
+    return [...this.#reads]
   }
 
   close(): void {
     this.#closed = true
-    this.#database?.close()
-    this.#database = null
+    this.#index?.close()
+    this.#index = null
   }
 
-  #open(): DatabaseSync {
+  #invoke(command: string, args: Readonly<Record<string, unknown>>): unknown {
+    try {
+      return this.#open().invoke(command, args)
+    } catch (error) {
+      throw toAppError(error)
+    }
+  }
+
+  #open(): WasmIndexBackend {
     if (this.#closed) {
       throw new Error('the test database is closed')
     }
-    this.#database ??= openMigratedIndex()
-    return this.#database
+    if (this.#index === null) {
+      this.#index = createWasmIndexBackend()
+      this.#generation = this.#index.invoke('index_open', {}) as number
+    }
+    return this.#index
   }
 }
 
 /**
- * A {@link DatabaseService} over a real in-memory SQLite index built from the
- * production migration chain. The database opens on first use, so building
- * one is cheap. Node.js only (`node:sqlite`).
+ * A {@link DatabaseService} over the index of the native shells, compiled to
+ * wasm, with a new in-memory database. The database opens on first use, so
+ * building one is cheap.
  */
-export function createNodeTestDatabaseService(): TestDatabaseService {
-  return new NodeTestDatabaseServiceImpl()
+export function createTestDatabaseService(): TestDatabaseService {
+  return new TestDatabaseServiceImpl()
 }
 
 /**

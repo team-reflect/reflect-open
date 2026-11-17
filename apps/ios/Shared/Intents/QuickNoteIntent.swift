@@ -1,5 +1,6 @@
 import CaptureShared
 import Foundation
+import TypesShared
 
 #if canImport(AppIntents)
 import AppIntents
@@ -17,12 +18,11 @@ import AppIntents
 /// and the App Group container, and never waits on the webview or graph.
 /// Deliberately not `@MainActor`: the file write must not queue behind
 /// app-boot main-thread work.
-@available(iOS 16.0, *)
 struct QuickNoteIntent: AppIntent {
-  static var title: LocalizedStringResource = "Add quick note"
-  static var description = IntentDescription(
+  static let title: LocalizedStringResource = "Add quick note"
+  static let description = IntentDescription(
     "Append a one-line note to today's daily note in Reflect, under the bullet set in Settings.")
-  static var openAppWhenRun = false
+  static let openAppWhenRun = false
 
   /// Apple's default is `.alwaysAllowed` (runs on a locked device), and
   /// `.requiresAuthentication` still allows a locked iPhone driven from an
@@ -30,7 +30,7 @@ struct QuickNoteIntent: AppIntent {
   /// protection is verified for locked writes, the device performing the
   /// write must itself be unlocked; Face ID satisfies this invisibly from
   /// the lock screen.
-  static var authenticationPolicy: IntentAuthenticationPolicy =
+  static let authenticationPolicy: IntentAuthenticationPolicy =
     .requiresLocalDeviceAuthentication
 
   @Parameter(title: "Note", requestValueDialog: "What do you want to note down?")
@@ -40,7 +40,7 @@ struct QuickNoteIntent: AppIntent {
     let parent = QuickNoteDefaults.parent()
     // `spoolText` folds whitespace to one line and returns false when
     // nothing printable remains — reprompt instead of claiming "Saved".
-    guard try CaptureInbox.spoolText(text, source: "ios-intent", parent: parent) else {
+    guard try CaptureInbox.spoolText(text, source: .iosIntent, parent: parent) else {
       throw $text.needsValueError("What do you want to note down?")
     }
     return .result(dialog: Self.savedDialog(parent: parent))

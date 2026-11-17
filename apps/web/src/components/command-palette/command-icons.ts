@@ -1,3 +1,4 @@
+import type { AppCommandId } from '@/lib/commands/types.ts'
 import {
   ArrowLeft,
   ArrowRight,
@@ -23,7 +24,7 @@ import {
  * contract: the registry stays host-agnostic (CLI and deep links don't render
  * icons), and an unmapped command just gets the generic glyph.
  */
-export const COMMAND_ICONS: Record<string, LucideIcon> = {
+export const COMMAND_ICONS: Partial<Record<AppCommandId, LucideIcon>> = {
   'nav.today': CalendarDays,
   'note.new': SquarePen,
   'history.back': ArrowLeft,

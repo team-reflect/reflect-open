@@ -1,9 +1,14 @@
-import { Profiler } from 'react'
+import { Profiler, useState, type ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import type { LightboxController } from '@meowdown/react'
-import { createTestSystemPreferencesService } from '@reflect/app/testing'
+import { noop } from '@ocavue/utils'
+import {
+  createTestNativeChromeHost,
+  createTestSystemPreferencesService,
+} from '@reflect/app/testing'
 import { act } from '@/test-utils/act.ts'
+import { lastChromeState, nativeChromeOptions } from '@/test-utils/native-chrome.tsx'
 import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { MediaLightbox } from './media-lightbox.tsx'
 
@@ -401,5 +406,21 @@ describe('MediaLightbox desktop surface', () => {
     firePointer(preview, 'pointerup', { pointerId: 1, clientX: 100, clientY: 200 })
     fireClick(preview)
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('MediaLightbox native shell', () => {
+  it('hides the shell bars while open', async () => {
+    const host = createTestNativeChromeHost()
+    let close: () => void = noop
+    function Harness(): ReactElement | null {
+      const [open, setOpen] = useState(true)
+      close = () => setOpen(false)
+      return open ? <MediaLightbox lightbox={makeLightbox(vi.fn())} onOpenImage={null} /> : null
+    }
+    await renderInApp(<Harness />, nativeChromeOptions(host))
+    await vi.waitFor(() => expect(lastChromeState(host)?.fullscreen).toBe(true))
+    await act(() => close())
+    await vi.waitFor(() => expect(lastChromeState(host)?.fullscreen).toBe(false))
   })
 })

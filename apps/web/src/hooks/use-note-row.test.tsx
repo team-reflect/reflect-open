@@ -1,9 +1,13 @@
+import type { NoteRow } from '@reflect/types'
 import { act } from '@/test-utils/act.ts'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
-import type { IndexQueryService, NoteRow } from '@reflect/core'
-import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
+import type { IndexQueryService } from '@reflect/core'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  type TestCoreServices,
+} from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useNoteRow } from './use-note-row.ts'
 
 const GENERATION = 5
@@ -34,7 +38,7 @@ async function mount() {
 }
 
 beforeEach(() => {
-  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  core = createTestCoreServices({ database: createTestDatabaseService() })
   getNote = vi.spyOn(core.indexQuery, 'getNote')
 })
 

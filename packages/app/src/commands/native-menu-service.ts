@@ -28,18 +28,18 @@ export type NativeMenuPredefinedItem =
   | 'BringAllToFront'
   | { About: null }
 
-export type AppMenuEntry =
-  | { kind: 'command'; commandId: string; text?: string | undefined }
+export type AppMenuEntry<CommandId extends string> =
+  | { kind: 'command'; commandId: CommandId; text?: string | undefined }
   | { kind: 'predefined'; item: NativeMenuPredefinedItem; text?: string | undefined }
 
-export interface AppSubmenuLayout {
+export interface AppSubmenuLayout<CommandId extends string> {
   text: string
   /**
    * macOS NSApp role: `windows` gains the automatic window list,
    * `help` gains the Search field.
    */
-  nsAppRole?: 'windows' | 'help'
-  entries: AppMenuEntry[]
+  nsAppRole?: 'windows' | 'help' | undefined
+  entries: AppMenuEntry<CommandId>[]
 }
 
 /**
@@ -50,17 +50,17 @@ export type NativeMenuItem =
       kind: 'command'
       id: string
       text: string
-      accelerator?: string
+      accelerator?: string | undefined
       /**
        * Invoked with the item id when the item is activated.
        */
       action: (id: string) => void
     }
-  | { kind: 'predefined'; item: NativeMenuPredefinedItem; text?: string }
+  | { kind: 'predefined'; item: NativeMenuPredefinedItem; text?: string | undefined }
 
 export interface NativeSubmenu {
   text: string
-  nsAppRole?: 'windows' | 'help'
+  nsAppRole?: 'windows' | 'help' | undefined
   items: NativeMenuItem[]
 }
 
@@ -117,7 +117,7 @@ export function createUnsupportedNativeMenuHost(): NativeMenuHost {
   return { buildAppMenu: unsupported, popup: unsupported }
 }
 
-export type MenuCommandDispatch = (commandId: string) => void
+export type MenuCommandDispatch<CommandId extends string> = (commandId: CommandId) => void
 
 const FocusedNoteMenuCommandSchema = z.enum(['note.find', 'note.findNext', 'note.findPrevious'])
 
@@ -139,7 +139,7 @@ const FOCUSED_NOTE_MENU_EVENT = 'reflect://focused-note-menu-command'
  * to the dispatcher that the mounted workspace published. While no dispatcher
  * is set, menu items are inert.
  */
-export interface NativeMenuService {
+export interface NativeMenuService<CommandId extends string> {
   /**
    * Build the application menu from `layout` and install it, replacing the
    * host's default. Call once at startup — the menu holds command ids, not
@@ -149,7 +149,7 @@ export interface NativeMenuService {
    * by the webview that created them, so a note window must not replace the
    * app-wide menu with an inert copy.
    */
-  install(layout: readonly AppSubmenuLayout[]): Promise<void>
+  install(layout: readonly AppSubmenuLayout<CommandId>[]): Promise<void>
   /**
    * Whether this webview has successfully installed the native app menu.
    */
@@ -157,7 +157,7 @@ export interface NativeMenuService {
   /**
    * Publish (or with `null`, withdraw) the active menu-command dispatcher.
    */
-  setCommandDispatch(dispatch: MenuCommandDispatch | null): void
+  setCommandDispatch(dispatch: MenuCommandDispatch<CommandId> | null): void
   /**
    * Forward a native menu activation to the focused webview. Find commands are
    * note-window-local; all other commands go to the published dispatcher. A
@@ -175,8 +175,8 @@ export interface NativeMenuService {
   openContextMenu(options: NativeContextMenuOptions): Promise<void>
 }
 
-export interface NativeMenuServiceDeps {
-  readonly commands: CommandService
+export interface NativeMenuServiceDeps<CommandId extends string, Context> {
+  readonly commands: CommandService<CommandId, Context>
   readonly window: WindowService
   readonly platform: PlatformFacts
   readonly ipc: IpcBridgeService
@@ -184,18 +184,21 @@ export interface NativeMenuServiceDeps {
   readonly host: NativeMenuHost
 }
 
-class NativeMenuServiceImpl implements NativeMenuService {
-  readonly #deps: NativeMenuServiceDeps
+class NativeMenuServiceImpl<
+  CommandId extends string,
+  Context,
+> implements NativeMenuService<CommandId> {
+  readonly #deps: NativeMenuServiceDeps<CommandId, Context>
   #installed = false
-  #current: MenuCommandDispatch | null = null
+  #current: MenuCommandDispatch<CommandId> | null = null
   readonly #mainWindow: boolean
 
-  constructor(deps: NativeMenuServiceDeps) {
+  constructor(deps: NativeMenuServiceDeps<CommandId, Context>) {
     this.#deps = deps
     this.#mainWindow = deps.window.isMainWindow()
   }
 
-  async install(layout: readonly AppSubmenuLayout[]): Promise<void> {
+  async install(layout: readonly AppSubmenuLayout<CommandId>[]): Promise<void> {
     const { platform, ipc, logger, host } = this.#deps
     if (!platform.isMacosDesktop || !this.#mainWindow) {
       return
@@ -203,7 +206,7 @@ class NativeMenuServiceImpl implements NativeMenuService {
     const menu = await host.buildAppMenu(
       layout.map((submenu) => ({
         text: submenu.text,
-        ...(submenu.nsAppRole !== undefined ? { nsAppRole: submenu.nsAppRole } : {}),
+        nsAppRole: submenu.nsAppRole,
         items: submenu.entries.map((entry) => this.#menuItem(entry)),
       })),
     )
@@ -223,7 +226,7 @@ class NativeMenuServiceImpl implements NativeMenuService {
     // Best-effort: the menu works without the item, so a failed call must
     // not make the whole install look failed.
     try {
-      await ipc.call('menu_install_paste_and_match_style', {}, z.null())
+      await ipc.call('menu_install_paste_and_match_style', {})
     } catch (error) {
       logger.warn('failed to add the Paste and Match Style menu item:', error)
     }
@@ -233,7 +236,7 @@ class NativeMenuServiceImpl implements NativeMenuService {
     return this.#installed
   }
 
-  setCommandDispatch(dispatch: MenuCommandDispatch | null): void {
+  setCommandDispatch(dispatch: MenuCommandDispatch<CommandId> | null): void {
     this.#current = dispatch
   }
 
@@ -243,7 +246,7 @@ class NativeMenuServiceImpl implements NativeMenuService {
       void this.#dispatchToFocusedWindow(focusedNoteCommand.data)
       return
     }
-    this.#current?.(commandId)
+    this.#dispatchToCurrent(commandId)
   }
 
   subscribeFocusedNoteCommands(listener: (commandId: FocusedNoteMenuCommand) => void): Unlisten {
@@ -289,15 +292,26 @@ class NativeMenuServiceImpl implements NativeMenuService {
       }
       return
     }
-    this.#current?.(commandId)
+    this.#dispatchToCurrent(commandId)
   }
 
-  #menuItem(entry: AppMenuEntry): NativeMenuItem {
+  /**
+   * Hands the registered command of `commandId` to the current dispatcher.
+   * The host returns menu item ids as plain strings.
+   */
+  #dispatchToCurrent(commandId: string): void {
+    const command = this.#deps.commands.list().find((candidate) => candidate.id === commandId)
+    if (command) {
+      this.#current?.(command.id)
+    }
+  }
+
+  #menuItem(entry: AppMenuEntry<CommandId>): NativeMenuItem {
     if (entry.kind === 'predefined') {
       return {
         kind: 'predefined',
         item: entry.item,
-        ...(entry.text !== undefined ? { text: entry.text } : {}),
+        text: entry.text,
       }
     }
     const command = this.#deps.commands.list().find((candidate) => candidate.id === entry.commandId)
@@ -309,12 +323,14 @@ class NativeMenuServiceImpl implements NativeMenuService {
       kind: 'command',
       id: command.id,
       text: entry.text ?? command.title,
-      ...(accelerator !== undefined ? { accelerator } : {}),
+      accelerator,
       action: this.dispatchCommand,
     }
   }
 }
 
-export function createNativeMenuService(deps: NativeMenuServiceDeps): NativeMenuService {
+export function createNativeMenuService<CommandId extends string, Context>(
+  deps: NativeMenuServiceDeps<CommandId, Context>,
+): NativeMenuService<CommandId> {
   return new NativeMenuServiceImpl(deps)
 }

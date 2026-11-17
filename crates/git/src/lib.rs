@@ -1,6 +1,6 @@
 //! Git backup/sync primitives (Plan 12) with no Tauri in them.
 //!
-//! Rust owns the *capabilities* — init/adopt, commit, fetch, merge, push —
+//! Rust owns the *capabilities* — init/adopt, commit, fetch, merge, push, repack —
 //! while the sync **policy** (debounce cadence, retry loop, product states,
 //! GitHub specifics) lives in `@reflect/core` `sync/`. Nothing here is
 //! GitHub-specific: remotes are URLs, and an HTTPS sign-in arrives per call
@@ -18,6 +18,7 @@ mod commit_message;
 #[cfg(test)]
 mod fault;
 mod locks;
+mod maintenance;
 mod merge;
 mod remote;
 mod repo;
@@ -28,32 +29,53 @@ mod tests;
 
 use std::path::Path;
 
-use serde::Serialize;
+pub use maintenance::{Repack, configure_libgit2, maintain};
 
-use reflect_types::AppResult;
+use reflect_types::{
+    AppResult, CommitOutcome, GitCredential, GitStatus, PullOutcome, PushOutcome, RemoteDelta,
+    RemoteTip,
+};
 
-pub use self::commit::{CommitOutcome, SkippedFile};
-pub use self::merge::{ChangeKind, ChangedFile, MergeKind};
-pub use self::remote::{GitCredential, PushOutcome, RemoteDelta, RemoteTip};
+/// How long libgit2 waits to open a connection to a remote.
+const CONNECT_TIMEOUT_MS: i32 = 10_000;
+
+/// How long one read or write on a remote connection may make no progress.
+/// It bounds a stall, not a whole transfer.
+const IO_TIMEOUT_MS: i32 = 30_000;
+
+/// Set libgit2's network timeouts for the process. Without them a stalled
+/// connection, or a socket that died while iOS suspended the app, blocks a
+/// fetch or push (and the sync engine's single flight behind it) for
+/// minutes. libgit2 has no per-call timeout: these process-wide options are
+/// its only one. Calls after the first do nothing.
+///
+/// # Safety
+///
+/// It writes libgit2 globals without synchronization (see
+/// `git2::opts::set_server_timeout_in_milliseconds`). Call it at startup,
+/// before any other thread runs a libgit2 operation.
+pub unsafe fn set_network_timeouts() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        // SAFETY: the caller guarantees no concurrent libgit2 use.
+        let set = unsafe {
+            git2::opts::set_server_connect_timeout_in_milliseconds(CONNECT_TIMEOUT_MS)
+                .and_then(|()| git2::opts::set_server_timeout_in_milliseconds(IO_TIMEOUT_MS))
+        };
+        if let Err(err) = set {
+            tracing::warn!("setting git network timeouts failed: {err}");
+        }
+    });
+}
 
 /// GitHub rejects files over 100 MB, failing the whole push; stop just under.
 pub const MAX_FILE_BYTES: u64 = 95 * 1024 * 1024;
 
-/// Snapshot of the graph's backup repository for the UI and the sync engine.
-/// Deliberately cheap — refs and config only, no working-tree scan.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GitStatus {
-    /// Whether the graph has a repository at all (backup set up).
-    pub initialized: bool,
-    pub branch: Option<String>,
-    pub remote_url: Option<String>,
-    /// Commits ahead/behind the last-fetched remote branch (no network).
-    pub ahead: usize,
-    pub behind: usize,
+pub fn status(root: &Path) -> AppResult<GitStatus> {
+    maintenance::with_object_read(root, || read_status(root))
 }
 
-pub fn status(root: &Path) -> AppResult<GitStatus> {
+fn read_status(root: &Path) -> AppResult<GitStatus> {
     if !root.join(".git").exists() {
         return Ok(GitStatus {
             initialized: false,
@@ -115,24 +137,6 @@ pub fn setup(
     status(root)
 }
 
-/// What one pull did: the commit of local changes, then the merge of the
-/// fetched remote branch.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PullOutcome {
-    /// Whether local changes were committed before the merge.
-    pub committed: bool,
-    /// Commits the local branch is ahead of the last-fetched remote after the
-    /// merge (no network).
-    pub ahead: usize,
-    pub skipped_large_files: Vec<SkippedFile>,
-    pub kind: MergeKind,
-    /// Graph-relative paths of the conflict copies the merge wrote.
-    pub review_paths: Vec<String>,
-    /// Every file the merge changed on disk.
-    pub changed_files: Vec<ChangedFile>,
-}
-
 /// Commit local changes and merge the fetched remote branch under one graph
 /// lock, so no write lands between the commit and the checkout.
 pub fn pull_all(root: &Path, message: &str, max_file_bytes: u64) -> AppResult<PullOutcome> {
@@ -174,7 +178,7 @@ pub fn clone(url: &str, path: &Path, credential: Option<GitCredential>) -> AppRe
 
 /// Fetch `origin` and report ahead/behind for the current branch.
 pub fn fetch(root: &Path, credential: Option<GitCredential>) -> AppResult<RemoteDelta> {
-    remote::fetch(root, credential)
+    maintenance::with_object_read(root, || remote::fetch(root, credential))
 }
 
 /// Read the remote tip of the current branch without fetching. `url` probes
@@ -189,7 +193,7 @@ pub fn remote_head(
 
 /// Push the current branch to `origin`; rejections come back as data.
 pub fn push(root: &Path, credential: Option<GitCredential>) -> AppResult<PushOutcome> {
-    remote::push(root, credential)
+    maintenance::with_object_read(root, || remote::push(root, credential))
 }
 
 /// Commit every pending change (no-op when clean). See `commit_all` in `commit.rs`.

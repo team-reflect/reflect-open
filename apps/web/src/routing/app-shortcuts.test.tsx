@@ -5,9 +5,9 @@ import {
   type GraphSessionService,
   type NoteDocumentService,
 } from '@reflect/core'
-import type { AppServices, LinkNavigationService, NativeMenuService } from '@reflect/app'
-import { createTestAppServices } from '@reflect/app/testing'
+import type { LinkNavigationService } from '@reflect/app'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestPlatformService,
   type TestCoreServices,
@@ -34,10 +34,10 @@ import { ShortcutsProvider, useShortcuts } from '@/providers/shortcuts-provider.
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider.tsx'
 import { MOD_KEY, NON_MOD_KEY } from '@/test-utils/mod-key.ts'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useAppShortcuts } from './app-shortcuts.ts'
 import { useRouterActions, useRouterHandlers, useRouterState } from './router.tsx'
 import { noop, returnFalse } from '@ocavue/utils'
+import { createWebTestAppServices, type WebTestAppServices } from '@/test-utils/app-services.ts'
 
 const GRAPH = { root: '/g', name: 'g', generation: 1 } satisfies TestOpenGraph
 
@@ -72,10 +72,10 @@ const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
 let platform: TestPlatformOptions
 // The services of the rendered app; set by `shortcutsHook`.
 let core: TestCoreServices
-let appLayer: AppServices
+let appLayer: WebTestAppServices
 let openRecent: MockInstance<GraphSessionService['openRecent']>
 let openRouteInNewWindow: MockInstance<LinkNavigationService['openRouteInNewWindow']>
-let isNativeMenuInstalled: MockInstance<NativeMenuService['isInstalled']>
+let isNativeMenuInstalled: MockInstance<WebTestAppServices['nativeMenu']['isInstalled']>
 
 beforeEach(() => {
   platform = {
@@ -90,7 +90,7 @@ beforeEach(() => {
 async function shortcutsHook() {
   const readSource = (): Promise<string> => Promise.resolve('# A\n')
   const services = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     platform: createTestPlatformService(platform),
     noteDocuments: {
       readSource,
@@ -101,7 +101,7 @@ async function shortcutsHook() {
     },
   })
   core = services
-  appLayer = createTestAppServices(services)
+  appLayer = createWebTestAppServices(services)
   openRecent = vi.spyOn(services.graphSession, 'openRecent').mockResolvedValue(true)
   openRouteInNewWindow = vi
     .spyOn(appLayer.linkNavigation, 'openRouteInNewWindow')
@@ -226,7 +226,7 @@ describe('app shortcuts', () => {
 
   it('pin and privacy no-op on note-less routes and without a graph', async () => {
     const { result } = await shortcutsHook()
-    await act(() => result.current.routerActions.navigate({ kind: 'settings' }))
+    await act(() => result.current.routerActions.navigate({ kind: 'settings', page: 'main' }))
     await act(() => press('o'))
     await act(() => result.current.context.togglePrivate())
     await act(() => core.graphSession.setGraph(null))
@@ -237,8 +237,8 @@ describe('app shortcuts', () => {
   })
 
   it('registers the command keybindings in the central keymap registry', () => {
-    const { keymap } = createTestAppServices(
-      createTestCoreServices({ database: createWasmTestDatabaseService() }),
+    const { keymap } = createWebTestAppServices(
+      createTestCoreServices({ database: createTestDatabaseService() }),
     )
     registerAppKeymaps(keymap)
     const bindings = keymap.list()
@@ -410,7 +410,7 @@ describe('app shortcuts', () => {
     const { result } = await shortcutsHook()
 
     await act(() => press('j'))
-    expect(result.current.routerState.route).toEqual({ kind: 'chat' })
+    expect(result.current.routerState.route).toEqual({ kind: 'chat', conversationId: null })
 
     await act(() => press('n', { shiftKey: true }))
     expect(newChat).toHaveBeenCalledTimes(1)

@@ -1,0 +1,17 @@
+[
+  {
+    "type": "backSwipe",
+    "phase": "start"
+  },
+  {
+    "type": "backSwipe",
+    "phase": "cancel"
+  },
+  {
+    "type": "chromeReady"
+  },
+  {
+    "type": "focusSearch",
+    "entryId": 3
+  }
+]

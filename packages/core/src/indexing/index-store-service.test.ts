@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { AppError } from '../errors.ts'
 import { parseNote } from '../markdown/index.ts'
-import { createNodeTestDatabaseService } from '../testing/database.ts'
+import { createTestDatabaseService } from '../testing/database.ts'
 import { createTestIndexStoreService } from '../testing/index-store.ts'
 import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { buildIndexedNote, type IndexedNote } from './indexed-note.ts'
@@ -31,7 +31,7 @@ function writeCommands(): Record<string, () => null> {
 describe('createIndexStoreService', () => {
   it('sends each write to its command with the generation', async () => {
     const ipc = createTestIpcBridgeService({ commands: writeCommands() })
-    const store = createIndexStoreService({ ipc, database: createNodeTestDatabaseService() })
+    const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
     const a = note('notes/a.md')
 
     await store.apply(a, 3)
@@ -56,7 +56,7 @@ describe('createIndexStoreService', () => {
 
   it('skips the backend for an empty batch or touch', async () => {
     const ipc = createTestIpcBridgeService()
-    const store = createIndexStoreService({ ipc, database: createNodeTestDatabaseService() })
+    const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
 
     await store.applyBatch([], 1)
     await store.touch([], 1)
@@ -66,14 +66,14 @@ describe('createIndexStoreService', () => {
 
   it('opens the index and resolves with its generation', async () => {
     const ipc = createTestIpcBridgeService({ commands: { index_open: () => 12 } })
-    const store = createIndexStoreService({ ipc, database: createNodeTestDatabaseService() })
+    const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
 
     await expect(store.open()).resolves.toBe(12)
   })
 
   it('re-states the path-derived addresses of a move', async () => {
     const ipc = createTestIpcBridgeService({ commands: writeCommands() })
-    const store = createIndexStoreService({ ipc, database: createNodeTestDatabaseService() })
+    const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
 
     await store.move('notes/Old.md', 'daily/2026-01-02.md', 4)
     await store.moveIndexed('notes/Old.md', 'notes/New Name.md', 8)
@@ -115,15 +115,15 @@ describe('createIndexStoreService', () => {
       stalePlaceholders: ['notes/c.md'],
     }
     const ipc = createTestIpcBridgeService({ commands: { index_reconcile_scan: () => scan } })
-    const store = createIndexStoreService({ ipc, database: createNodeTestDatabaseService() })
+    const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
 
     await expect(store.reconcileScan(5)).resolves.toEqual(scan)
     expect(ipc.calls()).toEqual([{ command: 'index_reconcile_scan', args: { generation: 5 } }])
   })
 
   it('reads `index_meta` through the database', async () => {
-    const database = createNodeTestDatabaseService()
-    await database.runQuery('INSERT INTO index_meta(key, value) VALUES (?, ?)', ['k', 'v'])
+    const database = createTestDatabaseService()
+    database.invoke('index_meta_set', { key: 'k', value: 'v', generation: database.generation() })
     const store = createIndexStoreService({ ipc: createTestIpcBridgeService(), database })
     try {
       await expect(store.getMeta('k')).resolves.toBe('v')
@@ -149,7 +149,7 @@ describe('createApplyBatch', () => {
         },
       },
     })
-    const store = createIndexStoreService({ ipc, database: createNodeTestDatabaseService() })
+    const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
     const skipped: { path: string; message: string }[] = []
     const batch = store.createApplyBatch(2, (skip) => {
       skipped.push(skip)
@@ -179,7 +179,7 @@ describe('createApplyBatch', () => {
         },
       },
     })
-    const store = createIndexStoreService({ ipc, database: createNodeTestDatabaseService() })
+    const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
     const batch = store.createApplyBatch(1)
 
     await batch.add(note('notes/a.md'))
@@ -189,7 +189,7 @@ describe('createApplyBatch', () => {
 
   it('flushes on its own at the transaction cap', async () => {
     const ipc = createTestIpcBridgeService({ commands: writeCommands() })
-    const store = createIndexStoreService({ ipc, database: createNodeTestDatabaseService() })
+    const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
     const batch = store.createApplyBatch(1)
     const projection = note('notes/a.md')
 
@@ -205,7 +205,7 @@ describe('createApplyBatch', () => {
 describe('createTouchBatch', () => {
   it('applies queued re-stamps in one `index_touch`', async () => {
     const ipc = createTestIpcBridgeService({ commands: writeCommands() })
-    const store = createIndexStoreService({ ipc, database: createNodeTestDatabaseService() })
+    const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
     const touches = store.createTouchBatch(6)
 
     await touches.add({ path: 'notes/a.md', mtime: 1 })
@@ -230,7 +230,7 @@ describe('createTouchBatch', () => {
 })
 describe('createTestIndexStoreService', () => {
   it('records calls and mirrors applies into its database', async () => {
-    const database = createNodeTestDatabaseService()
+    const database = createTestDatabaseService()
     const store = createTestIndexStoreService({ database, meta: { seeded: 'yes' } })
     try {
       await store.applyBatch([note('notes/a.md'), note('notes/b.md')], 1)
@@ -246,9 +246,7 @@ describe('createTestIndexStoreService', () => {
       ])
       expect(store.removed()).toEqual(['notes/b.md'])
       expect(store.moved()).toEqual([{ from: 'notes/x.md', to: 'notes/y.md' }])
-      await expect(database.db.selectFrom('notes').select('path').execute()).resolves.toEqual([
-        { path: 'notes/a.md' },
-      ])
+      expect(database.query('SELECT path FROM notes')).toEqual([{ path: 'notes/a.md' }])
       await expect(store.getMeta('k')).resolves.toBe('v')
       await expect(store.getMeta('seeded')).resolves.toBe('yes')
     } finally {
@@ -257,7 +255,7 @@ describe('createTestIndexStoreService', () => {
   })
 
   it('mirrors a move into its database, re-stating the path-derived claims', async () => {
-    const database = createNodeTestDatabaseService()
+    const database = createTestDatabaseService()
     const store = createTestIndexStoreService({ database })
     try {
       const source = '# Title\n\n[[Other]] #tag\n'
@@ -272,26 +270,25 @@ describe('createTestIndexStoreService', () => {
       await store.apply(note('notes/taken.md'), 1)
       await store.moveIndexed('notes/old.md', 'notes/New Name.md', 1)
 
-      await expect(
-        database.db.selectFrom('notes').select(['path', 'pathKey']).orderBy('path').execute(),
-      ).resolves.toEqual([
-        { path: 'notes/New Name.md', pathKey: 'notes/new name.md' },
-        { path: 'notes/taken.md', pathKey: 'notes/taken.md' },
+      expect(database.query('SELECT path, path_key FROM notes ORDER BY path')).toEqual([
+        { path: 'notes/New Name.md', path_key: 'notes/new name.md' },
+        { path: 'notes/taken.md', path_key: 'notes/taken.md' },
       ])
-      await expect(
-        database.runQuery('SELECT key, tier FROM note_claims WHERE note_path = ? ORDER BY tier', [
+      expect(
+        database.query('SELECT key, tier FROM note_claims WHERE note_path = ? ORDER BY tier', [
           'notes/New Name.md',
         ]),
-      ).resolves.toEqual([
+      ).toEqual([
         { key: 'title', tier: 2 },
         { key: 'new name', tier: 4 },
       ])
-      await expect(
-        database.runQuery('SELECT source_path FROM links UNION SELECT note_path FROM tags', []),
-      ).resolves.toEqual([{ source_path: 'notes/New Name.md' }])
-      await expect(
-        database.runQuery('SELECT path FROM search_fts ORDER BY path', []),
-      ).resolves.toEqual([{ path: 'notes/New Name.md' }, { path: 'notes/taken.md' }])
+      expect(
+        database.query('SELECT source_path FROM links UNION SELECT note_path FROM tags'),
+      ).toEqual([{ source_path: 'notes/New Name.md' }])
+      expect(database.query('SELECT path FROM search_fts ORDER BY path')).toEqual([
+        { path: 'notes/New Name.md' },
+        { path: 'notes/taken.md' },
+      ])
 
       await expect(store.move('notes/New Name.md', 'notes/taken.md', 1)).rejects.toMatchObject({
         kind: 'io',

@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { parseSearchQuery } from './indexing/filter-query.ts'
 import { createTestClockService } from './testing/clock.ts'
-import { createNodeTestDatabaseService, seedNotes } from './testing/database.ts'
+import { createTestDatabaseService, seedNotes } from './testing/database.ts'
 import { createTestNoteFileService } from './testing/graph.ts'
 import { createTestHttpService } from './testing/http.ts'
 import { createTestIpcBridgeService } from './testing/ipc.ts'
@@ -20,7 +19,7 @@ import {
 import { createPosixPathTransport } from './ports/path-service.ts'
 
 function requiredAdapters(): CoreAdapters {
-  const ipc = createTestIpcBridgeService({ commands: { app_version: () => '1.2.3' } })
+  const ipc = createTestIpcBridgeService({ commands: { mobile_storage_local: () => '/local' } })
   return {
     ipc,
     platform: createTestPlatformService(),
@@ -49,7 +48,7 @@ describe('createCoreServices', () => {
     expect(services.logger).toBe(adapters.logger)
     expect(services.clock).toBe(adapters.clock)
     expect(services.platform).toBe(adapters.platform)
-    await expect(services.ipc.call('app_version', {}, z.string())).resolves.toBe('1.2.3')
+    await expect(services.ipc.call('mobile_storage_local', {})).resolves.toBe('/local')
     expect(services.platform.appVersion).toBe('0.0.0-test')
     await expect(services.path.homeDir()).resolves.toBe('/home/test')
   })
@@ -117,7 +116,7 @@ describe('createCoreServices', () => {
 
   it('builds the index reads over the composed database', async () => {
     const ipc = createTestIpcBridgeService({
-      commands: { db_query: () => [{ path: 'notes/a.md' }] },
+      commands: { index_random_note: () => 'notes/a.md' },
     })
     const services = createCoreServices({
       ...requiredAdapters(),
@@ -125,7 +124,7 @@ describe('createCoreServices', () => {
       logger: createTestLoggerService(),
     })
     await expect(services.indexQuery.randomNotePath()).resolves.toBe('notes/a.md')
-    expect(ipc.calls().map((call) => call.command)).toEqual(['db_query'])
+    expect(ipc.calls().map((call) => call.command)).toEqual(['index_random_note'])
   })
 
   it('builds each replaced service with its factory over the same dependencies', () => {
@@ -145,7 +144,7 @@ describe('createCoreServices', () => {
 
 describe('createTestCoreServices', () => {
   it('builds the index reads over the test database and note files', async () => {
-    const services = createTestCoreServices({ database: createNodeTestDatabaseService() })
+    const services = createTestCoreServices({ database: createTestDatabaseService() })
     seedNotes(services.database, [{ path: 'notes/plan.md', markdown: '# Plan\n' }])
     await services.noteFile.write('notes/plan-2.md', '# Plan\n', 1)
 
@@ -159,7 +158,7 @@ describe('createTestCoreServices', () => {
   })
 
   it('builds the index reads over an overriding database', async () => {
-    const database = createNodeTestDatabaseService()
+    const database = createTestDatabaseService()
     seedNotes(database, [{ path: 'notes/other.md', markdown: '# Other\n' }])
     const services = createTestCoreServices({ database })
 

@@ -1,7 +1,7 @@
 import { returnNull } from '@ocavue/utils'
 import { describe, expect, it } from 'vitest'
 import { createTestChatHistoryService } from '../../testing/chat.ts'
-import { createNodeTestDatabaseService } from '../../testing/database.ts'
+import { createTestDatabaseService } from '../../testing/database.ts'
 import { createTestIpcBridgeService } from '../../testing/ipc.ts'
 import { createTestLoggerService } from '../../testing/logger.ts'
 import { createChatHistoryService } from './chat-history-service.ts'
@@ -41,39 +41,30 @@ const conversation = { id: 'conv-1', title: 'what is this?', createdMs: 1_000, u
 
 function setup() {
   const ipc = createTestIpcBridgeService()
-  const database = createNodeTestDatabaseService()
+  const database = createTestDatabaseService()
   const logger = createTestLoggerService()
   const history = createChatHistoryService({ ipc, database, logger })
 
-  async function insertConversation(row: typeof conversation): Promise<void> {
-    await database.runQuery(
-      'INSERT INTO chat_conversations(id, title, created_ms, updated_ms) VALUES (?, ?, ?, ?)',
-      [row.id, row.title, row.createdMs, row.updatedMs],
-    )
-  }
-
-  async function insertMessage(
-    seq: number,
+  function insertMessage(
     overrides: Partial<Record<'id' | 'parts', string>> = {},
-  ): Promise<void> {
-    await database.runQuery(
-      `INSERT INTO chat_messages(
-        id, conversation_id, seq, user_text, attachments, parts, response_messages, created_ms
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        overrides.id ?? turn.id,
-        conversation.id,
-        seq,
-        turn.userText,
-        JSON.stringify(turn.attachments),
-        overrides.parts ?? JSON.stringify(turn.parts),
-        JSON.stringify(turn.responseMessages),
-        2_000,
-      ],
-    )
+    row: typeof conversation = conversation,
+  ): void {
+    database.invoke('chat_message_save', {
+      conversation: row,
+      message: {
+        id: overrides.id ?? turn.id,
+        conversationId: row.id,
+        userText: turn.userText,
+        attachments: JSON.stringify(turn.attachments),
+        parts: overrides.parts ?? JSON.stringify(turn.parts),
+        responseMessages: JSON.stringify(turn.responseMessages),
+        createdMs: 2_000,
+      },
+      generation: database.generation(),
+    })
   }
 
-  return { ipc, database, logger, history, insertConversation, insertMessage }
+  return { ipc, database, logger, history, insertMessage }
 }
 
 describe('createChatHistoryService', () => {
@@ -113,10 +104,10 @@ describe('createChatHistoryService', () => {
   })
 
   it('lists the most recently active conversations first', async () => {
-    const { history, insertConversation } = setup()
-    await insertConversation(conversation)
-    await insertConversation({ ...conversation, id: 'conv-2', updatedMs: 3_000 })
-    await insertConversation({ ...conversation, id: 'conv-3', updatedMs: 1_500 })
+    const { history, insertMessage } = setup()
+    insertMessage({ id: 'turn-1' }, conversation)
+    insertMessage({ id: 'turn-2' }, { ...conversation, id: 'conv-2', updatedMs: 3_000 })
+    insertMessage({ id: 'turn-3' }, { ...conversation, id: 'conv-3', updatedMs: 1_500 })
 
     const recent = await history.listRecent()
     expect(recent.map((row) => row.id)).toEqual(['conv-2', 'conv-1', 'conv-3'])
@@ -125,20 +116,18 @@ describe('createChatHistoryService', () => {
   })
 
   it('round-trips a persisted turn in order, restored as done', async () => {
-    const { history, insertConversation, insertMessage } = setup()
-    await insertConversation(conversation)
-    await insertMessage(1, { id: 'turn-2' })
-    await insertMessage(0)
+    const { history, insertMessage } = setup()
+    insertMessage()
+    insertMessage({ id: 'turn-2' })
 
     const turns = await history.loadConversation('conv-1')
     expect(turns).toEqual([turn, { ...turn, id: 'turn-2' }])
   })
 
   it('drops an unreadable row but keeps the rest', async () => {
-    const { logger, history, insertConversation, insertMessage } = setup()
-    await insertConversation(conversation)
-    await insertMessage(0, { id: 'turn-bad', parts: '{not json' })
-    await insertMessage(1)
+    const { logger, history, insertMessage } = setup()
+    insertMessage({ id: 'turn-bad', parts: '{not json' })
+    insertMessage()
 
     expect(await history.loadConversation('conv-1')).toEqual([turn])
     expect(logger.getErrors()).toEqual([
@@ -147,14 +136,13 @@ describe('createChatHistoryService', () => {
   })
 
   it('drops a row whose parts fail validation', async () => {
-    const { history, insertConversation, insertMessage } = setup()
-    await insertConversation(conversation)
-    await insertMessage(0, { parts: JSON.stringify([{ kind: 'mystery' }]) })
+    const { history, insertMessage } = setup()
+    insertMessage({ parts: JSON.stringify([{ kind: 'mystery' }]) })
     expect(await history.loadConversation('conv-1')).toEqual([])
   })
 
   it('upgrades a legacy single-note read part to the batch shape', async () => {
-    const { history, insertConversation, insertMessage } = setup()
+    const { history, insertMessage } = setup()
     // History persisted before read_notes stored read as a single note; it must
     // still load, rewritten to the current paths/notes shape rather than dropped.
     const legacyParts = [
@@ -171,8 +159,7 @@ describe('createChatHistoryService', () => {
         error: null,
       },
     ]
-    await insertConversation(conversation)
-    await insertMessage(0, { parts: JSON.stringify(legacyParts) })
+    insertMessage({ parts: JSON.stringify(legacyParts) })
 
     const [restored] = await history.loadConversation('conv-1')
     expect(restored?.parts).toEqual([

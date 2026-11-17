@@ -7,9 +7,7 @@ import { clipAtWordBoundary } from './text.ts'
 
 const TITLE_TIMEOUT_MS = 30_000
 const FORMAT_TIMEOUT_MS = 60_000
-const MAX_TRANSCRIPT_CHARS = 4_000
 const MAX_TITLE_CHARS = 80
-const MAX_FALLBACK_WORDS = 8
 const OPENAI_AUDIO_MEMO_ENRICHMENT_MODEL = 'gpt-6-luna'
 const ANTHROPIC_AUDIO_MEMO_ENRICHMENT_MODEL = 'claude-haiku-5-5'
 const GOOGLE_AUDIO_MEMO_ENRICHMENT_MODEL = 'gemini-3.5-flash-lite'
@@ -20,28 +18,14 @@ const audioMemoTitleSchema = z.object({
 
 export interface AudioMemoEnrichmentCredentials {
   /**
-   * The provider entry whose provider selects the fixed small enrichment model.
+   * The small-model config from `pickAudioMemoEnrichmentConfig` or
+   * `audioMemoEnrichmentConfig`.
    */
   readonly config: AiProviderConfig
   /**
    * The BYOK API key, or an empty string for no-key compatible endpoints.
    */
   readonly apiKey: string
-}
-
-export interface GenerateAudioMemoTitleRequest {
-  /**
-   * Optional title-generation credentials; omitted means local fallback only.
-   */
-  readonly credentials?: AudioMemoEnrichmentCredentials | undefined
-  /**
-   * The memo transcript to name.
-   */
-  readonly transcript: string
-  /**
-   * Timestamp-derived fallback when the transcript cannot produce a title.
-   */
-  readonly fallbackTitle: string
 }
 
 /**
@@ -96,33 +80,12 @@ function firstContentLine(text: string): string {
 /**
  * Sanitize and length-bound a generated title for Markdown and wiki-link use.
  */
-export function normalizedAudioMemoTitle(candidate: string): string | null {
+function normalizedAudioMemoTitle(candidate: string): string | null {
   const safe = wikiLinkSafe(firstContentLine(candidate))
     .replace(/[.!?]+$/u, '')
     .trim()
   const clipped = clipAtWordBoundary(safe, MAX_TITLE_CHARS)
   return clipped === '' ? null : clipped
-}
-
-function titleCaseFallback(text: string): string {
-  return text
-    .split(/\s+/)
-    .filter((word) => word !== '')
-    .slice(0, MAX_FALLBACK_WORDS)
-    .map((word, index) => {
-      const lower = word.toLocaleLowerCase()
-      return index === 0 ? lower.charAt(0).toLocaleUpperCase() + lower.slice(1) : lower
-    })
-    .join(' ')
-}
-
-/**
- * Derive a short local title from the transcript without making a provider call.
- */
-export function transcriptFallbackTitle(transcript: string, fallbackTitle: string): string {
-  const firstSentence = firstContentLine(transcript).split(/[.!?]/u)[0] ?? ''
-  const normalized = normalizedAudioMemoTitle(titleCaseFallback(firstSentence))
-  return normalized ?? fallbackTitle
 }
 
 function titlePrompt(transcript: string): string {
@@ -132,7 +95,7 @@ function titlePrompt(transcript: string): string {
     'Use the language of the transcript.',
     'Return only the title: no quotes, no markdown, no punctuation unless it is part of a name.',
     '',
-    `Transcript:\n${transcript.slice(0, MAX_TRANSCRIPT_CHARS)}`,
+    `Transcript:\n${transcript.slice(0, TITLE_INPUT_MAX_CHARS)}`,
   ].join('\n')
 }
 
@@ -188,32 +151,6 @@ function retainsTranscriptContent(transcript: string, formatted: string): boolea
   )
 }
 
-export interface FormatAudioMemoTranscriptRequest {
-  /**
-   * Small-model credentials selected from the user's BYOK providers.
-   */
-  readonly credentials: AudioMemoEnrichmentCredentials
-  /**
-   * The complete raw provider transcript.
-   */
-  readonly transcript: string
-  /**
-   * Timestamp-derived fallback when the transcript cannot produce a title.
-   */
-  readonly fallbackTitle: string
-}
-
-export interface FormattedAudioMemoTranscript {
-  /**
-   * Sanitized title for the memo note and daily-note backlink.
-   */
-  readonly title: string
-  /**
-   * Formatted Markdown, or the untouched raw transcript if formatting fails.
-   */
-  readonly body: string
-}
-
 /**
  * Past this the formatting model reliably times out or fails the verbatim
  * equivalence check (`retainsTranscriptContent`), so the call would be paid
@@ -230,7 +167,7 @@ export const TITLE_INPUT_MAX_CHARS = 4_000
 
 export interface EnrichSessionTranscriptInput {
   /**
-   * The stitched, non-empty session transcript.
+   * The stitched session transcript.
    */
   readonly transcript: string
   /**
@@ -245,6 +182,10 @@ export interface EnrichSessionTranscriptInput {
    * Timestamp-derived title used when enrichment cannot name the memo.
    */
   readonly fallbackTitle: string
+  /**
+   * Returns `true` once the graph session has ended, which skips the title-only call.
+   */
+  readonly isStale?: (() => boolean) | undefined
 }
 
 export interface EnrichedSessionTranscript {
@@ -257,29 +198,22 @@ export interface TranscriptEnrichmentServiceDeps {
 }
 
 /**
- * Best-effort enrichment of a transcript after transcription: an optional
- * formatting pass and a content-derived title. Enrichment never gates the
- * transcript: every failure path falls back to the raw text and a local
- * title, because the transcript is already durable by the time this runs.
+ * Best-effort enrichment of a transcript after transcription. Enrichment never
+ * gates the transcript, because it is already durable by the time this runs.
  */
 export interface TranscriptEnrichmentService {
   /**
-   * Format and name one session's stitched transcript, or only name it.
+   * Format and name one session's stitched transcript. The formatting pass
+   * returns a title and a body; a body that does not retain the transcript is
+   * replaced by the raw transcript. A failed formatting pass or an empty title
+   * falls back to a title-only call, then to the timestamp title.
    */
   enrich(input: EnrichSessionTranscriptInput): Promise<EnrichedSessionTranscript>
-  /**
-   * Generate a concise, content-derived memo title. Provider failures are
-   * non-fatal because the transcript is already durable; callers still get a
-   * deterministic title from the transcript before falling back to the timestamp.
-   */
-  generateTitle(request: GenerateAudioMemoTitleRequest): Promise<string>
-  /**
-   * Best-effort transcript cleanup and naming in one small-model call. Formatting
-   * is optional enrichment: any model, timeout, or validation failure returns the
-   * raw transcript and a deterministic local title so successful transcription
-   * is never repeated or billed twice.
-   */
-  formatTranscript(request: FormatAudioMemoTranscriptRequest): Promise<FormattedAudioMemoTranscript>
+}
+
+interface FormattedTranscript {
+  readonly title: string | null
+  readonly body: string | null
 }
 
 class TranscriptEnrichmentServiceImpl implements TranscriptEnrichmentService {
@@ -289,86 +223,68 @@ class TranscriptEnrichmentServiceImpl implements TranscriptEnrichmentService {
     this.#deps = deps
   }
 
-  // One formatting-and-naming call when formatting is on and the transcript
-  // fits, else a title-only call.
   async enrich(input: EnrichSessionTranscriptInput): Promise<EnrichedSessionTranscript> {
-    if (
-      input.formatTranscript &&
-      input.enrichmentCredentials !== null &&
-      input.transcript.length <= FORMAT_MAX_CHARS
-    ) {
-      const formatted = await this.formatTranscript({
-        credentials: input.enrichmentCredentials,
-        transcript: input.transcript,
-        fallbackTitle: input.fallbackTitle,
-      })
-      return { title: formatted.title, body: formatted.body }
+    const { transcript, enrichmentCredentials: credentials } = input
+    if (credentials === null || transcript.trim() === '') {
+      return { title: input.fallbackTitle, body: transcript }
     }
-    const title = await this.generateTitle({
-      ...(input.enrichmentCredentials !== null ? { credentials: input.enrichmentCredentials } : {}),
-      transcript: input.transcript.slice(0, TITLE_INPUT_MAX_CHARS),
-      fallbackTitle: input.fallbackTitle,
-    })
-    return { title, body: input.transcript }
+    const formatted =
+      input.formatTranscript && transcript.length <= FORMAT_MAX_CHARS
+        ? await this.#format(credentials, transcript)
+        : null
+    const title =
+      formatted?.title ??
+      (input.isStale?.() === true ? null : await this.#title(credentials, transcript))
+    return { title: title ?? input.fallbackTitle, body: formatted?.body ?? transcript }
   }
 
-  async generateTitle(request: GenerateAudioMemoTitleRequest): Promise<string> {
-    const fallback = transcriptFallbackTitle(request.transcript, request.fallbackTitle)
-    if (request.transcript.trim() === '') {
-      return request.fallbackTitle
-    }
-    if (request.credentials === undefined) {
-      return fallback
-    }
-    const titleConfig = audioMemoEnrichmentConfig(request.credentials.config)
-    if (titleConfig === null) {
-      return fallback
-    }
+  /**
+   * Returns `null` when the call fails. The body is `null` when it does not
+   * retain the transcript.
+   */
+  async #format(
+    credentials: AudioMemoEnrichmentCredentials,
+    transcript: string,
+  ): Promise<FormattedTranscript | null> {
     try {
       const { generateText, Output } = await import('@reflect/modules/ai')
       const result = await generateText({
-        model: await this.#deps.languageModel.create(titleConfig, request.credentials.apiKey),
-        output: Output.object({ schema: audioMemoTitleSchema }),
-        prompt: titlePrompt(request.transcript),
-        abortSignal: AbortSignal.timeout(TITLE_TIMEOUT_MS),
-        maxRetries: 0,
-      })
-      return normalizedAudioMemoTitle(result.output.title) ?? fallback
-    } catch {
-      return fallback
-    }
-  }
-
-  async formatTranscript(
-    request: FormatAudioMemoTranscriptRequest,
-  ): Promise<FormattedAudioMemoTranscript> {
-    const fallbackTitle = transcriptFallbackTitle(request.transcript, request.fallbackTitle)
-    const config = audioMemoEnrichmentConfig(request.credentials.config)
-    if (request.transcript.trim() === '' || config === null) {
-      return { title: fallbackTitle, body: request.transcript }
-    }
-
-    try {
-      const { generateText, Output } = await import('@reflect/modules/ai')
-      const result = await generateText({
-        model: await this.#deps.languageModel.create(config, request.credentials.apiKey),
+        model: await this.#deps.languageModel.create(credentials.config, credentials.apiKey),
         output: Output.object({ schema: formattedAudioMemoSchema }),
         instructions: FORMAT_SYSTEM_PROMPT,
-        prompt: `Transcript JSON string:\n${JSON.stringify(request.transcript)}`,
+        prompt: `Transcript JSON string:\n${JSON.stringify(transcript)}`,
         abortSignal: AbortSignal.timeout(FORMAT_TIMEOUT_MS),
         maxRetries: 0,
       })
-
       const body = result.output.body.trim()
-      if (body === '' || !retainsTranscriptContent(request.transcript, body)) {
-        return { title: fallbackTitle, body: request.transcript }
-      }
       return {
-        title: normalizedAudioMemoTitle(result.output.title) ?? fallbackTitle,
-        body,
+        title: normalizedAudioMemoTitle(result.output.title),
+        body: body !== '' && retainsTranscriptContent(transcript, body) ? body : null,
       }
     } catch {
-      return { title: fallbackTitle, body: request.transcript }
+      return null
+    }
+  }
+
+  /**
+   * Returns `null` when the call fails or the title is empty after sanitizing.
+   */
+  async #title(
+    credentials: AudioMemoEnrichmentCredentials,
+    transcript: string,
+  ): Promise<string | null> {
+    try {
+      const { generateText, Output } = await import('@reflect/modules/ai')
+      const result = await generateText({
+        model: await this.#deps.languageModel.create(credentials.config, credentials.apiKey),
+        output: Output.object({ schema: audioMemoTitleSchema }),
+        prompt: titlePrompt(transcript),
+        abortSignal: AbortSignal.timeout(TITLE_TIMEOUT_MS),
+        maxRetries: 0,
+      })
+      return normalizedAudioMemoTitle(result.output.title)
+    } catch {
+      return null
     }
   }
 }

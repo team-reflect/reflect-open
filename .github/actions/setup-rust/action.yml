@@ -3,7 +3,7 @@ description: Installs the Rust toolchain and the cargo build cache.
 
 inputs:
   cache:
-    description: Whether to restore and save the cargo build cache.
+    description: Whether to restore and save the cache.
     required: false
     default: 'true'
   cache-key:

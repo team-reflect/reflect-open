@@ -1,3 +1,4 @@
+import type { WikiAliasCandidate, WikiTitleCandidate } from '@reflect/types'
 import { describe, expect, it } from 'vitest'
 import { parseNote } from '../markdown/index.ts'
 import { foldKey } from '../markdown/keys.ts'
@@ -7,12 +8,10 @@ import {
   mergeDateSuggestions,
   rankWikiSuggestions,
   serializeWikiSuggestionAddress,
-  type AliasCandidate,
-  type TitleCandidate,
   type WikiSuggestion,
 } from './suggest.ts'
 
-function note(title: string, mtime = 0, extra?: Partial<TitleCandidate>): TitleCandidate {
+function note(title: string, mtime = 0, extra?: Partial<WikiTitleCandidate>): WikiTitleCandidate {
   return {
     path: `notes/${title.toLowerCase().replaceAll(' ', '-')}.md`,
     title,
@@ -24,7 +23,7 @@ function note(title: string, mtime = 0, extra?: Partial<TitleCandidate>): TitleC
   }
 }
 
-function alias(target: TitleCandidate, aliasText: string): AliasCandidate {
+function alias(target: WikiTitleCandidate, aliasText: string): WikiAliasCandidate {
   return { ...target, alias: aliasText, aliasKey: aliasText.toLowerCase() }
 }
 

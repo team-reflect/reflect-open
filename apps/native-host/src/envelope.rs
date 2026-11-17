@@ -1,50 +1,16 @@
-//! The wire message and capture envelope, mirroring the zod schemas in
-//! `@reflect/core` (`capture/capture-envelope.ts` — the source of truth).
+//! Validation of the extension's wire message (`reflect_types::CaptureWireMessage`).
 //! Serde tolerates unknown fields (a newer extension must not break an older
 //! host); the checks here are the ones the host *must* enforce before the
 //! envelope id names files on disk.
 
 use base64::Engine;
-use serde::{Deserialize, Serialize};
+use reflect_types::{CaptureSource, CaptureWireMessage, LinkCaptureEnvelope};
 
 use crate::HostError;
 
-/// The capture envelope as spooled. `screenshot_ref` is host-stamped — the
-/// extension never sends it (the TS wire schema omits it).
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Envelope {
-    pub version: u32,
-    pub id: String,
-    pub url: String,
-    pub title: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub selection: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub content_text: Option<String>,
-    /// In-page meta description; only the iOS share extension sets it, so a
-    /// Chrome wire message carrying one passes through untouched.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub meta_description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub note: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub screenshot_ref: Option<String>,
-    pub captured_at: String,
-    pub source: String,
-}
-
-/// The extension→host message: envelope plus optional screenshot bytes.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct WireMessage {
-    envelope: Envelope,
-    screenshot_base64: Option<String>,
-}
-
 /// A wire message that passed every host-side check, screenshot decoded.
 pub struct ValidatedCapture {
-    pub envelope: Envelope,
+    pub envelope: LinkCaptureEnvelope,
     pub screenshot: Option<Vec<u8>>,
 }
 
@@ -144,7 +110,7 @@ impl ValidatedCapture {
     /// Parse and validate one wire payload. Every rejection is an
     /// `invalid-payload` ack with a reason the extension can surface.
     pub fn parse(payload: &[u8]) -> Result<Self, HostError> {
-        let message: WireMessage = serde_json::from_slice(payload)
+        let message: CaptureWireMessage = serde_json::from_slice(payload)
             .map_err(|error| HostError::InvalidPayload(format!("malformed message: {error}")))?;
         let mut envelope = message.envelope;
 
@@ -166,7 +132,7 @@ impl ValidatedCapture {
                 envelope.captured_at
             )));
         }
-        if envelope.source != "extension" {
+        if envelope.source != CaptureSource::Extension {
             return Err(HostError::InvalidPayload(format!(
                 "unknown source {:?}",
                 envelope.source

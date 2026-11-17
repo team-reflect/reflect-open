@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import TypesShared
 
 @testable import RecordingKit
 

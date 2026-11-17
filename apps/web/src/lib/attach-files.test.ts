@@ -1,7 +1,6 @@
-import { createTestAppServices, type TestAppServices } from '@reflect/app/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   createTestCoreServices,
   type TestCoreServices,
 } from '@reflect/core/testing'
@@ -13,13 +12,14 @@ import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { attachFilesToNote } from './attach-files.ts'
 import { noop, returnFalse } from '@ocavue/utils'
+import { createWebTestAppServices, type WebTestAppServices } from '@/test-utils/app-services.ts'
 
 let core: TestCoreServices
-let appLayer: TestAppServices
+let appLayer: WebTestAppServices
 
 beforeEach(() => {
-  core = createTestCoreServices({ database: createNodeTestDatabaseService() })
-  appLayer = createTestAppServices(core)
+  core = createTestCoreServices({ database: createTestDatabaseService() })
+  appLayer = createWebTestAppServices(core)
   core.graphSession.setGraph({ generation: 4 })
 })
 
@@ -51,6 +51,7 @@ function contextFor(notePath: string | null): CommandContext {
     openTemplatePicker: vi.fn(),
     openTemplateCreate: vi.fn(),
     enableSemanticSearch: vi.fn(),
+    selectSection: vi.fn(),
     clearScrollState: vi.fn(),
   }
 }

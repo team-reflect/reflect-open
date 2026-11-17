@@ -10,6 +10,7 @@ import {
   AppError,
 } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestSettingsService,
   type TestCoreServices,
@@ -17,7 +18,6 @@ import {
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider.tsx'
 import { useStore } from '@/lib/use-store.ts'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { createTestToastController } from '@/test-utils/toast.tsx'
 import { ToastControllerContext } from '@/lib/use-toasts.ts'
 import { AudioMemoProvider, useAudioMemo, useAudioMemoPhase } from './audio-memo-provider.tsx'
@@ -86,7 +86,7 @@ async function setup(provider: AiProviderConfig = OPENAI) {
   })
   await settings.whenLoaded()
   const core: TestCoreServices = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     settings,
   })
   core.audioRecorder.setStopResult(RECORDING)

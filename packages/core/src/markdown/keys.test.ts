@@ -51,7 +51,7 @@ describe('foldTag', () => {
 })
 
 describe('foldKey parity corpus', () => {
-  // The same corpus pins the CLI's `fold_key`; see `apps/cli/src/keys.rs`.
+  // The same corpus pins the CLI's `fold_key`; see `crates/index/src/text/keys.rs`.
   const fixtures = z
     .array(z.object({ input: z.string(), key: z.string() }))
     .parse(

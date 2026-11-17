@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   seedNotes,
   type TestDatabaseService,
   type TestNote,
@@ -8,7 +8,7 @@ import {
 import { createWikiResolverService } from './wiki-resolver-service.ts'
 
 function seeded(notes: readonly TestNote[]): TestDatabaseService {
-  const database = createNodeTestDatabaseService()
+  const database = createTestDatabaseService()
   seedNotes(database, notes)
   return database
 }
@@ -60,7 +60,7 @@ describe('resolveWikiTarget', () => {
     await expect(
       createWikiResolverService({ database }).resolveWikiTarget('  DAD  '),
     ).resolves.toEqual({ kind: 'resolved', ref: 'notes/winner.md' })
-    expect(database.getQueries()).toHaveLength(1)
+    expect(database.getReads()).toHaveLength(1)
   })
 
   it('preserves trimmed text when the canonical address is unresolved', async () => {
@@ -72,12 +72,12 @@ describe('resolveWikiTarget', () => {
   })
 
   it('short-circuits a blank target before querying the index', async () => {
-    const database = createNodeTestDatabaseService()
+    const database = createTestDatabaseService()
 
     await expect(createWikiResolverService({ database }).resolveWikiTarget('   ')).resolves.toEqual(
       { kind: 'unresolved', text: '' },
     )
-    expect(database.getQueries()).toEqual([])
+    expect(database.getReads()).toEqual([])
   })
 })
 
@@ -95,11 +95,11 @@ describe('findWikiTargetMatch', () => {
       tier: 2,
       paths: ['notes/business-ideas-2.md', 'notes/business-ideas.md'],
     })
-    expect(database.getQueries()).toHaveLength(1)
+    expect(database.getReads()).toHaveLength(1)
   })
 
   it('reports an unclaimed key as tier 0 and never queries when the key is blank', async () => {
-    const database = createNodeTestDatabaseService()
+    const database = createTestDatabaseService()
     const wikiResolver = createWikiResolverService({ database })
 
     await expect(wikiResolver.findWikiTargetMatch('missing')).resolves.toEqual({
@@ -107,7 +107,7 @@ describe('findWikiTargetMatch', () => {
       paths: [],
     })
     await expect(wikiResolver.findWikiTargetMatch('')).resolves.toEqual({ tier: 0, paths: [] })
-    expect(database.getQueries()).toHaveLength(1)
+    expect(database.getReads()).toHaveLength(1)
   })
 
   it('reads a daily-date claim from the same table as every other tier', async () => {
@@ -131,7 +131,7 @@ describe('findNotesByPathKey', () => {
       'Projects/Plan.md',
     ])
     await expect(wikiResolver.findNotesByPathKey('')).resolves.toEqual([])
-    expect(database.getQueries()).toHaveLength(1)
+    expect(database.getReads()).toHaveLength(1)
   })
 })
 

@@ -95,7 +95,13 @@ export function SettingsNavRow({
   disabled,
 }: SettingsNavRowProps): ReactElement {
   return (
-    <button type="button" className={PRESSABLE_ROW_CLASS} onClick={onPress} disabled={disabled}>
+    <button
+      type="button"
+      data-back-swipe="on"
+      className={PRESSABLE_ROW_CLASS}
+      onClick={onPress}
+      disabled={disabled}
+    >
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {value !== undefined ? (
         <span className="max-w-[55%] shrink-0 truncate text-text-secondary">{value}</span>
@@ -121,7 +127,7 @@ export function SettingsSwitchRow({
   descriptionId,
 }: SettingsSwitchRowProps): ReactElement {
   return (
-    <label className={ROW_CLASS}>
+    <label data-back-swipe="on" className={ROW_CLASS}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <Switch
         aria-describedby={descriptionId}
@@ -164,6 +170,7 @@ export function SettingsMenuRow<Value extends string>({
         <ChevronsUpDown aria-hidden className="-mr-1 size-[15px] shrink-0" strokeWidth={2.4} />
       </span>
       <select
+        data-back-swipe="on"
         aria-label={label}
         value={value}
         onChange={(event) => {
@@ -208,6 +215,7 @@ export function SettingsActionRow({
   return (
     <button
       type="button"
+      data-back-swipe="on"
       className={cn(
         PRESSABLE_ROW_CLASS,
         tone === 'destructive' ? 'text-destructive' : 'text-primary',
@@ -246,6 +254,7 @@ export function SettingsSelectRow({
   return (
     <button
       type="button"
+      data-back-swipe="on"
       className={PRESSABLE_ROW_CLASS}
       onClick={onPress}
       disabled={disabled}
@@ -285,6 +294,7 @@ export function SettingsHeroRow({
   return (
     <button
       type="button"
+      data-back-swipe="on"
       className={cn(PRESSABLE_ROW_CLASS, 'gap-4 py-3.5')}
       onClick={onPress}
       disabled={disabled}

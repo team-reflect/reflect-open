@@ -8,11 +8,11 @@ import { normalizeBinding } from './keybindings.ts'
  * capabilities through `Context`, an object the app assembles, so the
  * registry stays testable and host-agnostic.
  */
-export interface Command<Context = unknown> {
+export interface Command<CommandId extends string, Context = unknown> {
   /**
    * Stable id — the deep-link/CLI name (e.g. `nav.today`).
    */
-  id: string
+  id: CommandId
   /**
    * Palette display title.
    */
@@ -27,6 +27,14 @@ export interface Command<Context = unknown> {
   keybinding?: string
   run: (context: Context) => MaybePromise<void>
 }
+
+/**
+ * A list of commands, in registration order.
+ */
+export type Commands<CommandId extends string, Context = unknown> = readonly Command<
+  CommandId,
+  Context
+>[]
 
 /**
  * The fields of a `keydown` event that {@link CommandService.commandForKeyDown} reads.
@@ -44,24 +52,24 @@ export interface CommandKeyEvent {
 /**
  * A flat, collision-checked id → command map.
  */
-export interface CommandService<Context = unknown> {
+export interface CommandService<CommandId extends string, Context = unknown> {
   /**
    * Register commands; duplicate or blank ids/titles are programmer errors.
    */
-  register(definitions: readonly Command<Context>[]): void
+  register(definitions: Commands<CommandId, Context>): void
   /**
    * Every registered command, in registration order.
    */
-  list(): Command<Context>[]
+  list(): Command<CommandId, Context>[]
   /**
    * Run a command by id; unknown ids are a loud no-op (deep links may dangle).
    */
-  run(id: string, context: Context): Promise<void>
+  run(id: CommandId, context: Context): Promise<void>
   /**
    * The id of the command whose keybinding `event` types, or `null`. Only
    * chords with ⌘ or Ctrl match, and a held key (`repeat`) never does.
    */
-  commandForKeyDown(event: CommandKeyEvent): string | null
+  commandForKeyDown(event: CommandKeyEvent): CommandId | null
 }
 
 export interface CommandServiceDeps {
@@ -134,20 +142,23 @@ function bindingLookupsFor(event: CommandKeyEvent): BindingKeyLookup[] {
   return lookups
 }
 
-class CommandServiceImpl<Context> implements CommandService<Context> {
+class CommandServiceImpl<CommandId extends string, Context> implements CommandService<
+  CommandId,
+  Context
+> {
   readonly #deps: CommandServiceDeps
-  readonly #commands = new Map<string, Command<Context>>()
+  readonly #commands = new Map<CommandId, Command<CommandId, Context>>()
   /**
    * Normalized binding → command id, for Apple platforms and for the others.
    */
-  readonly #appleBindingToId = new Map<string, string>()
-  readonly #otherBindingToId = new Map<string, string>()
+  readonly #appleBindingToId = new Map<string, CommandId>()
+  readonly #otherBindingToId = new Map<string, CommandId>()
 
   constructor(deps: CommandServiceDeps) {
     this.#deps = deps
   }
 
-  register(definitions: readonly Command<Context>[]): void {
+  register(definitions: Commands<CommandId, Context>): void {
     for (const command of definitions) {
       if (command.id.trim() === '') {
         throw new Error('command id cannot be empty')
@@ -166,11 +177,11 @@ class CommandServiceImpl<Context> implements CommandService<Context> {
     }
   }
 
-  list(): Command<Context>[] {
+  list(): Command<CommandId, Context>[] {
     return [...this.#commands.values()]
   }
 
-  async run(id: string, context: Context): Promise<void> {
+  async run(id: CommandId, context: Context): Promise<void> {
     const command = this.#commands.get(id)
     if (!command) {
       this.#deps.logger.error(`unknown command: ${id}`)
@@ -179,7 +190,7 @@ class CommandServiceImpl<Context> implements CommandService<Context> {
     await command.run(context)
   }
 
-  commandForKeyDown(event: CommandKeyEvent): string | null {
+  commandForKeyDown(event: CommandKeyEvent): CommandId | null {
     if ((!event.metaKey && !event.ctrlKey) || event.repeat) {
       return null // held keys must not spam navigations (e.g. a stack of new notes)
     }
@@ -203,8 +214,8 @@ class CommandServiceImpl<Context> implements CommandService<Context> {
   }
 }
 
-export function createCommandService<Context = unknown>(
+export function createCommandService<CommandId extends string, Context = unknown>(
   deps: CommandServiceDeps,
-): CommandService<Context> {
-  return new CommandServiceImpl<Context>(deps)
+): CommandService<CommandId, Context> {
+  return new CommandServiceImpl<CommandId, Context>(deps)
 }

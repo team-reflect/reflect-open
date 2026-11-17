@@ -92,8 +92,9 @@ Cheap V1 details that carry the native feel:
 - ~~Back-swipe and stack transitions on note detail~~: done.
   `src/mobile/mobile-stack.tsx` renders note screens as cards over their
   tab root (slide-in push, slide-out pop, instant tab switches) and
-  `src/mobile/use-back-pager.ts` is the edge back-swipe, a native horizontal
-  scroll of the stack's layers. Not the View Transitions API on purpose: it
+  `src/mobile/use-back-pager.ts` is the back-swipe, a native horizontal
+  scroll of the stack's layers. It starts from the left edge or from the
+  background and rows of a stacked screen, never from a control or the editor. Not the View Transitions API on purpose: it
   commits the DOM swap before animating, which would remount the editor on
   every canceled swipe.
 - Status-bar tap → scroll to top, if reachable from the Tauri shell.

@@ -4,7 +4,6 @@ import type {
   ResolveOrCreateNoteResult,
 } from '../graph/note-creation-service.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
-import { inClauseChunks } from '../indexing/query-utils.ts'
 import { serializeWikiSuggestionAddress } from '../indexing/suggest.ts'
 import type { WikiResolverService } from '../indexing/wiki-resolver-service.ts'
 import { canonicalEmails } from '../markdown/email-fields.ts'
@@ -180,25 +179,11 @@ class PersonNoteServiceImpl implements PersonNoteService {
   }
 
   async #personOwners(emails: readonly string[]): Promise<PersonOwnerRow[]> {
-    const { db } = this.#deps.database
-    const owners = new Map<string, PersonOwnerRow>()
-    for (const chunk of inClauseChunks(emails)) {
-      const rows = await db
-        .selectFrom('noteEmails')
-        .innerJoin('notes', 'notes.path', 'noteEmails.notePath')
-        .innerJoin('tags', 'tags.notePath', 'notes.path')
-        .where('noteEmails.emailKey', 'in', chunk)
-        .where('tags.tagKey', '=', PERSON_TAG_KEY)
-        .where('notes.kind', '=', 'note')
-        .select('notes.path as path')
-        .distinct()
-        .orderBy('notes.path')
-        .execute()
-      for (const row of rows) {
-        owners.set(row.path, row)
-      }
-    }
-    return [...owners.values()].sort((left, right) => left.path.localeCompare(right.path))
+    const paths = await this.#deps.database.read('index_person_owners', {
+      emailKeys: emails,
+      tagKey: PERSON_TAG_KEY,
+    })
+    return paths.toSorted((left, right) => left.localeCompare(right)).map((path) => ({ path }))
   }
 }
 

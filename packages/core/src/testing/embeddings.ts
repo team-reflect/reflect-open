@@ -1,3 +1,4 @@
+import type { EmbeddedChunk } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
@@ -6,7 +7,6 @@ import type { StorageService } from '../ports/storage-service.ts'
 import type { GraphRole } from '../graph/graph-session.ts'
 import {
   createEmbeddingIndexService,
-  type EmbedChunkPayload,
   type EmbedNoteOptions,
   type EmbeddingBackfillOptions,
   type EmbeddingBackfillResult,
@@ -30,9 +30,9 @@ import {
 import { AppError } from '../errors.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
-import type { DatabaseService } from '../indexing/database-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
-import { createNodeTestDatabaseService } from './database.ts'
+import type { DatabaseService } from '../indexing/database-service.ts'
+import { createTestDatabaseService, type TestDatabaseService } from './database.ts'
 import { createTestNoteFileService } from './graph.ts'
 import { createTestGraphSessionService } from './graph-session.ts'
 import { createTestIndexLifecycleService } from './index-lifecycle.ts'
@@ -46,7 +46,7 @@ export interface TestEmbeddingRuntimeServiceOptions {
   /**
    * The runtime status. Defaults to `ready` with model `all-MiniLM-L6-v2`.
    */
-  status?: EmbedStatus
+  status?: EmbedStatus | undefined
   /**
    * The vector for one text. Defaults to a 384-dim unit vector.
    */
@@ -228,7 +228,7 @@ export function createTestRetrievalService(
  */
 export interface TestEmbeddingApply {
   readonly path: string
-  readonly chunks: readonly EmbedChunkPayload[]
+  readonly chunks: readonly EmbeddedChunk[]
   readonly generation: number
 }
 
@@ -251,23 +251,23 @@ export interface TestEmbeddingIndexServiceOptions {
   embeddingRuntime?: EmbeddingRuntimeService
   noteFile?: NoteFileService
   /**
-   * Read lazily, so the default (Node only) costs nothing until a note is embedded.
+   * Read lazily, so the default costs nothing until a note is embedded.
+   * Defaults to `storeChunksIn`, else to a new test database.
    */
   database?: DatabaseService
   indexLifecycle?: IndexLifecycleService
   logger?: LoggerService
   clock?: ClockService
   /**
-   * Write applied and removed chunk sets into `database` as the native
-   * writer does, so later passes and retrieval read them back. Needs a
-   * database that accepts writes (the Node test database). Defaults to
-   * `false`: writes are only recorded.
+   * Write applied and removed chunk sets into this database as the native
+   * writer does, so later passes and retrieval read them back. Without it,
+   * writes are only recorded.
    */
-  storeChunks?: boolean
+  storeChunksIn?: TestDatabaseService
   /**
    * Answers `backfill` calls in place of the real pass; a `follow` still runs the real one.
    */
-  backfill?: (options: EmbeddingBackfillOptions) => Promise<EmbeddingBackfillResult>
+  backfill?: ((options: EmbeddingBackfillOptions) => Promise<EmbeddingBackfillResult>) | undefined
   /**
    * Called before a chunk set is written. A returned `Error`
    * rejects the write with it, unrecorded.
@@ -295,82 +295,6 @@ export interface TestEmbeddingIndexService extends EmbeddingIndexService {
   follows(): readonly { readonly generation: number; readonly modelId: string }[]
 }
 
-interface StoredChunkRow {
-  id: number
-  content_hash: string
-}
-
-/**
-
- * `apply_chunks` of the native writer, over `database`.
-
- */
-async function storeChunks(
-  database: DatabaseService,
-  path: string,
-  chunks: readonly EmbedChunkPayload[],
-): Promise<void> {
-  const notes = (await database.runQuery('SELECT 1 FROM notes WHERE path = ?', [path])) as unknown[]
-  if (notes.length === 0) {
-    await dropChunks(database, path)
-    return
-  }
-  const existing = (await database.runQuery(
-    'SELECT id, content_hash FROM embedding_chunks WHERE note_path = ? ORDER BY pos_from',
-    [path],
-  )) as StoredChunkRow[]
-  for (const chunk of chunks) {
-    if (chunk.vector === null) {
-      const at = existing.findIndex((row) => row.content_hash === chunk.contentHash)
-      const row = existing[at]
-      if (row === undefined) {
-        throw new AppError('parse', `unchanged chunk has no stored row (hash ${chunk.contentHash})`)
-      }
-      existing.splice(at, 1)
-      await database.runQuery(
-        'UPDATE embedding_chunks SET heading = ?, pos_from = ?, pos_to = ?, model_id = ? WHERE id = ?',
-        [chunk.heading, chunk.posFrom, chunk.posTo, chunk.modelId, row.id],
-      )
-      continue
-    }
-    const inserted = (await database.runQuery(
-      `INSERT INTO embedding_chunks
-         (note_path, heading, pos_from, pos_to, text, content_hash, model_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-      [
-        path,
-        chunk.heading,
-        chunk.posFrom,
-        chunk.posTo,
-        chunk.text,
-        chunk.contentHash,
-        chunk.modelId,
-      ],
-    )) as { id: number }[]
-    await database.runQuery('INSERT INTO embedding_vectors(rowid, embedding) VALUES (?, ?)', [
-      BigInt(inserted[0]!.id),
-      JSON.stringify(chunk.vector),
-    ])
-  }
-  for (const row of existing) {
-    await database.runQuery('DELETE FROM embedding_vectors WHERE rowid = ?', [row.id])
-    await database.runQuery('DELETE FROM embedding_chunks WHERE id = ?', [row.id])
-  }
-}
-
-/**
-
- * `remove_chunks` of the native writer, over `database`.
-
- */
-async function dropChunks(database: DatabaseService, path: string): Promise<void> {
-  await database.runQuery(
-    'DELETE FROM embedding_vectors WHERE rowid IN (SELECT id FROM embedding_chunks WHERE note_path = ?)',
-    [path],
-  )
-  await database.runQuery('DELETE FROM embedding_chunks WHERE note_path = ?', [path])
-}
-
 class TestEmbeddingIndexServiceImpl implements TestEmbeddingIndexService {
   readonly #inner: EmbeddingIndexService
   readonly #backfillOverride: TestEmbeddingIndexServiceOptions['backfill']
@@ -380,28 +304,29 @@ class TestEmbeddingIndexServiceImpl implements TestEmbeddingIndexService {
   readonly #followLog: { generation: number; modelId: string }[] = []
 
   constructor(options?: TestEmbeddingIndexServiceOptions) {
-    const database = options?.database ?? createNodeTestDatabaseService()
+    const store = options?.storeChunksIn ?? null
+    const database = options?.database ?? store ?? createTestDatabaseService()
     this.#backfillOverride = options?.backfill
     const ipc = createTestIpcBridgeService({
       commands: {
-        embed_apply: async (args) => {
+        embed_apply: (args) => {
           const apply = args as unknown as TestEmbeddingApply
           const failure = options?.failApply?.(apply)
           if (failure !== undefined) {
             throw failure
           }
           this.#applyLog.push(apply)
-          if (options?.storeChunks === true) {
-            await storeChunks(database, apply.path, apply.chunks)
-          }
+          store?.invoke('embed_apply', {
+            path: apply.path,
+            chunks: apply.chunks,
+            generation: store.generation(),
+          })
           return null
         },
-        embed_remove: async (args) => {
+        embed_remove: (args) => {
           const remove = args as unknown as TestEmbeddingRemove
           this.#removeLog.push(remove)
-          if (options?.storeChunks === true) {
-            await dropChunks(database, remove.path)
-          }
+          store?.invoke('embed_remove', { path: remove.path, generation: store.generation() })
           return null
         },
       },

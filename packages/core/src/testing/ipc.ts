@@ -1,3 +1,4 @@
+import type { AssetReadBinaryArgs } from '@reflect/types'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { createTestLoggerService } from './logger.ts'
 import { AppError } from '../errors.ts'
@@ -152,6 +153,7 @@ class TestIpcBridgeServiceImpl implements TestIpcBridgeService {
 
   readonly transport: IpcBridge
   readonly hasBinaryTransport: boolean
+  readonly call: IpcBridgeService['call']
 
   constructor(options: TestIpcBridgeServiceOptions | undefined) {
     this.#transport = new TestIpcTransport(options)
@@ -161,23 +163,19 @@ class TestIpcBridgeServiceImpl implements TestIpcBridgeService {
       logger: options?.logger ?? createTestLoggerService(),
     })
     this.hasBinaryTransport = this.#inner.hasBinaryTransport
+    this.call = this.#inner.call.bind(this.#inner)
   }
 
-  call<TOutput>(
-    command: string,
-    args: Record<string, unknown>,
-    schema: ZodType<TOutput, unknown>,
-  ): Promise<TOutput> {
-    return this.#inner.call(command, args, schema)
+  callBytes(command: 'asset_read_binary', args: AssetReadBinaryArgs): Promise<ArrayBuffer> {
+    return this.#inner.callBytes(command, args)
   }
 
-  callBinary<TOutput>(
-    command: string,
+  callBinary(
+    command: 'asset_upload_append',
     body: Uint8Array,
     headers: Record<string, string>,
-    schema: ZodType<TOutput, unknown>,
-  ): Promise<TOutput> {
-    return this.#inner.callBinary(command, body, headers, schema)
+  ): Promise<void> {
+    return this.#inner.callBinary(command, body, headers)
   }
 
   listen(event: string, handler: (payload: unknown) => void): Promise<Unlisten> {

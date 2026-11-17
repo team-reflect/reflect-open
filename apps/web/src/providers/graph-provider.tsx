@@ -94,7 +94,7 @@ export function GraphProvider({
   platform = 'desktop',
 }: {
   children: ReactNode
-  platform?: AppPlatform
+  platform?: AppPlatform | undefined
 }) {
   const { graphSession: session, openDocuments } = useCoreServices()
   const { graphBoot, mobileOnboarding, whatsNew } = useAppServices()

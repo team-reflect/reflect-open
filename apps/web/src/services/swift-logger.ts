@@ -1,9 +1,9 @@
-import type { IpcBridge, LoggerService } from '@reflect/core'
+import type { CommandArgs, IpcBridge, LoggerService } from '@reflect/core'
 import { renderLogLine } from '@/services/log-line.ts'
 
 async function forward(
   transport: IpcBridge,
-  level: 'error' | 'warn' | 'info',
+  level: CommandArgs<'host.log'>['level'],
   message: string,
   cause?: unknown,
 ): Promise<void> {

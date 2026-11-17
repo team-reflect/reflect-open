@@ -34,8 +34,8 @@ const BOOT: WindowBootstrap = {
 interface SetupOptions {
   recents?: RecentGraph[]
   platform?: TestPlatformOptions
-  windowLabel?: string
-  bootstrap?: WindowBootstrap
+  windowLabel?: string | undefined
+  bootstrap?: WindowBootstrap | undefined
   /**
    * Hold every `graph_open` until `resolveOpen(root)`.
    */
@@ -92,8 +92,8 @@ function setup(options?: SetupOptions) {
     },
   })
   const window = createTestWindowService({
-    ...(options?.windowLabel === undefined ? {} : { label: options.windowLabel }),
-    ...(options?.bootstrap === undefined ? {} : { bootstrap: options.bootstrap }),
+    label: options?.windowLabel,
+    bootstrap: options?.bootstrap,
   })
   const session = createTestGraphSessionService({
     ipc,
@@ -216,7 +216,7 @@ describe('GraphBootService note-window boot', () => {
   function bootNoteWindow(bootstrap?: WindowBootstrap) {
     const context = setup({
       windowLabel: 'note-1',
-      ...(bootstrap === undefined ? {} : { bootstrap }),
+      bootstrap,
     })
     return { ...context, stop: context.boot.boot() }
   }

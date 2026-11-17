@@ -1,6 +1,6 @@
 import { memo, useMemo, useState, type ReactElement } from 'react'
 import { Autocomplete } from '@base-ui/react/autocomplete'
-import { CalendarDays, FileText } from 'lucide-react'
+import { CalendarDays, FileText, Sparkles } from 'lucide-react'
 import { getIsComposing, isModEvent } from '@meowdown/core'
 import { Kbd } from '@/components/kbd.tsx'
 import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
@@ -9,6 +9,7 @@ import type { AppCommand, CommandContext } from '@/lib/commands/types.ts'
 import { displayNoteTitle, parseHighlights, formatDayLabel, type DateFormat } from '@reflect/core'
 import { routeForPath, type NoteEntry } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
+import { useChatActions, useChatProviders } from '@/providers/chat-provider.tsx'
 import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { COMMAND_ICONS, FALLBACK_COMMAND_ICON } from './command-icons.ts'
 import { NotePreview } from './note-preview.tsx'
@@ -20,6 +21,7 @@ import { usePaletteResults } from './use-palette-results.ts'
  * Base UI's inline Autocomplete owns traversal (↑/↓/Enter) and we own
  * ranking (`mode="none"` — the index already ordered everything). Empty
  * query = recent notes (the recall feed, decided); `>` filters to commands.
+ * A typed query ends with an Ask row that asks Chat the query as typed.
  *
  * Note modes render two panes — results beside a live preview of the
  * highlighted note. Command mode (`>`) stays the original single narrow column.
@@ -30,7 +32,10 @@ interface CommandPaletteProps {
   context: CommandContext
 }
 
-type PaletteItem = { kind: 'note'; entry: NoteEntry } | { kind: 'command'; command: AppCommand }
+type PaletteItem =
+  | { kind: 'note'; entry: NoteEntry }
+  | { kind: 'command'; command: AppCommand }
+  | { kind: 'ask'; question: string }
 
 interface PaletteGroup {
   value: string
@@ -59,6 +64,9 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
   const { sections, resultsSettled, searchFailed } = usePaletteResults(open, query)
   const navigateNoteLink = useNoteLinkNavigation()
   const [highlighted, setHighlighted] = useState<PaletteItem | undefined>(undefined)
+  const hasProvider = useChatProviders().length > 0
+  const { ask } = useChatActions()
+  const question = query.trim()
 
   const groups = useMemo((): PaletteGroup[] => {
     const result: PaletteGroup[] = []
@@ -74,8 +82,11 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
         items: sections.commands.map((command) => ({ kind: 'command', command })),
       })
     }
+    if (question !== '' && !sections.commandsOnly) {
+      result.push({ value: 'Ask', items: [{ kind: 'ask', question }] })
+    }
     return result
-  }, [sections, query])
+  }, [sections, query, question])
 
   if (!open) {
     return null
@@ -83,10 +94,21 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
 
   const activate = (item: PaletteItem, openInNewWindow: boolean): void => {
     closePalette()
-    if (item.kind === 'note') {
-      navigateNoteLink({ target: routeForPath(item.entry.path), openInNewWindow })
-    } else {
-      void context.app.commands.run(item.command.id, context)
+    switch (item.kind) {
+      case 'note':
+        navigateNoteLink({ target: routeForPath(item.entry.path), openInNewWindow })
+        return
+      case 'command':
+        void context.app.commands.run(item.command.id, context)
+        return
+      case 'ask':
+        // With no AI provider, the row leads to Settings, where keys are added.
+        if (hasProvider) {
+          void ask(item.question)
+          context.navigate({ kind: 'chat', conversationId: null })
+        } else {
+          context.navigate({ kind: 'settings', page: 'main' })
+        }
     }
   }
 
@@ -160,11 +182,13 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
                   Search unavailable — the index didn’t answer.
                 </div>
               ) : null}
-              <Autocomplete.Empty>
-                {resultsSettled && !searchFailed ? (
-                  <div className="reflect-palette-empty">No results</div>
-                ) : null}
-              </Autocomplete.Empty>
+              {/* Counts notes and commands only: the Ask row is no result. */}
+              {resultsSettled &&
+              !searchFailed &&
+              sections.notes.length === 0 &&
+              sections.commands.length === 0 ? (
+                <div className="reflect-palette-empty">No results</div>
+              ) : null}
               {groups.map((group) => (
                 <Autocomplete.Group key={group.value} items={group.items}>
                   <Autocomplete.GroupLabel className="reflect-palette-group-label">
@@ -172,20 +196,34 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
                   </Autocomplete.GroupLabel>
                   <Autocomplete.Collection>
                     {(item: PaletteItem) => {
-                      return item.kind === 'note' ? (
-                        <NoteItem
-                          key={item.entry.path}
-                          item={item}
-                          dateFormat={dateFormat}
-                          onClick={(event) => activate(item, isModEvent(event))}
-                        />
-                      ) : (
-                        <CommandItem
-                          key={item.command.id}
-                          item={item}
-                          onClick={() => activate(item, false)}
-                        />
-                      )
+                      switch (item.kind) {
+                        case 'note':
+                          return (
+                            <NoteItem
+                              key={item.entry.path}
+                              item={item}
+                              dateFormat={dateFormat}
+                              onClick={(event) => activate(item, isModEvent(event))}
+                            />
+                          )
+                        case 'command':
+                          return (
+                            <CommandItem
+                              key={item.command.id}
+                              item={item}
+                              onClick={() => activate(item, false)}
+                            />
+                          )
+                        case 'ask':
+                          return (
+                            <AskItem
+                              key="ask"
+                              item={item}
+                              hasProvider={hasProvider}
+                              onClick={() => activate(item, false)}
+                            />
+                          )
+                      }
                     }}
                   </Autocomplete.Collection>
                 </Autocomplete.Group>
@@ -285,6 +323,28 @@ function CommandItem({ item, onClick }: CommandItemProps): ReactElement {
         <Icon aria-hidden strokeWidth={1.75} className="size-4 shrink-0 text-text-muted" />
         <span className="min-w-0 flex-1 truncate text-sm">{command.title}</span>
         {command.keybinding ? <ShortcutKeys binding={command.keybinding} /> : null}
+      </span>
+    </Autocomplete.Item>
+  )
+}
+
+interface AskItemProps {
+  item: Extract<PaletteItem, { kind: 'ask' }>
+  hasProvider: boolean
+  onClick: () => void
+}
+
+function AskItem({ item, hasProvider, onClick }: AskItemProps): ReactElement {
+  return (
+    <Autocomplete.Item value={item} onClick={onClick} className="reflect-palette-item">
+      <span className={cn('flex items-center gap-2.5', !hasProvider && 'text-text-muted')}>
+        <Sparkles aria-hidden strokeWidth={1.75} className="size-4 shrink-0 text-text-muted" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm">Ask “{item.question}”</span>
+          <span className="block truncate text-xs text-text-muted">
+            {hasProvider ? 'Answer from your notes' : 'Add an AI provider in Settings to ask'}
+          </span>
+        </span>
       </span>
     </Autocomplete.Item>
   )

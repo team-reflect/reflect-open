@@ -1,5 +1,6 @@
 import CaptureShared
 import Foundation
+import TypesShared
 import UniformTypeIdentifiers
 
 /// What one share-sheet invocation extracted, ready to spool.
@@ -71,7 +72,7 @@ final class ShareState: ObservableObject {
           metaDescription: metaDescription
         )
       case .text(let text):
-        guard try CaptureInbox.spoolText(text, source: "ios-share", parent: nil) else {
+        guard try CaptureInbox.spoolText(text, source: .iosShare, parent: nil) else {
           return update(.failed)  // nothing printable to save
         }
       }

@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { useGraphColors } from '@/hooks/use-graph-colors.ts'
-import { keybindingFor, sortGraphsByName } from '@/lib/commands/app-commands.ts'
+import { isGraphSwitchPosition, keybindingFor, sortGraphsByName } from '@/lib/commands/app-commands.ts'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { useSelector } from '@/lib/use-store.ts'
 import { cn } from '@/lib/utils.ts'
@@ -30,7 +30,8 @@ const SETTINGS_BINDING = keybindingFor('settings.open')
 
 function graphSwitchBindingFor(index: number): string | null {
   // Recent rows are zero-based; `graph.switchN` commands and keycaps are one-based.
-  return keybindingFor(`graph.switch${index + 1}`)
+  const position = index + 1
+  return isGraphSwitchPosition(position) ? keybindingFor(`graph.switch${position}`) : null
 }
 
 type SyncStatus = Extract<GitSyncState, { phase: 'connected' }>['status']

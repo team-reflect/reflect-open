@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import type { AiProviderConfig } from '../settings/schema.ts'
 import { APP_REVIEW_STUB_KEY, createDemoModel, DEMO_REPLY_TEXT } from './app-review-demo.ts'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   createTestHttpService,
   createTestLoggerService,
   createTestNoteFileService,
@@ -62,7 +62,7 @@ describe('createDemoModel', () => {
       noteTools: createNoteToolsService({
         retrieval: createTestRetrievalService(),
         noteFile,
-        noteList: createNoteListService({ database: createNodeTestDatabaseService() }),
+        noteList: createNoteListService({ database: createTestDatabaseService() }),
         dailyNotes: { listDailyNotes: () => [] },
         assetReferences,
         assetPrivacy: createAssetPrivacyService({ noteFile, xArchive, assetReferences }),

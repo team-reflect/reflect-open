@@ -1,3 +1,4 @@
+import type { LinkPreviewHtml } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import { z } from 'zod'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
@@ -19,18 +20,13 @@ const httpUrlSchema = z.url().refine((value) => {
 const linkPreviewHtmlSchema = z.object({
   html: z.string().max(LINK_PREVIEW_HTML_MAX_CHARS),
   finalUrl: httpUrlSchema,
-})
+}) satisfies z.ZodType<LinkPreviewHtml>
 
 const linkPreviewIconSchema = z
   .string()
   .max(LINK_PREVIEW_ICON_MAX_CHARS)
   .regex(/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/u)
   .refine((value) => value.slice(PNG_DATA_URL_PREFIX.length).length % 4 === 0)
-
-/**
- * Bounded, public-network-only HTML returned for editor link metadata.
- */
-export type LinkPreviewHtml = z.infer<typeof linkPreviewHtmlSchema>
 
 /**
  * Bounded outbound web fetches the native side performs (scheme, size,
@@ -72,15 +68,15 @@ class WebFetchServiceImpl implements WebFetchService {
   }
 
   async fetchMeta(url: CloudSafe<string>): Promise<string> {
-    return await this.#deps.ipc.call('capture_meta_fetch', { url }, z.string())
+    return await this.#deps.ipc.call('capture_meta_fetch', { url })
   }
 
   async fetchOembed(url: CloudSafe<string>): Promise<string> {
-    return await this.#deps.ipc.call('capture_oembed_fetch', { url }, z.string())
+    return await this.#deps.ipc.call('capture_oembed_fetch', { url })
   }
 
   async fetchLinkPreviewImage(url: CloudSafe<string>): Promise<string | null> {
-    return await this.#deps.ipc.call('capture_link_preview', { url }, z.string().nullable())
+    return await this.#deps.ipc.call('capture_link_preview', { url })
   }
 
   async fetchLinkPreviewHtml(url: CloudSafe<string>): Promise<LinkPreviewHtml> {

@@ -1,7 +1,7 @@
+import type { TagFacet } from '@reflect/types'
 import { useState, type ReactElement } from 'react'
 import { userEvent } from 'vitest/browser'
 import { describe, expect, it, vi } from 'vitest'
-import type { NoteTagFacet } from '@reflect/core'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { FilterBar } from './filter-bar.tsx'
 import { EMPTY_ALL_NOTES_FILTERS, type AllNotesFilters } from '@reflect/app'
@@ -14,7 +14,7 @@ import { noop } from '@ocavue/utils'
  * the real drawer; `swipeDrawerClosed` closes one the way a finger does.
  */
 
-const FACETS: NoteTagFacet[] = [
+const FACETS: TagFacet[] = [
   { tag: 'Book', count: 3 },
   { tag: 'work', count: 5 },
 ]

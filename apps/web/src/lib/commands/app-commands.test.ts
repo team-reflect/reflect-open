@@ -1,12 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  createTestAppServices,
-  createTestWindowService,
-  type TestWindowService,
-} from '@reflect/app/testing'
+import { createTestWindowService, type TestWindowService } from '@reflect/app/testing'
 import { buildIndexedNote, parseNote, type RecentGraph } from '@reflect/core'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   createTestCoreServices,
   createTestEmbeddingIndexService,
   createTestEmbeddingRuntimeService,
@@ -18,6 +14,7 @@ import { deepLinkForRoute, notePathForRoute, type Route, type NavigateOptions } 
 import { APP_COMMANDS, keybindingFor, sortGraphsByName } from './app-commands.ts'
 import type { CommandContext } from './types.ts'
 import { noop } from '@ocavue/utils'
+import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
 const TODAY = '2026-06-09'
 
@@ -29,7 +26,7 @@ function createCore() {
     backfill: () => Promise.resolve('completed'),
   })
   return createTestCoreServices({
-    database: createNodeTestDatabaseService(),
+    database: createTestDatabaseService(),
     embeddingRuntime,
     embeddingIndex,
   })
@@ -59,7 +56,7 @@ function fakeContext(overrides?: Partial<CommandContext>) {
   const navigated: Route[] = []
   const navigateOptions: (NavigateOptions | undefined)[] = []
   const route: () => Route = overrides?.route ?? (() => ({ kind: 'today' }))
-  const appLayer = createTestAppServices(core, { window: windows })
+  const appLayer = createWebTestAppServices(core, { window: windows })
   const context: CommandContext = {
     services: core,
     app: appLayer,
@@ -71,6 +68,7 @@ function fakeContext(overrides?: Partial<CommandContext>) {
     // Mirror the real context: note-scoped commands resolve their target from
     // the route (the focused-day branch is exercised in app-shortcuts).
     notePath: () => notePathForRoute(route(), TODAY),
+    selectSection: vi.fn(),
     back: vi.fn(),
     forward: vi.fn(),
     clearScrollState: vi.fn(),
@@ -130,9 +128,8 @@ describe('keybindingFor', () => {
     expect(keybindingFor('palette.open')).toBe('Mod-k')
   })
 
-  it('returns null for unbound commands and unknown ids', () => {
-    expect(keybindingFor('theme.toggle')).toBeNull() // a real command, no binding
-    expect(keybindingFor('no.such.command')).toBeNull()
+  it('returns null for unbound commands', () => {
+    expect(keybindingFor('theme.toggle')).toBeNull()
   })
 
   it('audioMemo.toggle is bound to Mod-Shift-r', () => {
@@ -186,7 +183,7 @@ describe('app commands', () => {
   it('settings.open navigates to the settings screen', async () => {
     const { context, navigated } = fakeContext()
     await command('settings.open').run(context)
-    expect(navigated).toEqual([{ kind: 'settings' }])
+    expect(navigated).toEqual([{ kind: 'settings', page: 'main' }])
   })
 
   it('note Find commands use the shared window-scoped capabilities', async () => {
@@ -213,7 +210,7 @@ describe('app commands', () => {
     expect(context.openTemplatePicker).toHaveBeenCalledTimes(1)
 
     // Settings edits no note — there is nothing to insert into.
-    const { context: noNote } = fakeContext({ route: () => ({ kind: 'settings' }) })
+    const { context: noNote } = fakeContext({ route: () => ({ kind: 'settings', page: 'main' }) })
     await command('template.insert').run(noNote)
     expect(noNote.openTemplatePicker).not.toHaveBeenCalled()
   })
@@ -225,7 +222,7 @@ describe('app commands', () => {
   })
 
   it('chat.new starts a fresh conversation only from the chat route', async () => {
-    const { context } = fakeContext({ route: () => ({ kind: 'chat' }) })
+    const { context } = fakeContext({ route: () => ({ kind: 'chat', conversationId: null }) })
     await command('chat.new').run(context)
     expect(context.newChat).toHaveBeenCalledTimes(1)
     expect(keybindingFor('chat.new')).toBe('Mod-Shift-n')
@@ -284,7 +281,7 @@ describe('app commands', () => {
   })
 
   it('note.openInNewWindow is inert on a screen with no selected note', async () => {
-    const { context } = fakeContext({ route: () => ({ kind: 'settings' }) })
+    const { context } = fakeContext({ route: () => ({ kind: 'settings', page: 'main' }) })
     await command('note.openInNewWindow').run(context)
     expect(windows.openedNoteWindows()).toEqual([])
   })
@@ -370,7 +367,7 @@ describe('app commands', () => {
 
   it('note.copyDeepLink no-ops on note-less routes', async () => {
     const deepLinkFor = vi.spyOn(core.noteActions, 'deepLinkFor').mockResolvedValue('reflect://x')
-    const { context, appLayer } = fakeContext({ route: () => ({ kind: 'settings' }) })
+    const { context, appLayer } = fakeContext({ route: () => ({ kind: 'settings', page: 'main' }) })
     await command('note.copyDeepLink').run(context)
     expect(deepLinkFor).not.toHaveBeenCalled()
     expect(appLayer.clipboard.writes()).toEqual([])
@@ -419,7 +416,7 @@ describe('app commands', () => {
     const absolutePathFor = vi
       .spyOn(core.noteActions, 'absolutePathFor')
       .mockResolvedValue('/g/notes/a.md')
-    const { context } = fakeContext({ route: () => ({ kind: 'settings' }) })
+    const { context } = fakeContext({ route: () => ({ kind: 'settings', page: 'main' }) })
     await command('note.copyPath').run(context)
     expect(absolutePathFor).not.toHaveBeenCalled()
   })
@@ -470,7 +467,7 @@ describe('app commands', () => {
 
   it('dev.toggleDevtools no-ops without a native shell (plain-browser dev)', async () => {
     const browser = createTestCoreServices({
-      database: createNodeTestDatabaseService(),
+      database: createTestDatabaseService(),
       platform: createTestPlatformService({ isNativeShell: false }),
     })
     const { context } = fakeContext({ services: browser })

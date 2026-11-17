@@ -1,0 +1,22 @@
+{
+  "type": "state",
+  "entryId": -1,
+  "chrome": "none",
+  "routeKind": null,
+  "tab": "daily",
+  "canBack": false,
+  "leading": [],
+  "trailing": [],
+  "keyboardVisible": false,
+  "modal": false,
+  "toolbar": null,
+  "plus": null,
+  "sidebar": null,
+  "history": null,
+  "title": null,
+  "search": null,
+  "fullscreen": false,
+  "hidesTabBar": false,
+  "theme": "light",
+  "generation": 1
+}

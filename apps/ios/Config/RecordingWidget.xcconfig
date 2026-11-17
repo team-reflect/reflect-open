@@ -5,8 +5,6 @@ PRODUCT_NAME = RecordingWidget
 PRODUCT_BUNDLE_IDENTIFIER = $(REFLECT_BUNDLE_ID).widgets
 INFOPLIST_FILE = Config/RecordingWidget-Info.plist
 CODE_SIGN_ENTITLEMENTS = Config/Extension.entitlements
-// Live Activities need iOS 16.2.
-IPHONEOS_DEPLOYMENT_TARGET = 16.2
 APPLICATION_EXTENSION_API_ONLY = YES
 SKIP_INSTALL = YES
 LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @executable_path/../../Frameworks

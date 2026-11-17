@@ -1,5 +1,6 @@
 import { useCallback, type CSSProperties, type ReactElement } from 'react'
 import { LightboxRoot, type LightboxController } from '@meowdown/react'
+import { useChromeFullscreen } from '@/mobile/chrome/chrome-renderer.ts'
 import { ImageLightboxContent } from '@/editor/image-lightbox-content.tsx'
 import { VideoLightboxContent } from '@/editor/video-lightbox-content.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
@@ -17,6 +18,11 @@ interface MediaLightboxProps {
   onOpenImage: (() => void) | null
 }
 
+function HideChrome(): null {
+  useChromeFullscreen(true)
+  return null
+}
+
 export function MediaLightbox({ lightbox, onOpenImage }: MediaLightboxProps): ReactElement {
   const { platform } = useCoreServices()
   const mobileSurface = platform.surface.mobileApp
@@ -25,18 +31,21 @@ export function MediaLightbox({ lightbox, onOpenImage }: MediaLightboxProps): Re
 
   return (
     <LightboxRoot lightbox={lightbox} style={mobileSurface ? IMMERSIVE_STYLE : undefined}>
-      {(item) => {
-        return item.type === 'image' ? (
-          <ImageLightboxContent
-            item={item}
-            mobileSurface={mobileSurface}
-            onClose={onClose}
-            onOpenImage={onOpenImage}
-          />
-        ) : (
-          <VideoLightboxContent item={item} mobileSurface={mobileSurface} onClose={onClose} />
-        )
-      }}
+      {(item) => (
+        <>
+          <HideChrome />
+          {item.type === 'image' ? (
+            <ImageLightboxContent
+              item={item}
+              mobileSurface={mobileSurface}
+              onClose={onClose}
+              onOpenImage={onOpenImage}
+            />
+          ) : (
+            <VideoLightboxContent item={item} mobileSurface={mobileSurface} onClose={onClose} />
+          )}
+        </>
+      )}
     </LightboxRoot>
   )
 }

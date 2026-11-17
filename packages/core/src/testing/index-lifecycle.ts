@@ -24,7 +24,7 @@ import type { Unlisten } from '../unlisten.ts'
 import type { XArchiveService } from '../embeds/x-archive-service.ts'
 import { createTestXArchiveService } from './capture.ts'
 import { createTestClockService } from './clock.ts'
-import { createNodeTestDatabaseService } from './database.ts'
+import { createTestDatabaseService } from './database.ts'
 import { createTestFileChangeService } from './file-change.ts'
 import { createTestNoteFileService } from './graph.ts'
 import { createTestIndexStoreService } from './index-store.ts'
@@ -242,7 +242,7 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
 export function createTestIndexLifecycleService(
   options?: TestIndexLifecycleServiceOptions,
 ): TestIndexLifecycleService {
-  const database = options?.database ?? createNodeTestDatabaseService()
+  const database = options?.database ?? createTestDatabaseService()
   const clock = options?.clock ?? createTestClockService()
   const graphSession = options?.graphSession ?? {
     get: () => ({ session: null }),

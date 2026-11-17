@@ -5,16 +5,16 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
 use rusqlite::{Connection, params};
-use serde::Deserialize;
-use serde_json::{Map, Value};
 
-use reflect_types::{AppError, AppResult, FileMeta};
+use reflect_types::{
+    AppError, AppResult, ChatConversation, ChatMessageRow, EmbeddedChunk, FileMeta, IndexTouch,
+    IndexedNote, MovedNoteAddress, NoteMoveRequest, ReconcileScan,
+};
 
-use crate::chat_write::{self, ChatConversation, ChatMessageRow};
-use crate::embed_write::{self, EmbeddedChunk};
-use crate::query;
-use crate::scan::{self, ReconcileScan};
-use crate::write::{self, IndexedNote, MovedNoteAddress};
+use crate::chat_write;
+use crate::embed_write;
+use crate::scan;
+use crate::write;
 
 /// Where a session gets its connections when it opens a root.
 pub trait IndexConnections {
@@ -75,26 +75,6 @@ struct ReaderInner {
 pub struct IndexSession {
     writer: Mutex<WriterInner>,
     reader: Mutex<ReaderInner>,
-}
-
-/// One `touch` entry: re-stamp `path`'s stored mtime to `mtime` (epoch ms, as
-/// listed by the file walk).
-#[derive(Debug, Deserialize)]
-pub struct IndexTouch {
-    pub path: String,
-    pub mtime: i64,
-}
-
-/// One user-initiated move, with the folded addressing for both directions:
-/// the destination's for the forward row move, the source's for the
-/// compensating reverse move when the disk refuses.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NoteMoveRequest {
-    pub from: String,
-    pub to: String,
-    pub to_address: MovedNoteAddress,
-    pub from_address: MovedNoteAddress,
 }
 
 impl IndexSession {
@@ -302,7 +282,7 @@ impl IndexSession {
     ) -> AppResult<ReconcileScan> {
         let writer = self.lock_writer()?;
         if writer.generation != generation {
-            return Ok(ReconcileScan::empty());
+            return Ok(ReconcileScan::default());
         }
         let conn = writer.conn.as_ref().ok_or_else(AppError::no_graph)?;
         scan::scan_reconcile(conn, files, now_ms)
@@ -394,17 +374,16 @@ impl IndexSession {
         }))
     }
 
-    /// Execute a read query and return its rows. `requested` is the reader
-    /// generation the caller saw when the query was issued: a session rebound
-    /// in between must error rather than answer with another graph's rows,
-    /// because the frontend caches results under root-scoped keys.
-    pub fn query(
+    /// Run `body` on the query connection. `requested` is the reader
+    /// generation the caller saw when the command was issued: a session
+    /// rebound in between must error rather than answer with another graph's
+    /// rows, because the frontend caches results under root-scoped keys.
+    fn on_reader<T>(
         &self,
         requested: u64,
-        sql: &str,
-        params: &[Value],
-    ) -> AppResult<Vec<Map<String, Value>>> {
-        let reader = self.lock_reader()?;
+        body: impl FnOnce(&mut Connection) -> AppResult<T>,
+    ) -> AppResult<T> {
+        let mut reader = self.lock_reader()?;
         if reader.generation != requested {
             return Err(AppError::io("index reopened during query"));
         }
@@ -412,15 +391,29 @@ impl IndexSession {
             // Single-connection hosts: release the reader lock first, because
             // the lock order is writer then reader.
             drop(reader);
-            let writer = self.lock_writer()?;
+            let mut writer = self.lock_writer()?;
             if writer.generation != requested {
                 return Err(AppError::io("index reopened during query"));
             }
-            let conn = writer.conn.as_ref().ok_or_else(AppError::no_graph)?;
-            return query::run_query(conn, sql, params);
+            return body(writer.conn.as_mut().ok_or_else(AppError::no_graph)?);
         }
-        let conn = reader.conn.as_ref().ok_or_else(AppError::no_graph)?;
-        query::run_query(conn, sql, params)
+        body(reader.conn.as_mut().ok_or_else(AppError::no_graph)?)
+    }
+
+    /// Run the queries of one read command in one read transaction, so they
+    /// all see the same committed state. `requested` is the reader generation
+    /// of [`read_generation`] when the command was issued.
+    ///
+    /// [`read_generation`]: IndexSession::read_generation
+    pub fn read<T>(
+        &self,
+        requested: u64,
+        body: impl FnOnce(&Connection) -> AppResult<T>,
+    ) -> AppResult<T> {
+        self.on_reader(requested, |conn| {
+            let tx = conn.transaction()?;
+            body(&tx)
+        })
     }
 }
 

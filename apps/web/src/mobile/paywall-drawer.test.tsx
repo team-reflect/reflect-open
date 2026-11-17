@@ -13,6 +13,7 @@ import {
   type IapProduct,
 } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestAppStoreService,
   createTestClassicAccessService,
@@ -27,7 +28,6 @@ import {
 } from '@reflect/core/testing'
 import { mutationKeys, mutationScopeIds } from '@/lib/query-client.ts'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { PaywallDrawer } from './paywall-drawer.tsx'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -92,7 +92,7 @@ beforeEach(() => {
   redeems = 0
   dismissals = 0
   const base = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     platform: createTestPlatformService({ appPlatform: 'ios' }),
   })
   logger = base.logger

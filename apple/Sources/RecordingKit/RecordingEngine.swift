@@ -2,6 +2,7 @@
 import AVFoundation
 public import Foundation
 import RecordingShared
+public import TypesShared
 import UIKit
 import UserNotifications
 
@@ -9,93 +10,20 @@ import UserNotifications
 import ActivityKit
 #endif
 
-/// The payload of the plugin's ~10 Hz `recordingLevel` event.
-public struct RecordingLevel: Encodable {
-  /// Linear input level 0…1, from the recorder's average power meter.
-  public let level: Float
-  /// Recorded time so far in milliseconds (pauses excluded).
-  public let elapsedMs: Double
-}
-
-/// The payload of the `recordingSegment` event: a finished segment of a
-/// session that is still recording. The final segment never arrives here (a
-/// webview stop resolves its own invoke, a native stop fires
-/// `recordingStopped`), so every segment is announced exactly once.
-public struct RecordingSegment: Encodable {
-  /// Absolute path of the staged `.m4a`.
-  public let path: String
-  /// The session's identity timestamp in epoch ms, shared by every segment.
-  public let sessionStartedMs: Double
-  /// 1-based position within the session.
-  public let part: Int
-}
-
-/// The payload of the `recordingStopped` event — a stop the *native* side
-/// initiated (interruption, route change, a remote stop, or an encoder
-/// error). A stop the webview asked for resolves its own invoke instead and
-/// never fires this event.
-public struct RecordingStopped: Encodable {
-  /// Absolute path of the staged `.m4a`, already `-end`-marked.
-  public let path: String
-  /// The session's identity timestamp in epoch ms, shared by every segment.
-  public let sessionStartedMs: Double
-  /// 1-based position of this final segment.
-  public let part: Int
-  /// The whole session's recorded length, not this segment's.
-  public let durationMs: Double
-  /// `interruption` | `routeChange` | `remote` | `error`
-  public let reason: String
-}
-
-/// `recordingStatus`'s response — whether a native recording is live right
-/// now. A fresh webview mount uses this to find a recording that outlived
-/// its UI (a reload or crash mid-memo) and stop-and-save it.
-public struct RecordingStatus: Encodable {
-  public let recording: Bool
-  /// The session's recorded length so far, across every segment.
-  public let elapsedMs: Double
-}
-
-/// The payload of the `nativeAction` event — an OS entry point (Siri, the
-/// home-screen quick action, the lock-screen widget's `reflect://` URL)
-/// asked for something only the webview can present.
-public struct NativeAction: Encodable {
-  /// Currently only `recordAudio`.
-  public let action: String
-}
-
-/// `stopRecording`'s response: the session's final segment.
-public struct StopResponse: Encodable {
-  /// Absolute path of the staged `.m4a`, already `-end`-marked.
-  public let path: String
-  /// The session's identity timestamp in epoch ms, shared by every segment.
-  public let sessionStartedMs: Double
-  /// 1-based position of this final segment.
-  public let part: Int
-  /// The whole session's recorded length.
-  public let durationMs: Double
-}
-
-/// `startRecording`'s response: the identity the webview files this session's
-/// segments under.
-public struct StartResponse: Encodable {
-  public let sessionStartedMs: Double
-}
-
 /// An event for the host to forward to the webview.
 public enum RecordingEvent {
   /// `recordingLevel`, ~10 Hz while recording in the foreground.
-  case level(RecordingLevel)
+  case level(RecordingLevelEvent)
   /// `recordingSegment`, a finished segment of a session still recording.
-  case segment(RecordingSegment)
+  case segment(RecordingSegmentEvent)
   /// `recordingStopped`, a stop the native side initiated.
-  case stopped(RecordingStopped)
+  case stopped(RecordingStoppedEvent)
   /// `nativeAction`, an OS entry point's request for the webview.
-  case nativeAction(NativeAction)
+  case nativeAction(RecordingNativeActionEvent)
 }
 
 /// A failed command; `message` is what the host rejects the call with.
-public struct RecordingError: Error {
+public struct RecordingError: Error, Sendable {
   public let message: String
 }
 
@@ -144,6 +72,10 @@ public final class RecordingEngine: NSObject {
   private static let reminderRequestId = "app.reflect.recording.reminder"
   /// `UNTimeIntervalNotificationTrigger` refuses anything under a minute.
   private static let minimumReminderSeconds: TimeInterval = 60
+  /// Runs the `UNUserNotificationCenter` calls in the order the main queue
+  /// sends them. A call can wait minutes for the notification daemon of a
+  /// device that just booted.
+  private static let reminderQueue = DispatchQueue(label: "app.reflect.recording.reminder")
 
   private var recorder: AVAudioRecorder?
   private var meterTimer: Timer?
@@ -167,7 +99,7 @@ public final class RecordingEngine: NSObject {
   /// the delegate directly), where `currentTime` already reads 0.
   private var lastMeteredSegmentMs: Double = 0
   /// The webview's `stopRecording` call, settled when the file finalizes.
-  private var pendingStop: ((Result<StopResponse, RecordingError>) -> Void)?
+  private var pendingStop: ((Result<RecordingStopResponse, RecordingError>) -> Void)?
   /// The webview's `cancelRecording` call — finalize, then delete.
   private var pendingCancel: ((Result<Void, RecordingError>) -> Void)?
   private var nativeStopReason: NativeStopReason?
@@ -179,9 +111,10 @@ public final class RecordingEngine: NSObject {
   /// True once the webview called `actionsReady` — queued native actions
   /// deliver immediately from then on.
   private var webviewReadyForActions = false
-  /// The live recording's Live Activity (`Activity<RecordingActivityAttributes>`,
-  /// type-erased: stored properties can't be availability-restricted).
-  private var liveActivity: Any?
+  #if canImport(ActivityKit)
+  /// The live recording's Live Activity.
+  private var liveActivity: Activity<RecordingActivityAttributes>?
+  #endif
   /// The staging directory the recorder writes into.
   private let stagingDirectory: () throws -> URL
 
@@ -256,15 +189,14 @@ public final class RecordingEngine: NSObject {
   /// `reminderMs`: remind the user this often while the session runs.
   public func start(
     segmentMs: Double, reminderMs: Double,
-    completion: @escaping (Result<StartResponse, RecordingError>) -> Void
+    completion: @escaping (Result<RecordingSessionStart, RecordingError>) -> Void
   ) {
     guard self.recorder == nil else {
       completion(.failure(RecordingError(message: "already recording")))
       return
     }
     let session = self.startSession
-    let audioSession = AVAudioSession.sharedInstance()
-    audioSession.requestRecordPermission { granted in
+    AVAudioApplication.requestRecordPermission { granted in
       DispatchQueue.main.async {
         guard self.startSession == session, self.recorder == nil else {
           // Cancelled while the permission prompt was up, or a retry beat
@@ -278,7 +210,7 @@ public final class RecordingEngine: NSObject {
         }
         do {
           try self.beginSession(segmentMs: segmentMs, reminderMs: reminderMs)
-          completion(.success(StartResponse(sessionStartedMs: self.sessionStartedMs)))
+          completion(.success(RecordingSessionStart(sessionStartedMs: self.sessionStartedMs)))
         } catch {
           self.deactivateAudioSession()
           completion(
@@ -290,7 +222,7 @@ public final class RecordingEngine: NSObject {
     }
   }
 
-  public func stop(completion: @escaping (Result<StopResponse, RecordingError>) -> Void) {
+  public func stop(completion: @escaping (Result<RecordingStopResponse, RecordingError>) -> Void) {
     guard let recorder = self.recorder else {
       completion(.failure(RecordingError(message: "no active recording")))
       return
@@ -330,7 +262,7 @@ public final class RecordingEngine: NSObject {
   }
 
   /// The staged recordings, without the segment being recorded.
-  public func listStaged() throws -> [StagedFile] {
+  public func listStaged() throws -> [StagedRecordingFile] {
     try RecordingFiles.listStaged(
       in: try self.stagingDirectory(),
       excluding: self.recorder?.url.standardizedFileURL.path)
@@ -454,7 +386,8 @@ public final class RecordingEngine: NSObject {
 
   private func emitSegment(path: String, part: Int) {
     onEvent?(
-      .segment(RecordingSegment(path: path, sessionStartedMs: sessionStartedMs, part: part)))
+      .segment(
+        RecordingSegmentEvent(path: path, sessionStartedMs: sessionStartedMs, part: UInt32(part))))
   }
 
   /// Capture the duration and ask the recorder to finalize the file; the
@@ -528,14 +461,14 @@ public final class RecordingEngine: NSObject {
     if let stop = pendingStop {
       pendingStop = nil
       // A failed finalization produced no usable file — reject rather than
-      // hand back a StopResponse pointing at a corrupt/absent recording.
+      // hand back a RecordingStopResponse pointing at a corrupt/absent recording.
       if !successfully {
         stop(.failure(RecordingError(message: "the recording failed to finalize")))
       } else {
         stop(
           .success(
-            StopResponse(
-              path: markEnded(path), sessionStartedMs: sessionStartedMs, part: partIndex,
+            RecordingStopResponse(
+              path: markEnded(path), sessionStartedMs: sessionStartedMs, part: UInt32(partIndex),
               durationMs: sessionDurationMs)))
       }
       resetSession()
@@ -554,8 +487,8 @@ public final class RecordingEngine: NSObject {
     let finalPath = markEnded(path)
     onEvent?(
       .stopped(
-        RecordingStopped(
-          path: finalPath, sessionStartedMs: sessionStartedMs, part: partIndex,
+        RecordingStoppedEvent(
+          path: finalPath, sessionStartedMs: sessionStartedMs, part: UInt32(partIndex),
           durationMs: durationMs, reason: reason.rawValue)))
     resetSession()
   }
@@ -571,7 +504,8 @@ public final class RecordingEngine: NSObject {
     let level = pow(10, recorder.averagePower(forChannel: 0) / 20)
     onEvent?(
       .level(
-        RecordingLevel(level: level, elapsedMs: elapsedBeforeSegmentMs + lastMeteredSegmentMs)))
+        RecordingLevelEvent(level: level, elapsedMs: elapsedBeforeSegmentMs + lastMeteredSegmentMs))
+    )
   }
 
   private func deactivateAudioSession() {
@@ -652,7 +586,7 @@ public final class RecordingEngine: NSObject {
       Self.clearPendingAction()
       return
     }
-    onEvent?(.nativeAction(NativeAction(action: action)))
+    onEvent?(.nativeAction(RecordingNativeActionEvent(action: action)))
   }
 
   private static func clearPendingAction() {
@@ -682,34 +616,38 @@ public final class RecordingEngine: NSObject {
   /// webview is gone.
   private func scheduleReminder(intervalMs: Double) {
     let interval = max(intervalMs / 1000, Self.minimumReminderSeconds)
-    let center = UNUserNotificationCenter.current()
     // Asked on the first recording rather than at launch, and never blocking:
     // a denial is not an error, it just leaves the Live Activity as the only
     // running indicator.
-    center.requestAuthorization(options: [.alert]) { granted, error in
-      if let error {
-        self.log?("recording reminder authorization failed: \(error)")
-        return
-      }
-      guard granted else { return }
-      DispatchQueue.main.async {
-        // The session may have ended while the permission prompt was up.
-        guard self.recorder != nil else { return }
-        let content = UNMutableNotificationContent()
-        content.title = "Reflect is still recording"
-        content.body = "Open Reflect to stop the recording."
-        // Silent on purpose: the microphone is live, and an alert tone would
-        // land in the recording itself. The elapsed time lives on the Live
-        // Activity, since a repeating request cannot carry a changing body.
-        content.sound = nil
-        let request = UNNotificationRequest(
-          identifier: Self.reminderRequestId,
-          content: content,
-          trigger: UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: true)
-        )
-        center.add(request) { error in
-          if let error {
-            self.log?("scheduling the recording reminder failed: \(error)")
+    Self.reminderQueue.async {
+      let center = UNUserNotificationCenter.current()
+      center.requestAuthorization(options: [.alert]) { granted, error in
+        if let error {
+          self.log?("recording reminder authorization failed: \(error)")
+          return
+        }
+        guard granted else { return }
+        DispatchQueue.main.async {
+          // The session may have ended while the permission prompt was up.
+          guard self.recorder != nil else { return }
+          let content = UNMutableNotificationContent()
+          content.title = "Reflect is still recording"
+          content.body = "Open Reflect to stop the recording."
+          // Silent on purpose: the microphone is live, and an alert tone would
+          // land in the recording itself. The elapsed time lives on the Live
+          // Activity, since a repeating request cannot carry a changing body.
+          content.sound = nil
+          let request = UNNotificationRequest(
+            identifier: Self.reminderRequestId,
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: true)
+          )
+          Self.reminderQueue.async {
+            center.add(request) { error in
+              if let error {
+                self.log?("scheduling the recording reminder failed: \(error)")
+              }
+            }
           }
         }
       }
@@ -718,58 +656,54 @@ public final class RecordingEngine: NSObject {
 
   /// Clear the reminder and any banner it already delivered.
   private func clearReminder() {
-    let center = UNUserNotificationCenter.current()
-    center.removePendingNotificationRequests(withIdentifiers: [Self.reminderRequestId])
-    center.removeDeliveredNotifications(withIdentifiers: [Self.reminderRequestId])
+    Self.reminderQueue.async {
+      let center = UNUserNotificationCenter.current()
+      center.removePendingNotificationRequests(withIdentifiers: [Self.reminderRequestId])
+      center.removeDeliveredNotifications(withIdentifiers: [Self.reminderRequestId])
+    }
   }
 
   // MARK: - Live Activity
 
   /// Show the recording on the lock screen / Dynamic Island: elapsed timer
-  /// plus (iOS 17+) a stop button. Requires iOS 16.2 and the user not having
-  /// disabled Live Activities — both degrade to "no activity", never an error.
+  /// plus a stop button. Requires the user not having disabled Live
+  /// Activities; otherwise it degrades to "no activity", never an error.
   private func startLiveActivity() {
     #if canImport(ActivityKit)
-    if #available(iOS 16.2, *) {
-      guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
-      let content = ActivityContent(
-        state: RecordingActivityAttributes.ContentState(startedAt: Date()),
-        staleDate: nil
+    guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+    let content = ActivityContent(
+      state: RecordingActivityAttributes.ContentState(startedAt: Date()),
+      staleDate: nil
+    )
+    do {
+      liveActivity = try Activity.request(
+        attributes: RecordingActivityAttributes(),
+        content: content,
+        pushType: nil
       )
-      do {
-        liveActivity = try Activity.request(
-          attributes: RecordingActivityAttributes(),
-          content: content,
-          pushType: nil
-        )
-      } catch {
-        self.log?("recording Live Activity failed to start: \(error)")
-      }
+    } catch {
+      self.log?("recording Live Activity failed to start: \(error)")
     }
     #endif
   }
 
   private func endLiveActivity() {
     #if canImport(ActivityKit)
-    if #available(iOS 16.2, *) {
-      guard let activity = liveActivity as? Activity<RecordingActivityAttributes> else {
-        return
-      }
-      liveActivity = nil
-      Task {
-        await activity.end(nil, dismissalPolicy: .immediate)
-      }
+    guard let activity = liveActivity else {
+      return
+    }
+    liveActivity = nil
+    Task {
+      await activity.end(nil, dismissalPolicy: .immediate)
     }
     #endif
   }
 
   private func endStaleLiveActivities() {
     #if canImport(ActivityKit)
-    if #available(iOS 16.2, *) {
-      Task {
-        for activity in Activity<RecordingActivityAttributes>.activities {
-          await activity.end(nil, dismissalPolicy: .immediate)
-        }
+    Task {
+      for activity in Activity<RecordingActivityAttributes>.activities {
+        await activity.end(nil, dismissalPolicy: .immediate)
       }
     }
     #endif

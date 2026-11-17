@@ -8,13 +8,16 @@ SUPPORTED_PLATFORMS = iphoneos iphonesimulator
 // iPhone and iPad.
 TARGETED_DEVICE_FAMILY = 1,2
 // The app's minimum iOS. scripts/build-ffi.ts builds the Rust core for the same version.
-IPHONEOS_DEPLOYMENT_TARGET = 16.0
+IPHONEOS_DEPLOYMENT_TARGET = 18.0
 
 // Swift 5 language mode, like the apple/ package. Shell types are marked
 // @MainActor one by one; there is no target-wide default actor isolation.
 // Complete checking reports concurrency issues as warnings.
 SWIFT_VERSION = 5.0
 SWIFT_STRICT_CONCURRENCY = complete
+// Every Swift warning fails the build. This applies to the project's own
+// targets only: Swift packages keep their own warning settings.
+SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
 
 // Automatic signing with the Reflect team. No provisioning profiles are committed.
 CODE_SIGN_STYLE = Automatic

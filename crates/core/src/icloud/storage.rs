@@ -16,8 +16,7 @@
 
 use std::path::{Path, PathBuf};
 
-use reflect_types::{AppError, AppResult};
-use serde::Serialize;
+use reflect_types::{AppError, AppResult, IcloudStatus, MobileStorageInfo};
 
 use crate::Core;
 
@@ -27,28 +26,6 @@ use crate::Core;
 /// onboarding default lives frontend-side as `DEFAULT_ICLOUD_GRAPH_NAME`.)
 const DEFAULT_ICLOUD_GRAPH_DIR: &str = "Notes";
 
-/// The storage locations available to the mobile graph, as the onboarding
-/// screen and `GraphProvider` consume them.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MobileStorage {
-    /// The app-sandbox `Documents/` directory — always available, never
-    /// synced. iOS container paths embed a UUID that changes across
-    /// restore/update, so callers must never persist this absolute path.
-    pub local_root: String,
-    /// The container's `Documents/` directory when iCloud Drive is usable
-    /// (entitled build + signed-in account) — where a new graph directory
-    /// is created. `None` when signed out or the platform has no iCloud.
-    /// Same rule as `local_root`: derive fresh, never persist.
-    pub icloud_documents_root: Option<String>,
-    /// Every existing graph directory inside the container (name-sorted,
-    /// same listing as desktop's `icloud_status`) — onboarding and the
-    /// graph switcher list them. Best-effort: content still syncing down at
-    /// first launch can grow this later. The persisted selector is the
-    /// graph's *name*, never these absolute paths.
-    pub icloud_graph_roots: Vec<String>,
-}
-
 impl Core {
     /// Command: resolve the mobile storage locations. Mobile-only; desktop picks
     /// its graph folders through the chooser and has no fixed roots.
@@ -56,7 +33,7 @@ impl Core {
     /// Runs on a blocking thread: the first `URLForUbiquityContainerIdentifier`
     /// call may extend the app sandbox and touch the network, and Apple forbids
     /// it on the main thread.
-    pub async fn mobile_storage(&self) -> AppResult<MobileStorage> {
+    pub async fn mobile_storage(&self) -> AppResult<MobileStorageInfo> {
         #[cfg(any(target_os = "android", target_os = "ios"))]
         {
             let local = self
@@ -73,7 +50,7 @@ impl Core {
                     .into_iter()
                     .map(|dir| dir.to_string_lossy().into_owned())
                     .collect();
-                Ok(MobileStorage {
+                Ok(MobileStorageInfo {
                     local_root: local.to_string_lossy().into_owned(),
                     icloud_documents_root: documents.map(|dir| dir.to_string_lossy().into_owned()),
                     icloud_graph_roots,
@@ -381,23 +358,6 @@ mod platform {
     pub fn pending_walk(_root: &Path, _nudge: bool, _notes_only: bool) -> u32 {
         0
     }
-}
-
-/// iCloud availability as desktop onboarding and settings consume it.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct IcloudStatus {
-    /// True when the app can reach its iCloud Drive container (entitled
-    /// build, signed-in account). Dev builds without the provisioning
-    /// profile honestly report `false`.
-    pub available: bool,
-    /// The container's `Documents/` directory when available.
-    pub documents_root: Option<String>,
-    /// Every existing graph inside the container (name-sorted) — the
-    /// returning-user fast path: onboarding lists them to open alongside
-    /// creating a fresh one. Same rule as every container path: derive
-    /// fresh, never persist.
-    pub existing_graph_roots: Vec<String>,
 }
 
 impl Core {

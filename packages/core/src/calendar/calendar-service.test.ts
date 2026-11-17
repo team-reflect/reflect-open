@@ -51,12 +51,6 @@ describe('createCalendarService', () => {
     })
   })
 
-  it('rejects a malformed response with a parse error', async () => {
-    const { ipc, calendar } = setup()
-    ipc.onCommand('calendar_authorization_status', () => 'maybe')
-    await expect(calendar.authorizationStatus()).rejects.toMatchObject({ kind: 'parse' })
-  })
-
   it('notifies change listeners until they unlisten', async () => {
     const { ipc, calendar } = setup()
     let count = 0

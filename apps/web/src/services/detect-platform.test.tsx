@@ -48,6 +48,13 @@ describe('detectPlatformFacts', () => {
     expect(facts.surface).toEqual(DESKTOP_SURFACE)
   })
 
+  it('is the iOS surface in the Swift shell without a build target', () => {
+    vi.stubEnv('TAURI_ENV_PLATFORM', '')
+    const facts = detectPlatformFacts('swift')
+    expect(facts.appPlatform).toBe('ios')
+    expect(facts.surface).toEqual(MOBILE_SURFACE)
+  })
+
   it.each(['ios', 'android'] as const)(
     'follows the `?platform=%s` override in plain-browser dev',
     (platform) => {

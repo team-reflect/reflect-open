@@ -12,9 +12,16 @@ publish.workspace = true
 # so everything that creates or migrates the schema is gated behind `vec`.
 # Read-only consumers (the CLI runtime) disable it and use only the constants.
 default = ["vec"]
-vec = ["dep:sqlite-vec"]
+vec = ["dep:sqlite-vec", "dep:sqlite-wasm-vec"]
 
 [dependencies]
 rusqlite = { workspace = true }
 rusqlite_migration = { workspace = true }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
 sqlite-vec = { workspace = true, optional = true }
+
+# The `sqlite-vec` crate needs libc headers, which `wasm32-unknown-unknown`
+# has none of. This crate builds the same extension with its own headers.
+[target.'cfg(target_family = "wasm")'.dependencies]
+sqlite-wasm-vec = { workspace = true, optional = true }

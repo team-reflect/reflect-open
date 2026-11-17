@@ -1,3 +1,4 @@
+import type { ChatConversation } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import { safeParseJson } from '@reflect/utils'
 import { z } from 'zod'
@@ -16,26 +17,11 @@ import type { AssistantPart, ChatTurn } from './transcript.ts'
  *
  * Writes go through generation-gated Rust commands like every other index
  * mutation: a save issued for one graph can never land in another's
- * history. Reads ride the ordinary read-only Kysely `db_query` bridge.
+ * history. Reads go through the `chat_conversations` and `chat_messages`
+ * commands.
  */
 
-/**
- * Chat write commands return `()` from Rust, which serializes to `null`.
- */
-const voidSchema = z.null()
-
-/**
- * One conversation's metadata row.
- */
-export interface ChatConversation {
-  id: string
-  /**
-   * First user message, truncated; fixed at creation.
-   */
-  title: string
-  createdMs: number
-  updatedMs: number
-}
+export type { ChatConversation }
 
 const hitSummarySchema = z.object({ path: z.string(), title: z.string() })
 
@@ -217,46 +203,32 @@ class ChatHistoryServiceImpl implements ChatHistoryService {
   }
 
   async saveTurn(input: SaveChatTurnInput): Promise<void> {
-    await this.#deps.ipc.call(
-      'chat_message_save',
-      {
-        conversation: input.conversation,
-        message: {
-          id: input.turn.id,
-          conversationId: input.conversation.id,
-          userText: input.turn.userText,
-          attachments: JSON.stringify(input.turn.attachments),
-          parts: JSON.stringify(input.turn.parts),
-          responseMessages: JSON.stringify(input.turn.responseMessages),
-          createdMs: input.createdMs,
-        },
-        generation: input.generation,
+    await this.#deps.ipc.call('chat_message_save', {
+      conversation: input.conversation,
+      message: {
+        id: input.turn.id,
+        conversationId: input.conversation.id,
+        userText: input.turn.userText,
+        attachments: JSON.stringify(input.turn.attachments),
+        parts: JSON.stringify(input.turn.parts),
+        responseMessages: JSON.stringify(input.turn.responseMessages),
+        createdMs: input.createdMs,
       },
-      voidSchema,
-    )
+      generation: input.generation,
+    })
   }
 
   async deleteConversation(id: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('chat_conversation_delete', { id, generation }, voidSchema)
+    await this.#deps.ipc.call('chat_conversation_delete', { id, generation })
   }
 
   async listRecent(limit = 50): Promise<ChatConversation[]> {
-    return await this.#deps.database.db
-      .selectFrom('chatConversations')
-      .select(['id', 'title', 'createdMs', 'updatedMs'])
-      .orderBy('updatedMs', 'desc')
-      .limit(limit)
-      .execute()
+    return await this.#deps.database.read('chat_conversations', { limit })
   }
 
   async loadConversation(conversationId: string): Promise<ChatTurn[]> {
     const { database, logger } = this.#deps
-    const rows = await database.db
-      .selectFrom('chatMessages')
-      .select(['id', 'userText', 'attachments', 'parts', 'responseMessages'])
-      .where('conversationId', '=', conversationId)
-      .orderBy('seq', 'asc')
-      .execute()
+    const rows = await database.read('chat_messages', { conversationId })
     return rows.flatMap((row) => {
       const turn = parseTurn(row)
       if (turn === null) {

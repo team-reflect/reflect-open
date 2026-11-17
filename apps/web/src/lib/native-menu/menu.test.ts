@@ -1,9 +1,10 @@
 import { isNotNullish } from '@ocavue/utils'
 import { describe, expect, it } from 'vitest'
 import { APP_COMMANDS, keybindingFor } from '@/lib/commands/app-commands.ts'
+import type { AppCommandId } from '@/lib/commands/types.ts'
 import { appMenuLayout } from './menu.ts'
 
-function referencedCommandIds(): string[] {
+function referencedCommandIds(): AppCommandId[] {
   return appMenuLayout().flatMap((submenu) => {
     return submenu.entries
       .map((entry) => (entry.kind === 'command' ? entry.commandId : null))

@@ -71,7 +71,7 @@ const MOBILE_IDLE_MS = 10_000
 const SECONDARY_CHANNEL_QUIET_MS = 5 * 60_000
 
 /**
- * How often a visible desktop window asks the remote for its branch tip.
+ * How often a visible window asks the remote for its branch tip.
  */
 const REMOTE_PROBE_MS = 90_000
 
@@ -256,10 +256,11 @@ class GitSyncServiceImpl implements GitSyncService {
         // iOS can suspend us at any await. Do not begin a launch, online, or
         // debounced Git cycle after the document is hidden; the existing
         // visible/focus trigger below replays a full cycle on foreground.
-        // The background flusher's protected local commit bypasses this
-        // engine deliberately.
+        // The background flush (a commit, then one push) bypasses this gate
+        // deliberately.
         canStartCycle: () => !this.#mobile || !activity.isHidden(),
         getCredential,
+        peekCredential: resolved.peek,
         onStatus: (engineStatus) => {
           this.#setState({
             phase: 'connected',
@@ -268,7 +269,10 @@ class GitSyncServiceImpl implements GitSyncService {
             isPrimaryChannel,
             status: engineStatus,
           })
-          if (remote.kind === 'github' && isForbidden(engineStatus)) {
+          // The classification reads the token with a refresh: not while iOS
+          // can suspend the app. The next resume classifies it again.
+          const hidden = this.#mobile && activity.isHidden()
+          if (remote.kind === 'github' && isForbidden(engineStatus) && !hidden) {
             void this.#classifyForbidden(engineStatus, remoteUrl, remote, isPrimaryChannel)
           }
         },
@@ -287,10 +291,12 @@ class GitSyncServiceImpl implements GitSyncService {
         isPrimaryChannel,
         status: { state: 'idle' },
       })
-      this.#adoptEngine(next)
+      // On mobile, the background flush also pushes: a phone is often put
+      // away right after an edit, and its next launch can be hours away.
+      this.#adoptEngine(next, this.#mobile && isPrimaryChannel ? 'push' : 'commit')
 
       this.#resumeDisposers.push(activity.subscribeResume(() => void next.syncNow()))
-      if (isPrimaryChannel && !this.#mobile && platform.isNativeShell) {
+      if (isPrimaryChannel && platform.isNativeShell) {
         this.#armProbe(next, getCredential)
       }
 
@@ -478,9 +484,9 @@ class GitSyncServiceImpl implements GitSyncService {
 
   /**
    * Wire an engine into the watcher (which feeds its debounce) and the
-   * quit-time flusher.
+   * quit-time and background flusher, which commits or also pushes once.
    */
-  #adoptEngine(next: SyncEngine): void {
+  #adoptEngine(next: SyncEngine, flush: 'commit' | 'push'): void {
     const { fileChanges, persistenceFlush } = this.#deps
     this.#engine = next
     // Spooled capture envelopes (`.reflect/inbox/`) are git-ignored and
@@ -494,11 +500,11 @@ class GitSyncServiceImpl implements GitSyncService {
         next.noteChanged()
       }
     })
-    // Quit-time commit (local only — never a network push on the way out),
-    // queued behind any running cycle so it can never land between a pull's
-    // ref move and its checkout.
+    // Quit-time commit (local only — never a network push on the way out of
+    // a desktop app), queued behind any running cycle so it can never land
+    // between a pull's ref move and its checkout.
     this.#unregisterGitSyncFlusher = persistenceFlush.registerFlusher('git-sync', () => {
-      return next.commitNow()
+      return flush === 'push' ? next.pushHidden() : next.commitNow()
     })
   }
 
@@ -549,7 +555,7 @@ class GitSyncServiceImpl implements GitSyncService {
           }
         },
       })
-      this.#adoptEngine(next)
+      this.#adoptEngine(next, 'commit')
       void next.syncNow() // first snapshot: commit whatever is already pending
     } catch (error) {
       // `adoptEngine` assigns the engine before it subscribes, so a

@@ -1,3 +1,4 @@
+import type { EventName } from '@reflect/types'
 import { z } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { IndexStoreService } from '../indexing/index-store-service.ts'
@@ -8,7 +9,7 @@ import type { OpenDocumentsService } from './open-documents-service.ts'
 /**
  * Event name the Rust move commands emit after their rows commit.
  */
-export const NOTE_MOVED_EVENT = 'note:moved'
+export const NOTE_MOVED_EVENT = 'note:moved' satisfies EventName
 
 const noteMovedSchema = z.object({ from: z.string(), to: z.string() })
 
@@ -52,7 +53,7 @@ export interface NoteMoveService {
    * 5s save-quiet gate (the debounce alone is 800ms — orders of magnitude
    * wider than the window). If that ever happens, the write lands at the
    * destination — where the note is about to live — and the refused move
-   * leaves at worst an orphan copy the duplicate-id surface flags. The
+   * leaves at worst an orphan copy that shares the note's id. The
    * alternative order (retarget after) fails worse: the same race would
    * resurrect the *old* path holding the newest bytes while the index points
    * at the new one. See the plan's risk log (decided 2026-06-11).

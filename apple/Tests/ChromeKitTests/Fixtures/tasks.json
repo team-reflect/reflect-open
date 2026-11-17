@@ -1,0 +1,36 @@
+{
+  "type": "state",
+  "entryId": 7,
+  "chrome": "shell",
+  "routeKind": "tasks",
+  "tab": "tasks",
+  "canBack": false,
+  "leading": [],
+  "trailing": [
+    {
+      "id": "filters",
+      "title": "Task filters",
+      "icon": "slider.horizontal.3"
+    }
+  ],
+  "keyboardVisible": false,
+  "modal": false,
+  "toolbar": null,
+  "plus": {
+    "kind": "action",
+    "label": "New task"
+  },
+  "sidebar": null,
+  "history": null,
+  "title": null,
+  "search": {
+    "placeholder": "Search tasks…",
+    "label": "Search tasks",
+    "text": "",
+    "revision": 0
+  },
+  "fullscreen": false,
+  "hidesTabBar": false,
+  "theme": "system",
+  "generation": 1
+}

@@ -18,6 +18,11 @@ import type { Route } from './route.ts'
 export interface DeepLinkIo {
   navigate: (route: Route) => void
   /**
+   * Show the results for `query`. A search link is an intent, not a place,
+   * so it adds no history entry.
+   */
+  search: (query: string) => void
+  /**
    * Whether the graph session or navigation intent changed while the handler
    * awaited; a stale note resolution is dropped, never navigated.
    */
@@ -31,6 +36,10 @@ export interface DeepLinkIo {
  */
 export interface DeepLinkSession {
   navigate: (route: Route) => void
+  /**
+   * See {@link DeepLinkIo.search}.
+   */
+  search: (query: string) => void
   /**
    * Start one navigation intent for a link that addresses a place. The
    * returned probe answers whether the intent went stale since.
@@ -101,16 +110,16 @@ class DeepLinkRouterImpl implements DeepLinkRouter {
 
   serve(session: DeepLinkSession): Unlisten {
     const { intake, logger, graphSession } = this.#deps
-    const { navigate } = session
+    const { navigate, search } = session
     const graph = graphSession.get().session
     return intake.onUrl((url) => {
       const link = parseDeepLink(url)
       // Capture and rejected URLs do not express a navigation intent, so they
       // must not supersede a note target that is still resolving.
-      let io: DeepLinkIo = { navigate }
+      let io: DeepLinkIo = { navigate, search }
       if (link !== null && link.kind !== 'capture') {
         const intentStale = session.beginNavigationIntent()
-        io = { navigate, isStale: () => graph?.signal.aborted === true || intentStale() }
+        io = { navigate, search, isStale: () => graph?.signal.aborted === true || intentStale() }
       }
       this.#handleIn(url, io, graph).catch((cause: unknown) => {
         logger.error(`deep link failed: ${url}`, cause)
@@ -130,7 +139,11 @@ class DeepLinkRouterImpl implements DeepLinkRouter {
     // A place link navigates synchronously, with no round-trip through the intake.
     const link = parseDeepLink(url)
     if (link?.kind === 'navigate') {
-      io.navigate(link.place)
+      if (link.place.kind === 'search') {
+        io.search(link.place.query)
+      } else {
+        io.navigate(link.place)
+      }
       return
     }
     const options: DeepLinkResolveOptions =

@@ -11,7 +11,6 @@
  * the user types.
  */
 
-import { sql, type RawBuilder } from 'kysely'
 import { foldKey } from '../markdown/index.ts'
 
 /** Split a free-text query into the terms shared by FTS and title recall. */
@@ -23,13 +22,10 @@ export function splitSearchTerms(query: string): string[] {
  * A character `unicode61` keeps inside a token: its default `categories` is
  * `'L* N* Co'`, so letters, numbers and private-use codepoints of every script
  * count (Han, kana, Hangul and Thai included), while punctuation, symbols and
- * combining marks separate tokens. `is_fts_token_char` (`apps/cli/src/search.rs`)
+ * combining marks separate tokens. `is_fts_token_char` (`crates/index/src/text/fts.rs`)
  * mirrors this codepoint for codepoint; the two must move together.
  */
 const FTS_TOKEN_CHAR_RE = /[\p{L}\p{N}\p{Co}]/u
-
-/** A run of characters that separate tokens, per {@link FTS_TOKEN_CHAR_RE}. */
-const FTS_TOKEN_SEPARATOR_RE = /[^\p{L}\p{N}\p{Co}]+/u
 
 /** Wrap a term as an FTS5 string literal, doubling quotes (FTS5's own escape). */
 function quoteFtsLiteral(term: string): string {
@@ -82,28 +78,13 @@ export function buildFtsMatch(query: string): string | null {
 }
 
 /**
- * Build an FTS5 `MATCH` expression for titles containing `text` as a phrase
- * whose last word may be a prefix. The tokenizer drops diacritics, so `elisk`
- * matches `Eliška`. `null` unless that last word has two or more letters or
- * digits: a one-letter prefix (`a`, or the `c` left of `c++`) expands to most
- * of the index's vocabulary, which is slow on every keystroke. Splitting at
- * every combining mark can only shorten the word (`unicode61` keeps a few
- * combining marks inside a token and then drops them, such as the dot of a
- * lowercased `İ`), so this errs towards skipping the index.
- */
-export function buildFtsTitlePrefixMatch(text: string): string | null {
-  const lastToken = text.split(FTS_TOKEN_SEPARATOR_RE).findLast(Boolean) ?? ''
-  return [...lastToken].length > 1 ? `title : ${quoteFtsLiteral(text)}*` : null
-}
-
-/**
  * Scripts written without spaces between words (Han, kana, Hangul, Thai, …).
  * FTS5's `unicode61` tokenizer only segments at non-alphanumeric characters,
  * so a title run in these scripts indexes as ONE token and a shorter query
  * can never match it lexically — such terms need anywhere-in-the-title
  * substring recall. Space-delimited scripts must NOT get it: `car` may find
  * `Car log` but never `Oscar party`. The Rust CLI mirrors this table
- * (`apps/cli/src/keys.rs`); the two must move together.
+ * (`crates/index/src/text/keys.rs`); the two must move together.
  */
 const UNSEGMENTED_SCRIPT_RANGES: ReadonlyArray<readonly [number, number]> = [
   [0x0e00, 0x0eff], // Thai, Lao
@@ -160,44 +141,4 @@ export function titleRecallTerms(query: string): TitleRecallTerm[] {
  */
 export function titleRecallNeedles(query: string): string[] {
   return titleRecallTerms(query).map((term) => (term.anywhere ? term.value : ` ${term.value}`))
-}
-
-export interface TitleMatchSql {
-  /**
-   * True when every query term matches the folded title — at a word start for
-   * space-delimited scripts, anywhere for unsegmented ones.
-   */
-  readonly containsAllTerms: RawBuilder<boolean>
-  /** Exact (0), whole-query prefix (1), all-terms title match (2), else 3. */
-  readonly rank: RawBuilder<number>
-}
-
-/**
- * Build title-recall SQL against a stored, already-folded title-key column.
- * Every query term must match per {@link titleRecallNeedles}, so `東京 旅行`
- * matches `東京旅行計画` even though `unicode61` sees the uninterrupted title
- * as one token, while `car` never matches `Oscar party`.
- */
-export function buildTitleMatchSql(
-  titleKeyColumn: RawBuilder<string>,
-  query: string,
-): TitleMatchSql {
-  const needles = titleRecallNeedles(query)
-  const containsAllTerms =
-    needles.length === 0
-      ? sql<boolean>`0`
-      : sql<boolean>`(${sql.join(
-          needles.map((needle) => sql`instr(' ' || ${titleKeyColumn}, ${needle}) > 0`),
-          sql` and `,
-        )})`
-  const titleKey = foldKey(query)
-  return {
-    containsAllTerms,
-    rank: sql<number>`case
-      when ${titleKeyColumn} = ${titleKey} then 0
-      when instr(${titleKeyColumn}, ${titleKey}) = 1 then 1
-      when ${containsAllTerms} then 2
-      else 3
-    end`,
-  }
 }

@@ -123,8 +123,9 @@ by a **Tauri 2** desktop shell and a Swift iOS shell. The Rust crates form one
   `apps/native-host/`: its Chrome native-messaging sidecar `reflect-capture-host`
   (Plan 11).
 - `apple/`: the local Swift package with iOS code shared between targets ([docs/contributing/apple-package.md](docs/contributing/apple-package.md)).
-- `packages/core/`, `packages/app/`, `packages/db/`: see Services below and each
-  package's README.
+- `packages/core/`, `packages/app/`: see Services below and each package's README.
+- `packages/index-wasm/`: the Rust index compiled to wasm, for the browser dev
+  bridge and the tests (`pnpm build:index-wasm`).
 - `crates/index-schema/`: the SQLite migrations shared by the desktop writer and the
   CLI reader.
 - `design-system/`, `docs/` (product and architecture docs, `docs/plans/`).
@@ -180,8 +181,8 @@ The short version:
 
 **Frontend ↔ Rust**
 
-- Define commands as `Core` methods in `crates/core` with a row in `dispatch_table!`. Desktop-only commands are `#[tauri::command]`s in `apps/tauri/src/`.
-- Bind each command as a method of the core service that owns the domain, through `ipc.call(command, args, zodSchema)`. Components never call `invoke`. See [docs/contributing/adding-a-command.md](docs/contributing/adding-a-command.md).
+- Define commands as `Core` methods in `crates/core`, `#[tauri::command]`s in `apps/tauri/src/` for desktop-only ones, or Swift shell handlers for `plugin:` and `host.` commands, each with a row in the command table (`crates/types/src/commands.rs`). Types that cross between TS and Swift without a command (the chrome protocol, plugin events, capture files) also live in `crates/types`. Run `pnpm gen:types` after you change a row or a type.
+- Bind each command as a method of the core service that owns the domain, through `ipc.call(command, args)`. The table types the args and the result. Components never call `invoke`. See [docs/contributing/adding-a-command.md](docs/contributing/adding-a-command.md).
 - Add Tauri plugins in `apps/tauri/Cargo.toml` (Rust) and grant permissions in `apps/tauri/capabilities/`.
 
 **Common commands** (run from the repo root; the rest are in `package.json`)
@@ -230,12 +231,16 @@ and the existing local patterns over new abstractions.
 
 ## Data Boundaries
 
-- Use Zod for all incoming or untrusted data: JSON, IPC payloads, external API
-  responses, file-derived metadata, and worker payloads. Never parse JSON with type
-  assertions.
+- Use Zod for all incoming or untrusted data: JSON, external API responses,
+  file-derived metadata, and worker payloads. Never parse JSON with type
+  assertions. IPC results are typed from the Rust command table and need no Zod,
+  unless the data comes from disk or the network.
 - Normalize casing once at the boundary; TypeScript types are camelCase.
-- In public function parameters or returns, use Kysely helper types
-  (`Selectable<T>`, `Insertable<T>`, `Updateable<T>`), not raw table types.
+- Every runtime SQL statement of the index is in `crates/index`; its schema
+  migrations are in `crates/index-schema`. TypeScript reads the index with
+  `DatabaseService.read(command, args)`; a new query is a row in the
+  `index_read` block of the command table
+  ([adding a command](docs/contributing/adding-a-command.md)).
 - Handle Promise rejections properly, but do not add broad defensive error
   handling unless the call site needs it.
 

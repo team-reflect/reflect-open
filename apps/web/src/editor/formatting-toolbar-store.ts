@@ -1,25 +1,7 @@
+import type { ToolbarState } from '@reflect/types'
 import { isDeepEqual } from '@ocavue/utils'
 import { WritableStore } from '@reflect/core'
 import { useSelector } from '@/lib/use-store.ts'
-
-/**
- * Enable/disable state for the toolbar's structural buttons, recomputed from
- * the editor selection (ProseKit `canExec`). Selection-aware enablement is
- * what made V1's native accessory bar feel native — the porting doc calls it
- * the load-bearing behavior, not the buttons themselves.
- */
-export interface FormattingToolbarCapabilities {
-  canIndent: boolean
-  canDedent: boolean
-  canMoveUp: boolean
-  canMoveDown: boolean
-  /**
-   * Whether this editor can persist files. Only a pane that was given a
-   * `saveFile` can (the inline task editor, for one, was not), and an attach
-   * button over an editor without one is a button that does nothing.
-   */
-  canAttachFiles: boolean
-}
 
 /** Autocomplete-trigger characters the toolbar can type into the editor. */
 export type FormattingTriggerText = '/' | '[[' | '#'
@@ -46,7 +28,7 @@ export interface FormattingToolbarCommands {
    * Persist picked files into the graph's `assets/` and insert their markdown
    * at the caret — `![](…)` for an image, a `[name](…)` link otherwise, the
    * same markdown a paste or drop produces. A no-op without
-   * {@link FormattingToolbarCapabilities.canAttachFiles}.
+   * {@link ToolbarState.canAttachFiles}.
    */
   attachFiles: (files: File[]) => Promise<void>
   /**
@@ -58,7 +40,7 @@ export interface FormattingToolbarCommands {
 
 /** What the mobile shell's toolbar renders for the focused editor. */
 export interface FormattingToolbar {
-  capabilities: FormattingToolbarCapabilities
+  capabilities: ToolbarState
   commands: FormattingToolbarCommands
 }
 

@@ -1,7 +1,8 @@
+import { noop } from '@ocavue/utils'
 import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, onTestFinished } from 'vitest'
 import type { ReactElement } from 'react'
-import { createTestCoreServices, seedNotes } from '@reflect/core/testing'
+import { createTestDatabaseService, createTestCoreServices, seedNotes } from '@reflect/core/testing'
 import { PaletteProvider } from '@/components/command-palette/palette-provider.tsx'
 import { type GraphInfo, formatDayLabel } from '@reflect/core'
 import type { Route } from '@reflect/app'
@@ -14,7 +15,6 @@ import { ShortcutsProvider } from '@/providers/shortcuts-provider.tsx'
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider.tsx'
 import { V1ImportProvider } from '@/providers/v1-import-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { WorkspaceContent } from './workspace-content.tsx'
 
 const GRAPH: GraphInfo = { root: '/notes', name: 'Notes', generation: 1 }
@@ -32,7 +32,7 @@ function SidebarToggle(): ReactElement {
 }
 
 function renderWorkspace(route: Route) {
-  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  const core = createTestCoreServices({ database: createTestDatabaseService() })
   onTestFinished(() => core.database.close())
   // Pinned, so the sidebar of this note (and only this note) offers "Un-pin this note".
   seedNotes(core.database, [
@@ -45,7 +45,7 @@ function renderWorkspace(route: Route) {
         <NoteTemplatesProvider>
           <SidebarProvider>
             <AudioMemoProvider graph={GRAPH}>
-              <DeepLinkProvider>
+              <DeepLinkProvider search={noop}>
                 <FocusedDailyProvider>
                   <NoteFindProvider>
                     <V1ImportProvider>

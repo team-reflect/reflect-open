@@ -110,15 +110,14 @@ class XArchiveServiceImpl implements XArchiveService {
 
   async owners(assetPath: string, generation?: number): Promise<string[]> {
     if (!assetPath.startsWith('assets/x/')) return []
-    return await this.#deps.ipc.call(
-      'x_archive_owners',
-      { assetPath, generation },
-      z.array(z.string()),
-    )
+    return await this.#deps.ipc.call('x_archive_owners', {
+      assetPath,
+      generation: generation ?? null,
+    })
   }
 
   async write(generation: number, post: ArchivedXPost): Promise<void> {
-    await this.#deps.ipc.call('x_archive_write', { generation, value: post }, z.null())
+    await this.#deps.ipc.call('x_archive_write', { generation, value: post })
   }
 
   async fetchSyndication(postId: string): Promise<XPost | null> {

@@ -1,5 +1,6 @@
 import type { XPost } from '@post-embed/types'
-import type { LinkPreviewHtml, WebFetchService } from '../link-preview/web-fetch-service.ts'
+import type { LinkPreviewHtml } from '@reflect/types'
+import type { WebFetchService } from '../link-preview/web-fetch-service.ts'
 import type { CloudSafe } from '../privacy/cloud-safe.ts'
 import type {
   CaptureService,

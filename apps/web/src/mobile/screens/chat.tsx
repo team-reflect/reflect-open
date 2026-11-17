@@ -1,11 +1,16 @@
 import { useState, type ReactElement } from 'react'
-import { ChevronLeft, History, MessageSquare, Plus } from 'lucide-react'
+import { MessageSquare } from 'lucide-react'
 import { ChatTurnList } from '@/components/chat/chat-turn-list.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { MobileChatComposer } from '@/mobile/chat-composer.tsx'
+import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import { ChatHistoryDrawer } from '@/mobile/chat-history-drawer.tsx'
-import { MobileTopBar, MobileTopBarIconButton, MobileTopBarRow } from '@/mobile/top-bar.tsx'
-import { useChatActions, useChatProviders, useHasChatTurns } from '@/providers/chat-provider.tsx'
+import {
+  useChatActions,
+  useChatProviders,
+  useHasChatTurns,
+  useSyncChatRoute,
+} from '@/providers/chat-provider.tsx'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
 /**
@@ -21,50 +26,37 @@ import { useRouterState, useRouterActions } from '@/routing/router.tsx'
  */
 export function MobileChat(): ReactElement {
   const providers = useChatProviders()
+  useSyncChatRoute()
   const hasTurns = useHasChatTurns()
   const { newChat } = useChatActions()
-  const { canBack } = useRouterState()
+  const { canBack, section } = useRouterState()
   const { navigate, back } = useRouterActions()
   const [historyOpen, setHistoryOpen] = useState(false)
   const hasProvider = providers.length > 0
+  const goBack = (): void => (canBack ? back() : navigate({ kind: 'today' }))
 
   return (
-    <div className="flex h-full w-screen flex-col pt-safe">
-      <MobileTopBar>
-        <MobileTopBarRow>
-          <MobileTopBarIconButton
-            edge="leading"
-            aria-label="Back"
-            onClick={() => (canBack ? back() : navigate({ kind: 'today' }))}
-          >
-            <ChevronLeft aria-hidden />
-          </MobileTopBarIconButton>
-          <h1 className="min-w-0 flex-1 truncate text-base font-semibold">Chat</h1>
-          {hasProvider ? (
-            <>
-              {hasTurns ? (
-                <MobileTopBarIconButton aria-label="New chat" onClick={newChat}>
-                  <Plus aria-hidden />
-                </MobileTopBarIconButton>
-              ) : null}
-              <MobileTopBarIconButton
-                edge="trailing"
-                aria-label="Chat history"
-                onClick={() => setHistoryOpen(true)}
-              >
-                <History aria-hidden />
-              </MobileTopBarIconButton>
-            </>
-          ) : null}
-        </MobileTopBarRow>
-      </MobileTopBar>
+    <div className="flex h-full w-full flex-col pt-safe">
+      <ChromeTopBar
+        back={section === 'chat' ? undefined : goBack}
+        trailing={
+          hasProvider
+            ? [
+                ...(hasTurns ? [{ id: 'new', title: 'New chat', icon: 'plus' } as const] : []),
+                { id: 'history', title: 'Chat history', icon: 'history' },
+              ]
+            : []
+        }
+        onAction={(id) => (id === 'new' ? newChat() : setHistoryOpen(true))}
+        title="Chat"
+      />
       {hasProvider ? (
         <>
           <ChatTurnList />
           <MobileChatComposer />
         </>
       ) : (
-        <div className="flex flex-1 items-center justify-center px-6">
+        <div className="flex flex-1 items-center justify-center px-safe-offset-6">
           <div className="flex max-w-sm flex-col items-center text-center">
             <MessageSquare aria-hidden strokeWidth={1.5} className="size-8 text-text-muted" />
             <h2 className="mt-4 text-lg font-semibold text-text">Chat with your notes</h2>
@@ -72,7 +64,7 @@ export function MobileChat(): ReactElement {
               Add an AI provider to start chatting. Reflect calls the provider directly with your
               own key — it stays in the device keychain, and private notes are never sent.
             </p>
-            <Button className="mt-5" onClick={() => navigate({ kind: 'settings' })}>
+            <Button className="mt-5" onClick={() => navigate({ kind: 'settings', page: 'main' })}>
               Add an AI provider
             </Button>
           </div>

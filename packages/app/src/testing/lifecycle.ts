@@ -19,7 +19,7 @@ export interface TestLifecycleServiceOptions extends TestActivityPortOptions {
    * The activity signals to share, e.g. the `activity` of test core services.
    * Defaults to a new test activity port built from the other options.
    */
-  activity?: TestActivityPort
+  activity?: TestActivityPort | undefined
 }
 
 class Listeners {

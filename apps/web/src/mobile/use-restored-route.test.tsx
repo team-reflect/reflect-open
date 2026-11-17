@@ -1,12 +1,12 @@
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestPlatformService,
   createTestStorageService,
 } from '@reflect/core/testing'
-import type { Route } from '@reflect/app'
+import type { Route, Section } from '@reflect/app'
 import { describe, expect, it } from 'vitest'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useRestoredRoute } from './use-restored-route.ts'
 
 const STORAGE_KEY = 'reflect.mobile.route'
@@ -17,21 +17,26 @@ async function renderRestoredRoute(stored: unknown, isSwiftMobile = true) {
   storage.session.set(STORAGE_KEY, JSON.stringify(stored))
   const core = createTestCoreServices({
     storage,
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     platform: createTestPlatformService({ isSwiftMobile }),
   })
   const view = await renderHookInApp(() => useRestoredRoute('/graph'), { core })
   return { view, storage }
 }
 
-function storedRoute(graphRoot: string, route: Route | { kind: 'nowhere' }): unknown {
-  return { graphRoot, route }
+function storedRoute(
+  graphRoot: string,
+  route: Route | { kind: 'nowhere' },
+  section: Section = 'tasks',
+): unknown {
+  return { graphRoot, route, section }
 }
 
 describe('useRestoredRoute', () => {
   it('returns the route stored for the graph and removes it', async () => {
-    const { view, storage } = await renderRestoredRoute(storedRoute('/graph', { kind: 'tasks' }))
-    expect(view.result.current).toEqual({ kind: 'tasks' })
+    const note: Route = { kind: 'note', path: 'a.md' }
+    const { view, storage } = await renderRestoredRoute(storedRoute('/graph', note))
+    expect(view.result.current).toEqual({ route: note, section: 'tasks' })
     expect(storage.session.get(STORAGE_KEY)).toBeNull()
   })
 
@@ -57,7 +62,7 @@ describe('useRestoredRoute', () => {
     const stored = storedRoute('/graph', { kind: 'tasks' })
     const { view, storage } = await renderRestoredRoute(stored, false)
     expect(view.result.current).toBeUndefined()
-    view.appServices.navigation.navigate({ kind: 'settings' })
+    view.appServices.navigation.navigate({ kind: 'settings', page: 'main' })
     expect(storage.session.get(STORAGE_KEY)).toBe(JSON.stringify(stored))
   })
 })

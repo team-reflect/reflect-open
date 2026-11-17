@@ -1,6 +1,6 @@
 import type { MaybePromise } from '@reflect/utils'
 import { deepLinkForRoute, formatBinding } from '@reflect/app'
-import { createTestAppServices, createTestWindowService } from '@reflect/app/testing'
+import { createTestWindowService } from '@reflect/app/testing'
 import { userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useEffect, type ReactNode } from 'react'
@@ -11,6 +11,7 @@ import type {
   WikiSuggestion,
 } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestEmbeddingRuntimeService,
   createTestNoteFileService,
@@ -20,10 +21,10 @@ import type { CommandContext } from '@/lib/commands/types.ts'
 import { useRouterState } from '@/routing/router.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { CommandPalette } from './command-palette.tsx'
 import { PaletteProvider, usePalette } from './palette-provider.tsx'
 import { noop, returnNull } from '@ocavue/utils'
+import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
 // The palette runs on the real `PaletteSearchService` of the test app
 // services; each test scripts the index reads below it.
@@ -88,7 +89,7 @@ function RouteProbe(): ReactNode {
 async function renderPalette(query: string, context?: Partial<CommandContext>) {
   const navigate = vi.fn()
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     suggestions: {
       suggestWikiTargets,
       suggestWikiLinkTargets: () => ({
@@ -107,7 +108,7 @@ async function renderPalette(query: string, context?: Partial<CommandContext>) {
     }),
     noteFile: createTestNoteFileService({ files }),
   })
-  const appLayer = createTestAppServices(core, {
+  const appLayer = createWebTestAppServices(core, {
     window: createTestWindowService({ openNoteWindow }),
   })
   const fullContext: CommandContext = {
@@ -118,6 +119,7 @@ async function renderPalette(query: string, context?: Partial<CommandContext>) {
     notePath: returnNull,
     back: vi.fn(),
     forward: vi.fn(),
+    selectSection: vi.fn(),
     clearScrollState: vi.fn(),
     togglePin: vi.fn(noop),
     togglePrivate: vi.fn(noop),
@@ -190,6 +192,16 @@ describe('CommandPalette', () => {
     await expect.element(view.getByText('Recent One')).toBeInTheDocument()
     await expect.element(view.getByText('Recent', { exact: true })).toBeInTheDocument()
     expect(view.getByText('Commands').query()).toBeNull() // recall feed only (decided)
+  })
+
+  it('ends a typed query with an Ask row that leads to Settings with no AI provider', async () => {
+    suggestWikiTargets.mockResolvedValue([])
+    searchWithFilters.mockResolvedValue([])
+    const { view, navigate } = await renderPalette('pricing plans')
+    await expect.element(view.getByText('No results')).toBeInTheDocument()
+    await view.getByText('Ask “pricing plans”').click()
+    expect(navigate).toHaveBeenCalledWith({ kind: 'settings', page: 'main' })
+    expect(view.getByTestId('palette-overlay').query()).toBeNull()
   })
 
   it('a typed query shows ranked notes with highlighted snippets and Enter opens the top hit', async () => {
@@ -407,7 +419,7 @@ describe('CommandPalette', () => {
     searchWithFilters.mockResolvedValue([])
     const toggleTheme = vi.fn()
     const { view } = await renderPalette('toggle theme', { toggleTheme })
-    await expect.element(view.getByText('Toggle theme')).toBeInTheDocument()
+    await expect.element(view.getByText('Toggle theme', { exact: true })).toBeInTheDocument()
 
     await userEvent.keyboard('{Enter}')
     await vi.waitFor(() => expect(toggleTheme).toHaveBeenCalled())

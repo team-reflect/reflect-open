@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { errorMessage } from '../errors.ts'
@@ -9,15 +8,9 @@ import type { Unlisten } from '../unlisten.ts'
 import type { GraphSessionService } from './graph-session-service.ts'
 import {
   graphImportProgressSchema,
-  graphImportSummarySchema,
   type GraphImportProgress,
   type GraphImportSummary,
 } from './schemas.ts'
-
-/**
- * Commands that return `()` from Rust serialize as `null` over IPC.
- */
-const voidSchema = z.null()
 
 /**
  * Event name the running import emits {@link GraphImportProgress} ticks on.
@@ -112,11 +105,10 @@ class V1ImportServiceImpl implements V1ImportService {
     })
     void (async () => {
       try {
-        const summary = await ipc.call(
-          'graph_import_reflect_v1_zip',
-          { path: zipPath, generation: startedFor.generation },
-          graphImportSummarySchema,
-        )
+        const summary = await ipc.call('graph_import_reflect_v1_zip', {
+          path: zipPath,
+          generation: startedFor.generation,
+        })
         const current = graphSession.get().graph
         if (
           this.#attached &&
@@ -201,7 +193,7 @@ class V1ImportServiceImpl implements V1ImportService {
    */
   async #cancelNative(): Promise<void> {
     try {
-      await this.#deps.ipc.call('graph_import_cancel', {}, voidSchema)
+      await this.#deps.ipc.call('graph_import_cancel', {})
     } catch (cause) {
       this.#deps.logger.warn('cancelling the import failed:', cause)
     }

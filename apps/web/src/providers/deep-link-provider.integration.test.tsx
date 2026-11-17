@@ -1,26 +1,27 @@
+import { noop } from '@ocavue/utils'
 import { describe, expect, it, vi } from 'vitest'
-import { createTestAppServices } from '@reflect/app/testing'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestCaptureInboxService,
   createTestDeepLinkIntakeService,
   createTestGraphSessionService,
 } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DeepLinkProvider } from './deep-link-provider.tsx'
+import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
 describe('DeepLinkProvider navigation intent integration', () => {
   it('keeps a deferred note resolution current when a capture arrives', async () => {
     const pendingResolution = Promise.withResolvers<string>()
-    const { indexQuery } = createTestCoreServices({ database: createWasmTestDatabaseService() })
+    const { indexQuery } = createTestCoreServices({ database: createTestDatabaseService() })
     const resolveNoteTarget = vi
       .spyOn(indexQuery, 'resolveNoteTarget')
       .mockImplementation(() => pendingResolution.promise)
     const captureInbox = createTestCaptureInboxService()
     const graphSession = createTestGraphSessionService()
     const core = createTestCoreServices({
-      database: createWasmTestDatabaseService(),
+      database: createTestDatabaseService(),
       captureInbox,
       graphSession,
       deepLinkIntake: createTestDeepLinkIntakeService({
@@ -29,8 +30,11 @@ describe('DeepLinkProvider navigation intent integration', () => {
         graphSession,
       }),
     })
-    const appServices = createTestAppServices(core)
-    await renderInApp(<DeepLinkProvider>{null}</DeepLinkProvider>, { core, appServices })
+    const appServices = createWebTestAppServices(core)
+    await renderInApp(<DeepLinkProvider search={noop}>{null}</DeepLinkProvider>, {
+      core,
+      appServices,
+    })
 
     appServices.deepLinkRouter.dispatch('reflect://note/Project%20X')
     expect(resolveNoteTarget).toHaveBeenCalledWith('Project X')

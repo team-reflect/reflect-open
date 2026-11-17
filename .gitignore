@@ -59,3 +59,7 @@ __screenshots__/
 .swiftpm/
 xcuserdata/
 DerivedData/
+
+# The wasm build of the index (`pnpm build:index-wasm`)
+/packages/index-wasm/pkg/*
+!/packages/index-wasm/pkg/reflect_index_wasm.d.ts

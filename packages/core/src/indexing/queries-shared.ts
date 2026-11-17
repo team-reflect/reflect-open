@@ -1,8 +1,6 @@
-import type { Database } from '@reflect/db'
-import { sql, type Kysely, type RawBuilder } from 'kysely'
 import { wikiNoteReference } from '../graph/note-reference.ts'
 import { normalizeWikiTarget } from '../markdown/index.ts'
-import { inClauseChunks } from './query-utils.ts'
+import type { DatabaseService } from './database-service.ts'
 import {
   serializeWikiSuggestionAddress,
   type WikiLinkSuggestion,
@@ -19,22 +17,6 @@ export interface WikiLinkSuggestionResult {
   readonly claimedTargetKeys: readonly string[]
   /** Whether the raw query produced at least one generated date candidate. */
   readonly queryReadsAsDate: boolean
-}
-
-/**
- * The recall-feed ordering, shared by the filtered search and the All Notes
- * list so the two "V1 list order" implementations can't drift: optionally
- * pinned-first (explicit pin order, then unordered pins), then recency, then
- * path as the stable tiebreaker. Raw fragments because Kysely's typed
- * `orderBy` can't resolve `notes.*` refs across differently-rooted queries.
- */
-export function recallOrder(pinnedFirst: boolean): RawBuilder<unknown>[] {
-  const pinned = [
-    sql`"notes"."is_pinned" desc`,
-    sql`"notes"."pinned_order" is null`,
-    sql`"notes"."pinned_order"`,
-  ]
-  return [...(pinnedFirst ? pinned : []), sql`"notes"."mtime" desc`, sql`"notes"."path"`]
 }
 
 /**
@@ -96,30 +78,15 @@ function addressableAsRanked(
  * cannot be serialized.
  */
 async function winningAliasesByPath(
-  db: Kysely<Database>,
+  database: DatabaseService,
   paths: ReadonlySet<string>,
 ): Promise<Map<string, string[]>> {
+  const rows = await database.read('index_wiki_winning_aliases', { paths: [...paths] })
   const winning = new Map<string, string[]>()
-  for (const chunk of inClauseChunks([...paths])) {
-    const rows = await db
-      .selectFrom('aliases')
-      .innerJoin('noteKeys', (join) => {
-        return join
-          .onRef('noteKeys.key', '=', 'aliases.aliasKey')
-          .onRef('noteKeys.notePath', '=', 'aliases.notePath')
-      })
-      .where('aliases.notePath', 'in', chunk)
-      .select(['aliases.notePath', 'aliases.alias', 'noteKeys.claimCount'])
-      .orderBy(sql`"aliases"."rowid"`)
-      .execute()
-    for (const row of rows) {
-      if (Number(row.claimCount) !== 1) {
-        continue
-      }
-      const aliases = winning.get(row.notePath) ?? []
-      aliases.push(row.alias)
-      winning.set(row.notePath, aliases)
-    }
+  for (const row of rows) {
+    const aliases = winning.get(row.notePath) ?? []
+    aliases.push(row.alias)
+    winning.set(row.notePath, aliases)
   }
   return winning
 }
@@ -159,7 +126,7 @@ function fallbackInsert(address: string, candidate: WikiSuggestion): string | nu
 }
 
 export async function verifyWikiSuggestionAddresses(
-  db: Kysely<Database>,
+  database: DatabaseService,
   candidates: readonly WikiSuggestion[],
   candidateTargetKeys: readonly string[],
   limit: number,
@@ -177,22 +144,12 @@ export async function verifyWikiSuggestionAddresses(
   keys.delete('')
 
   const winners = new Map<string, WikiAddressWinner>()
-  for (const chunk of inClauseChunks([...keys])) {
-    const rows = await db
-      .selectFrom('noteKeys')
-      .innerJoin('notes', 'notes.path', 'noteKeys.notePath')
-      .where('key', 'in', chunk)
-      .select(['key', 'notePath', 'notes.dailyDate', 'noteKeys.claimCount'])
-      .execute()
-    for (const row of rows) {
-      if (row.key !== null && row.notePath !== null) {
-        winners.set(row.key, {
-          path: row.notePath,
-          dailyDate: row.dailyDate,
-          claimCount: Number(row.claimCount),
-        })
-      }
-    }
+  for (const row of await database.read('index_wiki_key_winners', { keys: [...keys] })) {
+    winners.set(row.key, {
+      path: row.path,
+      dailyDate: row.dailyDate,
+      claimCount: row.claimCount,
+    })
   }
 
   const unaddressedPaths = new Set<string>()
@@ -203,7 +160,7 @@ export async function verifyWikiSuggestionAddresses(
   }
   const rescueAliases =
     unaddressedPaths.size > 0
-      ? await winningAliasesByPath(db, unaddressedPaths)
+      ? await winningAliasesByPath(database, unaddressedPaths)
       : new Map<string, string[]>()
   const claimedTargetKeys = new Set(winners.keys())
   for (const aliases of rescueAliases.values()) {

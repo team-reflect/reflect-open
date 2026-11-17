@@ -1,7 +1,7 @@
 import { StrictMode, type ReactElement, type ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { createTestAppServices } from '@reflect/app/testing'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestCaptureInboxService,
   createTestDeepLinkIntakeService,
@@ -10,9 +10,9 @@ import {
 } from '@reflect/core/testing'
 import { act } from '@/test-utils/act.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DeepLinkProvider } from './deep-link-provider.tsx'
-import { sleep } from '@ocavue/utils'
+import { noop, sleep } from '@ocavue/utils'
+import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
 // The handler itself is covered in `@reflect/app`; these cover how the
 // provider ties it to the router and to the graph session.
@@ -20,7 +20,7 @@ import { sleep } from '@ocavue/utils'
 const GRAPH = { root: '/g', name: 'g', generation: 7 }
 
 function setup() {
-  const { indexQuery } = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  const { indexQuery } = createTestCoreServices({ database: createTestDatabaseService() })
   const resolveNoteTarget = vi.spyOn(indexQuery, 'resolveNoteTarget')
   const captureInbox = createTestCaptureInboxService()
   const operations = createTestProgressPort()
@@ -32,16 +32,16 @@ function setup() {
     graphSession,
   })
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     captureInbox,
     progress: operations,
     graphSession,
     deepLinkIntake,
   })
-  const appServices = createTestAppServices(core)
+  const appServices = createWebTestAppServices(core)
 
   function tree(): ReactElement {
-    return <DeepLinkProvider>{null}</DeepLinkProvider>
+    return <DeepLinkProvider search={noop}>{null}</DeepLinkProvider>
   }
 
   /**

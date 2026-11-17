@@ -7,7 +7,7 @@
 //   --flavor=beta|stable      Required
 //   --no-sign                 Unsigned archive without credentials and without an IPA
 
-import { rmSync, writeFileSync } from 'node:fs'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { exec } from 'tinyexec'
@@ -40,15 +40,9 @@ const FLAVORS = {
 const APP_BINARY_PATH = join(ARCHIVE_PATH, 'Products', 'Applications', 'Reflect.app', 'Reflect')
 const DSYM_PATH = join(ARCHIVE_PATH, 'dSYMs', 'Reflect.app.dSYM')
 
-const EXPORT_OPTIONS = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>method</key>
-	<string>app-store-connect</string>
-</dict>
-</plist>
-`
+// The ad-hoc signed archive has no team, so the export options name it.
+// It repeats `DEVELOPMENT_TEAM` of `apps/ios/Config/Shared.xcconfig`.
+const EXPORT_OPTIONS_PATH = join(IOS_DIR, 'ExportOptions.plist')
 
 async function main(): Promise<void> {
   const { values } = parseArgs({
@@ -105,7 +99,12 @@ async function main(): Promise<void> {
       `REFLECT_MARKETING_VERSION=${packageJson.version.split('-')[0]}`,
       `REFLECT_BUILD_NUMBER=${buildNumber}`,
       `REFLECT_SENTRY_DSN=${(process.env.VITE_SENTRY_DSN ?? '').trim()}`,
-      ...(noSign ? ['CODE_SIGNING_ALLOWED=NO'] : signing),
+      // Signed to run locally: no certificate, but the signature keeps the
+      // entitlements that the export re-signs with. Without the API key, the
+      // archive cannot create a development certificate on the account.
+      ...(noSign
+        ? ['CODE_SIGNING_ALLOWED=NO']
+        : ['CODE_SIGN_IDENTITY=-', 'AD_HOC_CODE_SIGNING_ALLOWED=YES']),
     ]
     await exec('xcodebuild', archive, {
       throwOnError: true,
@@ -117,8 +116,6 @@ async function main(): Promise<void> {
     })
 
     if (apiKey) {
-      const exportOptions = join(tempDir, 'ExportOptions.plist')
-      writeFileSync(exportOptions, EXPORT_OPTIONS)
       const exportArchive = [
         '-exportArchive',
         '-archivePath',
@@ -126,7 +123,7 @@ async function main(): Promise<void> {
         '-exportPath',
         BUILD_DIR,
         '-exportOptionsPlist',
-        exportOptions,
+        EXPORT_OPTIONS_PATH,
         ...signing,
       ]
       await exec('xcodebuild', exportArchive, INHERIT)

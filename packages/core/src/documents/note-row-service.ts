@@ -1,6 +1,6 @@
+import type { NoteRow, PinnedNoteRow } from '@reflect/types'
 import { isShallowEqual } from '@ocavue/utils'
 import type { GraphSession } from '../graph/graph-session.ts'
-import type { NoteRow, PinnedNote } from '../indexing/index-query-service.ts'
 import { combineStores, deriveStore, WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import { isValidPinOrder } from './pin-order.ts'
@@ -243,15 +243,15 @@ function sortsAfter(order: number | null | undefined, other: number | null | und
  * Returns `pinned` itself when nothing changes.
  */
 export function applyPinnedNoteOverlays(
-  pinned: readonly PinnedNote[],
+  pinned: readonly PinnedNoteRow[],
   overlays: ReadonlyMap<string, NoteRowOverlay>,
-  preview: (path: string) => PinnedNote,
-): readonly PinnedNote[] {
+  preview: (path: string) => PinnedNoteRow,
+): readonly PinnedNoteRow[] {
   if (overlays.size === 0) {
     return pinned
   }
   let changed = false
-  const shelf: PinnedNote[] = []
+  const shelf: PinnedNoteRow[] = []
   for (const note of pinned) {
     const overlay = overlays.get(note.path)
     if (overlay?.trashed === true || overlay?.isPinned === false) {
@@ -274,7 +274,7 @@ export function applyPinnedNoteOverlays(
     return pinned
   }
   // Stable insertion sort: notes the overlays did not move keep the index's order.
-  const sorted: PinnedNote[] = []
+  const sorted: PinnedNoteRow[] = []
   for (const note of shelf) {
     const at = sorted.findIndex((placed) => sortsAfter(placed.pinnedOrder, note.pinnedOrder))
     if (at === -1) {

@@ -1,6 +1,6 @@
+import type { NoteListEntry } from '@reflect/types'
 import { useCallback, useEffect, useRef, type MouseEvent, type ReactElement } from 'react'
 import { Virtualizer, type VirtualizerHandle } from 'virtua'
-import type { NoteListEntry } from '@reflect/core'
 import type { ListSelection } from '@/lib/selection/use-list-selection.ts'
 import { cn } from '@/lib/utils.ts'
 import type { ModClickEvent } from '@/hooks/use-note-link-navigation.ts'

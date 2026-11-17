@@ -77,13 +77,6 @@ export default defineConfig(({ command }) => ({
   // platform, which gates desktop-only surfaces like the updater).
   envPrefix: ['VITE_', 'TAURI_ENV_'],
 
-  // The dev bridge's SQLite (dev-only, behind `?platform=ios`) locates its
-  // .wasm relative to its own module URL; esbuild pre-bundling would relocate
-  // the module into .vite/deps and break that lookup.
-  optimizeDeps: {
-    exclude: ['@sqlite.org/sqlite-wasm'],
-  },
-
   // Keep the Tauri CLI's Rust output on screen during `tauri dev`.
   clearScreen: false,
   // `devUrl` in apps/tauri/tauri.conf.json and the iOS dev scheme expect this

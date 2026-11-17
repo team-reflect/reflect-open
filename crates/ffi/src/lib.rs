@@ -27,7 +27,7 @@ use std::sync::{Arc, PoisonError, RwLock};
 
 use futures_util::FutureExt;
 use reflect_core::{Core, CoreConfig, Host, Reply};
-use reflect_types::{AppError, AppResult};
+use reflect_types::{AppError, AppResult, AssetResolveReply, ByteRange, CoreStartConfig};
 
 /// The reply status of a JSON result in `json`.
 pub const REFLECT_STATUS_JSON: i32 = 0;
@@ -82,7 +82,7 @@ type MainTask = Box<dyn FnOnce() + Send>;
 
 /// Creates a core. `config_json` is a NUL-terminated JSON object, or NULL
 /// for an empty one, with the optional string keys `documentDir`,
-/// `appDataDir` (or `dataDir`) and `userAgent`; other keys are ignored. `ctx`
+/// `appDataDir` and `userAgent`; other keys are ignored. `ctx`
 /// is passed to `on_event`, `on_main` and `on_open_url`. On failure it
 /// returns NULL and, when `error_out` is not NULL, stores an error JSON
 /// `{"kind":...,"message":...}` there for `reflect_core_string_free`.
@@ -195,11 +195,8 @@ pub unsafe extern "C" fn reflect_core_dispatch(
 /// Resolves a `reflect-asset` request and calls `reply` once with a JSON
 /// object. `path` is the percent-decoded request path, `query` the query
 /// string and `range` the `Range` header; `query` and `range` may be NULL. The
-/// reply is `{"path":...,"mime":...,"total":...,"range":[first,last]}` with
-/// the absolute file path, the `Content-Type`, the file length and the
-/// selected bytes (`null` for the whole file), or
-/// `{"status":...,"total":...}` with the HTTP status to refuse the request
-/// with. The function copies every input before it returns.
+/// reply is an [`AssetResolveReply`]. The function copies every input before
+/// it returns.
 ///
 /// # Safety
 ///
@@ -232,10 +229,19 @@ pub unsafe extern "C" fn reflect_core_asset_resolve(
                     .arc()
                     .asset_resolve(&path, query.as_deref(), range.as_deref())
                     .await;
-                let json = match answer {
-                    Ok(file) => serde_json::to_string(&file),
-                    Err(refusal) => serde_json::to_string(&refusal),
+                let reply = match answer {
+                    Ok(file) => AssetResolveReply::File {
+                        path: file.path.to_string_lossy().into_owned(),
+                        mime: file.mime,
+                        total: file.total,
+                        range: file.range.map(|(start, end)| ByteRange { start, end }),
+                    },
+                    Err(refusal) => AssetResolveReply::Refused {
+                        status: refusal.status,
+                        total: refusal.total,
+                    },
                 };
+                let json = serde_json::to_string(&reply);
                 json.map(Reply::Json)
                     .map_err(|err| AppError::io(err.to_string()))
             },
@@ -521,28 +527,17 @@ impl Host for FfiHost {
     }
 }
 
-/// The keys of `config_json` that map to [`CoreConfig`]. Other keys are
-/// ignored.
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ConfigJson {
-    #[serde(alias = "dataDir")]
-    app_data_dir: Option<PathBuf>,
-    document_dir: Option<PathBuf>,
-    user_agent: Option<String>,
-}
-
-/// Parses `config_json`, a JSON object.
+/// Parses `config_json`, a [`CoreStartConfig`]. Other keys are ignored.
 unsafe fn read_config(config_json: *const c_char) -> AppResult<CoreConfig> {
     if config_json.is_null() {
         return Ok(CoreConfig::default());
     }
     let raw = unsafe { CStr::from_ptr(config_json) }.to_bytes();
-    let config: ConfigJson = serde_json::from_slice(raw)
+    let config: CoreStartConfig = serde_json::from_slice(raw)
         .map_err(|err| AppError::parse(format!("invalid core config: {err}")))?;
     Ok(CoreConfig {
-        app_data_dir: config.app_data_dir,
-        document_dir: config.document_dir,
+        app_data_dir: config.app_data_dir.map(PathBuf::from),
+        document_dir: config.document_dir.map(PathBuf::from),
         user_agent: config.user_agent.unwrap_or_default(),
     })
 }
@@ -776,15 +771,11 @@ mod tests {
             unsafe { read_config(json.as_ptr()) }.unwrap()
         };
         let config = read(
-            r#"{"documentDir":"/d","dataDir":"/a","userAgent":"Reflect/1.2.3","flavor":"dev"}"#,
+            r#"{"documentDir":"/d","appDataDir":"/a","userAgent":"Reflect/1.2.3","flavor":"dev"}"#,
         );
         assert_eq!(config.document_dir, Some(PathBuf::from("/d")));
         assert_eq!(config.app_data_dir, Some(PathBuf::from("/a")));
         assert_eq!(config.user_agent, "Reflect/1.2.3");
-        assert_eq!(
-            read(r#"{"appDataDir":"/b"}"#).app_data_dir,
-            Some(PathBuf::from("/b"))
-        );
         let empty = unsafe { read_config(ptr::null()) }.unwrap();
         assert_eq!(empty.document_dir, None);
         assert_eq!(empty.user_agent, "");
@@ -822,14 +813,18 @@ mod tests {
         };
 
         let file = resolve(format!("{generation}/assets/cat.png"), Some("bytes=2-5"));
+        assert_eq!(file["kind"], "file");
         assert_eq!(file["mime"], "image/png");
         assert_eq!(file["total"], png.len());
-        assert_eq!(file["range"], json!([2, 5]));
+        assert_eq!(file["range"], json!({ "start": 2, "end": 5 }));
         let served = PathBuf::from(file["path"].as_str().unwrap());
         assert_eq!(std::fs::read(served).unwrap(), png);
 
         let missing = resolve(format!("{generation}/assets/missing.png"), None);
-        assert_eq!(missing, json!({ "status": 404, "total": null }));
+        assert_eq!(
+            missing,
+            json!({ "kind": "refused", "status": 404, "total": null })
+        );
         unsafe { reflect_core_free(core) };
     }
 

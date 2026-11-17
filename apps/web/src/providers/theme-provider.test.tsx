@@ -4,6 +4,7 @@ import { createThemeService, THEME_PREFERENCE_CACHE_KEY, type ThemeService } fro
 import { createTestSystemPreferencesService } from '@reflect/app/testing'
 import type { CoreServices, Settings } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestSettingsService,
   createTestStorageService,
@@ -11,7 +12,6 @@ import {
   type TestStorageService,
 } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { ThemeEffect } from './theme-provider.tsx'
 
 /**
@@ -42,7 +42,7 @@ function install(stored: Partial<Settings>, options: { gateLoad?: boolean } = {}
   const systemPreferences = createTestSystemPreferencesService({ colorScheme: 'light' })
   theme = createThemeService({ settings, storage, systemPreferences })
   core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     settings,
     storage,
   })

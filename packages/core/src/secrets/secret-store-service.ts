@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 
 export interface SecretStoreServiceDeps {
@@ -26,13 +25,6 @@ export interface SecretStoreService {
 }
 
 /**
- * Commands that return `()` from Rust serialize as `null` over IPC.
- */
-const voidSchema = z.null()
-
-const secretSchema = z.string().nullable()
-
-/**
  * A keychain over the `secret_get`, `secret_set` and `secret_delete` commands.
  */
 class SecretStoreServiceImpl implements SecretStoreService {
@@ -43,15 +35,15 @@ class SecretStoreServiceImpl implements SecretStoreService {
   }
 
   async get(name: string): Promise<string | null> {
-    return await this.#deps.ipc.call('secret_get', { name }, secretSchema)
+    return await this.#deps.ipc.call('secret_get', { name })
   }
 
   async set(name: string, value: string): Promise<void> {
-    await this.#deps.ipc.call('secret_set', { name, value }, voidSchema)
+    await this.#deps.ipc.call('secret_set', { name, value })
   }
 
   async delete(name: string): Promise<void> {
-    await this.#deps.ipc.call('secret_delete', { name }, voidSchema)
+    await this.#deps.ipc.call('secret_delete', { name })
   }
 }
 

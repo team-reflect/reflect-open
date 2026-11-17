@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AppError } from '../errors.ts'
 import { createWikiResolverService } from '../indexing/wiki-resolver-service.ts'
-import { createNodeTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
+import { createTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
 import { createTestNoteFileService } from '../testing/graph.ts'
 import { createNoteLinkResolverService } from './note-link-resolver-service.ts'
 
@@ -25,7 +25,7 @@ interface Graph {
 }
 
 function setup({ indexed = [], files = {}, placeholders = [], readErrors = [] }: Graph = {}) {
-  const database = createNodeTestDatabaseService()
+  const database = createTestDatabaseService()
   seedNotes(database, indexed)
   const noteFile = createTestNoteFileService({ files, evicted: placeholders })
   for (const path of [...placeholders, ...readErrors]) {
@@ -56,14 +56,14 @@ function setup({ indexed = [], files = {}, placeholders = [], readErrors = [] }:
      * How many `note_claims` lookups the resolver ran.
      */
     claimLookups: () => {
-      return database.getQueries().filter((query) => query.sql.includes('note_claims')).length
+      return database.getReads().filter((read) => read.command === 'index_wiki_target_match').length
     },
     expectNoWrites: () => {
       expect(noteFile.writes()).toEqual([])
       expect(noteFile.trashed()).toEqual([])
     },
     expectUntouched: () => {
-      expect(database.getQueries()).toEqual([])
+      expect(database.getReads()).toEqual([])
       expect(read).not.toHaveBeenCalled()
       expect(listNotes).not.toHaveBeenCalled()
     },

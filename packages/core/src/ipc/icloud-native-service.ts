@@ -1,10 +1,11 @@
+import type { IcloudStatus, IcloudSweepOutcome } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import { z } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { listenNow, type IpcBridgeService } from './ipc-service.ts'
 import type { Unlisten } from '../unlisten.ts'
 
-const countSchema = z.number().int().nonnegative()
+export type { IcloudStatus, IcloudSweepOutcome } from '@reflect/types'
 
 /**
  * Which placeholders a pending-download call covers: `'notes'` is markdown
@@ -13,41 +14,6 @@ const countSchema = z.number().int().nonnegative()
  * and `'all'` is everything, requested once the notes have drained.
  */
 export type IcloudDownloadScope = 'notes' | 'all'
-
-const icloudStatusSchema = z.object({
-  available: z.boolean(),
-  documentsRoot: z.string().nullable(),
-  /**
-   * Every graph in the container (name-sorted) — onboarding lists them.
-   */
-  existingGraphRoots: z.array(z.string()),
-})
-
-/**
- * Whether this build can reach its iCloud Drive container (Plan 21). Dev
- * builds without the iCloud entitlement/provisioning profile honestly report
- * unavailable.
- */
-export type IcloudStatus = z.infer<typeof icloudStatusSchema>
-
-const icloudSweepChangeSchema = z.object({
-  path: z.string(),
-  kind: z.enum(['upsert', 'remove']),
-  modifiedMs: z.number().optional(),
-})
-
-const icloudSweepOutcomeSchema = z.object({
-  changed: z.array(icloudSweepChangeSchema),
-  copies: z.array(z.string()),
-  autoResolved: z.number().int().nonnegative(),
-})
-
-/**
- * What one iCloud conflict sweep did (Plan 21): the files it rewrote or
- * removed (reindex these directly), the graph-relative paths of the conflict
- * copies it wrote, and how many conflicts auto-resolved.
- */
-export type IcloudSweepOutcome = z.infer<typeof icloudSweepOutcomeSchema>
 
 /**
  * How much of the graph a sweep checks for unresolved versions. `'full'`
@@ -186,56 +152,44 @@ class ICloudNativeServiceImpl implements ICloudNativeService {
   }
 
   status(): Promise<IcloudStatus> {
-    return this.#deps.ipc.call('icloud_status', {}, icloudStatusSchema)
+    return this.#deps.ipc.call('icloud_status', {})
   }
 
   adoptGraph(generation: number): Promise<string> {
-    return this.#deps.ipc.call('icloud_adopt_graph', { generation }, z.string())
+    return this.#deps.ipc.call('icloud_adopt_graph', { generation })
   }
 
   conflictsScan(options: IcloudScanOptions): Promise<IcloudSweepOutcome> {
-    return this.#deps.ipc.call(
-      'icloud_conflicts_scan',
-      {
-        generation: options.generation,
-        skipPaths: options.skipPaths ?? [],
-        ingestedPaths: options.ingestedPaths ?? [],
-        recordBaseline: options.recordBaseline ?? false,
-        scope: options.scope ?? 'full',
-      },
-      icloudSweepOutcomeSchema,
-    )
+    return this.#deps.ipc.call('icloud_conflicts_scan', {
+      generation: options.generation,
+      skipPaths: options.skipPaths ?? [],
+      ingestedPaths: options.ingestedPaths ?? [],
+      recordBaseline: options.recordBaseline ?? false,
+      scope: options.scope ?? 'full',
+    })
   }
 
   async watchStart(root: string): Promise<void> {
-    await this.#deps.ipc.call('icloud_watch_start', { root }, z.null())
+    await this.#deps.ipc.call('icloud_watch_start', { root })
   }
 
   async watchStop(): Promise<void> {
-    await this.#deps.ipc.call('icloud_watch_stop', {}, z.null())
+    await this.#deps.ipc.call('icloud_watch_stop', {})
   }
 
   downloadPending(root: string, scope: IcloudDownloadScope): Promise<number> {
-    return this.#deps.ipc.call(
-      'icloud_download_pending',
-      { root, notesOnly: scope === 'notes' },
-      countSchema,
-    )
+    return this.#deps.ipc.call('icloud_download_pending', { root, notesOnly: scope === 'notes' })
   }
 
   pendingCount(root: string, scope: IcloudDownloadScope): Promise<number> {
-    return this.#deps.ipc.call(
-      'icloud_pending_count',
-      { root, notesOnly: scope === 'notes' },
-      countSchema,
-    )
+    return this.#deps.ipc.call('icloud_pending_count', { root, notesOnly: scope === 'notes' })
   }
 
   async requestDownloads(paths: readonly string[]): Promise<number> {
     if (paths.length === 0) {
       return 0
     }
-    return await this.#deps.ipc.call('icloud_request_downloads', { paths }, countSchema)
+    return await this.#deps.ipc.call('icloud_request_downloads', { paths })
   }
 
   subscribeConflicts(listener: (paths: string[]) => void): Unlisten {

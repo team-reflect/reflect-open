@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-slim
     timeout-minutes: 10
     outputs:
+      build-index-wasm: ${{ steps.classify.outputs.build-index-wasm }}
       lint-node: ${{ steps.classify.outputs.lint-node }}
       test-node: ${{ steps.classify.outputs.test-node }}
       test-chromium: ${{ steps.classify.outputs.test-chromium }}
@@ -70,6 +71,18 @@ jobs:
             'Cargo.lock'
             '*.sql'
             'apps/tauri/*.json'
+            'apple/Sources/TypesShared/*'
+          )
+          # The TypeScript tests run the Rust index, built to wasm.
+          index_wasm_files=(
+            'crates/index/*'
+            'crates/index-schema/*'
+            'crates/index-wasm/*'
+            'crates/types/*'
+            'Cargo.lock'
+            'Cargo.toml'
+            'rust-toolchain.toml'
+            'mise.toml'
           )
           swift_files=(
             '.github/*'
@@ -79,6 +92,7 @@ jobs:
             'apps/ios/*'
             'apps/safari-extension/*'
             'scripts/build-ffi.ts'
+            'scripts/test-ios.ts'
           )
 
           changed() {
@@ -88,6 +102,7 @@ jobs:
           js=false
           rust=false
           swift=false
+          skip_slow=$PR_IS_DRAFT
 
           if [[ $PR_IS_STACK_MIDDLE == true ]]; then
             echo "In the middle of a stack: the top PR runs the jobs."
@@ -95,9 +110,10 @@ jobs:
             js=true
             rust=true
             swift=true
+            skip_slow=false
           else
             git diff --name-only --no-renames HEAD^1 HEAD
-            if changed "${js_files[@]}"; then
+            if changed "${js_files[@]}" "${index_wasm_files[@]}"; then
               js=true
             fi
             if changed "${rust_files[@]}"; then
@@ -108,20 +124,29 @@ jobs:
             fi
           fi
 
+          webkit=$js
+          ios=$swift
+          if [[ $skip_slow == true ]]; then
+            webkit=false
+            ios=false
+          fi
+
           {
+            echo "build-index-wasm=$js"
             echo "lint-node=$js"
             echo "test-node=$js"
             echo "test-chromium=$js"
-            echo "test-webkit=$([[ $js == true && $PR_IS_DRAFT == false ]] && echo true || echo false)"
+            echo "test-webkit=$webkit"
             echo "test-swift=$swift"
-            echo "test-ios=$swift"
+            echo "test-ios=$ios"
             echo "lint-rust=$rust"
             echo "test-rust=$rust"
           } | tee -a "$GITHUB_OUTPUT"
 
-  lint-node:
+  # Builds the Rust index to wasm once; the TypeScript jobs download it.
+  build-index-wasm:
     needs: classify
-    if: needs.classify.outputs.lint-node == 'true'
+    if: needs.classify.outputs.build-index-wasm == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -130,11 +155,43 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      - name: Verify generated DB types are current
-        run: |
-          pnpm --filter @reflect/db db:codegen
-          git diff --exit-code packages/db/src/schema.gen.ts \
-            || (echo "::error::schema.gen.ts is stale — run 'pnpm --filter @reflect/db db:codegen' and commit the result." && exit 1)
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache-key: index-wasm
+
+      - uses: ./.github/actions/setup-mise
+
+      - name: Build
+        run: pnpm build:index-wasm
+
+      - name: Upload the index wasm build
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: index-wasm
+          path: |
+            packages/index-wasm/pkg
+            !packages/index-wasm/pkg/*.d.ts
+          retention-days: 1
+
+  lint-node:
+    needs: [classify, build-index-wasm]
+    if: needs.classify.outputs.lint-node == 'true'
+    runs-on: ubuntu-24.04
+    env:
+      # The job downloads the wasm build of the index; it has no Rust toolchain.
+      REFLECT_INDEX_WASM_PREBUILT: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node
+
+      - name: Download the index wasm build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: index-wasm
+          path: packages/index-wasm/pkg
 
       - name: Verify the generated iOS CSP is current
         run: |
@@ -152,9 +209,12 @@ jobs:
         run: pnpm build
 
   test-node:
-    needs: classify
+    needs: [classify, build-index-wasm]
     if: needs.classify.outputs.test-node == 'true'
     runs-on: ubuntu-24.04
+    env:
+      # The job downloads the wasm build of the index; it has no Rust toolchain.
+      REFLECT_INDEX_WASM_PREBUILT: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -162,11 +222,17 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
+      - name: Download the index wasm build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: index-wasm
+          path: packages/index-wasm/pkg
+
       - name: Test
         run: pnpm run test:node
 
   test-chromium:
-    needs: classify
+    needs: [classify, build-index-wasm]
     if: needs.classify.outputs.test-chromium == 'true'
     runs-on: ubuntu-24.04
     strategy:
@@ -175,6 +241,8 @@ jobs:
         shard: [1, 2, 3]
     name: test-chromium (${{ matrix.shard }}/3)
     env:
+      # The job downloads the wasm build of the index; it has no Rust toolchain.
+      REFLECT_INDEX_WASM_PREBUILT: '1'
       REFLECT_TEST_BROWSER: chromium
       # Chromium on Linux does not promptly free the iframe of a finished
       # test file (https://issues.chromium.org/issues/530892387), so one
@@ -192,6 +260,12 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
+      - name: Download the index wasm build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: index-wasm
+          path: packages/index-wasm/pkg
+
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:chromium
 
@@ -200,10 +274,12 @@ jobs:
 
   # Not part of `all-green`: a WebKit failure does not block merging.
   test-webkit:
-    needs: classify
+    needs: [classify, build-index-wasm, test-chromium]
     if: needs.classify.outputs.test-webkit == 'true'
     runs-on: xcode-27
     env:
+      # The job downloads the wasm build of the index; it has no Rust toolchain.
+      REFLECT_INDEX_WASM_PREBUILT: '1'
       REFLECT_TEST_BROWSER: webkit
       # Suspected workaround, root cause unknown: WebContent sometimes
       # segfaults in JavaScriptCore JIT code ("The webkit page crashed") in
@@ -219,6 +295,12 @@ jobs:
       - uses: ./.github/actions/setup-xcode
 
       - uses: ./.github/actions/setup-node
+
+      - name: Download the index wasm build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: index-wasm
+          path: packages/index-wasm/pkg
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:webkit
@@ -258,9 +340,13 @@ jobs:
         working-directory: apple
         run: xcodebuild build -scheme ReflectApple-Package -destination 'generic/platform=iOS Simulator' -quiet
 
+      - name: Build apple/ for iOS devices
+        working-directory: apple
+        run: xcodebuild build -scheme ReflectApple-Package -destination 'generic/platform=iOS' -quiet
+
   # Builds the Swift shell in apps/ios and runs its unit and UI tests in a simulator.
   test-ios:
-    needs: classify
+    needs: [classify, test-swift]
     if: needs.classify.outputs.test-ios == 'true'
     runs-on: xcode-27
     timeout-minutes: 60
@@ -279,58 +365,18 @@ jobs:
 
       - uses: ./.github/actions/setup-mise
 
-      - name: Build the web app
-        run: pnpm --filter @reflect/ios build:web
+      # The script prints the time of each of its steps.
+      - name: Build and run the tests
+        run: pnpm test:ios
 
-      # A simulator that still does its first-boot work launches the app
-      # slowly, or not at all.
-      - name: Boot the simulator
-        run: |
-          udid=$(xcrun simctl list devices available --json \
-            | jq -r '[.devices[][] | select(.name == "iPhone 17")][-1].udid')
-          xcrun simctl bootstatus "$udid" -b
-          echo "SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
-
-      # The steps are separate so that the job page shows the time of each.
-      - name: Build the Rust core
-        run: pnpm build:ffi --debug --sdk iphonesimulator
-
-      - name: Resolve the Swift packages
-        run: |
-          xcodebuild -resolvePackageDependencies \
-            -project apps/ios/Reflect.xcodeproj \
-            -scheme Reflect \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData"
-
-      - name: Build the app and the tests
-        run: |
-          xcodebuild build-for-testing \
-            -project apps/ios/Reflect.xcodeproj \
-            -scheme Reflect \
-            -configuration Debug-Dev \
-            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            -showBuildTimingSummary
-
-      - name: Run the unit tests
-        run: |
-          xcodebuild test-without-building \
-            -project apps/ios/Reflect.xcodeproj \
-            -scheme Reflect \
-            -configuration Debug-Dev \
-            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            -only-testing:ReflectTests
-
-      - name: Run the UI tests
-        run: |
-          xcodebuild test-without-building \
-            -project apps/ios/Reflect.xcodeproj \
-            -scheme Reflect \
-            -configuration Debug-Dev \
-            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            -only-testing:ReflectUITests
+      # The result bundle has the screenshots and the steps of each failed test.
+      - name: Upload the result bundle and the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-ios-results
+          path: apps/ios/build/test-ios
+          retention-days: 7
 
   lint-rust:
     needs: classify
@@ -373,6 +419,12 @@ jobs:
       - name: Clippy (iOS simulator)
         if: matrix.name == 'macOS'
         run: cargo clippy --workspace --exclude reflect-open --all-targets --target aarch64-apple-ios-sim
+
+      - name: Clippy (wasm)
+        if: matrix.name == 'Linux'
+        run: |
+          export AR_wasm32_unknown_unknown="$(rustc --print sysroot)/lib/rustlib/$(rustc -vV | sed -n 's/host: //p')/bin/llvm-ar"
+          cargo clippy --package reflect-index-wasm --target wasm32-unknown-unknown
 
       - name: Format check
         run: cargo fmt --all -- --check
@@ -424,6 +476,7 @@ jobs:
     if: always()
     needs:
       - classify
+      - build-index-wasm
       - lint-node
       - test-node
       - test-chromium

@@ -1,13 +1,12 @@
 import { act } from '@/test-utils/act.ts'
 import { describe, expect, it } from 'vitest'
-import { createTestCoreServices } from '@reflect/core/testing'
+import { createTestDatabaseService, createTestCoreServices } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useSessionFlag } from './use-session-flag.ts'
 
 describe('useSessionFlag', () => {
   it('falls back to the default until set, then persists for the session', async () => {
-    const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+    const core = createTestCoreServices({ database: createTestDatabaseService() })
     const first = await renderHookInApp(() => useSessionFlag('reflect.test-flag', true), { core })
     expect(first.result.current[0]).toBe(true)
 

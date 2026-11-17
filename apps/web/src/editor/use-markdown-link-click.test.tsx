@@ -11,6 +11,7 @@ import {
   type TestOpenerService,
 } from '@reflect/app/testing'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestAttachmentService,
   createTestGraphSessionService,
@@ -19,7 +20,6 @@ import {
 import { useMarkdownLinkClick } from '@/editor/use-markdown-link-click.ts'
 import { useRouterState } from '@/routing/router.tsx'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 
 const dispatchDeepLink = vi.fn<(url: string) => void>()
 const resolveMarkdownHref = vi.fn()
@@ -38,13 +38,13 @@ let onLinkClick: LinkClickHandler
 async function mount(sourcePath: string | null): Promise<void> {
   const graphSession = createTestGraphSessionService()
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     attachments,
     graphSession,
   })
   const linkNavigation = createTestAppServices(
     createTestCoreServices({
-      database: createWasmTestDatabaseService(),
+      database: createTestDatabaseService(),
       graphSession,
       noteLinkResolver: { resolveWikiTarget: vi.fn(), resolveMarkdownHref },
       attachments,
@@ -53,7 +53,7 @@ async function mount(sourcePath: string | null): Promise<void> {
       window: createTestWindowService({ openNoteWindow }),
       opener,
       deepLinkRouter: Object.assign(
-        createTestAppServices(createTestCoreServices({ database: createWasmTestDatabaseService() }))
+        createTestAppServices(createTestCoreServices({ database: createTestDatabaseService() }))
           .deepLinkRouter,
         {
           dispatch: dispatchDeepLink,

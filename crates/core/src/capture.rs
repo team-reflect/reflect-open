@@ -14,7 +14,16 @@ use std::time::Duration;
 
 use reflect_graph_io::io::modified_ms;
 use reflect_graph_io::{current_root, root_for_generation};
-use reflect_types::{AppError, AppResult, FileMeta};
+#[cfg(any(target_os = "ios", target_os = "macos"))]
+use reflect_types::APP_GROUP_KEY;
+#[cfg(any(target_os = "ios", target_os = "macos", test))]
+use reflect_types::SHARED_INBOX_DIR;
+use reflect_types::{
+    AppError, AppResult, CAPTURE_POINTER_PATH, CapturePointer, FileMeta, GRAPH_INBOX_DIR,
+    INBOX_SPOOL_MAX_BYTES, SHARED_ENVELOPE_MAX_BYTES, SHARED_SCREENSHOT_MAX_BYTES,
+};
+#[cfg(any(target_os = "ios", test))]
+use reflect_types::{QUICK_NOTE_DEFAULTS_FILE, QuickNoteDefaultsFile};
 
 use crate::Core;
 #[cfg(test)]
@@ -40,9 +49,6 @@ const EXTENSION_ORIGINS: [&str; 2] = [
     "chrome-extension://ccabifmooehighoonjeiololjfofkhkd/",
 ];
 
-/// Graph-relative spool directory the host writes and the drain reads.
-const INBOX_DIR: &str = ".reflect/inbox";
-
 // ---- pointer file ------------------------------------------------------------
 
 /// Where the host discovers the active graph. Same app-data directory as
@@ -50,17 +56,19 @@ const INBOX_DIR: &str = ".reflect/inbox";
 /// as a typed host error, never a silent mis-spool.
 fn pointer_path() -> AppResult<PathBuf> {
     let base = dirs::config_dir().ok_or_else(|| AppError::io("no OS config dir"))?;
-    Ok(base.join("reflect-open").join("capture-pointer.json"))
+    Ok(CAPTURE_POINTER_PATH
+        .iter()
+        .fold(base, |path, part| path.join(part)))
 }
 
 fn pointer_json(root: &Path) -> String {
-    serde_json::json!({
-        "version": 1,
-        "graphRoot": root.to_string_lossy(),
-        "bookmarkVersion": 2,
-        "xLikeVersion": 2,
-    })
-    .to_string()
+    let pointer = CapturePointer {
+        version: 1,
+        graph_root: root.to_string_lossy().into_owned(),
+        bookmark_version: Some(2),
+        x_like_version: Some(2),
+    };
+    serde_json::to_string(&pointer).expect("the pointer serializes")
 }
 
 // Also used by `skill.rs` for the agent-skill files under `~/.agents/`.
@@ -165,7 +173,7 @@ impl Core {
     /// and Linux paths land with Plan 15 packaging).
     pub fn capture_host_register(&self) -> AppResult<()> {
         let root = current_root(&self.graph)?;
-        fs::create_dir_all(root.join(INBOX_DIR))?;
+        fs::create_dir_all(root.join(GRAPH_INBOX_DIR))?;
         atomic_write_to(&pointer_path()?, &pointer_json(&root))?;
 
         #[cfg(target_os = "macos")]
@@ -196,7 +204,7 @@ fn inbox_file(root: &Path, name: &str) -> AppResult<PathBuf> {
             "not a spool filename: {name:?}"
         )));
     }
-    Ok(root.join(INBOX_DIR).join(name))
+    Ok(root.join(GRAPH_INBOX_DIR).join(name))
 }
 
 impl Core {
@@ -204,7 +212,7 @@ impl Core {
     /// siblings). A missing inbox lists as empty — the host creates it lazily.
     pub fn capture_inbox_list(&self, generation: u64) -> AppResult<Vec<FileMeta>> {
         let root = root_for_generation(&self.graph, generation)?;
-        let inbox = root.join(INBOX_DIR);
+        let inbox = root.join(GRAPH_INBOX_DIR);
         let mut out = Vec::new();
         let entries = match fs::read_dir(&inbox) {
             Ok(entries) => entries,
@@ -219,7 +227,7 @@ impl Core {
                 continue; // host tmp files and directories are not spool entries
             }
             out.push(FileMeta {
-                path: format!("{INBOX_DIR}/{name}"),
+                path: format!("{GRAPH_INBOX_DIR}/{name}"),
                 size: meta.len(),
                 modified_ms: modified_ms(&meta).unwrap_or(0),
                 placeholder: false, // the inbox lives under `.reflect/`, never synced/evicted
@@ -230,12 +238,8 @@ impl Core {
     }
 }
 
-/// Envelopes this app spools itself (deep-link captures) are one short text
-/// payload — anything near this cap is not a capture, it's smuggling.
-const INBOX_SPOOL_MAX_BYTES: usize = 64 * 1024;
-
 fn ensure_spool_size(json: &str) -> AppResult<()> {
-    if json.len() > INBOX_SPOOL_MAX_BYTES {
+    if json.len() as u64 > INBOX_SPOOL_MAX_BYTES {
         return Err(AppError::parse(format!(
             "envelope exceeds the {INBOX_SPOOL_MAX_BYTES}-byte spool cap"
         )));
@@ -313,25 +317,10 @@ impl Core {
 // extension) cannot reach the graph folder, so they spool into their App
 // Group container and the app relays each spool file into the graph inbox.
 
-/// The Info.plist key naming an App Group, per flavor so dev, beta, and stable
-/// never drain each other's inbox. It matches the
-/// `com.apple.security.application-groups` entitlement. On iOS it sits in the
-/// app's Info.plist (`apps/ios/Config/Info.plist`), and `CaptureInbox.swift`
-/// (`apple/Sources/CaptureShared/`) reads the same key from the extension's.
-/// On macOS it sits in the Safari app extension's, set when
-/// `scripts/safari-extension.ts` builds it.
-#[cfg(any(target_os = "ios", target_os = "macos"))]
-const APP_GROUP_KEY: &str = "ReflectAppGroup";
-
 /// The Safari app extension's bundle inside `Contents/PlugIns/`
 /// (`apps/safari-extension/ReflectSafari.xcodeproj`).
 #[cfg(target_os = "macos")]
 const SAFARI_APPEX: &str = "SafariExtension.appex";
-
-/// The spool directory inside the App Group container. The extensions
-/// create it lazily; a missing directory relays as zero.
-#[cfg(any(target_os = "ios", target_os = "macos", test))]
-const SHARED_INBOX_DIR: &str = "inbox";
 
 /// Where oversized shared spools are quarantined, beside the shared inbox —
 /// moved, never deleted, mirroring the drain's `.reflect/inbox-rejected/`.
@@ -342,12 +331,6 @@ const SHARED_REJECTED_DIR: &str = "inbox-rejected";
 /// rename — swept so the container can't accrete junk (the drain applies
 /// the same rule to orphan screenshots).
 const SHARED_TMP_MAX_AGE: Duration = Duration::from_secs(60 * 60);
-
-/// What the relay copies, matching the Safari app extension's caps
-/// (`CaptureSpool.swift`): a page capture can carry the page's extracted text
-/// and a full-window screenshot. Anything over them is not a capture.
-const SHARED_ENVELOPE_MAX_BYTES: u64 = 8 * 1024 * 1024;
-const SHARED_SCREENSHOT_MAX_BYTES: u64 = 16 * 1024 * 1024;
 
 /// Move every committed `.json` envelope, and the `.jpg` screenshot beside
 /// it, from the shared inbox into the graph's capture inbox. Copy + atomic
@@ -547,11 +530,6 @@ impl Core {
     }
 }
 
-/// The quick note defaults inside the App Group container, read by the iOS
-/// App Intent (`apple/Sources/CaptureShared/QuickNoteDefaults.swift`).
-#[cfg(any(target_os = "ios", test))]
-const QUICK_NOTE_DEFAULTS_FILE: &str = "quick-note.json";
-
 impl Core {
     /// Mirror the quick note parent into the App Group container, so the iOS App
     /// Intent reads it while the app is closed. An empty `parent` removes the
@@ -584,7 +562,11 @@ fn write_quick_note_defaults(container: &Path, parent: &str) -> AppResult<()> {
             result => Ok(result?),
         };
     }
-    let json = serde_json::json!({ "version": 1, "parent": parent }).to_string();
+    let defaults = QuickNoteDefaultsFile {
+        version: 1,
+        parent: parent.to_owned(),
+    };
+    let json = serde_json::to_string(&defaults).expect("the quick note defaults serialize");
     atomic_write_bytes_to(&path, json.as_bytes())
 }
 
@@ -829,7 +811,7 @@ mod tests {
     fn spool_size_cap_refuses_oversized_envelopes() {
         assert!(ensure_spool_size("{\"small\":true}").is_ok());
         assert!(matches!(
-            ensure_spool_size(&"x".repeat(INBOX_SPOOL_MAX_BYTES + 1)),
+            ensure_spool_size(&"x".repeat(usize::try_from(INBOX_SPOOL_MAX_BYTES).unwrap() + 1)),
             Err(AppError::Parse { .. })
         ));
     }
@@ -846,7 +828,7 @@ mod tests {
     #[test]
     fn quarantine_moves_the_spool_file_out_of_the_inbox() {
         let dir = tempfile::tempdir().unwrap();
-        let inbox = dir.path().join(INBOX_DIR);
+        let inbox = dir.path().join(GRAPH_INBOX_DIR);
         fs::create_dir_all(&inbox).unwrap();
         fs::write(inbox.join("bad.json"), "not an envelope").unwrap();
 
@@ -862,7 +844,7 @@ mod tests {
     #[test]
     fn quarantine_is_idempotent_for_a_missing_source() {
         let dir = tempfile::tempdir().unwrap();
-        fs::create_dir_all(dir.path().join(INBOX_DIR)).unwrap();
+        fs::create_dir_all(dir.path().join(GRAPH_INBOX_DIR)).unwrap();
         assert!(quarantine_spool(dir.path(), "gone.json").is_ok());
     }
 
@@ -881,7 +863,7 @@ mod tests {
         let relayed = relay_shared_spools(&shared_inbox, graph.path()).unwrap();
 
         assert_eq!(relayed, 2);
-        let inbox = graph.path().join(INBOX_DIR);
+        let inbox = graph.path().join(GRAPH_INBOX_DIR);
         assert_eq!(
             fs::read_to_string(inbox.join("7c9e6679.json")).unwrap(),
             r#"{"version":1}"#
@@ -948,7 +930,7 @@ mod tests {
         let relayed = relay_shared_spools(&shared_inbox, graph.path()).unwrap();
 
         assert_eq!(relayed, 1);
-        let inbox = graph.path().join(INBOX_DIR);
+        let inbox = graph.path().join(GRAPH_INBOX_DIR);
         assert_eq!(fs::read(inbox.join("7c9e6679.jpg")).unwrap(), b"jpeg-bytes");
         assert_eq!(
             fs::read_to_string(inbox.join("7c9e6679.json")).unwrap(),
@@ -971,7 +953,7 @@ mod tests {
         .unwrap();
         // A directory where the envelope lands fails its write after the
         // screenshot has copied.
-        let inbox = graph.path().join(INBOX_DIR);
+        let inbox = graph.path().join(GRAPH_INBOX_DIR);
         let blocked = inbox.join("7c9e6679.json");
         fs::create_dir_all(&blocked).unwrap();
 
@@ -1000,7 +982,7 @@ mod tests {
             fs::write(shared_inbox.join(format!("{failing}.json")), "{}").unwrap();
             fs::write(shared_inbox.join(format!("{other}.json")), "{}").unwrap();
             // A directory where the envelope lands fails its write.
-            let inbox = graph.path().join(INBOX_DIR);
+            let inbox = graph.path().join(GRAPH_INBOX_DIR);
             fs::create_dir_all(inbox.join(format!("{failing}.json"))).unwrap();
 
             assert!(relay_shared_spools(&shared_inbox, graph.path()).is_err());
@@ -1027,7 +1009,7 @@ mod tests {
         let rejected = shared.path().join(SHARED_REJECTED_DIR);
         assert!(rejected.join("big.jpg").is_file());
         assert!(rejected.join("big.json").is_file());
-        assert!(!graph.path().join(INBOX_DIR).exists());
+        assert!(!graph.path().join(GRAPH_INBOX_DIR).exists());
     }
 
     #[test]
@@ -1063,7 +1045,7 @@ mod tests {
         let graph = tempfile::tempdir().unwrap();
         let shared_inbox = shared.path().join(SHARED_INBOX_DIR);
         fs::create_dir_all(&shared_inbox).unwrap();
-        let inbox = graph.path().join(INBOX_DIR);
+        let inbox = graph.path().join(GRAPH_INBOX_DIR);
         fs::create_dir_all(&inbox).unwrap();
         // A crash between the copy and the source delete leaves both sides.
         fs::write(shared_inbox.join("7c9e6679.json"), r#"{"version":1}"#).unwrap();
@@ -1099,7 +1081,7 @@ mod tests {
                 .join("big.json")
                 .is_file()
         );
-        assert!(!graph.path().join(INBOX_DIR).join("big.json").exists());
+        assert!(!graph.path().join(GRAPH_INBOX_DIR).join("big.json").exists());
     }
 
     #[test]

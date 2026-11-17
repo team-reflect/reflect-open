@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createPersistenceFlushService, type Unlisten } from '@reflect/core'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   createTestCoreServices,
   createTestLoggerService,
   createTestPlatformService,
@@ -136,7 +136,7 @@ function setup(options?: {
   const logger = createTestLoggerService()
   const settingsService = createTestSettingsService()
   vi.spyOn(settingsService, 'flush').mockImplementation(settings.fn)
-  const { openDocuments } = createTestCoreServices({ database: createNodeTestDatabaseService() })
+  const { openDocuments } = createTestCoreServices({ database: createTestDatabaseService() })
   vi.spyOn(openDocuments, 'flushAll').mockImplementation(documents.fn)
   const persistenceFlush = createPersistenceFlushService({
     settings: settingsService,

@@ -1,17 +1,16 @@
 import { useEffect, useRef, type ReactElement } from 'react'
-import { ChevronDown, Settings } from 'lucide-react'
-import { Button } from '@/components/ui/button.tsx'
 import { addDaysToIsoDate, getYearMonth } from '@reflect/utils'
 import { getUserWeekStart } from '@reflect/core'
 import { monthPickTarget, weekAtIndex } from '@reflect/app'
-import { cn } from '@/lib/utils.ts'
+import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
+import type { ChromePlus } from '@/mobile/chrome/screen-chrome.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { MonthPicker } from '@/mobile/month-picker.tsx'
-import { MonthTitle } from '@/mobile/month-title.tsx'
 import { useDailyNoteDates } from '@/mobile/use-daily-note-dates.ts'
 import { useWeekStrip } from '@/mobile/use-week-strip.ts'
 import { WeekRow } from '@/mobile/week-row.tsx'
+import { useStore } from '@/lib/use-store.ts'
+import { sidebarVisible, useGraphMenu } from '@/mobile/sidebar.ts'
 import { useWeekStartDay } from '@/providers/settings-provider.tsx'
 import { useRouterActions } from '@/routing/router.tsx'
 
@@ -33,6 +32,7 @@ interface CalendarStripProps {
   resetSeq: number
   /** Select a day — drives the carousel and the route. */
   onSelect: (date: string) => void
+  plus: ChromePlus
 }
 
 /**
@@ -51,6 +51,7 @@ export function CalendarStrip({
   today,
   resetSeq,
   onSelect,
+  plus,
 }: CalendarStripProps): ReactElement {
   const { haptics } = useMobileServices()
   const weekStartDay = useWeekStartDay()
@@ -79,9 +80,22 @@ export function CalendarStrip({
     showWeekOf(today)
   }
 
+  const sidebar = useStore(sidebarVisible)
+  const graphMenu = useGraphMenu()
+
+  const runAction = (id: string): void => {
+    if (id === 'today') {
+      jumpToToday()
+    } else if (id === 'settings') {
+      openSettings()
+    } else {
+      graphMenu.run(id)
+    }
+  }
+
   const openSettings = (): void => {
     hapticImpactLight(haptics)
-    navigate({ kind: 'settings' })
+    navigate({ kind: 'settings', page: 'main' })
   }
 
   const pickMonth = (picked: string): void => {
@@ -104,65 +118,46 @@ export function CalendarStrip({
   }, [resetSeq, date, showWeekOf])
 
   return (
-    <header className="shrink-0 border-b border-border px-safe-offset-2 pt-safe pb-1">
-      {/* Three equal-flanked columns so the month sits at the screen's center
-          regardless of the gear (left) and the fading Today button (right). */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 px-1 py-1">
-        <div className="justify-self-start">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-9"
-            aria-label="Settings"
-            onClick={openSettings}
-          >
-            <Settings />
-          </Button>
-        </div>
-        <h1 className="min-w-0 text-center text-base font-semibold">
-          <MonthPicker
-            month={getYearMonth(headerDate)}
-            selected={getYearMonth(date)}
-            today={getYearMonth(today)}
-            onPick={pickMonth}
-          >
-            <MonthTitle month={getYearMonth(headerDate)} />
-            <ChevronDown aria-hidden className="size-4 shrink-0 text-text-muted" />
-          </MonthPicker>
-        </h1>
-        <div className="justify-self-end">
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-hidden={!showToday || undefined}
-            inert={!showToday}
-            className={cn(
-              'transition-opacity duration-150 motion-reduce:transition-none',
-              showToday ? 'opacity-100' : 'pointer-events-none opacity-0',
-            )}
-            onClick={jumpToToday}
-          >
-            Today
-          </Button>
+    <ChromeTopBar
+      align="center"
+      // On iPad the sidebar holds Settings, or the graph menu does while the
+      // sidebar is hidden.
+      leading={sidebar === null ? [{ id: 'settings', title: 'Settings', icon: 'settings' }] : []}
+      trailing={[
+        { id: 'today', title: 'Today', hidden: !showToday },
+        ...(sidebar === false
+          ? [{ id: 'graph', title: graphMenu.title, menu: graphMenu.items }]
+          : []),
+      ]}
+      onAction={runAction}
+      plus={plus}
+      title={{
+        kind: 'month',
+        month: getYearMonth(headerDate),
+        selected: getYearMonth(date),
+        today: getYearMonth(today),
+        onPick: pickMonth,
+      }}
+    >
+      <div className="px-2 pb-1">
+        <div ref={scrollerRef} data-scroll-x className="pager-x flex overflow-x-auto">
+          {Array.from({ length: weekWindow.count }, (_, index) => {
+            const weekStart = weekAtIndex(weekWindow, index)
+            const weekEnd = addDaysToIsoDate(weekStart, 6)
+            const contains = (day: string): boolean => day >= weekStart && day <= weekEnd
+            return (
+              <WeekRow
+                key={weekStart}
+                weekStart={weekStart}
+                selectedDay={contains(date) ? date : null}
+                todayDay={contains(today) ? today : null}
+                dailyNoteDates={dailyNoteDates}
+                onSelect={onSelect}
+              />
+            )
+          })}
         </div>
       </div>
-      <div ref={scrollerRef} data-scroll-x className="pager-x flex overflow-x-auto">
-        {Array.from({ length: weekWindow.count }, (_, index) => {
-          const weekStart = weekAtIndex(weekWindow, index)
-          const weekEnd = addDaysToIsoDate(weekStart, 6)
-          const contains = (day: string): boolean => day >= weekStart && day <= weekEnd
-          return (
-            <WeekRow
-              key={weekStart}
-              weekStart={weekStart}
-              selectedDay={contains(date) ? date : null}
-              todayDay={contains(today) ? today : null}
-              dailyNoteDates={dailyNoteDates}
-              onSelect={onSelect}
-            />
-          )
-        })}
-      </div>
-    </header>
+    </ChromeTopBar>
   )
 }

@@ -1,0 +1,22 @@
+[
+  { "type": "back", "entryId": 3 },
+  { "type": "tab", "tab": "all" },
+  { "type": "action", "entryId": 3, "id": "gear" },
+  { "type": "command", "id": "indent" },
+  { "type": "files", "files": [{ "name": "Image.png", "type": "image/png", "data": "AQID" }] },
+  { "type": "windowControls", "width": 88 },
+  { "type": "plus", "entryId": 3, "command": "note" },
+  { "type": "sidebarVisible", "visible": true },
+  { "type": "sidebarVisible", "visible": null },
+  { "type": "history", "entryId": 3, "direction": "back" },
+  { "type": "history", "entryId": 3, "direction": "forward" },
+  { "type": "sidebar", "command": { "kind": "chat" } },
+  { "type": "sidebar", "command": { "kind": "search" } },
+  { "type": "sidebar", "command": { "kind": "settings" } },
+  { "type": "sidebar", "command": { "kind": "openNote", "path": "reflect-v2.md" } },
+  { "type": "sidebar", "command": { "kind": "unpin", "path": "reflect-v2.md" } },
+  { "type": "sidebar", "command": { "kind": "share", "path": "reflect-v2.md" } },
+  { "type": "sidebar", "command": { "kind": "menu", "id": "graphs" } },
+  { "type": "search", "entryId": 3, "text": "meet" },
+  { "type": "pickMonth", "entryId": 3, "month": "2026-08" }
+]

@@ -530,6 +530,7 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
               enrichmentCredentials,
               formatTranscript: input.formatTranscript,
               fallbackTitle: memo.title,
+              isStale: stale,
             })
             title = enriched.title
             body = enriched.body

@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
-import { Archive, CircleCheck, Plus, SlidersHorizontal } from 'lucide-react'
+import { CircleCheck } from 'lucide-react'
 import {
   composeVisibleTaskGroups,
   getTaskKey,
@@ -16,17 +16,26 @@ import { useTaskActions } from '@/lib/tasks/use-task-actions.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { SearchInput } from '@/mobile/search-input.tsx'
 import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet.tsx'
 import { TaskFiltersDrawer } from '@/mobile/task-filters-drawer.tsx'
 import { MobileTaskGroup } from '@/mobile/task-group.tsx'
-import { MobileTopBar, MobileTopBarIconButton, MobileTopBarRow } from '@/mobile/top-bar.tsx'
+import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
+import type { Focusable } from '@/mobile/chrome/screen-chrome.ts'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
+import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { routeForPath } from '@reflect/app'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useStore } from '@/lib/use-store.ts'
+
+interface MobileTasksProps {
+  /**
+   * The live search text — lifted to the shell so it survives navigation.
+   */
+  query: string
+  onQueryChange: (query: string) => void
+}
 
 /**
  * The Tasks tab (V1 mobile's third tab over Plan 18's shipped data layer): every
@@ -43,7 +52,7 @@ import { useStore } from '@/lib/use-store.ts'
  * keeps the row struck (V1's middle state) until Archive hides this session's
  * completed tasks.
  */
-export function MobileTasks(): ReactElement {
+export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactElement {
   const { haptics } = useMobileServices()
   const { tasks: taskService } = useCoreServices()
   const graph = useGraphInfo()
@@ -51,8 +60,7 @@ export function MobileTasks(): ReactElement {
   const { navigate } = useRouterActions()
   const today = useToday()
   const { filters, toggle } = useTaskFilters()
-  const [query, setQuery] = useState('')
-  const searchInputRef = useRef<HTMLInputElement>(null)
+  const searchInputRef = useRef<Focusable>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
   // The one row whose swipe actions are showing (its getTaskKey), across all groups.
   const [revealedRow] = useState(() => new WritableStore<string | null>(null))
@@ -96,6 +104,10 @@ export function MobileTasks(): ReactElement {
     [open, completed, recentlyCompleted, filters, needle, today],
   )
 
+  // The task list scroller renders only while there are rows to show.
+  const listRef = useRef<HTMLDivElement>(null)
+  const { onScroll } = useScrollRestoration(listRef, !isError && groups.length > 0)
+
   // The sheet edits the task's *live* row, not the snapshot taken when it
   // opened: a mutation or reindex can rewrite the row (raw, checked) while
   // `editingTask` is set, and acting on the stale copy could flip a marker the
@@ -126,7 +138,7 @@ export function MobileTasks(): ReactElement {
   // so typing starts immediately.
   const onAdd = (target: InsertTaskTarget): void => {
     hapticImpactLight(haptics)
-    setQuery('')
+    onQueryChange('')
     void actions.insert(target).then((created) => {
       if (created !== null) {
         editTask(created, { autoFocus: true, haptic: false })
@@ -140,49 +152,50 @@ export function MobileTasks(): ReactElement {
   }
 
   return (
-    <div className="flex h-full w-screen flex-col pt-safe">
-      <MobileTopBar>
-        <MobileTopBarRow>
-          <SearchInput
-            ref={searchInputRef}
-            placeholder="Search tasks…"
-            aria-label="Search tasks"
-            value={query}
-            onValueChange={setQuery}
-          />
-          {recentlyCompleted.length > 0 ? (
-            <MobileTopBarIconButton
-              aria-label={`Archive ${recentlyCompleted.length} completed`}
-              onClick={archiveCompleted}
-            >
-              <Archive />
-            </MobileTopBarIconButton>
-          ) : null}
-          <MobileTopBarIconButton
-            edge="trailing"
-            aria-label="Task filters"
-            onClick={() => {
-              hapticImpactLight(haptics)
-              setFiltersOpen(true)
-            }}
-          >
-            <SlidersHorizontal />
-          </MobileTopBarIconButton>
-        </MobileTopBarRow>
-      </MobileTopBar>
+    <div className="flex h-full w-full flex-col pt-safe">
+      <ChromeTopBar
+        plus={{ kind: 'action', label: 'New task', onTap: () => onAdd(todaysDailyTarget(today)) }}
+        search={{
+          value: query,
+          placeholder: 'Search tasks…',
+          label: 'Search tasks',
+          onChange: onQueryChange,
+          ref: searchInputRef,
+        }}
+        trailing={[
+          ...(recentlyCompleted.length > 0
+            ? [
+                {
+                  id: 'archive',
+                  title: `Archive ${recentlyCompleted.length} completed`,
+                  icon: 'archive',
+                } as const,
+              ]
+            : []),
+          { id: 'filters', title: 'Task filters', icon: 'filters' },
+        ]}
+        onAction={(id) => {
+          if (id === 'archive') {
+            archiveCompleted()
+          } else if (id === 'filters') {
+            hapticImpactLight(haptics)
+            setFiltersOpen(true)
+          }
+        }}
+      />
       {isError ? (
-        <p role="alert" className="px-4 py-6 text-sm text-text-muted">
+        <p role="alert" className="px-safe-offset-4 py-6 text-sm text-text-muted">
           Couldn’t load tasks.
         </p>
       ) : enabled && !ready && groups.length === 0 ? (
         // Loading only gates what would otherwise be a false empty state: with
         // archived flipping on, the open groups keep showing while the
         // completed history loads (desktop likewise gates only the message).
-        <div className="flex flex-1 items-center justify-center" aria-label="Loading tasks">
+        <div className="flex flex-1 items-center justify-center px-safe" aria-label="Loading tasks">
           <Spinner className="size-5 text-text-muted" />
         </div>
       ) : groups.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-text-muted">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-safe text-text-muted">
           <CircleCheck className="size-6" />
           <p className="text-sm">{needle ? 'No matching tasks' : 'No tasks to show'}</p>
           {needle === '' ? (
@@ -195,8 +208,12 @@ export function MobileTasks(): ReactElement {
         <div
           // A stacking context, so WebKit composites the sticky headers and row
           // surfaces inside this scroller, below the iOS scroll indicator.
-          className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-24"
-          onScroll={() => revealedRow.set(null)}
+          className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-chrome-safe-offset-24"
+          ref={listRef}
+          onScroll={(event) => {
+            revealedRow.set(null)
+            onScroll(event)
+          }}
         >
           {groups.map((group) => (
             <MobileTaskGroup
@@ -214,14 +231,6 @@ export function MobileTasks(): ReactElement {
           ))}
         </div>
       )}
-      <Button
-        size="icon"
-        aria-label="New task"
-        className="fixed right-safe-offset-4 bottom-above-keyboard-offset-17 z-40 size-12 rounded-full shadow-lg"
-        onClick={() => onAdd(todaysDailyTarget(today))}
-      >
-        <Plus className="size-6" />
-      </Button>
       {liveEditingTask !== null ? (
         <MobileTaskEditSheet
           key={getTaskKey(liveEditingTask)}

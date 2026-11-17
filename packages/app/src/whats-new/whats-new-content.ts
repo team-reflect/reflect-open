@@ -24,6 +24,32 @@ const MENUS_BODY =
  * marketing version's list, and each update shows only the items not seen yet.
  */
 export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
+  '0.19.0': [
+    {
+      id: 'claude-fable-5-2',
+      title: 'New AI models',
+      body: 'New AI models: Claude Fable 5.2, Gemini 4 Hydrogen, and Gemini 4 Carbon.',
+      platforms: ALL_PLATFORMS,
+    },
+    {
+      id: 'liquid-glass',
+      title: 'A fresh new look',
+      body: 'A new Liquid Glass design for iPhone and iPad.',
+      platforms: ['ios'],
+    },
+    {
+      id: 'mobile-keyboard-shortcuts',
+      title: 'Keyboard shortcuts on mobile',
+      body: 'Desktop keyboard shortcuts now work with a hardware keyboard.',
+      platforms: ['ios'],
+    },
+    {
+      id: 'mobile-faster-sync',
+      title: 'Faster sync on mobile',
+      body: 'Your notes now sync faster across devices.',
+      platforms: ['ios'],
+    },
+  ],
   '0.18.0': [
     {
       id: 'smoother-gestures',

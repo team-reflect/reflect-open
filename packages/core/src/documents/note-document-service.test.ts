@@ -12,8 +12,8 @@ function setup(options?: {
   session?: Omit<TestNoteSessionOptions, 'path'>
 }) {
   const noteFile = createTestNoteFileService({
-    ...(options?.files === undefined ? {} : { files: options.files }),
-    ...(options?.generation === undefined ? {} : { generation: options.generation }),
+    files: options?.files,
+    generation: options?.generation,
   })
   const session =
     options?.session === undefined

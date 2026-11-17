@@ -1,14 +1,11 @@
+import type { DailyNoteRow, RecentNoteRow } from '@reflect/types'
 import { createTestGraphSessionService } from '../../testing/graph-session.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { AppError } from '../../errors.ts'
 import type { ToolExecutionOptions } from '@reflect/modules/ai'
 import type { RetrievalHit, RetrieveOptions } from '../../embeddings/retrieval-service.ts'
-import type { DailyNoteRow, DailyNotesRange } from '../../daily/daily-note-service.ts'
-import {
-  createNoteListService,
-  type RecentNoteRow,
-  type RecentNotesOptions,
-} from '../../indexing/note-list-service.ts'
+import type { DailyNotesRange } from '../../daily/daily-note-service.ts'
+import { createNoteListService, type RecentNotesOptions } from '../../indexing/note-list-service.ts'
 import {
   ASSET_UNAVAILABLE_ERROR,
   MAX_ASSET_DESCRIPTION_CHARS,
@@ -21,7 +18,7 @@ import { MAX_NOTE_CONTENT_CHARS, type ReadNoteResult, type ReadNotesOutput } fro
 import { createAssetPrivacyService } from '../../assets/asset-privacy-service.ts'
 import { createPrivacyService } from '../../privacy/privacy-service.ts'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   createTestNoteFileService,
   createTestRetrievalService,
   createTestXArchiveService,
@@ -64,7 +61,7 @@ function buildNoteTools(effects: ToolEffects = {}): NoteTools {
   vi.spyOn(retrieval, 'retrieve').mockImplementation(
     effects.retrieveFn ?? (() => Promise.resolve([])),
   )
-  const noteList = createNoteListService({ database: createNodeTestDatabaseService() })
+  const noteList = createNoteListService({ database: createTestDatabaseService() })
   vi.spyOn(noteList, 'listRecentNotes').mockImplementation(
     effects.listRecentNotesFn ?? (() => Promise.resolve([])),
   )

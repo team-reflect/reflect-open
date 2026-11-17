@@ -4,27 +4,10 @@
 //! `write.rs`.
 
 use rusqlite::{Connection, params};
-use serde::Deserialize;
 
-use reflect_types::{AppError, AppResult};
+use reflect_types::{AppError, AppResult, EmbeddedChunk};
 
-/// One chunk of a note, built in TS (`@reflect/core` chunker). `vector` is
-/// present only for new/changed chunks — `None` means "this chunk's hash
-/// already has a row; keep its vector, refresh its metadata" (positions and
-/// headings shift when text moves above an unchanged chunk).
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EmbeddedChunk {
-    pub(super) heading: Option<String>,
-    pub(super) pos_from: i64,
-    pub(super) pos_to: i64,
-    pub(super) text: String,
-    pub(super) content_hash: String,
-    pub(super) model_id: String,
-    pub(super) vector: Option<Vec<f32>>,
-}
-
-fn vector_json(vector: &[f32]) -> String {
+pub(crate) fn vector_json(vector: &[f32]) -> String {
     let mut out = String::with_capacity(vector.len() * 10 + 2);
     out.push('[');
     for (i, value) in vector.iter().enumerate() {

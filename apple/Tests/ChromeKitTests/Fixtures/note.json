@@ -1,0 +1,61 @@
+{
+  "type": "state",
+  "entryId": 7,
+  "chrome": "shell",
+  "routeKind": "note",
+  "tab": "daily",
+  "canBack": true,
+  "leading": [],
+  "trailing": [
+    {
+      "id": "actions",
+      "title": "Note actions",
+      "icon": "ellipsis",
+      "menu": [
+        {
+          "type": "action",
+          "id": "pin",
+          "title": "Pin",
+          "icon": "pin"
+        },
+        {
+          "type": "section",
+          "items": [
+            {
+              "type": "action",
+              "id": "delete",
+              "title": "Delete",
+              "icon": "trash",
+              "destructive": true,
+              "confirm": {
+                "title": "Delete this note?",
+                "action": "Delete"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "keyboardVisible": true,
+  "modal": false,
+  "toolbar": {
+    "canIndent": true,
+    "canDedent": false,
+    "canMoveUp": true,
+    "canMoveDown": false,
+    "canAttachFiles": true
+  },
+  "plus": null,
+  "sidebar": null,
+  "history": null,
+  "title": {
+    "kind": "text",
+    "text": "Edit note"
+  },
+  "search": null,
+  "fullscreen": false,
+  "hidesTabBar": false,
+  "theme": "dark",
+  "generation": 1
+}

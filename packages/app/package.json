@@ -9,7 +9,7 @@
     "./testing": "./src/testing/index.ts"
   },
   "scripts": {
-    "test": "vitest run --config ../../vitest.config.ts --project app"
+    "test": "node ../../scripts/build-index-wasm.ts && vitest run --config ../../vitest.config.ts --project app"
   },
   "dependencies": {
     "@ocavue/utils": "^1.12.0",

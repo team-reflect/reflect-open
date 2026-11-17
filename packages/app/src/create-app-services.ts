@@ -34,6 +34,11 @@ import {
 } from './app/update-service.ts'
 import { createThemeService, type ThemeService } from './settings/theme-service.ts'
 import { createKeyboardService, type KeyboardService } from './mobile/keyboard-service.ts'
+import {
+  createNativeChromeService,
+  type NativeChromeHost,
+  type NativeChromeService,
+} from './mobile/native-chrome-service.ts'
 import { createShareService, type ShareService } from './mobile/share-service.ts'
 import {
   createAutocompleteSuggestionService,
@@ -114,12 +119,19 @@ export interface AppHost {
    * The native menus; without a host, every menu operation rejects.
    */
   readonly nativeMenu?: NativeMenuHost
+  /**
+   * The shell that draws the mobile chrome natively; without one, the web
+   * draws it.
+   */
+  readonly nativeChrome?: NativeChromeHost | undefined
 }
 
 /**
  * The app-layer services of one webview, built over the core services.
+ * `CommandId` and `Context` are the id and context types of the app's
+ * commands.
  */
-export interface AppServices {
+export interface AppServices<CommandId extends string, Context> {
   /**
    * Facts about this webview's window and the actions that span windows.
    */
@@ -156,15 +168,15 @@ export interface AppServices {
   /**
    * The command registry. The app decides the context type that its commands run with.
    */
-  readonly commands: CommandService
+  readonly commands: CommandService<CommandId, Context>
   /**
    * The native macOS application menu and native context menus.
    */
-  readonly nativeMenu: NativeMenuService
+  readonly nativeMenu: NativeMenuService<CommandId>
   /**
    * The command palette's data layer.
    */
-  readonly paletteSearch: PaletteSearchService
+  readonly paletteSearch: PaletteSearchService<CommandId, Context>
   /**
    * Exception-only crash reporting.
    */
@@ -185,6 +197,10 @@ export interface AppServices {
    * The software keyboard's overlap height, as the UI last measured it.
    */
   readonly keyboard: KeyboardService
+  /**
+   * Whether the shell draws the mobile chrome, and the messages to and from it.
+   */
+  readonly nativeChrome: NativeChromeService
   /**
    * Shares a note through the OS share sheet.
    */
@@ -230,9 +246,15 @@ export interface AppServices {
 /**
  * Build the app layer once per webview.
  */
-export function createAppServices(core: CoreServices, host: AppHost): AppServices {
+export function createAppServices<CommandId extends string, Context>(
+  core: CoreServices,
+  host: AppHost,
+): AppServices<CommandId, Context> {
   const systemPreferences = createSystemPreferencesService({ media: host.media })
-  const commands = createCommandService({ platform: core.platform, logger: core.logger })
+  const commands = createCommandService<CommandId, Context>({
+    platform: core.platform,
+    logger: core.logger,
+  })
   const keymap = createKeymapService({ platform: core.platform })
   const nativeMenu = createNativeMenuService({
     commands,
@@ -313,6 +335,7 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
     }),
     operations: host.operations,
     keyboard: createKeyboardService(),
+    nativeChrome: createNativeChromeService({ host: host.nativeChrome, clock: core.clock }),
     share: createShareService({ openDocuments: core.openDocuments }),
     autocompleteSuggestions: createAutocompleteSuggestionService({
       suggestions: core.suggestions,

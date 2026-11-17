@@ -1,13 +1,7 @@
 import Foundation
 import ReflectCoreFFI
+import TypesShared
 import WebHostKit
-
-/// The directories and user agent that the Rust core starts with.
-struct CoreConfig: Encodable, Sendable {
-  var documentDir: String
-  var dataDir: String
-  var userAgent: String
-}
 
 /// One event that the core emitted: a name and a JSON payload.
 struct CoreEvent: Sendable, Equatable {
@@ -34,7 +28,7 @@ final class ReflectCore: Sendable {
   /// Starts a core. `openURL` receives each URL or absolute file path that a
   /// command opens with the system handler, on a Rust thread, and returns
   /// whether it accepted it.
-  init(config: CoreConfig, openURL: @escaping @Sendable (String) -> Bool) throws {
+  init(config: CoreStartConfig, openURL: @escaping @Sendable (String) -> Bool) throws {
     let (events, continuation) = AsyncStream.makeStream(of: CoreEvent.self)
     self.events = events
     let callbacks = Unmanaged.passRetained(

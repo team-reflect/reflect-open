@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { page, userEvent, type Locator } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   makeOpenTask as task,
   type TestCoreServices,
@@ -16,7 +17,6 @@ import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { act } from '@/test-utils/act.ts'
 import { scrollElement } from '@/test-utils/scroll.ts'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileTasks } from './tasks.tsx'
 import { noop, returnFalse } from '@ocavue/utils'
 
@@ -150,10 +150,18 @@ function RouteProbe(): ReactNode {
   return <output data-testid="route">{JSON.stringify(route)}</output>
 }
 
+/**
+ * Holds the search text the way the shell does.
+ */
+function ShellTasks(): ReactNode {
+  const [query, setQuery] = useState('')
+  return <MobileTasks query={query} onQueryChange={setQuery} />
+}
+
 function renderScreen() {
   return renderInApp(
     <>
-      <MobileTasks />
+      <ShellTasks />
       <RouteProbe />
     </>,
     {
@@ -218,7 +226,7 @@ beforeEach(async () => {
   await page.viewport(375, 700)
   // A fresh service per test, so its recently-completed set starts empty.
   core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
   })
   const { tasks } = core
   getOpenTasks = vi.spyOn(tasks, 'getOpenTasks').mockResolvedValue([])

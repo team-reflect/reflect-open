@@ -6,6 +6,7 @@
 export { createTestIdService, type TestIdService } from './id.ts'
 export { createTestLoggerService, type LogEntry, type TestLoggerService } from './logger.ts'
 export { createTestClockService, type TestClockService } from './clock.ts'
+export { createTestIndexedNote } from './indexed-note.ts'
 export {
   createTestIpcBridgeService,
   type TestIpcBridgeService,
@@ -50,9 +51,9 @@ export {
   type TestContactsServiceOptions,
 } from './contacts.ts'
 export {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   seedNotes,
-  type TestDatabaseQuery,
+  type IndexCommand,
   type TestDatabaseService,
   type TestNote,
 } from './database.ts'

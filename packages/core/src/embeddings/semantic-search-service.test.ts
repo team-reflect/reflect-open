@@ -64,7 +64,7 @@ async function setup(options?: {
     embeddingRuntime: runtime,
     indexLifecycle,
     logger,
-    ...(options?.backfill === undefined ? {} : { backfill: options.backfill }),
+    backfill: options?.backfill,
   })
   const retrieval = createTestRetrievalService(
     options?.relatedNotes === undefined ? {} : { relatedNotes: options.relatedNotes },

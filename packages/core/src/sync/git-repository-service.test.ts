@@ -65,11 +65,4 @@ describe('createGitRepositoryService', () => {
       { command: 'git_pull', args: { message: 'Update notes', generation: 3 } },
     ])
   })
-
-  it('rejects a malformed response with a parse error', async () => {
-    const ipc = createTestIpcBridgeService({ commands: { git_fetch: () => ({ ahead: 'x' }) } })
-    const git = createGitRepositoryService({ ipc })
-
-    await expect(git.fetch(null, 1)).rejects.toMatchObject({ kind: 'parse' })
-  })
 })

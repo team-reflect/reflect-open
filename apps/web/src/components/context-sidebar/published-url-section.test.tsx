@@ -1,19 +1,19 @@
+import type { NoteRow } from '@reflect/types'
 import { userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { MIN_VISIBLE_MS } from '@reflect/app'
-import type { GistPublishService, NoteRow } from '@reflect/core'
+import type { GistPublishService } from '@reflect/core'
 import {
-  createTestAppServices,
   createTestOperationsService,
   type TestClipboardService,
   type TestOpenerService,
   type TestOperationsService,
 } from '@reflect/app/testing'
-import { createTestCoreServices } from '@reflect/core/testing'
+import { createTestDatabaseService, createTestCoreServices } from '@reflect/core/testing'
 import { queryKeys } from '@/lib/query-client.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { PublishedUrlSection } from './published-url-section.tsx'
+import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
 // What the index answers for the note; each test sets it before `renderSection`.
 let row: NoteRow | null
@@ -41,14 +41,14 @@ function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
 async function renderSection(path = 'notes/a.md') {
   operations = createTestOperationsService()
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     progress: operations,
   })
   vi.spyOn(core.indexQuery, 'getNote').mockImplementation(() => Promise.resolve(row ?? undefined))
   publish = vi
     .spyOn(core.gistPublish, 'publish')
     .mockResolvedValue({ url: 'https://gist.github.com/alex/g1', stale: false })
-  const appLayer = createTestAppServices(core)
+  const appLayer = createWebTestAppServices(core)
   ;({ clipboard, opener } = appLayer)
   if (clipboardFailure !== null) {
     clipboard.failWith(clipboardFailure)

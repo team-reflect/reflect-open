@@ -14,11 +14,23 @@ import { useCoreServices } from '@/services/services-provider.tsx'
  * debug actions whose `Trigger test error` row crashes the tree on purpose to
  * drill this screen (`useCrashTest`).
  */
-export function AppErrorBoundary({ children }: { children: ReactNode }): ReactElement {
+export function AppErrorBoundary({
+  children,
+  besideFallback,
+}: {
+  children: ReactNode
+  /** Rendered next to the crash card, e.g. to take down native chrome. */
+  besideFallback?: ReactNode
+}): ReactElement {
   const { logger } = useCoreServices()
   return (
     <ErrorBoundary
-      FallbackComponent={CrashFallback}
+      fallbackRender={(props) => (
+        <>
+          {besideFallback}
+          <CrashFallback {...props} />
+        </>
+      )}
       onError={(error, info) => {
         logger.error('render crash:', { error, componentStack: info.componentStack })
       }}

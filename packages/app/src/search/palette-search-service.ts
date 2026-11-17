@@ -45,7 +45,7 @@ export interface PaletteSectionsInput {
  * `palette-entries.ts`; the mobile All tab's query model in
  * `all-notes-filters.ts`.
  */
-export interface PaletteSearchService<Context = unknown> {
+export interface PaletteSearchService<CommandId extends string, Context = unknown> {
   /**
    * Title suggestions for `text` (at most 8), generated date phrases merged in.
    */
@@ -61,25 +61,28 @@ export interface PaletteSearchService<Context = unknown> {
   /**
    * Merge the data with every registered command into the palette's sections.
    */
-  sections(input: PaletteSectionsInput): PaletteSections<Command<Context>>
+  sections(input: PaletteSectionsInput): PaletteSections<Command<CommandId, Context>>
   /**
    * Resolve a relative updated-at preset of the mobile All tab against the clock.
    */
   updatedPresetFilter(preset: UpdatedPreset): UpdatedFilter
 }
 
-export interface PaletteSearchServiceDeps<Context = unknown> {
+export interface PaletteSearchServiceDeps<CommandId extends string, Context = unknown> {
   readonly suggestions: SuggestionService
   readonly search: SearchService
   readonly retrieval: RetrievalService
-  readonly commands: CommandService<Context>
+  readonly commands: CommandService<CommandId, Context>
   readonly clock: ClockService
 }
 
-class PaletteSearchServiceImpl<Context> implements PaletteSearchService<Context> {
-  readonly #deps: PaletteSearchServiceDeps<Context>
+class PaletteSearchServiceImpl<CommandId extends string, Context> implements PaletteSearchService<
+  CommandId,
+  Context
+> {
+  readonly #deps: PaletteSearchServiceDeps<CommandId, Context>
 
-  constructor(deps: PaletteSearchServiceDeps<Context>) {
+  constructor(deps: PaletteSearchServiceDeps<CommandId, Context>) {
     this.#deps = deps
   }
 
@@ -105,7 +108,7 @@ class PaletteSearchServiceImpl<Context> implements PaletteSearchService<Context>
     }))
   }
 
-  sections(input: PaletteSectionsInput): PaletteSections<Command<Context>> {
+  sections(input: PaletteSectionsInput): PaletteSections<Command<CommandId, Context>> {
     return buildPaletteSections({ ...input, commands: this.#deps.commands.list() })
   }
 
@@ -114,8 +117,8 @@ class PaletteSearchServiceImpl<Context> implements PaletteSearchService<Context>
   }
 }
 
-export function createPaletteSearchService<Context = unknown>(
-  deps: PaletteSearchServiceDeps<Context>,
-): PaletteSearchService<Context> {
-  return new PaletteSearchServiceImpl<Context>(deps)
+export function createPaletteSearchService<CommandId extends string, Context = unknown>(
+  deps: PaletteSearchServiceDeps<CommandId, Context>,
+): PaletteSearchService<CommandId, Context> {
+  return new PaletteSearchServiceImpl<CommandId, Context>(deps)
 }

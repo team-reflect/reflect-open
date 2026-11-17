@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  buildFtsMatch,
-  buildFtsTitlePrefixMatch,
-  containsUnsegmentedScript,
-  titleRecallNeedles,
-} from './search-query.ts'
+import { buildFtsMatch, containsUnsegmentedScript, titleRecallNeedles } from './search-query.ts'
 
 describe('buildFtsMatch', () => {
   it('returns null for an empty or whitespace-only query', () => {
@@ -61,23 +56,8 @@ describe('buildFtsMatch', () => {
   })
 })
 
-describe('buildFtsTitlePrefixMatch', () => {
-  it('prefix-matches the whole query as a title phrase', () => {
-    expect(buildFtsTitlePrefixMatch('eliska nov')).toBe('title : "eliska nov"*')
-    expect(buildFtsTitlePrefixMatch('ab"cd')).toBe('title : "ab""cd"*')
-  })
-
-  it('returns null when the last token has under two letters or digits', () => {
-    // Every combining mark splits a token here, even those `unicode61` keeps.
-    for (const text of ['', 'e', 'c++', 'ab c', 'i\u{307}s', 'the\u{336}b', 'राम', '𝐀']) {
-      expect(buildFtsTitlePrefixMatch(text)).toBeNull()
-    }
-    expect(buildFtsTitlePrefixMatch('i\u{307}st')).toBe('title : "i\u{307}st"*')
-  })
-})
-
 describe('containsUnsegmentedScript', () => {
-  // The Rust CLI mirrors this classification (`apps/cli/src/keys.rs`) — the
+  // The Rust CLI mirrors this classification (`crates/index/src/text/keys.rs`) — the
   // same inputs must classify the same way there.
   it('detects scripts written without word separators', () => {
     expect(containsUnsegmentedScript('東京')).toBe(true) // Han

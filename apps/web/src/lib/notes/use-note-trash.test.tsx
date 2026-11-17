@@ -1,13 +1,13 @@
 import { act } from '@/test-utils/act.ts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestNoteFileService,
   type TestNoteFileService,
   type TestOpenGraph,
 } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useNoteTrash } from './use-note-trash.ts'
 
 const GRAPH: TestOpenGraph = { root: '/g', name: 'g', generation: 1 }
@@ -22,7 +22,7 @@ beforeEach(() => {
 
 async function mount(graph: TestOpenGraph | null = GRAPH) {
   return await renderHookInApp(() => useNoteTrash(), {
-    core: createTestCoreServices({ database: createWasmTestDatabaseService(), noteFile }),
+    core: createTestCoreServices({ database: createTestDatabaseService(), noteFile }),
     graph,
   })
 }

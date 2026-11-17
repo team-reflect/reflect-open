@@ -10,7 +10,11 @@ import {
 } from 'react'
 import { act } from '@/test-utils/act.ts'
 import type { DayScrollPosition } from '@reflect/app'
-import { createTestCoreServices, createTestClockService } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  createTestClockService,
+} from '@reflect/core/testing'
 import { FocusedDailyProvider, useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { useRouterState, useRouterHandlers, useRouterActions } from '@/routing/router.tsx'
 import { getIsoToday } from '@reflect/utils'
@@ -19,7 +23,6 @@ import { createDayWindow, dateAtIndex, indexOfDate } from '@reflect/app'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DailyStream, ESTIMATED_DAY_HEIGHT } from './daily-stream.tsx'
 import { noop } from '@ocavue/utils'
 
@@ -50,7 +53,7 @@ function Stream({ children }: { children: ReactNode }): ReactElement {
  * Render `children` in a stream-sized box; the app runs on `clock` (the system clock by default).
  */
 async function renderStream(children: ReactNode, clock: ClockService = createSystemClock()) {
-  const core = createTestCoreServices({ database: createWasmTestDatabaseService(), clock })
+  const core = createTestCoreServices({ database: createTestDatabaseService(), clock })
   // Reads never resolve: every day stays a loading placeholder.
   vi.spyOn(core.noteFile, 'read').mockReturnValue(new Promise(noop))
   return await renderInApp(<Stream>{children}</Stream>, {

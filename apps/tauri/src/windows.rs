@@ -14,14 +14,14 @@ use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex, MutexGuard, Once};
 
 use reflect_core::Core;
-use serde::Serialize;
+use reflect_types::WindowBootstrap;
 use tauri::webview::{NewWindowFeatures, NewWindowResponse};
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::db;
 use crate::error::{AppError, AppResult};
-use crate::fs::{self, GraphInfo};
+use crate::fs;
 use crate::quit::QuitState;
 
 /// App-wide note-window registry.
@@ -526,20 +526,6 @@ pub async fn close_note_windows(app: tauri::AppHandle) -> AppResult<()> {
     }
     tracing::warn!("note windows still open after the close deadline; proceeding");
     Ok(())
-}
-
-/// What a secondary window needs to boot: the open graph's identity (both
-/// session generations, unbumped) and the deep link it was created to show.
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WindowBootstrap {
-    pub graph: GraphInfo,
-    /// The open index session's generation, or null when the main window's
-    /// index failed to open (the note window then boots without index reads).
-    pub index_generation: Option<u64>,
-    /// The `reflect://` link this window was opened for — one-shot, absent on
-    /// a reload (the router simply stays where the reloaded window was).
-    pub initial_deep_link: Option<String>,
 }
 
 /// Adopt the open graph for a secondary window: a pure read of the current

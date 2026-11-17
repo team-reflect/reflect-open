@@ -1,5 +1,5 @@
+import type { NoteRow, PinnedNoteRow } from '@reflect/types'
 import { describe, expect, it, vi } from 'vitest'
-import type { NoteRow, PinnedNote } from '../indexing/index-query-service.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import {
   applyNoteRowOverlay,
@@ -85,10 +85,10 @@ describe('applyNoteRowOverlays', () => {
 })
 
 describe('applyPinnedNoteOverlays', () => {
-  function pinned(path: string, pinnedOrder: number | null): PinnedNote {
+  function pinned(path: string, pinnedOrder: number | null): PinnedNoteRow {
     return { path, title: path, dailyDate: null, pinnedOrder }
   }
-  const preview = (path: string): PinnedNote => pinned(`preview:${path}`, null)
+  const preview = (path: string): PinnedNoteRow => pinned(`preview:${path}`, null)
   const shelf = [pinned('a', 1024), pinned('b', 2048), pinned('c', null), pinned('d', null)]
 
   it('removes unpinned and trashed notes and moves reordered ones', () => {

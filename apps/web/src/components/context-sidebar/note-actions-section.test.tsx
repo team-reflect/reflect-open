@@ -1,3 +1,4 @@
+import type { NoteRow } from '@reflect/types'
 import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import {
@@ -7,14 +8,16 @@ import {
   type IndexQueryService,
   type NoteActionsService,
   type NoteDocumentService,
-  type NoteRow,
   AppError,
 } from '@reflect/core'
-import { createTestCoreServices, createTestPlatformService } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  createTestPlatformService,
+} from '@reflect/core/testing'
 import { createTestOperationsService, type TestOperationsService } from '@reflect/app/testing'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NoteActionsSection } from './note-actions-section.tsx'
 
 // What the app's fakes answer; each test sets them before `renderSection`.
@@ -43,7 +46,7 @@ function pinnedTitles(): string | null {
 async function renderSection(path: string, showTrash = false, copies = 1) {
   operations = createTestOperationsService()
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     progress: operations,
     noteDocuments: {
       readSource: readNoteSource,
@@ -115,7 +118,12 @@ describe('NoteActionsSection pin toggle', () => {
 
   it('offers Un-pin this note when the index lists the note as pinned', async () => {
     getPinnedNotes.mockResolvedValue([
-      { path: 'daily/2026-06-10.md', title: 'June 10th, 2026', dailyDate: '2026-06-10' },
+      {
+        path: 'daily/2026-06-10.md',
+        title: 'June 10th, 2026',
+        dailyDate: '2026-06-10',
+        pinnedOrder: null,
+      },
     ])
     noteSource = '---\npinned: true\n---\n# A\n'
     const view = await renderSection('daily/2026-06-10.md')

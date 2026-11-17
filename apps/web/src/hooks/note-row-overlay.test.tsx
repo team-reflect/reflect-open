@@ -1,9 +1,12 @@
+import type { NoteRow } from '@reflect/types'
 import { act } from '@/test-utils/act.ts'
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { NoteRow } from '@reflect/core'
-import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
+import {
+  createTestDatabaseService,
+  createTestCoreServices,
+  type TestCoreServices,
+} from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useNoteRowOverlay } from './note-row-overlay.ts'
 
 function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
@@ -31,7 +34,7 @@ async function mount(path: string) {
 }
 
 beforeEach(() => {
-  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  core = createTestCoreServices({ database: createTestDatabaseService() })
 })
 
 describe('useNoteRowOverlay', () => {

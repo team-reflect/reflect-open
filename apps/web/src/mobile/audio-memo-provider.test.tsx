@@ -9,6 +9,7 @@ import {
   AppError,
 } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestAssetStoreService,
   createTestAudioRecorderService,
@@ -16,7 +17,6 @@ import {
 } from '@reflect/core/testing'
 import { useStore } from '@/lib/use-store.ts'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileAudioMemoProvider, useMobileAudioMemo } from './audio-memo-provider.tsx'
 
 const GRAPH: GraphInfo = { root: '/notes', name: 'Notes', generation: 3 }
@@ -69,7 +69,7 @@ async function setup(provider: AiProviderConfig = OPENAI) {
   audioRecorder.setStopResult(RECORDING)
   const assetStore = createTestAssetStoreService({ sources: { [STAGED]: 'audio' } })
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     audioRecorder,
     assetStore,
     platform: createTestPlatformService({ appPlatform: 'ios' }),

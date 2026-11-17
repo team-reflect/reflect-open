@@ -6,7 +6,7 @@
   "scripts": {
     "build:ipa": "node scripts/build-ipa.ts",
     "build:web": "TAURI_ENV_PLATFORM=ios pnpm --filter @reflect/web build",
-    "dev:web": "TAURI_ENV_PLATFORM=ios pnpm --filter @reflect/web dev",
+    "dev:web": "pnpm --filter @reflect/web dev",
     "upload:testflight": "node scripts/upload-testflight.ts"
   },
   "devDependencies": {

@@ -11,7 +11,6 @@ import { createTestLoggerService } from '@reflect/core/testing'
 import { createDevAssetStore } from '@/dev/dev-asset-store.ts'
 import { createDevBridge } from '@/dev/dev-bridge.ts'
 import { createDevFileStore } from '@/dev/dev-file-store.ts'
-import { createDevIndexDb } from '@/dev/dev-index-db.ts'
 
 let appStore: AppStoreService
 let iap: IapService
@@ -19,12 +18,11 @@ let iap: IapService
 /**
  * The App Store and IAP services over a fresh dev bridge.
  */
-async function openPreview(): Promise<void> {
+function openPreview(): void {
   const logger = createTestLoggerService()
   const ipc = createIpcBridgeService({
     transport: createDevBridge({
       files: createDevFileStore({}),
-      index: await createDevIndexDb(),
       assets: createDevAssetStore(),
     }),
     logger,
@@ -62,7 +60,7 @@ describe('dev bridge App Store and IAP bindings', () => {
     await expect(iap.isOwned(IAP_PRODUCT_IDS.yearly)).resolves.toBe(false)
     await expect(iap.isOwned(IAP_PRODUCT_IDS.monthly)).resolves.toBe(true)
 
-    await openPreview()
+    openPreview()
     await expect(iap.isOwned(IAP_PRODUCT_IDS.monthly)).resolves.toBe(false)
   })
 

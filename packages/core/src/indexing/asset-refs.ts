@@ -49,19 +49,9 @@ class AssetReferencesImpl implements AssetReferences {
     const { database, xArchive } = this.#deps
     const owners = knownOwners ?? (await xArchive.owners(assetPath))
     const basename = assetPath.split('/').at(-1) ?? assetPath
-    const rows = await database.db
-      .selectFrom('assets')
-      .where((eb) => {
-        return eb.or([
-          eb('assetPath', '=', assetPath),
-          eb('assetPath', '=', basename),
-          ...(owners.length > 0 ? [eb('assetPath', 'in', owners)] : []),
-        ])
-      })
-      .select('notePath')
-      .distinct()
-      .execute()
-    return rows.map((row) => row.notePath)
+    return await database.read('index_asset_owners', {
+      assetPaths: [assetPath, basename, ...owners],
+    })
   }
 }
 

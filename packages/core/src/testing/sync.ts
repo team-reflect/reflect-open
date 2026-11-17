@@ -113,6 +113,7 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
     remoteHead: (): RemoteTip => ({ remoteOid: null, trackingOid: null, defaultBranch: null }),
     push: (): PushOutcome => ({ pushed: true, nonFastForward: false, rejectionMessage: null }),
     pull: (): PullOutcome => ({
+      kind: 'merged',
       committed: false,
       ahead: 0,
       skippedLargeFiles: [],
@@ -440,6 +441,10 @@ class TestGithubAuthServiceImpl implements TestGithubAuthService {
 
   getToken(): Promise<string | null> {
     return this.#inner.getToken()
+  }
+
+  peekToken(): Promise<string | null | undefined> {
+    return this.#inner.peekToken()
   }
 
   deviceFlowStart(clientId?: string): Promise<DeviceFlowStart> {

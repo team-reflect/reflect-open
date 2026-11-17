@@ -342,7 +342,7 @@ describe('NoteEditor image lightbox', () => {
     const opener = page.getByRole('button', { name: 'Open' })
     await expect.element(opener).toBeVisible()
     expect(opener.element().parentElement?.className).toContain('top-safe-or-4')
-    expect(opener.element().parentElement?.className).toContain('right-safe-or-4')
+    expect(opener.element().parentElement?.className).toContain('right-safe-offset-4')
   })
 
   it('shows mobile close chrome inside iOS safe-area bounds', async () => {
@@ -352,7 +352,15 @@ describe('NoteEditor image lightbox', () => {
     const close = page.getByRole('button', { name: 'Close', exact: true })
     await expect.element(close).toBeVisible()
     expect(close.element().parentElement?.className).toContain('top-safe-or-4')
-    expect(close.element().parentElement?.className).toContain('left-safe-or-4')
+    expect(close.element().parentElement?.className).toContain('left-window-controls-offset-4')
+    const left = (): number => close.element().getBoundingClientRect().left
+    const start = left()
+    document.documentElement.style.setProperty('--window-controls-width', '88px')
+    try {
+      expect(left()).toBe(start + 88)
+    } finally {
+      document.documentElement.style.removeProperty('--window-controls-width')
+    }
     await expect
       .element(page.getByRole('dialog', { name: 'Image preview' }).locate('.bg-black'))
       .toBeInTheDocument()

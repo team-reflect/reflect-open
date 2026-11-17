@@ -1,6 +1,7 @@
+import type { ChunkHit } from '@reflect/types'
 import { describe, expect, it } from 'vitest'
 import {
-  createNodeTestDatabaseService,
+  createTestDatabaseService,
   createTestEmbeddingIndexService,
   createTestEmbeddingRuntimeService,
   createTestLoggerService,
@@ -16,7 +17,6 @@ import {
   createRetrievalService,
   fuseRanked,
   mergeNearestFirst,
-  type ChunkHitRow,
   type RetrievalHit,
 } from './retrieval-service.ts'
 
@@ -64,7 +64,7 @@ const NOTES: readonly TestNote[] = [
  * A retrieval service over a graph of {@link NOTES}, embedded through the real pipeline.
  */
 async function setup(options?: { status?: EmbedStatus; embedded?: boolean }) {
-  const database = createNodeTestDatabaseService()
+  const database = createTestDatabaseService()
   seedNotes(database, NOTES)
   const noteFile = createTestNoteFileService({
     files: Object.fromEntries(NOTES.map((note) => [note.path, note.markdown])),
@@ -72,10 +72,9 @@ async function setup(options?: { status?: EmbedStatus; embedded?: boolean }) {
   const logger = createTestLoggerService()
   if (options?.embedded !== false) {
     const index = createTestEmbeddingIndexService({
-      database,
       noteFile,
       embeddingRuntime: createTestEmbeddingRuntimeService({ vectors: embed }),
-      storeChunks: true,
+      storeChunksIn: database,
     })
     await expect(
       index.backfill({ generation: 1, fileGeneration: 1, modelId: MODEL }),
@@ -83,7 +82,7 @@ async function setup(options?: { status?: EmbedStatus; embedded?: boolean }) {
   }
   const runtime = createTestEmbeddingRuntimeService({
     vectors: embed,
-    ...(options?.status === undefined ? {} : { status: options.status }),
+    status: options?.status,
   })
   const retrieval = createRetrievalService({
     database,
@@ -236,13 +235,13 @@ function hit(path: string, overrides?: Partial<RetrievalHit>): RetrievalHit {
   }
 }
 
-function row(path: string, distance: number, overrides?: Partial<ChunkHitRow>): ChunkHitRow {
+function row(path: string, distance: number, overrides?: Partial<ChunkHit>): ChunkHit {
   return {
     path,
     title: path,
     heading: null,
     text: ` about ${path} `,
-    isPrivate: 0,
+    isPrivate: false,
     distance,
     ...overrides,
   }
@@ -278,7 +277,7 @@ describe('bestChunkPerNote', () => {
   })
 
   it('trims snippets and converts the private flag', () => {
-    const hits = bestChunkPerNote([row('notes/p.md', 0.1, { isPrivate: 1 })], 12)
+    const hits = bestChunkPerNote([row('notes/p.md', 0.1, { isPrivate: true })], 12)
     expect(hits[0]!.snippet).toBe('about notes/p.md')
     expect(hits[0]!.isPrivate).toBe(true)
   })

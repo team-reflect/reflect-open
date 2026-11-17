@@ -1,7 +1,6 @@
-import { sql } from 'kysely'
+import type { NoteListEntry, RecentNoteRow, TagFacet } from '@reflect/types'
 import { foldTag } from '../markdown/index.ts'
 import type { DatabaseService } from './database-service.ts'
-import { recallOrder } from './queries-shared.ts'
 
 /**
  * The All Notes list: every regular note, pinned first then newest, optionally
@@ -13,52 +12,11 @@ import { recallOrder } from './queries-shared.ts'
  * neither query carries a per-row parameter, so list size has no SQL ceiling.
  */
 
-/**
- * One row of the All Notes list.
- */
-export interface NoteListEntry {
-  path: string
-  title: string
-  /**
-   * The indexed row preview (`buildIndexedNote`; may be empty).
-   */
-  snippet: string
-  /**
-   * The note's body tags (first-seen casing), alphabetical.
-   */
-  tags: string[]
-  /**
-   * File modification time (epoch ms) — the list's recency sort key.
-   */
-  mtime: number
-  /**
-   * Pinned notes lead the list (V1 order) and show a pin marker.
-   */
-  isPinned: boolean
-}
-
 export interface NoteListOptions {
   /**
    * Only notes carrying this tag (case-insensitive). `null` lists all.
    */
   tag?: string | null
-}
-
-/**
- * One row of the recent-notes listing (the AI chat's recents tool).
- */
-export interface RecentNoteRow {
-  path: string
-  title: string
-  /**
-   * The indexed row preview (`buildIndexedNote`; may be empty).
-   */
-  preview: string
-  /**
-   * File modification time (epoch ms).
-   */
-  mtime: number
-  isPrivate: boolean
 }
 
 export interface RecentNotesOptions {
@@ -70,14 +28,6 @@ export interface RecentNotesOptions {
    * Only notes carrying this tag (case-insensitive). `null` lists all.
    */
   tag?: string | null
-}
-
-/**
- * One tag facet over the note list: display casing + non-daily note count.
- */
-export interface NoteTagFacet {
-  tag: string
-  count: number
 }
 
 export interface NoteListServiceDeps {
@@ -109,7 +59,7 @@ export interface NoteListService {
    * filter (and the `#tag` search token): `#Book` and `#book` are one facet,
    * displayed with one deterministic casing.
    */
-  listNoteTags(): Promise<NoteTagFacet[]>
+  listNoteTags(): Promise<TagFacet[]>
 }
 
 class NoteListServiceImpl implements NoteListService {
@@ -120,142 +70,23 @@ class NoteListServiceImpl implements NoteListService {
   }
 
   async listNotes(options: NoteListOptions = {}): Promise<NoteListEntry[]> {
-    const { db } = this.#deps.database
-    const tag = options.tag ?? null
-
-    let listQuery =
-      tag === null
-        ? db
-            .selectFrom('notes')
-            .where('notes.kind', '=', 'note')
-            .select([
-              'notes.path',
-              'notes.title',
-              'notes.mtime',
-              'notes.preview',
-              'notes.isPinned',
-              'notes.pinnedOrder',
-            ])
-        : db
-            .selectFrom('tags')
-            .innerJoin('notes', 'notes.path', 'tags.notePath')
-            .where('tags.tagKey', '=', foldTag(tag))
-            .where('notes.kind', 'in', ['note', 'daily'])
-            .select([
-              'notes.path',
-              'notes.title',
-              'notes.mtime',
-              'notes.preview',
-              'notes.isPinned',
-              'notes.pinnedOrder',
-            ])
-            .distinct()
-    for (const order of recallOrder(true)) {
-      listQuery = listQuery.orderBy(order)
-    }
-    const rows = await listQuery.execute()
-
-    if (rows.length === 0) {
-      return []
-    }
-
-    // Tags for the same note set, via the same predicates — a join rather than a
-    // `note_path IN (…)` list, which would put a per-row parameter between the
-    // list and SQLite's bound-parameter ceiling.
-    const tagRows =
-      tag === null
-        ? await db
-            .selectFrom('tags')
-            .innerJoin('notes', 'notes.path', 'tags.notePath')
-            .where('notes.kind', '=', 'note')
-            .select(['tags.notePath', 'tags.tag'])
-            // Order on the folded key so a row's tags read in the same alphabetical
-            // order as the facet list, regardless of display casing.
-            .orderBy('tags.tagKey')
-            .execute()
-        : await db
-            .selectFrom('tags')
-            .innerJoin('notes', 'notes.path', 'tags.notePath')
-            .innerJoin('tags as filterTags', 'filterTags.notePath', 'notes.path')
-            .where('filterTags.tagKey', '=', foldTag(tag))
-            .where('notes.kind', 'in', ['note', 'daily'])
-            .select(['tags.notePath', 'tags.tag'])
-            .distinct()
-            .orderBy('tags.tagKey')
-            .execute()
-    const tagsByPath = new Map<string, string[]>()
-    for (const row of tagRows) {
-      const tags = tagsByPath.get(row.notePath)
-      if (tags === undefined) {
-        tagsByPath.set(row.notePath, [row.tag])
-      } else {
-        tags.push(row.tag)
-      }
-    }
-
-    return rows.map((row) => ({
-      path: row.path,
-      title: row.title,
-      mtime: row.mtime,
-      snippet: row.preview,
-      tags: tagsByPath.get(row.path) ?? [],
-      isPinned: row.isPinned !== 0,
-    }))
+    return await this.#deps.database.read('index_list_notes', { tagKey: tagKeyOf(options.tag) })
   }
 
   async listRecentNotes(options: RecentNotesOptions): Promise<RecentNoteRow[]> {
-    const { db } = this.#deps.database
-    const tag = options.tag ?? null
-
-    const rows =
-      tag === null
-        ? await db
-            .selectFrom('notes')
-            .where('notes.kind', '=', 'note')
-            .where('notes.isPrivate', '=', 0)
-            .select([
-              'notes.path',
-              'notes.title',
-              'notes.preview',
-              'notes.mtime',
-              'notes.isPrivate',
-            ])
-            .orderBy('notes.mtime', 'desc')
-            .orderBy('notes.path')
-            .limit(options.limit)
-            .execute()
-        : await db
-            .selectFrom('tags')
-            .innerJoin('notes', 'notes.path', 'tags.notePath')
-            .where('tags.tagKey', '=', foldTag(tag))
-            .where('notes.kind', '=', 'note')
-            .where('notes.isPrivate', '=', 0)
-            .select([
-              'notes.path',
-              'notes.title',
-              'notes.preview',
-              'notes.mtime',
-              'notes.isPrivate',
-            ])
-            .distinct()
-            .orderBy('notes.mtime', 'desc')
-            .orderBy('notes.path')
-            .limit(options.limit)
-            .execute()
-    return rows.map((row) => ({ ...row, isPrivate: row.isPrivate !== 0 }))
+    return await this.#deps.database.read('index_recent_notes', {
+      limit: options.limit,
+      tagKey: tagKeyOf(options.tag),
+    })
   }
 
-  async listNoteTags(): Promise<NoteTagFacet[]> {
-    const { db } = this.#deps.database
-    return await db
-      .selectFrom('tags')
-      .innerJoin('notes', 'notes.path', 'tags.notePath')
-      .where('notes.kind', '=', 'note')
-      .select([sql<string>`min(tags.tag)`.as('tag'), sql<number>`count(*)`.as('count')])
-      .groupBy('tags.tagKey')
-      .orderBy('tags.tagKey')
-      .execute()
+  async listNoteTags(): Promise<TagFacet[]> {
+    return await this.#deps.database.read('index_note_tags', {})
   }
+}
+
+function tagKeyOf(tag: string | null | undefined): string | null {
+  return tag == null ? null : foldTag(tag)
 }
 
 export function createNoteListService(deps: NoteListServiceDeps): NoteListService {

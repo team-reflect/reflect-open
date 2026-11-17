@@ -15,7 +15,7 @@ import { ConnectGitHostDrawer } from '@/mobile/connect-git-host-drawer.tsx'
 import { ConnectRepositoryDrawer } from '@/mobile/connect-repository-drawer.tsx'
 import { GithubSignInDrawer } from '@/mobile/github-sign-in-drawer.tsx'
 import { PRIVACY_POLICY_URL } from '@/mobile/legal-urls.ts'
-import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
+import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import { TextSettingDrawer } from '@/mobile/text-setting-drawer.tsx'
 import {
   SettingsActionRow,
@@ -29,6 +29,11 @@ import {
   type SettingsMenuOption,
 } from '@/mobile/settings-list.tsx'
 import { useStore } from '@/lib/use-store.ts'
+import {
+  setMobileFormOverride,
+  useMobileFormOverride,
+  type MobileFormOverride,
+} from '@/mobile/mobile-form.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
 import { useSubscriptionControls } from '@/mobile/use-subscription-controls.ts'
@@ -110,6 +115,28 @@ function ReviewRow(): ReactElement {
       label="Simulate review page"
       checked={override}
       onCheckedChange={review.setOverride}
+    />
+  )
+}
+
+const MOBILE_LAYOUT_OPTIONS: readonly SettingsMenuOption<MobileFormOverride>[] = [
+  { value: 'auto', label: 'Automatic' },
+  { value: 'bar', label: 'iPhone' },
+  { value: 'rail', label: 'iPhone Duo' },
+  { value: 'pad', label: 'iPad' },
+]
+
+/**
+ * Pins the form of the web chrome until the page reloads. A web page cannot
+ * tell an iPhone Duo from an iPhone, so its layout shows only when pinned.
+ */
+function MobileLayoutRow(): ReactElement {
+  return (
+    <SettingsMenuRow
+      label="Mobile layout"
+      value={useMobileFormOverride()}
+      options={MOBILE_LAYOUT_OPTIONS}
+      onChange={setMobileFormOverride}
     />
   )
 }
@@ -309,10 +336,12 @@ export function MobileSettings(): ReactElement {
         : undefined
 
   return (
-    <div className="flex h-full w-screen flex-col pt-safe">
-      <MobileScreenHeader
+    <div className="flex h-full w-full flex-col pt-safe">
+      <ChromeTopBar
+        align="center"
+        back={() => (canBack ? back() : navigate({ kind: 'today' }))}
         title="Settings"
-        onBack={() => (canBack ? back() : navigate({ kind: 'today' }))}
+        hidesTabBar
       />
       <main className="min-h-0 flex-1 overflow-y-auto bg-surface-app px-safe pb-safe">
         <div className="flex flex-col gap-8 px-4 py-5">
@@ -321,7 +350,7 @@ export function MobileSettings(): ReactElement {
               title={graph?.name ?? '—'}
               subtitle={storageLabel}
               media={<img src={appIcon} alt="" className="size-full object-cover" />}
-              onPress={() => navigate({ kind: 'graphs' })}
+              onPress={() => navigate({ kind: 'settings', page: 'graphs' })}
             />
           </SettingsGroup>
 
@@ -598,7 +627,7 @@ export function MobileSettings(): ReactElement {
             />
             <SettingsNavRow
               label="Open Source Licenses"
-              onPress={() => navigate({ kind: 'licenses' })}
+              onPress={() => navigate({ kind: 'settings', page: 'licenses' })}
             />
             <SettingsActionRow
               label="Privacy Policy"
@@ -621,6 +650,7 @@ export function MobileSettings(): ReactElement {
               ) : null}
               <WhatsNewRow />
               <ReviewRow />
+              {isIos ? null : <MobileLayoutRow />}
               <SettingsSwitchRow
                 label="Performance HUD"
                 checked={perfHudEnabled}

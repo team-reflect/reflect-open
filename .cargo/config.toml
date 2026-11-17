@@ -2,3 +2,8 @@
 # `CARGO_BUILD_WARNINGS=warn` to allow them while iterating.
 [build]
 warnings = "deny"
+
+# Ignore crate versions published less than 24 hours ago, unless they are
+# already in `Cargo.lock`.
+[registry]
+global-min-publish-age = "24 hours"

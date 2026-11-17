@@ -1,11 +1,11 @@
 import type { RenderResult } from 'vitest-browser-react'
-import { page, userEvent } from 'vitest/browser'
+import { cdp, page, server, userEvent } from 'vitest/browser'
 import { mouse } from 'vitest-browser-commands/playwright'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { StrictMode, type ReactElement } from 'react'
 import { act } from '@/test-utils/act.ts'
-import { createTestAppServices, type TestAppServices } from '@reflect/app/testing'
 import {
+  createTestDatabaseService,
   createTestChatEngineService,
   createTestCoreServices,
   createTestSecretStoreService,
@@ -30,10 +30,13 @@ import { dispatchTouch, scrollElement, touch } from '@/test-utils/scroll.ts'
 import { emulateReducedMotion } from '@/test-utils/reduced-motion.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp, type RenderInAppOptions } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileAudioMemoProvider } from './audio-memo-provider.tsx'
+import { AllSearchProvider } from '@/mobile/all-search.tsx'
+import { quickOpenVisible } from '@/mobile/quick-open.tsx'
 import { MobileShell } from './mobile-shell.tsx'
+import { BACK_PAGER_OVERSHOOT_PX } from './use-back-pager.ts'
 import { noop, returnFalse, sleep } from '@ocavue/utils'
+import { createWebTestAppServices, type WebTestAppServices } from '@/test-utils/app-services.ts'
 
 const waitFor = vi.waitFor
 
@@ -114,13 +117,13 @@ const GRAPH: GraphInfo = { root: '/g', name: 'g', generation: 1 }
 
 // The services of the running test: the graph's files live in `core.noteFile`.
 let core: TestCoreServices
-let appServices: TestAppServices
+let appServices: WebTestAppServices
 let dailyDatesInRange: MockInstance<DailyNoteService['dailyDatesInRange']>
 
 beforeEach(async () => {
   await page.viewport(375, 700)
-  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  appServices = createTestAppServices(core)
+  core = createTestCoreServices({ database: createTestDatabaseService() })
+  appServices = createWebTestAppServices(core)
   // The tests compute dates from the real clock.
   core.clock.setNow(Date.now())
   // The browser and the test preferences both prefer reduced motion.
@@ -137,10 +140,12 @@ function mount(
   options?: { strict?: boolean; settings?: RenderInAppOptions['settings'] },
 ) {
   const tree = (
-    <MobileAudioMemoProvider graph={GRAPH}>
-      <MobileShell />
-      {probeRoute ? <NavProbe to={probeRoute} /> : null}
-    </MobileAudioMemoProvider>
+    <AllSearchProvider>
+      <MobileAudioMemoProvider graph={GRAPH}>
+        <MobileShell />
+        {probeRoute ? <NavProbe to={probeRoute} /> : null}
+      </MobileAudioMemoProvider>
+    </AllSearchProvider>
   )
   // The app runs under StrictMode (main.tsx); opt in where a test guards
   // against impure updaters (dev double-invocation caught a double-pop once).
@@ -176,6 +181,13 @@ function stackLayers(view: BrowserView): HTMLElement[] {
 }
 
 /** The screen the user sees — the one stack layer not hidden as a11y-inert. */
+/**
+ * The dot icon of All's Chat button, shown while a conversation is in progress.
+ */
+function chatButtonDot(view: BrowserView): Element | null {
+  return view.container.querySelector('[aria-label="Chat"] .lucide-message-square-dot')
+}
+
 function visibleLayer(view: BrowserView): HTMLElement {
   const visible = stackLayers(view).find((layer) => layer.getAttribute('aria-hidden') !== 'true')
   if (!visible) {
@@ -681,24 +693,6 @@ describe('MobileShell', () => {
     await expect.element(view.getByRole('navigation', { name: 'Sections' })).toBeVisible()
   })
 
-  it('renders a search entry as the All tab with the query seeded', async () => {
-    const user = userEvent
-    const view = await mount({ kind: 'search', query: 'meeting' })
-
-    const box = view.getByRole('searchbox', { name: 'Search notes' })
-    await waitFor(() => {
-      expect((box.element() as HTMLInputElement).value).toBe('meeting')
-    })
-    expect(view.getByRole('button', { name: 'All' }).element().getAttribute('aria-current')).toBe(
-      'page',
-    )
-
-    await user.click(view.getByRole('button', { name: 'Clear search' }))
-
-    expect((box.element() as HTMLInputElement).value).toBe('')
-    expect(view.getByRole('button', { name: 'Clear search' }).query()).toBeNull()
-  })
-
   it('has three tabs: Daily, All and Tasks (Chat lives in All)', async () => {
     const view = await mount({ kind: 'today' })
 
@@ -726,11 +720,11 @@ describe('MobileShell', () => {
       { type: 'complete', messages: [{ role: 'assistant', content: reply }] },
     ])
     core = createTestCoreServices({
-      database: createWasmTestDatabaseService(),
+      database: createTestDatabaseService(),
       secretStore: createTestSecretStoreService({ [aiKeySecretName(model.id)]: 'sk-test' }),
       chatEngine,
     })
-    appServices = createTestAppServices(core)
+    appServices = createWebTestAppServices(core)
     core.clock.setNow(Date.now())
     appServices.systemPreferences.reducedMotion.set(true)
     const view = await mount({ kind: 'allNotes', tag: null }, undefined, {
@@ -745,6 +739,51 @@ describe('MobileShell', () => {
       expect(visibleLayer(view).querySelector('h1')?.textContent).toBe('Chat')
     })
   }
+
+  it('Quick Open shows the results over the screen and ⌘Return lands on All', async () => {
+    const view = await mount({ kind: 'today' })
+    await act(() => quickOpenVisible.set(true))
+    const input = view.getByRole('searchbox', { name: 'Quick Open' })
+    await userEvent.fill(input, 'meeting')
+    await expect.element(view.getByRole('button', { name: 'See all in All ⌘↩' })).toBeVisible()
+
+    await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
+
+    expect(view.getByRole('dialog', { name: 'Quick Open' }).query()).toBeNull()
+    const box = view.getByRole('searchbox', { name: 'Search notes' })
+    await waitFor(() => {
+      expect((box.element() as HTMLInputElement).value).toBe('meeting')
+    })
+    expect(view.getByRole('button', { name: 'All' }).element().getAttribute('aria-current')).toBe(
+      'page',
+    )
+  })
+
+  it('Quick Open closes on Escape and leaves the screen as it was', async () => {
+    const view = await mount({ kind: 'tasks' })
+    await act(() => quickOpenVisible.set(true))
+    await expect.element(view.getByRole('searchbox', { name: 'Quick Open' })).toHaveFocus()
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(view.getByRole('dialog', { name: 'Quick Open' }).query()).toBeNull()
+    expect(view.getByRole('button', { name: 'Tasks' }).element().getAttribute('aria-current')).toBe(
+      'page',
+    )
+  })
+
+  it('with no AI provider, the Ask row leads to Settings', async () => {
+    const view = await mount({ kind: 'allNotes', tag: null })
+    const box = view.getByRole('searchbox', { name: 'Search notes' })
+    await userEvent.fill(box, 'pricing')
+    await expect.element(view.getByText('Add an AI provider in Settings to ask')).toBeVisible()
+
+    await userEvent.click(view.getByRole('button', { name: /^Ask “pricing”/ }))
+
+    await waitFor(() => {
+      expect(visibleLayer(view).querySelector('h1')?.textContent).toBe('Settings')
+    })
+  })
 
   it('asks the search text from All: Chat opens over All, Back returns to the results', async () => {
     const user = userEvent
@@ -778,8 +817,8 @@ describe('MobileShell', () => {
       expect((box.element() as HTMLInputElement).value).toBe('pricing')
       expect(visibleLayer(view).contains(box.element())).toBe(true)
     })
-    // The header's Chat button now resumes that conversation.
-    await expect.element(view.getByTestId('chat-in-progress')).toBeInTheDocument()
+    // The header's Chat button now resumes that conversation, marked with a dot.
+    await waitFor(() => expect(chatButtonDot(view)).not.toBeNull())
 
     // A second tap on the same Ask reopens that answer instead of paying for
     // the question twice.
@@ -792,7 +831,7 @@ describe('MobileShell', () => {
     const user = userEvent
     const { view } = await mountAllWithChatProvider('unused')
     // No conversation yet, so nothing to mark as in progress.
-    expect(view.getByTestId('chat-in-progress').query()).toBeNull()
+    expect(chatButtonDot(view)).toBeNull()
 
     await user.click(view.getByRole('button', { name: 'Chat', exact: true }))
 
@@ -902,6 +941,71 @@ describe('MobileShell', () => {
     await waitFor(() => expect(visibleLayer(view).contains(box.element())).toBe(true))
   })
 
+  it('tapping Tasks from another tab returns to the note it was left on, over the list', async () => {
+    const user = userEvent
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'tasks' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await user.click(view.getByRole('button', { name: 'probe-navigate' }))
+    await expect.element(view.getByRole('heading', { name: 'Edit note' })).toBeVisible()
+
+    await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
+    await waitFor(() => expect(shownMonth(view)).not.toBeNull())
+    await user.click(view.getByRole('button', { name: 'Tasks' }))
+
+    await waitFor(() => {
+      expect(
+        page.elementLocator(visibleLayer(view)).getByTestId('fake-editor').element().textContent,
+      ).toContain('agenda')
+    })
+    expect(view.getByRole('button', { name: 'Tasks' }).element().getAttribute('aria-current')).toBe(
+      'page',
+    )
+    // The task list sits underneath, so Back lands there.
+    await user.click(page.elementLocator(visibleLayer(view)).getByRole('button', { name: 'Back' }))
+    const box = view.getByRole('searchbox', { name: 'Search tasks' })
+    await waitFor(() => expect(visibleLayer(view).contains(box.element())).toBe(true))
+  })
+
+  it('keeps the Tasks search when switching tabs and back', async () => {
+    const user = userEvent
+    const view = await mount({ kind: 'tasks' })
+    await user.fill(view.getByRole('searchbox', { name: 'Search tasks' }), 'milk')
+
+    await user.click(view.getByRole('button', { name: 'All' }))
+    await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
+    await user.click(view.getByRole('button', { name: 'Tasks' }))
+
+    await expect.element(view.getByRole('searchbox', { name: 'Search tasks' })).toHaveValue('milk')
+  })
+
+  it('restores the All list scroll when switching tabs and back', async () => {
+    const user = userEvent
+    vi.spyOn(core.search, 'searchWithFilters').mockResolvedValue(
+      Array.from({ length: 40 }, (_, index) => ({
+        path: `notes/note-${index}.md`,
+        title: `Note ${index}`,
+        highlightedTitle: `Note ${index}`,
+        dailyDate: null,
+        snippet: null,
+        preview: '',
+        mtime: 0,
+        isPinned: false,
+      })),
+    )
+    const view = await mount({ kind: 'allNotes', tag: null })
+    const list = (): HTMLElement => {
+      return visibleLayer(view).querySelector<HTMLElement>('ul')!.parentElement!
+    }
+    await waitFor(() => expect(list().scrollHeight).toBeGreaterThan(list().clientHeight + 300))
+    await scrollElement({ element: list(), top: 300 })
+
+    await user.click(view.getByRole('button', { name: 'Tasks' }))
+    await expect.element(view.getByRole('searchbox', { name: 'Search tasks' })).toBeVisible()
+    await user.click(view.getByRole('button', { name: 'All' }))
+
+    await waitFor(() => expect(list().scrollTop).toBe(300))
+  })
+
   it('back from a cold note entry lands on today', async () => {
     const user = userEvent
     core.noteFile.set('notes/meeting-notes.md', 'agenda')
@@ -951,6 +1055,13 @@ describe('MobileStack transitions & back pager', () => {
       throw new Error('no mobile pager')
     }
     return element
+  }
+
+  /**
+   * The pager's offset when it rests on the current page.
+   */
+  function restLeft(element: HTMLElement): number {
+    return element.scrollWidth - element.clientWidth
   }
 
   const today = (): string => formatMonthLabel(getYearMonth(getIsoToday()))
@@ -1008,6 +1119,22 @@ describe('MobileStack transitions & back pager', () => {
     expect(layers).toHaveLength(1)
     expect(layers[0]!.className).not.toContain('mobile-stack-slide-in')
     expect(view.container.querySelector('.mobile-stack-scrim')).toBeNull()
+  })
+
+  it('leaves All’s open note for another tab in place, without a slide-out', async () => {
+    const user = userEvent
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount(
+      { kind: 'allNotes', tag: null },
+      { kind: 'note', path: 'notes/meeting-notes.md' },
+    )
+    await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
+    await pushProbeNote(view)
+
+    await user.click(view.getByRole('button', { name: 'Tasks' }))
+
+    await waitFor(() => expect(stackLayers(view)).toHaveLength(1))
+    expect(view.container.querySelector('.mobile-stack-slide-out')).toBeNull()
   })
 
   it('returns to All’s open note in place, over the list, like any tab switch', async () => {
@@ -1105,7 +1232,7 @@ describe('MobileStack transitions & back pager', () => {
 
     const scroller = pager(view)
     expect(stackLayers(view)).toHaveLength(2)
-    expect(scroller.scrollLeft).toBe(scroller.clientWidth)
+    expect(scroller.scrollLeft).toBe(restLeft(scroller))
     expect(visibleLayer(view).getBoundingClientRect().left).toBe(
       scroller.getBoundingClientRect().left,
     )
@@ -1161,7 +1288,7 @@ describe('MobileStack transitions & back pager', () => {
 
     const scroller = pager(view)
     await scrollElement({ element: scroller, left: 0 })
-    await waitFor(() => expect(scroller.scrollLeft).toBe(scroller.clientWidth))
+    await waitFor(() => expect(scroller.scrollLeft).toBe(restLeft(scroller)))
     expect(view.getByRole('heading').element().textContent).toBe('Edit note')
     expect(stackLayers(view)).toHaveLength(2)
   })
@@ -1174,7 +1301,7 @@ describe('MobileStack transitions & back pager', () => {
     const scroller = pager(view)
     await touch(scroller, 'start')
     await scrollElement({ element: scroller, left: 0 })
-    await scrollElement({ element: scroller, left: scroller.clientWidth })
+    await scrollElement({ element: scroller, left: restLeft(scroller) })
     await touch(scroller, 'end')
     await sleep(200)
     expect(view.getByRole('heading').element().textContent).toBe('Edit note')
@@ -1205,6 +1332,87 @@ describe('MobileStack transitions & back pager', () => {
       expect(scroller.scrollLeft).toBe(0)
     })
     await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
+  })
+
+  it('pops once the card is off screen, short of the snap point', async () => {
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await pushProbeNote(view)
+
+    const scroller = pager(view)
+    // Holds the scroll where a release leaves it, before the snap ends.
+    scroller.style.scrollSnapType = 'none'
+    await scrollElement({ element: scroller, left: BACK_PAGER_OVERSHOOT_PX / 2, touch: true })
+    await waitFor(() => expect(shownMonth(view)).toBe(today()))
+    scroller.style.removeProperty('scroll-snap-type')
+  })
+
+  it.each([
+    { stop: 0.75, lands: 'note' },
+    { stop: 0.25, lands: 'today' },
+  ])(
+    'scrolls a pager stopped at $stop of its range on to the $lands page',
+    async ({ stop, lands }) => {
+      core.noteFile.set('notes/meeting-notes.md', 'agenda')
+      const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+      await pushProbeNote(view)
+
+      const scroller = pager(view)
+      // Stands in for a touch that stops the snap: WebKit then snaps no more.
+      scroller.style.scrollSnapType = 'none'
+      await scrollElement({
+        element: scroller,
+        left: Math.round(restLeft(scroller) * stop),
+        touch: true,
+      })
+      if (lands === 'note') {
+        await waitFor(() => expect(scroller.scrollLeft).toBe(restLeft(scroller)))
+        expect(view.getByRole('heading').element().textContent).toBe('Edit note')
+      } else {
+        await waitFor(() => expect(shownMonth(view)).toBe(today()))
+      }
+      scroller.style.removeProperty('scroll-snap-type')
+    },
+  )
+
+  it('takes no hits from the release of a swipe until the pager settles', async () => {
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await pushProbeNote(view)
+
+    const scroller = pager(view)
+    expect(getComputedStyle(scroller).pointerEvents).toBe('auto')
+    // Holds the scroll where the finger leaves it.
+    scroller.style.scrollSnapType = 'none'
+    await touch(scroller, 'start')
+    await act(async () => {
+      scroller.scrollTo({ left: restLeft(scroller) - 30, behavior: 'instant' })
+      await new Promise((resolve) => scroller.addEventListener('scroll', resolve, { once: true }))
+    })
+    expect(getComputedStyle(scroller).pointerEvents).toBe('auto')
+
+    await touch(scroller, 'end')
+    expect(getComputedStyle(scroller).pointerEvents).toBe('none')
+    expect(getComputedStyle(visibleLayer(view)).pointerEvents).toBe('none')
+
+    scroller.style.removeProperty('scroll-snap-type')
+    await act(() => {
+      scroller.dispatchEvent(new Event('scrollend'))
+    })
+    await waitFor(() => expect(getComputedStyle(scroller).pointerEvents).toBe('auto'))
+    expect(scroller.scrollLeft).toBe(restLeft(scroller))
+    expect(view.getByRole('heading').element().textContent).toBe('Edit note')
+  })
+
+  it('keeps taking hits after a tap on the pager', async () => {
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await pushProbeNote(view)
+
+    const scroller = pager(view)
+    await touch(scroller, 'start')
+    await touch(scroller, 'end')
+    expect(getComputedStyle(scroller).pointerEvents).toBe('auto')
   })
 
   it('passes a tap on the edge strip to the back button under it', async () => {
@@ -1289,8 +1497,8 @@ describe('MobileStack transitions & back pager', () => {
       lowest = Math.min(lowest, scroller.scrollLeft)
     })
     await mouseDragFromStrip(view, 60)
-    await waitFor(() => expect(scroller.scrollLeft).toBe(scroller.clientWidth))
-    expect(lowest).toBeLessThan(scroller.clientWidth - 30)
+    await waitFor(() => expect(scroller.scrollLeft).toBe(restLeft(scroller)))
+    expect(lowest).toBeLessThan(restLeft(scroller) - 30)
     await sleep(200)
     expect(view.getByRole('heading').element().textContent).toBe('Edit note')
     expect(stackLayers(view)).toHaveLength(2)
@@ -1314,16 +1522,146 @@ describe('MobileStack transitions & back pager', () => {
     )
     expect(stackLayers(view)).toHaveLength(2)
     const scroller = pager(view)
-    expect(scroller.scrollLeft).toBe(scroller.clientWidth)
+    expect(scroller.scrollLeft).toBe(restLeft(scroller))
+  })
+
+  /**
+   * Scrolls `element` into view and drags one finger horizontally by `dx`
+   * from near its left edge. The touches go through the compositor, so
+   * `touch-action` applies.
+   */
+  async function touchDrag(element: Element, dx: number): Promise<void> {
+    element.scrollIntoView({ block: 'center' })
+    await sleep(50)
+    const session = cdp()
+    const rect = element.getBoundingClientRect()
+    const x = rect.left + Math.min(40, rect.width / 2)
+    const y = rect.top + rect.height / 2
+    const at = (offset: number) => [{ x: x + offset, y, id: 1 }]
+    await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(0) })
+    for (let step = 1; step <= 10; step++) {
+      await sleep(16)
+      await session.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: at((dx * step) / 10),
+      })
+    }
+    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  }
+
+  it.skipIf(server.browser !== 'chromium')(
+    'pops on a finger drag from a settings row, not from its switch',
+    async () => {
+      const view = await mount({ kind: 'settings', page: 'main' })
+      const toggle = await waitFor(() => {
+        return view.getByRole('switch', { name: 'Smooth caret animation' }).element()
+      })
+      const checked = toggle.getAttribute('aria-checked')
+
+      await touchDrag(toggle, 300)
+      await sleep(300)
+      expect(pager(view).scrollLeft).toBe(restLeft(pager(view)))
+      expect(toggle.getAttribute('aria-checked')).toBe(checked)
+
+      await touchDrag(view.getByRole('button', { name: 'Add AI provider' }).element(), 300)
+      await waitFor(() => expect(shownMonth(view)).toBe(today()))
+    },
+  )
+
+  /**
+   * Which element a finger drag from each part of a stacked screen moves:
+   * the back pager, a horizontal scroller inside the screen, or nothing.
+   */
+  it.skipIf(server.browser !== 'chromium').each([
+    { start: 'background', dx: 120, moves: 'pager' },
+    { start: 'row', dx: 120, moves: 'pager' },
+    { start: 'row-label', dx: 120, moves: 'pager' },
+    { start: 'button', dx: 120, moves: 'nothing' },
+    { start: 'switch-thumb', dx: 120, moves: 'nothing' },
+    { start: 'row-switch-thumb', dx: 120, moves: 'nothing' },
+    { start: 'editor-text', dx: 120, moves: 'nothing' },
+    { start: 'code', dx: -120, moves: 'code' },
+    { start: 'code', dx: 120, moves: 'nothing' },
+    { start: 'swipe-row', dx: -120, moves: 'swipe-row' },
+    { start: 'swipe-row', dx: 120, moves: 'nothing' },
+  ])('moves the $moves on a drag of $dx px from the $start', async ({ start, dx, moves }) => {
+    const view = await renderInApp(
+      <div className="mobile-pager flex h-[600px] w-[375px] overflow-x-auto overscroll-none">
+        <div className="h-full w-full shrink-0" />
+        <div className="mobile-pager-content h-full w-full shrink-0">
+          <main className="h-full overflow-y-auto">
+            <div data-start="background" className="h-12" />
+            <button type="button" data-back-swipe="on" className="block h-12 w-full">
+              <span data-start="row-label">Row</span>
+            </button>
+            <button type="button" data-start="button" className="block h-12 w-full">
+              Button
+            </button>
+            <button type="button" role="switch" aria-checked className="block h-12 w-full">
+              <span data-start="switch-thumb">Thumb</span>
+            </button>
+            <label data-back-swipe="on" data-start="row" className="flex h-12">
+              <span className="w-1/2">Switch row</span>
+              <button type="button" role="switch" aria-checked className="w-1/2">
+                <span data-start="row-switch-thumb">Thumb</span>
+              </button>
+            </label>
+            <div contentEditable suppressContentEditableWarning>
+              <p data-start="editor-text" className="h-12">
+                Text
+              </p>
+              <pre data-scroll-x data-start="code" className="h-12 overflow-x-auto">
+                {'x'.repeat(300)}
+              </pre>
+            </div>
+            <div data-scroll-x className="flex h-12 overflow-x-auto">
+              <button type="button" data-start="swipe-row" className="w-full shrink-0">
+                Surface
+              </button>
+              <div className="w-36 shrink-0" />
+            </div>
+          </main>
+        </div>
+      </div>,
+      { core, appServices, graph: GRAPH, route: { kind: 'today' } },
+    )
+    const find = (selector: string) => view.container.querySelector<HTMLElement>(selector)!
+    const scrollers = {
+      pager: find('.mobile-pager'),
+      code: find('[data-start="code"]'),
+      'swipe-row': find('[data-start="swipe-row"]').parentElement!,
+    }
+    scrollers.pager.scrollLeft = scrollers.pager.clientWidth
+    const before = Object.fromEntries(
+      Object.entries(scrollers).map(([name, element]) => [name, element.scrollLeft]),
+    )
+
+    await touchDrag(find(`[data-start="${start}"]`), dx)
+    await sleep(300)
+
+    const moved = Object.entries(scrollers)
+      .filter(([name, element]) => Math.abs(element.scrollLeft - before[name]!) > 4)
+      .map(([name]) => name)
+    expect(moved).toEqual(moves === 'nothing' ? [] : [moves])
   })
 
   it('swipes a cold note entry back to today', async () => {
     core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'note', path: 'notes/meeting-notes.md' })
     await waitFor(() => expect(stackLayers(view)).toHaveLength(2))
-    expect(pager(view).scrollLeft).toBe(pager(view).clientWidth)
+    expect(pager(view).scrollLeft).toBe(restLeft(pager(view)))
 
     await scrollElement({ element: pager(view), left: 0, touch: true })
     await waitFor(() => expect(shownMonth(view)).toBe(today()))
+  })
+
+  it('swipes a cold settings page back to Settings, where its Back lands', async () => {
+    const view = await mount({ kind: 'settings', page: 'licenses' })
+    await waitFor(() => expect(stackLayers(view)).toHaveLength(2))
+
+    await scrollElement({ element: pager(view), left: 0, touch: true })
+    await waitFor(() => {
+      expect(view.appServices.navigation.get().route).toEqual({ kind: 'settings', page: 'main' })
+    })
   })
 })

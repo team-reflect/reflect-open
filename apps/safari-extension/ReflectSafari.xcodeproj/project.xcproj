@@ -10,6 +10,12 @@
       "Base",
     ],
   },
+  "packages": [
+    {
+      "kind": "local",
+      "path": "../../apple",
+    },
+  ],
   "files": [
     { "kind": "folder", "path": "Sources", "target-membership": [ "SafariExtension" ] },
     {
@@ -29,6 +35,14 @@
       "build-phases": [
         "compile-sources",
         "resources",
+        "frameworks",
+      ],
+      "package-product-members": [
+        {
+          "package": "apple",
+          "product-name": "TypesShared",
+          "build-phase": { "build-phase": "frameworks" },
+        },
       ],
       "build-settings": {
         "CODE_SIGNING_ALLOWED": "NO",
@@ -42,6 +56,7 @@
         "PRODUCT_BUNDLE_IDENTIFIER": "$(REFLECT_APP_IDENTIFIER).safari-extension",
         "PRODUCT_NAME": "SafariExtension",
         "SDKROOT": "macosx",
+        "SWIFT_TREAT_WARNINGS_AS_ERRORS": "YES",
         "SWIFT_VERSION": "5.0",
       },
     },

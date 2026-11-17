@@ -17,7 +17,7 @@ export function initialRouteForDeepLink(link: string | null): Route | null {
     return null
   }
   if (parsed.kind === 'navigate') {
-    return parsed.place
+    return parsed.place.kind === 'search' ? null : parsed.place
   }
   if (parsed.kind === 'openNote' && (isNotePath(parsed.target) || isDaily(parsed.target))) {
     return routeForPath(parsed.target)
@@ -27,16 +27,18 @@ export function initialRouteForDeepLink(link: string | null): Route | null {
 
 /**
  * The route a resolved deep link navigates to, or null when it names none.
+ * A search link names no route: it is an intent that the router hands to
+ * {@link DeepLinkIo.search}.
  */
 export function routeForDeepLinkTarget(target: DeepLinkTarget): Route | null {
   switch (target.kind) {
     case 'today':
     case 'tasks':
     case 'daily':
-    case 'search':
       return target
     case 'note':
       return routeForPath(target.path)
+    case 'search':
     case 'capture':
     case 'none':
       return null

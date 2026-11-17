@@ -56,7 +56,7 @@ extern "C" {
 
 // Creates a core. `config_json` is a NUL-terminated JSON object, or NULL
 // for an empty one, with the optional string keys `documentDir`,
-// `appDataDir` (or `dataDir`) and `userAgent`; other keys are ignored. `ctx`
+// `appDataDir` and `userAgent`; other keys are ignored. `ctx`
 // is passed to `on_event`, `on_main` and `on_open_url`. On failure it
 // returns NULL and, when `error_out` is not NULL, stores an error JSON
 // `{"kind":...,"message":...}` there for `reflect_core_string_free`.
@@ -99,11 +99,8 @@ void reflect_core_dispatch(const ReflectCore *core,
 // Resolves a `reflect-asset` request and calls `reply` once with a JSON
 // object. `path` is the percent-decoded request path, `query` the query
 // string and `range` the `Range` header; `query` and `range` may be NULL. The
-// reply is `{"path":...,"mime":...,"total":...,"range":[first,last]}` with
-// the absolute file path, the `Content-Type`, the file length and the
-// selected bytes (`null` for the whole file), or
-// `{"status":...,"total":...}` with the HTTP status to refuse the request
-// with. The function copies every input before it returns.
+// reply is an [`AssetResolveReply`]. The function copies every input before
+// it returns.
 //
 // # Safety
 //

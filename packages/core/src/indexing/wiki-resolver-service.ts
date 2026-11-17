@@ -1,21 +1,11 @@
+import type { WikiClaimMatch } from '@reflect/types'
 import { normalizeWikiTarget, resolved, unresolved, type Resolution } from '../markdown/index.ts'
 import type { DatabaseService } from './database-service.ts'
 import { verifyWikiSuggestionAddresses } from './queries-shared.ts'
 import { rankWikiSuggestions, type WikiLinkSuggestion } from './suggest.ts'
 
 /**
- * The winning tier's claimants for a folded key, preserving ambiguity.
- */
-export interface WikiTargetMatch {
-  /**
-   * One of `CLAIM_TIER`, or {@link UNCLAIMED_TIER} with no paths.
-   */
-  readonly tier: number
-  readonly paths: readonly string[]
-}
-
-/**
- * `WikiTargetMatch.tier` when nothing claims the key (never stored).
+ * `WikiClaimMatch.tier` when nothing claims the key (never stored).
  */
 export const UNCLAIMED_TIER = 0
 
@@ -44,7 +34,7 @@ export interface WikiResolverService {
    * miss need to distinguish one existing note from several notes claiming
    * the same spelling.
    */
-  findWikiTargetMatch(key: string): Promise<WikiTargetMatch>
+  findWikiTargetMatch(key: string): Promise<WikiClaimMatch>
   /**
    * Every indexed note whose folded path matches, sorted.
    */
@@ -73,96 +63,49 @@ class WikiResolverServiceImpl implements WikiResolverService {
   }
 
   async resolveWikiTarget(target: string): Promise<Resolution> {
-    const { db } = this.#deps.database
     const normalized = normalizeWikiTarget(target)
     if (normalized.key === '') {
       return unresolved(normalized.raw)
     }
-    const winner = await db
-      .selectFrom('noteKeys')
-      .where('key', '=', normalized.key)
-      .select('notePath')
-      .executeTakeFirst()
-    return winner?.notePath ? resolved(winner.notePath) : unresolved(normalized.raw)
+    const path = await this.#deps.database.read('index_resolve_wiki', { key: normalized.key })
+    return path === null || path === '' ? unresolved(normalized.raw) : resolved(path)
   }
 
-  async findWikiTargetMatch(key: string): Promise<WikiTargetMatch> {
-    const { db } = this.#deps.database
+  async findWikiTargetMatch(key: string): Promise<WikiClaimMatch> {
     if (key === '') {
       return { tier: UNCLAIMED_TIER, paths: [] }
     }
-    const rows = await db
-      .selectFrom('noteClaims')
-      .where('key', '=', key)
-      .select(['notePath', 'tier'])
-      .orderBy('tier')
-      .orderBy('notePath')
-      .execute()
-    const tier = rows[0]?.tier
-    return tier === undefined
-      ? { tier: UNCLAIMED_TIER, paths: [] }
-      : {
-          tier,
-          paths: [...new Set(rows.filter((row) => row.tier === tier).map((row) => row.notePath))],
-        }
+    const match = await this.#deps.database.read('index_wiki_target_match', { key })
+    return match ?? { tier: UNCLAIMED_TIER, paths: [] }
   }
 
   async findNotesByPathKey(pathKey: string): Promise<string[]> {
-    const { db } = this.#deps.database
     if (pathKey === '') {
       return []
     }
-    const rows = await db
-      .selectFrom('notes')
-      .where('pathKey', '=', pathKey)
-      .select('path')
-      .distinct()
-      .orderBy('path')
-      .execute()
-    return rows.map((row) => row.path)
+    return await this.#deps.database.read('index_notes_by_path_key', { pathKey })
   }
 
   async getLinkSources(targetKey: string): Promise<string[]> {
-    const { db } = this.#deps.database
-    const rows = await db
-      .selectFrom('links')
-      .where('targetKey', '=', targetKey)
-      .select('sourcePath')
-      .distinct()
-      .orderBy('sourcePath')
-      .execute()
-    return rows.map((row) => row.sourcePath)
+    return await this.#deps.database.read('index_link_sources', { targetKey })
   }
 
   async getPathLinkSources(targetPathKey: string): Promise<string[]> {
-    const { db } = this.#deps.database
-    const rows = await db
-      .selectFrom('links')
-      .where('targetPathKey', '=', targetPathKey)
-      .select('sourcePath')
-      .distinct()
-      .orderBy('sourcePath')
-      .execute()
-    return rows.map((row) => row.sourcePath)
+    return await this.#deps.database.read('index_path_link_sources', { targetPathKey })
   }
 
   async getWikiAddressForPath(path: string): Promise<WikiLinkSuggestion | null> {
-    const { db } = this.#deps.database
-    const note = await db
-      .selectFrom('notes')
-      .where('path', '=', path)
-      .where('kind', '!=', 'template')
-      .select(['path', 'title', 'titleKey', 'dailyDate', 'mtime'])
-      .executeTakeFirst()
-    if (note === undefined) {
+    const { database } = this.#deps
+    const note = await database.read('index_wiki_address_note', { path })
+    if (note === null) {
       return null
     }
-    const candidate = rankWikiSuggestions('', [{ ...note, linkCount: 0 }], [], 1)[0]
+    const candidate = rankWikiSuggestions('', [note], [], 1)[0]
     if (candidate === undefined) {
       return null
     }
     const result = await verifyWikiSuggestionAddresses(
-      db,
+      database,
       [candidate],
       [note.titleKey],
       1,

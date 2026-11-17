@@ -1,10 +1,6 @@
+import type { NoteRow } from '@reflect/types'
 import { type MaybePromise, getYearMonth } from '@reflect/utils'
-import {
-  type DailyNoteService,
-  type NoteRow,
-  type RetrievalService,
-  formatDayLabel,
-} from '@reflect/core'
+import { type DailyNoteService, type RetrievalService, formatDayLabel } from '@reflect/core'
 import { deepLinkForRoute, formatMonthLabel } from '@reflect/app'
 import { createTestWindowService } from '@reflect/app/testing'
 import { page, userEvent } from 'vitest/browser'
@@ -12,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestNoteFileService,
   createTestRetrievalService,
@@ -23,7 +20,6 @@ import { useRouterState } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DailyContextSidebar } from './daily-context-sidebar.tsx'
 import { sleep } from '@ocavue/utils'
 
@@ -54,7 +50,7 @@ function sidebar(date: string): ReactNode {
 function createCore(storage: TestStorageService = createTestStorageService()) {
   noteFile = createTestNoteFileService({ files: { 'daily/2026-06-09.md': dailySource } })
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     noteFile,
     storage,
     retrieval: createTestRetrievalService({ relatedNotes }),

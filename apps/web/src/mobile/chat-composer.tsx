@@ -52,7 +52,7 @@ export function MobileChatComposer(): ReactElement {
   }
 
   return (
-    <div className="shrink-0 border-t border-border px-safe-offset-3 pb-2 pt-2">
+    <div className="shrink-0 border-t border-border px-safe-offset-3 pt-2 pb-chrome-safe-unless-keyboard-offset-2">
       {attachments.length > 0 ? (
         <AttachmentGroup className="flex-wrap gap-2 overflow-visible pb-1">
           {attachments.map((attachment) => (

@@ -1,4 +1,14 @@
 import { isIsoDate } from '@reflect/utils'
+import type {
+  IndexedAlias,
+  IndexedClaim,
+  IndexedEmail,
+  IndexedLink,
+  IndexedNote,
+  IndexedTag,
+  IndexedTask,
+  NoteKind,
+} from '@reflect/types'
 import { z } from 'zod'
 import {
   markdownNoteReference,
@@ -29,11 +39,7 @@ import { serializeWikiSuggestionAddress } from './suggest.ts'
  * the row-set the Rust `index_apply` command upserts. Pure — no IO — so it's the
  * unit-testable heart of the pipeline.
  *
- * The zod schemas below are the single source of truth for the payload shape —
- * the TS types are inferred from them. They mirror the serde `IndexedNote` struct
- * in `crates/index/src/write.rs` field-for-field (camelCase ↔ serde
- * `rename_all = "camelCase"`); a change on either side must be mirrored on the
- * other, and {@link indexedNoteSchema} is the contract a drift test can assert.
+ * The payload types are generated from `crates/types/src/index.rs`.
  */
 
 /**
@@ -114,52 +120,16 @@ export const CLAIM_TIER = {
   basename: 4,
 } as const
 
-export const indexedClaimSchema = z.object({
-  /** Folded spelling this note answers to. */
-  key: z.string(),
-  /** One of {@link CLAIM_TIER}. */
-  tier: z.number().int().min(CLAIM_TIER.dailyDate).max(CLAIM_TIER.basename),
-})
-export type IndexedClaim = z.infer<typeof indexedClaimSchema>
-
-export const indexedLinkSchema = z.object({
-  kind: z.enum(['wiki', 'md']),
-  targetRaw: z.string(),
-  /**
-   * Name key the link answers to: for wiki links, `wikiNoteReference`'s
-   * folded key ('' when the target has no name reading, i.e. a rooted path,
-   * `#self`, or a refused URI); for md links, the lowercased href.
-   */
-  targetKey: z.string(),
-  /** Folded vault path when the link names a file; null when it names a note. */
-  targetPathKey: z.string().nullable(),
-  alias: z.string().nullable(),
-  posFrom: z.number(),
-  posTo: z.number(),
-})
-export type IndexedLink = z.infer<typeof indexedLinkSchema>
-
-export const indexedTagSchema = z.object({
-  /** Display casing (first-seen in the document). */
-  tag: z.string(),
-  /** Case-folded match key ({@link foldTag}) — what queries compare against. */
-  tagKey: z.string(),
-})
-export type IndexedTag = z.infer<typeof indexedTagSchema>
-
-export const indexedAliasSchema = z.object({
-  alias: z.string(),
-  aliasKey: z.string(),
-})
-export type IndexedAlias = z.infer<typeof indexedAliasSchema>
-
-export const indexedEmailSchema = z.object({
-  /** Display casing (as written in the field bullet). */
-  email: z.string(),
-  /** Case-folded match key ({@link canonicalEmail}) — what resolution compares against. */
-  emailKey: z.string(),
-})
-export type IndexedEmail = z.infer<typeof indexedEmailSchema>
+export type {
+  IndexedAlias,
+  IndexedClaim,
+  IndexedEmail,
+  IndexedLink,
+  IndexedNote,
+  IndexedTag,
+  IndexedTask,
+  NoteKind,
+}
 
 const taskBreadcrumbsSchema = z.array(z.string()).readonly()
 
@@ -175,68 +145,6 @@ export function encodeTaskBreadcrumbs(breadcrumbs: readonly string[]): string {
 export function decodeTaskBreadcrumbs(column: string): readonly string[] {
   return taskBreadcrumbsSchema.parse(JSON.parse(column))
 }
-
-export const indexedTaskSchema = z.object({
-  /** The task's address in the note body's AST (`encodeTaskPath`) — the row PK with `path`. */
-  astPath: z.string(),
-  /** The task's first paragraph as Markdown, marker excluded. */
-  markdown: z.string(),
-  /** The headings above the task, then its ancestor list items' first paragraphs, as Markdown, outermost first. */
-  breadcrumbs: taskBreadcrumbsSchema,
-  checked: z.boolean(),
-  /** Explicit due date (first `[[YYYY-MM-DD]]` in the item), or null — drives Overdue. */
-  dueDate: z.string().nullable(),
-})
-export type IndexedTask = z.infer<typeof indexedTaskSchema>
-
-/** What a `notes` row is: part of the graph (daily/note) or a template. */
-export const noteKindSchema = z.enum(['daily', 'note', 'template'])
-export type NoteKind = z.infer<typeof noteKindSchema>
-
-export const indexedNoteSchema = z.object({
-  path: z.string(),
-  id: z.string().nullable(),
-  title: z.string(),
-  titleKey: z.string(),
-  /** ASCII-folded graph path: what a path-qualified link joins against. */
-  pathKey: z.string(),
-  /** Derived from the path; templates are excluded from note surfaces. */
-  kind: noteKindSchema,
-  dailyDate: z.string().nullable(),
-  isPrivate: z.boolean(),
-  isPinned: z.boolean(),
-  /** Explicit pin order (`pinned: <n>`); null for bare `pinned: true`. */
-  pinnedOrder: z.number().nullable(),
-  /** The note is not blank: it has display text, or a body the FTS can match. */
-  hasContent: z.boolean(),
-  /** The published gist's html url, or null when the note has none. */
-  gistUrl: z.string().nullable(),
-  /** The body changed since it was last published to the gist. */
-  gistStale: z.boolean(),
-  fileHash: z.string(),
-  mtime: z.number(),
-  text: z.string(),
-  /**
-   * Description text of the note's referenced assets (Plan 20), folded into the
-   * FTS `body` only — not the preview or the note text AI reads (chat reaches
-   * descriptions solely via the read_assets tool and its live privacy gate).
-   * Empty when the note has no described assets.
-   */
-  assetText: z.string(),
-  /** The All Notes row snippet, derived once here rather than per query. */
-  preview: z.string(),
-  links: z.array(indexedLinkSchema),
-  tags: z.array(indexedTagSchema),
-  aliases: z.array(indexedAliasSchema),
-  /** Every folded spelling this note answers to (see `note_claims`). */
-  claims: z.array(indexedClaimSchema),
-  /** Emails the note owns via `- Email:` contact-field bullets. */
-  emails: z.array(indexedEmailSchema),
-  assets: z.array(z.string()),
-  /** Reflect task rows for the Tasks projection (Plan 18). */
-  tasks: z.array(indexedTaskSchema),
-})
-export type IndexedNote = z.infer<typeof indexedNoteSchema>
 
 /**
  * The `aliases` projection: `aliases:` frontmatter verbatim, then the linkable
@@ -394,7 +302,7 @@ export function buildIndexedNote(
     tasks: parsed.tasks.map((task) => ({
       astPath: encodeTaskPath(task.astPath),
       markdown: task.markdown,
-      breadcrumbs: task.breadcrumbs,
+      breadcrumbs: [...task.breadcrumbs],
       checked: task.checked,
       dueDate: task.dueDate,
     })),

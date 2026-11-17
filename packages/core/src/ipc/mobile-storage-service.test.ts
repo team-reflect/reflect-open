@@ -24,11 +24,4 @@ describe('createMobileStorageService', () => {
     await expect(storage.createGraph(graph.root)).resolves.toEqual(graph)
     expect(ipc.calls().at(-1)).toEqual({ command: 'graph_create', args: { path: graph.root } })
   })
-
-  it('rejects a malformed storage answer with a parse error', async () => {
-    const ipc = createTestIpcBridgeService({ commands: { mobile_storage: () => ({}) } })
-    await expect(createMobileStorageService({ ipc }).resolve()).rejects.toMatchObject({
-      kind: 'parse',
-    })
-  })
 })

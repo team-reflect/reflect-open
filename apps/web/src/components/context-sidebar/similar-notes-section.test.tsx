@@ -4,6 +4,7 @@ import { userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RetrievalService } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestCoreServices,
   createTestNoteFileService,
   createTestRetrievalService,
@@ -12,7 +13,6 @@ import type { ReactNode } from 'react'
 import { deepLinkForRoute } from '@reflect/app'
 import { useRouterState } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { SimilarNotesSection } from './similar-notes-section.tsx'
 import { sleep } from '@ocavue/utils'
 
@@ -27,7 +27,7 @@ function RouteProbe(): ReactNode {
 
 async function renderSimilar(path: string, probe: boolean = true) {
   const core = createTestCoreServices({
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     noteFile: createTestNoteFileService({ files: { 'daily/2026-06-09.md': '- daily entry\n' } }),
     retrieval: createTestRetrievalService({ relatedNotes }),
   })

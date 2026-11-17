@@ -4,18 +4,10 @@ import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { PluginEvent } from '../ipc/plugin.ts'
 import {
-  actionPerformedCommand,
-  actionsReadyCommand,
-  cancelRecordingCommand,
-  deleteStagedCommand,
-  listStagedCommand,
   recordingLevelEvent,
   recordingNativeActionEvent,
   recordingSegmentEvent,
-  recordingStatusCommand,
   recordingStoppedEvent,
-  startRecordingCommand,
-  stopRecordingCommand,
   type RecordingLevelEvent,
   type RecordingNativeActionEvent,
   type RecordingSegmentEvent,
@@ -158,7 +150,7 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
     this.#state.set('requesting')
     let session: RecordingSessionStart
     try {
-      session = await startRecordingCommand(ipc, {
+      session = await ipc.call('plugin:recording|start_recording', {
         request: { segmentMs: options.segmentMs, reminderMs: options.reminderMs },
       })
     } catch (error) {
@@ -180,7 +172,7 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
     }
     const stopped = (async (): Promise<AudioRecorderFinalSegment | null> => {
       try {
-        return this.#claimFinal(await stopRecordingCommand(ipc, {}))
+        return this.#claimFinal(await ipc.call('plugin:recording|stop_recording', {}))
       } finally {
         this.#state.set('idle')
       }
@@ -194,22 +186,22 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
   async cancel(): Promise<void> {
     // Also aborts a pending permission request natively.
     try {
-      await cancelRecordingCommand(this.#deps.ipc, {})
+      await this.#deps.ipc.call('plugin:recording|cancel_recording', {})
     } finally {
       this.#state.set('idle')
     }
   }
 
   status(): Promise<RecordingStatus> {
-    return recordingStatusCommand(this.#deps.ipc, {})
+    return this.#deps.ipc.call('plugin:recording|recording_status', {})
   }
 
   async listStaged(): Promise<StagedRecordingFile[]> {
-    return (await listStagedCommand(this.#deps.ipc, {})).files
+    return (await this.#deps.ipc.call('plugin:recording|list_staged', {})).files
   }
 
   async deleteStaged(path: string): Promise<void> {
-    await deleteStagedCommand(this.#deps.ipc, { request: { path } })
+    await this.#deps.ipc.call('plugin:recording|delete_staged', { request: { path } })
   }
 
   claimStaged(path: string): void {
@@ -237,11 +229,11 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
     if (options?.signal?.aborted === true) {
       return
     }
-    await actionsReadyCommand(ipc, {})
+    await ipc.call('plugin:recording|actions_ready', {})
   }
 
   async actionPerformed(): Promise<void> {
-    await actionPerformedCommand(this.#deps.ipc, {})
+    await this.#deps.ipc.call('plugin:recording|action_performed', {})
   }
 
   subscribeLevel(listener: (event: RecordingLevelEvent) => void): Unlisten {

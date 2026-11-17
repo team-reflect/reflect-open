@@ -3,6 +3,7 @@ import { page, userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GitSyncState, Settings } from '@reflect/core'
 import {
+  createTestDatabaseService,
   createTestAppStoreService,
   createTestClassicAccessService,
   createTestCoreServices,
@@ -17,7 +18,6 @@ import {
 import '@/test-utils/locator.ts'
 import { TERMS_OF_USE_URL } from '@/mobile/legal-urls.ts'
 import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
-import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileSettings } from './settings.tsx'
 import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
 
@@ -82,7 +82,7 @@ async function mount(options?: MountOptions) {
   const appStore = createTestAppStoreService()
   const core = createTestCoreServices({
     appStore,
-    database: createWasmTestDatabaseService(),
+    database: createTestDatabaseService(),
     gitSync,
     gitHostConnector,
     // A note window's graph runs no sync lifecycle.
@@ -107,8 +107,8 @@ async function mount(options?: MountOptions) {
     core,
     graph: { root: '/g', name: 'Field Notes', generation: 1 },
     mobile: { kind: options?.storageKind ?? 'icloud' },
-    route: { kind: 'settings' },
-    ...(options?.settings === undefined ? {} : { settings: options.settings }),
+    route: { kind: 'settings', page: 'main' },
+    settings: options?.settings,
   })
   return Object.assign(view, { gitSync, gitHostConnector, updateSettings, appStore })
 }
@@ -140,7 +140,7 @@ describe('MobileSettings', () => {
     await user.click(graphRow)
 
     expect(view.appServices.navigation.navigations()).toEqual([
-      { route: { kind: 'graphs' }, options: undefined },
+      { route: { kind: 'settings', page: 'graphs' }, options: undefined },
     ])
   })
 
@@ -150,7 +150,7 @@ describe('MobileSettings', () => {
     await userEvent.click(page.getByRole('button', { name: 'Open Source Licenses' }))
 
     expect(view.appServices.navigation.navigations()).toEqual([
-      { route: { kind: 'licenses' }, options: undefined },
+      { route: { kind: 'settings', page: 'licenses' }, options: undefined },
     ])
   })
 
