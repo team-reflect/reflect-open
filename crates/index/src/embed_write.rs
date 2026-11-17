@@ -3,9 +3,13 @@
 //! layer ([`super`]) owns transactions and generation gating, mirroring
 //! `write.rs`.
 
-use rusqlite::{Connection, params};
+use rusqlite::Connection;
+use sea_query::{Expr, ExprTrait, Order, Query};
 
 use reflect_types::{AppError, AppResult, EmbeddedChunk};
+
+use crate::schema::{EmbeddingChunks, EmbeddingVectors, Notes};
+use crate::sql::{self, lit};
 
 pub(crate) fn vector_json(vector: &[f32]) -> String {
     let mut out = String::with_capacity(vector.len() * 10 + 2);
@@ -33,23 +37,31 @@ pub(super) fn apply_chunks(
     // own queue, so a slow in-flight embed can land after index_remove
     // deleted the note — without this guard it would reinsert vectors for a
     // dead path (which surface as stale text if the path is later reused).
-    let note_exists: bool = conn
-        .prepare_cached("SELECT EXISTS(SELECT 1 FROM notes WHERE path = ?1)")?
-        .query_row(params![note_path], |row| row.get(0))?;
+    let note = Query::select()
+        .expr(lit(1))
+        .from(Notes::Table)
+        .and_where(Expr::col(Notes::Path).eq(note_path))
+        .take();
+    let note_exists: bool =
+        sql::query_one(conn, Query::select().expr(Expr::exists(note)), |row| {
+            row.get(0)
+        })?;
     if !note_exists {
         return remove_chunks(conn, note_path); // hygiene: drop any leftovers
     }
 
     // Existing rows by content hash (a note rarely has duplicate-hash chunks;
     // if it does, rows pair up by position order — both forms are identical).
-    let mut existing: Vec<(i64, String)> = conn
-        .prepare_cached(
-            "SELECT id, content_hash FROM embedding_chunks WHERE note_path = ?1 ORDER BY pos_from",
-        )?
-        .query_map(params![note_path], |row| Ok((row.get(0)?, row.get(1)?)))?
-        .collect::<Result<_, _>>()?;
+    let mut existing: Vec<(i64, String)> = sql::query(
+        conn,
+        Query::select()
+            .columns([EmbeddingChunks::Id, EmbeddingChunks::ContentHash])
+            .from(EmbeddingChunks::Table)
+            .and_where(Expr::col(EmbeddingChunks::NotePath).eq(note_path))
+            .order_by(EmbeddingChunks::PosFrom, Order::Asc),
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
 
-    let mut kept: Vec<i64> = Vec::new();
     for chunk in chunks {
         match chunk.vector.as_ref() {
             None => {
@@ -63,63 +75,89 @@ pub(super) fn apply_chunks(
                         ))
                     })?;
                 let (id, _) = existing.remove(at);
-                conn.prepare_cached(
-                    "UPDATE embedding_chunks
-                     SET heading = ?2, pos_from = ?3, pos_to = ?4, model_id = ?5
-                     WHERE id = ?1",
-                )?
-                .execute(params![
-                    id,
-                    chunk.heading,
-                    chunk.pos_from,
-                    chunk.pos_to,
-                    chunk.model_id
-                ])?;
-                kept.push(id);
+                sql::execute(
+                    conn,
+                    Query::update()
+                        .table(EmbeddingChunks::Table)
+                        .value(EmbeddingChunks::Heading, chunk.heading.as_deref())
+                        .value(EmbeddingChunks::PosFrom, chunk.pos_from)
+                        .value(EmbeddingChunks::PosTo, chunk.pos_to)
+                        .value(EmbeddingChunks::ModelId, chunk.model_id.as_str())
+                        .and_where(Expr::col(EmbeddingChunks::Id).eq(id)),
+                )?;
             }
             Some(vector) => {
-                conn.prepare_cached(
-                    "INSERT INTO embedding_chunks
-                       (note_path, heading, pos_from, pos_to, text, content_hash, model_id)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                )?
-                .execute(params![
-                    note_path,
-                    chunk.heading,
-                    chunk.pos_from,
-                    chunk.pos_to,
-                    chunk.text,
-                    chunk.content_hash,
-                    chunk.model_id
-                ])?;
+                sql::execute(
+                    conn,
+                    Query::insert()
+                        .into_table(EmbeddingChunks::Table)
+                        .columns([
+                            EmbeddingChunks::NotePath,
+                            EmbeddingChunks::Heading,
+                            EmbeddingChunks::PosFrom,
+                            EmbeddingChunks::PosTo,
+                            EmbeddingChunks::Text,
+                            EmbeddingChunks::ContentHash,
+                            EmbeddingChunks::ModelId,
+                        ])
+                        .values_panic([
+                            note_path.into(),
+                            chunk.heading.as_deref().into(),
+                            chunk.pos_from.into(),
+                            chunk.pos_to.into(),
+                            chunk.text.as_str().into(),
+                            chunk.content_hash.as_str().into(),
+                            chunk.model_id.as_str().into(),
+                        ]),
+                )?;
                 let id = conn.last_insert_rowid();
-                conn.prepare_cached(
-                    "INSERT INTO embedding_vectors(rowid, embedding) VALUES (?1, ?2)",
-                )?
-                .execute(params![id, vector_json(vector)])?;
-                kept.push(id);
+                sql::execute(
+                    conn,
+                    Query::insert()
+                        .into_table(EmbeddingVectors::Table)
+                        .columns([EmbeddingVectors::Rowid, EmbeddingVectors::Embedding])
+                        .values_panic([id.into(), vector_json(vector).into()]),
+                )?;
             }
         }
     }
 
     // Whatever wasn't kept is stale: drop vector + row.
     for (id, _) in existing {
-        conn.prepare_cached("DELETE FROM embedding_vectors WHERE rowid = ?1")?
-            .execute(params![id])?;
-        conn.prepare_cached("DELETE FROM embedding_chunks WHERE id = ?1")?
-            .execute(params![id])?;
+        sql::execute(
+            conn,
+            Query::delete()
+                .from_table(EmbeddingVectors::Table)
+                .and_where(Expr::col(EmbeddingVectors::Rowid).eq(id)),
+        )?;
+        sql::execute(
+            conn,
+            Query::delete()
+                .from_table(EmbeddingChunks::Table)
+                .and_where(Expr::col(EmbeddingChunks::Id).eq(id)),
+        )?;
     }
     Ok(())
 }
 
 /// Drop every chunk + vector belonging to `note_path` (note deletion).
 pub(super) fn remove_chunks(conn: &Connection, note_path: &str) -> AppResult<()> {
-    conn.prepare_cached(
-        "DELETE FROM embedding_vectors WHERE rowid IN
-           (SELECT id FROM embedding_chunks WHERE note_path = ?1)",
-    )?
-    .execute(params![note_path])?;
-    conn.prepare_cached("DELETE FROM embedding_chunks WHERE note_path = ?1")?
-        .execute(params![note_path])?;
+    let chunk_ids = Query::select()
+        .column(EmbeddingChunks::Id)
+        .from(EmbeddingChunks::Table)
+        .and_where(Expr::col(EmbeddingChunks::NotePath).eq(note_path))
+        .take();
+    sql::execute(
+        conn,
+        Query::delete()
+            .from_table(EmbeddingVectors::Table)
+            .and_where(Expr::col(EmbeddingVectors::Rowid).in_subquery(chunk_ids)),
+    )?;
+    sql::execute(
+        conn,
+        Query::delete()
+            .from_table(EmbeddingChunks::Table)
+            .and_where(Expr::col(EmbeddingChunks::NotePath).eq(note_path)),
+    )?;
     Ok(())
 }

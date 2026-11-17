@@ -104,6 +104,50 @@ pub(crate) fn query_one<T>(
         .query_row(params_from_iter(params), map)?)
 }
 
+/// Whether `statement` has a row.
+pub(crate) fn exists(conn: &Connection, statement: &impl QueryStatementWriter) -> AppResult<bool> {
+    let (sql, params) = build(statement);
+    Ok(conn
+        .prepare_cached(&sql)?
+        .exists(params_from_iter(params))?)
+}
+
+/// Runs `statement` and returns the number of rows it changed.
+pub(crate) fn execute(
+    conn: &Connection,
+    statement: &impl QueryStatementWriter,
+) -> AppResult<usize> {
+    let (sql, params) = build(statement);
+    Ok(conn
+        .prepare_cached(&sql)?
+        .execute(params_from_iter(params))?)
+}
+
+/// Inserts `rows` into `columns` of `table` through one prepared statement.
+pub(crate) fn insert_rows<T: Iden + Copy + 'static, const N: usize>(
+    conn: &Connection,
+    table: T,
+    columns: [T; N],
+    rows: impl IntoIterator<Item = AppResult<[Value; N]>>,
+) -> AppResult<()> {
+    let mut rows = rows.into_iter();
+    let Some(first) = rows.next().transpose()? else {
+        return Ok(());
+    };
+    let (sql, params) = build(
+        Query::insert()
+            .into_table(table)
+            .columns(columns)
+            .values_panic(first.map(Expr::from)),
+    );
+    let mut statement = conn.prepare_cached(&sql)?;
+    statement.execute(params_from_iter(params))?;
+    for row in rows {
+        statement.execute(params_from_iter(row?.map(Param)))?;
+    }
+    Ok(())
+}
+
 /// The row id of a table, which no schema lists.
 pub(crate) const ROWID: &str = "rowid";
 
