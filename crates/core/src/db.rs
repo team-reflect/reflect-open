@@ -61,11 +61,11 @@ impl Core {
         command: &str,
         args_json: &[u8],
     ) -> AppResult<Reply> {
-        // Pin the index session before the hop: a graph switch can rebind the
-        // index between invoke and execution, and a query issued for graph A
-        // must not return graph B's rows.
-        let read_generation = self.index.read_generation()?;
         if reflect_index::INDEX_READ_COMMANDS.contains(&command) {
+            // Pin the index session before the hop: a graph switch can rebind
+            // the index between invoke and execution, and a query issued for
+            // graph A must not return graph B's rows.
+            let read_generation = self.index.read_generation()?;
             let core = Arc::clone(self);
             let command = command.to_owned();
             let args_json = args_json.to_vec();
@@ -79,7 +79,8 @@ impl Core {
         }
         let _background_task =
             background_task::scoped(&self.background_tasks, background_task_name(command));
-        IndexCommands::new(&self.index, self.as_ref(), read_generation)
+        // A write takes no reader lock: a long query never delays it.
+        IndexCommands::new(&self.index, self.as_ref(), 0)
             .dispatch(command, args_json)
             .map(Reply::Json)
     }

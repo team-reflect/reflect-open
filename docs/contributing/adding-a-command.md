@@ -75,7 +75,9 @@ runs on a blocking-pool thread, never on the main thread.
 A command that only reads or writes the SQLite index is not a `Core` method.
 Its row goes in the `index_write` or `index_read` block, and its method on
 `IndexCommands` in `crates/index/src/commands.rs`. `Core` routes both blocks
-to it, and a read runs on the blocking pool.
+to it, and a read runs on the blocking pool. A write takes the index
+`generation` that `index_open` returned, and `IndexSession` drops a write with
+a stale one; it resolves no graph root.
 
 A command that exists only on the desktop (windows, menus) is a
 `#[tauri::command]` in the Tauri crate. Its row goes in the `desktop` block as
