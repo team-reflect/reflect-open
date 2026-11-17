@@ -116,9 +116,8 @@ A rename reaches git as delete+add. Two-device tests in
   recoverable).
 - **One note retitled differently on two devices** forks into two files sharing
   one id. Both survive; the user copies any differing edits into one and
-  deletes the other. `getDuplicateNoteIds` detects forks, but the app shows no
-  UI for them: the term means nothing to a user, and the remedy is what they
-  would do anyway.
+  deletes the other. The app shows no UI for forks: the term means nothing to a
+  user, and the remedy is what they would do anyway.
 
 ## What deliberately doesn't exist
 
