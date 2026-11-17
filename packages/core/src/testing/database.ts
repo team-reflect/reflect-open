@@ -89,7 +89,7 @@ class TestDatabaseServiceImpl implements TestDatabaseService {
 
   #invoke(command: string, args: Readonly<Record<string, unknown>>): unknown {
     try {
-      return this.#open().invoke(command, args as Record<string, unknown>)
+      return this.#open().invoke(command, args)
     } catch (error) {
       throw toAppError(error)
     }
