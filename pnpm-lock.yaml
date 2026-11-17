@@ -190,6 +190,9 @@ importers:
       '@reflect/design-system':
         specifier: workspace:*
         version: link:../../design-system
+      '@reflect/index-wasm':
+        specifier: workspace:*
+        version: link:../../packages/index-wasm
       '@reflect/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -272,9 +275,6 @@ importers:
       '@sentry/vite-plugin':
         specifier: ^11.9.0
         version: 11.9.0
-      '@sqlite.org/sqlite-wasm':
-        specifier: 3.53.4-build2
-        version: 3.53.4-build2
       '@tailwindcss/vite':
         specifier: ^4.3.5
         version: 4.3.5(vite@8.3.5)
@@ -2501,10 +2501,6 @@ packages:
   '@sindresorhus/merge-streams@4.0.0':
     resolution: {integrity: sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ==}
     engines: {node: '>=18'}
-
-  '@sqlite.org/sqlite-wasm@3.53.4-build2':
-    resolution: {integrity: sha512-kQVArGJA4z7s56Dm8t+eTBXad4LiohuVj9pfgDNOcxa+Ic5xMrWlLPTq6cT0hw5S4MIvtpsraW+B0wD+IPvC7A==}
-    engines: {node: '>=22'}
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -8514,8 +8510,6 @@ snapshots:
   '@sindresorhus/base62@1.0.0': {}
 
   '@sindresorhus/merge-streams@4.0.0': {}
-
-  '@sqlite.org/sqlite-wasm@3.53.4-build2': {}
 
   '@standard-schema/spec@1.1.0': {}
 

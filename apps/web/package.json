@@ -28,6 +28,7 @@
     "@reflect/app": "workspace:*",
     "@reflect/core": "workspace:*",
     "@reflect/design-system": "workspace:*",
+    "@reflect/index-wasm": "workspace:*",
     "@reflect/types": "workspace:*",
     "@reflect/utils": "workspace:*",
     "@sentry/react": "^11.9.0",
@@ -57,7 +58,6 @@
   "devDependencies": {
     "@ocavue/tsconfig": "^0.7.1",
     "@sentry/vite-plugin": "^11.9.0",
-    "@sqlite.org/sqlite-wasm": "3.53.4-build2",
     "@tailwindcss/vite": "^4.3.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
