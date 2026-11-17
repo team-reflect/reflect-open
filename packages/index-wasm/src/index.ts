@@ -59,9 +59,12 @@ export class WasmIndexError extends Error {
   }
 }
 
-function toError(thrown: unknown): unknown {
-  if (typeof thrown !== 'string') {
+function toError(thrown: unknown): WasmIndexError {
+  if (thrown instanceof WasmIndexError) {
     return thrown
+  }
+  if (typeof thrown !== 'string') {
+    return new WasmIndexError('io', thrown instanceof Error ? thrown.message : String(thrown))
   }
   try {
     const { kind, message } = JSON.parse(thrown) as { kind?: unknown; message?: unknown }
@@ -94,8 +97,12 @@ class WasmIndexBackendImpl implements WasmIndexBackend {
     try {
       if (command === 'note_move_indexed') {
         const { from, to } = args['request'] as { from: string; to: string }
+        const files = this.#files
         index.move_note(JSON.stringify(args), () => {
-          this.#files?.move(from, to)
+          if (files === undefined) {
+            throw new Error('the index has no note files to move')
+          }
+          files.move(from, to)
         })
         return null
       }
@@ -119,7 +126,8 @@ class WasmIndexBackendImpl implements WasmIndexBackend {
 
 /**
  * Create an index over a new in-memory database. `files` backs the two
- * commands that read or move note files; without it the graph has no files.
+ * commands that read or move note files; without it the graph lists no files
+ * and a note move fails.
  */
 export function createWasmIndexBackend(files?: WasmIndexFiles): WasmIndexBackend {
   return new WasmIndexBackendImpl(files)

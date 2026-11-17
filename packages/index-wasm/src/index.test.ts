@@ -91,6 +91,29 @@ it('throws the kind of the native error', () => {
   index.invoke('index_open', {})
 
   expect(() => query('delete from notes')).toThrow(WasmIndexError)
+  expect(() => query('delete from notes')).toThrow(expect.objectContaining({ kind: 'io' }))
   expect(index.has('db_query')).toBe(true)
   expect(index.has('note_read')).toBe(false)
+})
+
+it('fails a note move when the index has no note files', () => {
+  index = createWasmIndexBackend()
+  const generation = index.invoke('index_open', {})
+  index.invoke('index_apply', { note: NOTE, generation })
+  const address = (stem: string) => ({
+    pathKey: `notes/${stem}`,
+    basenameKey: stem,
+    dailyDate: null,
+  })
+  const request = {
+    from: 'notes/a.md',
+    to: 'notes/b.md',
+    fromAddress: address('a'),
+    toAddress: address('b'),
+  }
+
+  expect(() => index.invoke('note_move_indexed', { request, generation: 1 })).toThrow(
+    'the index has no note files to move',
+  )
+  expect(query('select path from notes')).toEqual([{ path: 'notes/a.md' }])
 })

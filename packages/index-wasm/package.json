@@ -8,7 +8,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "node ../../scripts/build-index-wasm.ts && vitest run"
   },
   "dependencies": {
     "@reflect/types": "workspace:*"
