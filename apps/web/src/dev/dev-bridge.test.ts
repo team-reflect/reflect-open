@@ -8,6 +8,7 @@ import {
 import {
   createTestClockService,
   createTestFileChangeService,
+  createTestIndexedNote,
   createTestLoggerService,
 } from '@reflect/core/testing'
 import { createDevAssetStore } from '@/dev/dev-asset-store.ts'
@@ -15,33 +16,14 @@ import { createDevBridge } from '@/dev/dev-bridge.ts'
 import { createDevFileStore } from '@/dev/dev-file-store.ts'
 
 function projection(path: string, mtime: number, fileHash: string): IndexedNote {
-  return {
+  return createTestIndexedNote({
     path,
-    id: null,
     title: path,
     titleKey: path,
     pathKey: foldGraphPath(path),
-    kind: 'note',
-    dailyDate: null,
-    isPrivate: false,
-    isPinned: false,
-    pinnedOrder: null,
-    hasContent: true,
-    gistUrl: null,
-    gistStale: false,
     fileHash,
     mtime,
-    text: 'body',
-    assetText: '',
-    preview: 'body',
-    links: [],
-    tags: [],
-    aliases: [],
-    claims: [],
-    emails: [],
-    assets: [],
-    tasks: [],
-  }
+  })
 }
 
 describe('dev bridge index_reconcile_scan', () => {
