@@ -3,7 +3,6 @@
 //! command name to its method.
 
 use rusqlite::Connection;
-use serde_json::{Map, Value};
 
 use reflect_types::{
     AppError, AppResult, Backlink, BacklinkPage, BacklinkSourceCursor, ChatConversation,
@@ -367,11 +366,6 @@ impl<'a> IndexCommands<'a> {
     /// The messages of one conversation, in order.
     fn chat_messages(&self, conversation_id: String) -> AppResult<Vec<ChatMessageRow>> {
         self.read(|conn| read::chat::messages(conn, &conversation_id))
-    }
-
-    /// Executes a read query that the frontend compiled with Kysely.
-    fn db_query(&self, sql: String, params: Vec<Value>) -> AppResult<Vec<Map<String, Value>>> {
-        self.session.query(self.read_generation, &sql, &params)
     }
 }
 

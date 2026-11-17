@@ -36,7 +36,7 @@ afterEach(() => {
 })
 
 function query(sql: string, params: unknown[] = []): unknown {
-  return index.invoke('db_query', { sql, params })
+  return index.invoke('test_query', { sql, params })
 }
 
 it('writes a note and finds it with full-text search', () => {
@@ -92,7 +92,7 @@ it('throws the kind of the native error', () => {
 
   expect(() => query('delete from notes')).toThrow(WasmIndexError)
   expect(() => query('delete from notes')).toThrow(expect.objectContaining({ kind: 'io' }))
-  expect(index.has('db_query')).toBe(true)
+  expect(index.has('test_query')).toBe(true)
   expect(index.has('note_read')).toBe(false)
 })
 

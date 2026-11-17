@@ -123,8 +123,9 @@ by a **Tauri 2** desktop shell and a Swift iOS shell. The Rust crates form one
   `apps/native-host/`: its Chrome native-messaging sidecar `reflect-capture-host`
   (Plan 11).
 - `apple/`: the local Swift package with iOS code shared between targets ([docs/contributing/apple-package.md](docs/contributing/apple-package.md)).
-- `packages/core/`, `packages/app/`, `packages/db/`: see Services below and each
-  package's README.
+- `packages/core/`, `packages/app/`: see Services below and each package's README.
+- `packages/index-wasm/`: the Rust index compiled to wasm, for the browser dev
+  bridge and the tests (`pnpm build:index-wasm`).
 - `crates/index-schema/`: the SQLite migrations shared by the desktop writer and the
   CLI reader.
 - `design-system/`, `docs/` (product and architecture docs, `docs/plans/`).
@@ -235,8 +236,11 @@ and the existing local patterns over new abstractions.
   assertions. IPC results are typed from the Rust command table and need no Zod,
   unless the data comes from disk or the network.
 - Normalize casing once at the boundary; TypeScript types are camelCase.
-- In public function parameters or returns, use Kysely helper types
-  (`Selectable<T>`, `Insertable<T>`, `Updateable<T>`), not raw table types.
+- Every runtime SQL statement of the index is in `crates/index`; its schema
+  migrations are in `crates/index-schema`. TypeScript reads the index with
+  `DatabaseService.read(command, args)`; a new query is a row in the
+  `index_read` block of the command table
+  ([adding a command](docs/contributing/adding-a-command.md)).
 - Handle Promise rejections properly, but do not add broad defensive error
   handling unless the call site needs it.
 

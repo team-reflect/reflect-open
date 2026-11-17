@@ -52,7 +52,6 @@ export {
 export {
   createNodeTestDatabaseService,
   seedNotes,
-  type TestDatabaseQuery,
   type TestDatabaseService,
   type TestNote,
 } from './database.ts'

@@ -111,7 +111,7 @@ describe('getBacklinksWithContext', () => {
       await expect(
         backlinks.getBacklinksWithContext('notes/target.md', { cursor: null, limit }),
       ).rejects.toThrow('positive safe integer')
-      expect(database.getQueries()).toEqual([])
+      expect(database.getReads()).toEqual([])
     },
   )
 

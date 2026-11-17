@@ -54,9 +54,11 @@ the service plus members that seed, drive or observe it.
 - `createNodeTestDatabaseService()` (Node.js) and `createWasmTestDatabaseService()`
   (desktop browser tests, `@/test-utils/test-database.ts`) are the Rust index
   of the native shells, compiled to wasm, over an in-memory SQLite database.
-  Seed notes and assert query results, not SQL. `database.invoke(command, args)`
-  runs a native index command, for rows that `seedNotes` cannot write (chat
-  history, embeddings, `index_meta`).
+  Seed notes and assert the results of the services. `database.invoke(command,
+  args)` runs a native index command, for rows that `seedNotes` cannot write
+  (chat history, embeddings, `index_meta`). `database.query(sql, params)` runs
+  one read-only statement, for rows that no read command returns.
+  `database.getReads()` lists the read commands a test ran.
 - The tests need the wasm build of the index. `pnpm test` builds it first; it
   needs the Rust toolchain and the `wasm-bindgen` CLI (`mise install`). After a
   change in `crates/index`, `crates/index-schema`, `crates/index-wasm` or

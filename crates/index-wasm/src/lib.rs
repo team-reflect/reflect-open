@@ -17,8 +17,14 @@ use serde::Deserialize;
 /// path only names the session.
 const ROOT: &str = "/wasm-index";
 
-/// The commands that need the host: it has no graph root and no file system.
-const HOST_COMMANDS: &[&str] = &["index_open", "index_reconcile_scan", "note_move_indexed"];
+/// The commands of this host alone. Three need the caller: the host has no
+/// graph root and no file system. `test_query` reads any table, for tests.
+const HOST_COMMANDS: &[&str] = &[
+    "index_open",
+    "index_reconcile_scan",
+    "note_move_indexed",
+    "test_query",
+];
 
 fn schema_error(err: reflect_index_schema::SchemaError) -> AppError {
     AppError::io(err.to_string())
@@ -66,6 +72,13 @@ struct ReconcileScanArgs {
     now_ms: u64,
 }
 
+/// The arguments of `test_query`: one read-only statement and its values.
+#[derive(Deserialize)]
+struct TestQueryArgs {
+    sql: String,
+    params: Vec<serde_json::Value>,
+}
+
 fn parse_args<T: serde::de::DeserializeOwned>(command: &str, args_json: &str) -> AppResult<T> {
     serde_json::from_str(args_json)
         .map_err(|err| AppError::parse(format!("invalid arguments for {command}: {err}")))
@@ -99,6 +112,13 @@ impl Index {
                     now_ms,
                 } = parse_args(command, args_json)?;
                 json_reply(&self.session.reconcile_scan(generation, &files, now_ms)?)
+            }
+            "test_query" => {
+                let TestQueryArgs { sql, params } = parse_args(command, args_json)?;
+                let read_generation = self.session.read_generation()?;
+                json_reply(&self.session.read(read_generation, |conn| {
+                    reflect_index::run_query(conn, &sql, &params)
+                })?)
             }
             _ => {
                 let read_generation = self.session.read_generation()?;
@@ -199,7 +219,7 @@ mod tests {
     fn paths(index: &Index) -> String {
         index
             .call(
-                "db_query",
+                "test_query",
                 r#"{"sql":"select path from notes order by path","params":[]}"#,
             )
             .unwrap()
@@ -214,7 +234,7 @@ mod tests {
         assert_eq!(paths(&index), r#"[{"path":"notes/a.md"}]"#);
         let hits = index
             .call(
-                "db_query",
+                "test_query",
                 r#"{"sql":"select path from search_fts where search_fts match ?","params":["hello"]}"#,
             )
             .unwrap();

@@ -75,7 +75,10 @@ runs on a blocking-pool thread, never on the main thread.
 A command that only reads or writes the SQLite index is not a `Core` method.
 Its row goes in the `index_write` or `index_read` block, and its method on
 `IndexCommands` in `crates/index/src/commands.rs`. `Core` routes both blocks
-to it, and a read runs on the blocking pool. A write takes the index
+to it, and a read runs on the blocking pool. The SQL of a read is a function
+in `crates/index/src/read/`; `IndexSession::read` runs it in one read
+transaction, and `crates/index/src/tests.rs` tests it on the real schema. The
+service calls it with `database.read(command, args)`. A write takes the index
 `generation` that `index_open` returned, and `IndexSession` drops a write with
 a stale one; it resolves no graph root.
 

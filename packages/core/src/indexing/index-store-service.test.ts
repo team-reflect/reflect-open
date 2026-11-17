@@ -246,9 +246,7 @@ describe('createTestIndexStoreService', () => {
       ])
       expect(store.removed()).toEqual(['notes/b.md'])
       expect(store.moved()).toEqual([{ from: 'notes/x.md', to: 'notes/y.md' }])
-      await expect(database.db.selectFrom('notes').select('path').execute()).resolves.toEqual([
-        { path: 'notes/a.md' },
-      ])
+      expect(database.query('SELECT path FROM notes')).toEqual([{ path: 'notes/a.md' }])
       await expect(store.getMeta('k')).resolves.toBe('v')
       await expect(store.getMeta('seeded')).resolves.toBe('yes')
     } finally {
@@ -272,26 +270,25 @@ describe('createTestIndexStoreService', () => {
       await store.apply(note('notes/taken.md'), 1)
       await store.moveIndexed('notes/old.md', 'notes/New Name.md', 1)
 
-      await expect(
-        database.db.selectFrom('notes').select(['path', 'pathKey']).orderBy('path').execute(),
-      ).resolves.toEqual([
-        { path: 'notes/New Name.md', pathKey: 'notes/new name.md' },
-        { path: 'notes/taken.md', pathKey: 'notes/taken.md' },
+      expect(database.query('SELECT path, path_key FROM notes ORDER BY path')).toEqual([
+        { path: 'notes/New Name.md', path_key: 'notes/new name.md' },
+        { path: 'notes/taken.md', path_key: 'notes/taken.md' },
       ])
-      await expect(
-        database.runQuery('SELECT key, tier FROM note_claims WHERE note_path = ? ORDER BY tier', [
+      expect(
+        database.query('SELECT key, tier FROM note_claims WHERE note_path = ? ORDER BY tier', [
           'notes/New Name.md',
         ]),
-      ).resolves.toEqual([
+      ).toEqual([
         { key: 'title', tier: 2 },
         { key: 'new name', tier: 4 },
       ])
-      await expect(
-        database.runQuery('SELECT source_path FROM links UNION SELECT note_path FROM tags', []),
-      ).resolves.toEqual([{ source_path: 'notes/New Name.md' }])
-      await expect(
-        database.runQuery('SELECT path FROM search_fts ORDER BY path', []),
-      ).resolves.toEqual([{ path: 'notes/New Name.md' }, { path: 'notes/taken.md' }])
+      expect(
+        database.query('SELECT source_path FROM links UNION SELECT note_path FROM tags'),
+      ).toEqual([{ source_path: 'notes/New Name.md' }])
+      expect(database.query('SELECT path FROM search_fts ORDER BY path')).toEqual([
+        { path: 'notes/New Name.md' },
+        { path: 'notes/taken.md' },
+      ])
 
       await expect(store.move('notes/New Name.md', 'notes/taken.md', 1)).rejects.toMatchObject({
         kind: 'io',

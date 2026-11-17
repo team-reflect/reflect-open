@@ -10,9 +10,6 @@
   "include": ["src", "src/**/*.json", "./*.ts"],
   "references": [
     {
-      "path": "../db/tsconfig.json"
-    },
-    {
       "path": "../index-wasm/tsconfig.json"
     },
     {

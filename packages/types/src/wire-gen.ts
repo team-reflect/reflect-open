@@ -1062,13 +1062,6 @@ export type Commands = {
     }
     result: null
   }
-  db_query: {
-    args: {
-      sql: string
-      params: unknown[]
-    }
-    result: { [key in string]: unknown }[]
-  }
   index_meta_get: {
     args: {
       key: string
@@ -2723,7 +2716,6 @@ export type WindowBootstrap = {
  * The name of every command that reads the index.
  */
 export type IndexReadCommand =
-  | 'db_query'
   | 'index_meta_get'
   | 'index_graph_stats'
   | 'index_note'
