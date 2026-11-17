@@ -214,7 +214,9 @@ class DevBridgeImpl implements IpcBridge {
       case 'note_move_indexed': {
         const {
           request: { from, to },
+          generation,
         } = argsOf('note_move_indexed', args)
+        this.#checkGeneration(generation)
         if (!files.exists(from)) {
           throw new AppError('notFound', `cannot move note: ${from} does not exist`)
         }
@@ -352,29 +354,27 @@ class DevBridgeImpl implements IpcBridge {
   }
 
   // The index events (`index:written`, `note:moved`) fire like the native
-  // broadcast. The other native event streams (watcher, embeddings, EventKit)
+  // broadcast: after the command that caused them has replied. The other native event streams (watcher, embeddings, EventKit)
   // do not exist in the browser: those subscriptions succeed and never fire.
   // Plugin event registrations do the same, so the keyboard and recorder
   // hooks mount in the harness.
   listen(event: string, handler: (payload: unknown) => void): Promise<() => void> {
     const handlers = this.#listeners.get(event) ?? new Set()
     this.#listeners.set(event, handlers)
-    handlers.add(handler)
+    // One entry per registration: the same handler can listen twice.
+    const deliver = (payload: unknown): void => {
+      handler(payload)
+    }
+    handlers.add(deliver)
     return Promise.resolve(() => {
-      handlers.delete(handler)
+      handlers.delete(deliver)
     })
   }
 
-  /**
-   * Deliver an event after the command that caused it has replied, like the
-   * native broadcast.
-   */
   #emit(event: string, payload: unknown): void {
-    queueMicrotask(() => {
-      for (const handler of this.#listeners.get(event) ?? []) {
-        handler(payload)
-      }
-    })
+    for (const handler of this.#listeners.get(event) ?? []) {
+      handler(payload)
+    }
   }
 
   async listenPlugin(): Promise<void> {}

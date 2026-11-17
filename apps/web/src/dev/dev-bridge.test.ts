@@ -86,12 +86,48 @@ describe('dev bridge index events', () => {
     await bridge.invoke('index_apply', { note, generation: generation + 1 })
     expect(written).not.toHaveBeenCalled()
 
-    await bridge.invoke('index_apply', { note, generation })
+    // The event arrives after the command has replied.
+    const reply = bridge.invoke('index_apply', { note, generation })
+    expect(written).not.toHaveBeenCalled()
+    await reply
     expect(written).toHaveBeenCalledExactlyOnceWith(null)
 
     unlisten()
     await bridge.invoke('index_apply', { note, generation })
     expect(written).toHaveBeenCalledOnce()
+  })
+
+  it('announces a note move with both paths, and nothing for a stale graph generation', async () => {
+    const files = createDevFileStore({ 'notes/a.md': '# A' })
+    const bridge = createDevBridge({ files, assets: createDevAssetStore() })
+    const generation = (await bridge.invoke('index_open', {})) as number
+    await bridge.invoke('index_apply', { note: projection('notes/a.md', 1, 'hash'), generation })
+    const written = vi.fn()
+    const moved = vi.fn()
+    await bridge.listen('index:written', written)
+    await bridge.listen('note:moved', moved)
+    const address = (stem: string) => ({
+      pathKey: `notes/${stem}.md`,
+      basenameKey: stem,
+      dailyDate: null,
+    })
+    const request = {
+      from: 'notes/a.md',
+      to: 'notes/b.md',
+      fromAddress: address('a'),
+      toAddress: address('b'),
+    }
+
+    await expect(bridge.invoke('note_move_indexed', { request, generation: 2 })).rejects.toThrow(
+      'the graph changed',
+    )
+    expect(moved).not.toHaveBeenCalled()
+    expect(files.exists('notes/a.md')).toBe(true)
+
+    await bridge.invoke('note_move_indexed', { request, generation: 1 })
+    expect(written).toHaveBeenCalledExactlyOnceWith(null)
+    expect(moved).toHaveBeenCalledExactlyOnceWith({ from: 'notes/a.md', to: 'notes/b.md' })
+    expect(files.exists('notes/b.md')).toBe(true)
   })
 })
 
