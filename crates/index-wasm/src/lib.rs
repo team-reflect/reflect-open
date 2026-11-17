@@ -4,14 +4,16 @@
 //! database. The `wasm32` build exports it to JavaScript as `WasmIndex`.
 
 use std::path::Path;
+use std::sync::Mutex;
 
 use reflect_index::{
     INDEX_READ_COMMANDS, INDEX_WRITE_COMMANDS, IndexCommands, IndexConnections, IndexEvents,
     IndexSession,
 };
+use reflect_types::events::EventName;
 use reflect_types::{AppError, AppResult, FileMeta};
 use rusqlite::Connection;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// The root that the session is opened for. The database is in memory, so the
 /// path only names the session.
@@ -52,14 +54,39 @@ impl IndexConnections for MemoryConnections {
     }
 }
 
-/// The host announces no write: the frontend refreshes from its own
-/// local-write echo.
-struct NoEvents;
+/// One event that the native shell would broadcast to the frontend.
+#[derive(Serialize)]
+struct IndexEvent {
+    event: &'static str,
+    payload: serde_json::Value,
+}
 
-impl IndexEvents for NoEvents {
-    fn index_written(&self) {}
+/// The announced writes that the caller has not taken yet.
+#[derive(Default)]
+struct EventQueue(Mutex<Vec<IndexEvent>>);
 
-    fn note_moved(&self, _from: &str, _to: &str) {}
+impl EventQueue {
+    fn push(&self, event: EventName, payload: serde_json::Value) {
+        if let Ok(mut events) = self.0.lock() {
+            events.push(IndexEvent {
+                event: event.as_str(),
+                payload,
+            });
+        }
+    }
+}
+
+impl IndexEvents for EventQueue {
+    fn index_written(&self) {
+        self.push(EventName::IndexWritten, serde_json::Value::Null);
+    }
+
+    fn note_moved(&self, from: &str, to: &str) {
+        self.push(
+            EventName::NoteMoved,
+            serde_json::json!({ "from": from, "to": to }),
+        );
+    }
 }
 
 /// The arguments of `index_reconcile_scan` on this host: the caller lists the
@@ -92,6 +119,7 @@ fn json_reply<T: serde::Serialize>(value: &T) -> AppResult<String> {
 #[derive(Default)]
 pub struct Index {
     session: IndexSession,
+    events: EventQueue,
 }
 
 impl Index {
@@ -122,7 +150,7 @@ impl Index {
             }
             _ => {
                 let read_generation = self.session.read_generation()?;
-                IndexCommands::new(&self.session, &NoEvents, read_generation)
+                IndexCommands::new(&self.session, &self.events, read_generation)
                     .dispatch(command, args_json.as_bytes())
             }
         }
@@ -137,7 +165,20 @@ impl Index {
     ) -> AppResult<()> {
         let reflect_types::commands::note_move_indexed::Args { request, .. } =
             parse_args("note_move_indexed", args_json)?;
-        self.session.move_note(Path::new(ROOT), &request, rename)
+        self.session.move_note(Path::new(ROOT), &request, rename)?;
+        self.events.index_written();
+        self.events.note_moved(&request.from, &request.to);
+        Ok(())
+    }
+
+    /// Takes the events of the writes that committed since the last call, as
+    /// JSON text: an array of `{ event, payload }`.
+    pub fn take_events(&self) -> AppResult<String> {
+        let events = match self.events.0.lock() {
+            Ok(mut events) => std::mem::take(&mut *events),
+            Err(_) => Vec::new(),
+        };
+        json_reply(&events)
     }
 }
 
@@ -177,6 +218,12 @@ mod bindings {
         /// `AppError`.
         pub fn call(&self, command: &str, args_json: &str) -> Result<String, JsValue> {
             self.0.call(command, args_json).map_err(to_js_error)
+        }
+
+        /// Takes the events of the committed writes since the last call, as
+        /// JSON text.
+        pub fn take_events(&self) -> Result<String, JsValue> {
+            self.0.take_events().map_err(to_js_error)
         }
 
         /// Runs `note_move_indexed`; `rename` moves the file. Throws the
@@ -257,7 +304,16 @@ mod tests {
             .unwrap_err();
         assert!(matches!(error, AppError::Io { .. }), "{error:?}");
         assert_eq!(paths(&index), r#"[{"path":"notes/a.md"}]"#);
+        assert_eq!(
+            index.take_events().unwrap(),
+            r#"[{"event":"index:written","payload":null}]"#
+        );
         index.move_note(&args, || Ok(())).unwrap();
+        assert_eq!(
+            index.take_events().unwrap(),
+            r#"[{"event":"index:written","payload":null},{"event":"note:moved","payload":{"from":"notes/a.md","to":"notes/b.md"}}]"#
+        );
+        assert_eq!(index.take_events().unwrap(), "[]");
         assert_eq!(paths(&index), r#"[{"path":"notes/b.md"}]"#);
     }
 }

@@ -16,6 +16,11 @@ export class WasmIndex {
    */
   move_note(argsJson: string, rename: () => void): void
   /**
+   * Takes the events of the committed writes since the last call, as JSON
+   * text: an array of `{ event, payload }`.
+   */
+  take_events(): string
+  /**
    * Releases the database.
    */
   free(): void

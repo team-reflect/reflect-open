@@ -27,6 +27,12 @@ export interface WasmIndexFiles {
 }
 
 /**
+ * Receives one event of a committed write, with the name and the payload of
+ * the native broadcast.
+ */
+export type WasmIndexEventHandler = (event: string, payload: unknown) => void
+
+/**
  * The graph index of the native shells, compiled to wasm, over an in-memory
  * database.
  */
@@ -79,10 +85,12 @@ function toError(thrown: unknown): WasmIndexError {
 
 class WasmIndexBackendImpl implements WasmIndexBackend {
   readonly #files: WasmIndexFiles | undefined
+  readonly #onEvent: WasmIndexEventHandler | undefined
   #index: WasmIndex | null = new WasmIndex()
 
-  constructor(files: WasmIndexFiles | undefined) {
+  constructor(files: WasmIndexFiles | undefined, onEvent: WasmIndexEventHandler | undefined) {
     this.#files = files
+    this.#onEvent = onEvent
   }
 
   has(command: string): boolean {
@@ -95,26 +103,50 @@ class WasmIndexBackendImpl implements WasmIndexBackend {
       throw new WasmIndexError('io', 'the index is closed')
     }
     try {
-      if (command === 'note_move_indexed') {
-        const { from, to } = args['request'] as { from: string; to: string }
-        const files = this.#files
-        index.move_note(JSON.stringify(args), () => {
-          if (files === undefined) {
-            throw new Error('the index has no note files to move')
-          }
-          files.move(from, to)
-        })
-        return null
-      }
-      if (command === 'index_reconcile_scan') {
-        const files = this.#files?.list() ?? []
-        return JSON.parse(
-          index.call(command, JSON.stringify({ ...args, files, nowMs: Date.now() })),
-        )
-      }
-      return JSON.parse(index.call(command, JSON.stringify(args)))
+      return this.#run(index, command, args)
     } catch (error) {
       throw toError(error)
+    } finally {
+      this.#announce(index)
+    }
+  }
+
+  #run(index: WasmIndex, command: string, args: Record<string, unknown>): unknown {
+    if (command === 'note_move_indexed') {
+      const { from, to } = args['request'] as { from: string; to: string }
+      const files = this.#files
+      index.move_note(JSON.stringify(args), () => {
+        if (files === undefined) {
+          throw new Error('the index has no note files to move')
+        }
+        files.move(from, to)
+      })
+      return null
+    }
+    if (command === 'index_reconcile_scan') {
+      const files = this.#files?.list() ?? []
+      return JSON.parse(index.call(command, JSON.stringify({ ...args, files, nowMs: Date.now() })))
+    }
+    return JSON.parse(index.call(command, JSON.stringify(args)))
+  }
+
+  /**
+   * Hand the events of the writes that just committed to the handler.
+   */
+  #announce(index: WasmIndex): void {
+    // Taking the events also empties the queue of an index without a handler.
+    const taken = index.take_events()
+    const onEvent = this.#onEvent
+    if (onEvent === undefined) {
+      return
+    }
+    const events = JSON.parse(taken) as { event: string; payload: unknown }[]
+    for (const { event, payload } of events) {
+      // Each event has its own microtask, after the command has returned: a
+      // failing handler changes neither the result nor the other events.
+      queueMicrotask(() => {
+        onEvent(event, payload)
+      })
     }
   }
 
@@ -127,8 +159,13 @@ class WasmIndexBackendImpl implements WasmIndexBackend {
 /**
  * Create an index over a new in-memory database. `files` backs the two
  * commands that read or move note files; without it the graph lists no files
- * and a note move fails.
+ * and a note move fails. `onEvent` receives the events that the native shell
+ * broadcasts after a committed write (`index:written`, `note:moved`), after
+ * the command that caused them has returned.
  */
-export function createWasmIndexBackend(files?: WasmIndexFiles): WasmIndexBackend {
-  return new WasmIndexBackendImpl(files)
+export function createWasmIndexBackend(
+  files?: WasmIndexFiles,
+  onEvent?: WasmIndexEventHandler,
+): WasmIndexBackend {
+  return new WasmIndexBackendImpl(files, onEvent)
 }
