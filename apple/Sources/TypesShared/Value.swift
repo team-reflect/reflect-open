@@ -1,5 +1,4 @@
 /// Any JSON value: the Swift side of Rust's `serde_json::Value`.
-///
 /// TODO: specta-swift renders `serde_json::Value` as an enum that does not
 /// compile (`case null(Void)`, an undefined `Number`), so `pnpm gen:types`
 /// drops it and this file defines it. Remove this file once specta-swift

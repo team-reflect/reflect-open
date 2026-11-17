@@ -28,7 +28,6 @@ mod wake;
 mod windows;
 
 use std::sync::Arc;
-
 use reflect_core::{Core, CoreConfig};
 use tauri::{Emitter, Manager};
 

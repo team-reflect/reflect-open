@@ -82,7 +82,6 @@ describe('MobileStatusLayer', () => {
     const handle = await operate(() => appServices.operations.start('Completing task'))
     await act(() => handle.fail('The note is busy.'))
     await expect.element(page.getByRole('alert')).toBeVisible()
-
     await act(() => appServices.keyboard.publish(300))
 
     expect(page.getByRole('alert').query()).toBeNull()
