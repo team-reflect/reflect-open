@@ -9,7 +9,6 @@
 //! open: this check runs per `search` invocation, and the accepted cost is
 //! that an external edit preserving a file's mtime goes unwarned.
 
-use std::collections::HashMap;
 use std::path::Path;
 use std::time::Duration;
 
@@ -93,19 +92,8 @@ impl Staleness {
 /// Compare the indexed rows against the files on disk. Only files whose mtime
 /// diverges are hashed, so the check stays cheap on large graphs.
 pub fn detect_staleness(conn: &Connection, root: &Path) -> Result<Staleness, CliError> {
-    let mut indexed: HashMap<String, (i64, String)> = HashMap::new();
-    let mut statement = conn.prepare("SELECT path, mtime, file_hash FROM notes")?;
-    let rows = statement.query_map([], |row| {
-        Ok((
-            row.get::<_, String>(0)?,
-            row.get::<_, i64>(1)?,
-            row.get::<_, String>(2)?,
-        ))
-    })?;
-    for row in rows {
-        let (path, mtime, file_hash) = row?;
-        indexed.insert(path, (mtime, file_hash));
-    }
+    let mut indexed = reflect_index::read::notes::stored_file_facts(conn)
+        .map_err(|err| CliError::runtime(err.message()))?;
 
     let mut staleness = Staleness::default();
     for note in walk_notes(root) {

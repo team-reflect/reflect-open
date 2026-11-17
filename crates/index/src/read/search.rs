@@ -94,39 +94,73 @@ fn recall_hit(row: &Row<'_>) -> rusqlite::Result<SearchHitRow> {
     })
 }
 
-fn run(
-    conn: &Connection,
-    sql: Sql,
-    hit: fn(&Row<'_>) -> rusqlite::Result<SearchHitRow>,
-) -> AppResult<Vec<SearchHitRow>> {
-    let hits = conn
-        .prepare_cached(&sql.text)?
-        .query_map(params_from_iter(sql.params), hit)?
-        .collect::<Result<_, _>>()?;
-    Ok(hits)
+/// How the ranked search differs between its callers.
+#[derive(Clone, Copy, Debug)]
+pub struct RankedOptions {
+    /// Leaves private notes out.
+    pub exclude_private: bool,
+    /// The most tokens of a body snippet.
+    pub snippet_tokens: u8,
+}
+
+/// One hit of the ranked search.
+#[derive(Debug)]
+pub struct RankedHit {
+    pub hit: SearchHitRow,
+    /// The title-boosted bm25 rank; a lower value is better. It is 0 for a
+    /// hit that title recall alone admits.
+    pub score: f64,
 }
 
 /// The notes that match `request`. Templates never match.
 ///
 /// Without free text the result is a recall feed: pins first when asked, then
-/// newest first. With free text it is ranked: exact, prefix and all-terms
-/// title matches lead, then the title-boosted bm25 rank, pins, recency and the
-/// path.
+/// newest first. With free text it is ranked, see [`search_ranked`].
 pub(crate) fn search(conn: &Connection, request: &SearchRequest) -> AppResult<Vec<SearchHitRow>> {
-    match build_fts_match(&request.text) {
-        Some(fts_match) => run(conn, ranked_sql(request, fts_match), |row| {
-            Ok(SearchHitRow {
-                fts_highlighted_title: row.get(6)?,
-                snippet: row.get(7)?,
-                ..recall_hit(row)?
-            })
-        }),
-        None => recall(conn, request),
+    if build_fts_match(&request.text).is_none() {
+        return recall(conn, request);
     }
+    let options = RankedOptions {
+        exclude_private: false,
+        snippet_tokens: 10,
+    };
+    Ok(search_ranked(conn, request, options)?
+        .into_iter()
+        .map(|ranked| ranked.hit)
+        .collect())
+}
+
+/// The notes that match the free text and the filters of `request`, ranked:
+/// exact, prefix and all-terms title matches lead, then the title-boosted
+/// bm25 rank, pins, recency and the path. Text with no search term matches
+/// nothing.
+pub fn search_ranked(
+    conn: &Connection,
+    request: &SearchRequest,
+    options: RankedOptions,
+) -> AppResult<Vec<RankedHit>> {
+    let Some(fts_match) = build_fts_match(&request.text) else {
+        return Ok(Vec::new());
+    };
+    let sql = ranked_sql(request, fts_match, options);
+    let hits = conn
+        .prepare_cached(&sql.text)?
+        .query_map(params_from_iter(sql.params), |row| {
+            Ok(RankedHit {
+                hit: SearchHitRow {
+                    fts_highlighted_title: row.get(6)?,
+                    snippet: row.get(7)?,
+                    ..recall_hit(row)?
+                },
+                score: row.get(8)?,
+            })
+        })?
+        .collect::<Result<_, _>>()?;
+    Ok(hits)
 }
 
 /// The ranked search for free text that compiles to `fts_match`.
-fn ranked_sql(request: &SearchRequest, fts_match: String) -> Sql {
+fn ranked_sql(request: &SearchRequest, fts_match: String, options: RankedOptions) -> Sql {
     // SQLite rejects `MATCH ... OR ...`, and a flattened FTS subquery under a
     // notes-first join reruns MATCH for every note. The materialized CTE
     // computes the lexical hits once; the outer join admits rows that only
@@ -143,17 +177,12 @@ fn ranked_sql(request: &SearchRequest, fts_match: String) -> Sql {
         String::from(HIGHLIGHT_END),
     );
     sql.bind(" snippet(search_fts, 2, ?", String::from(HIGHLIGHT_START));
-    sql.bind(", ?, '…', 10) AS snippet,", String::from(HIGHLIGHT_END));
+    sql.bind(
+        &format!(", ?, '…', {}) AS snippet,", options.snippet_tokens),
+        String::from(HIGHLIGHT_END),
+    );
     sql.push(&format!(" {RANK_EXPR} AS rank FROM search_fts"));
     sql.bind(" WHERE search_fts MATCH ?)", fts_match);
-    sql.push(&format!(
-        " SELECT fn.path, fn.title, fn.daily_date, fn.preview, fn.mtime, fn.is_pinned,
-                 lexical.fts_highlighted_title, lexical.snippet
-          FROM (SELECT {HIT_COLUMNS}, notes.title_key FROM notes
-                WHERE notes.kind != 'template'"
-    ));
-    push_filters(&mut sql, request, &request.tag_keys);
-    sql.push(") AS fn LEFT JOIN lexical ON lexical.path = fn.path");
 
     // Every term matches the folded title: at a word start for scripts with
     // spaces, anywhere for scripts without.
@@ -172,7 +201,29 @@ fn ranked_sql(request: &SearchRequest, fts_match: String) -> Sql {
         }
         sql.push(")");
     };
-    sql.push(" WHERE (lexical.path IS NOT NULL OR ");
+    // A title-only hit that title recall admits keeps score 0. A title that
+    // only the tokenizer matches (`cafe` finds `Café`) keeps its bm25 rank, so
+    // it still leads body hits.
+    sql.bind(
+        " SELECT fn.path, fn.title, fn.daily_date, fn.preview, fn.mtime, fn.is_pinned,
+                 lexical.fts_highlighted_title, lexical.snippet,
+                 CASE WHEN instr(coalesce(lexical.snippet, ''), ?) > 0 OR NOT (",
+        String::from(HIGHLIGHT_START),
+    );
+    push_contains_all_terms(&mut sql);
+    sql.push(&format!(
+        ") THEN coalesce(lexical.rank, 0) ELSE 0 END AS score
+          FROM (SELECT {HIT_COLUMNS}, notes.title_key FROM notes
+                WHERE notes.kind != 'template'"
+    ));
+    if options.exclude_private {
+        sql.push(" AND notes.is_private = 0");
+    }
+    push_filters(&mut sql, request, &request.tag_keys);
+    sql.push(
+        ") AS fn LEFT JOIN lexical ON lexical.path = fn.path
+          WHERE (lexical.path IS NOT NULL OR ",
+    );
     push_contains_all_terms(&mut sql);
     // The title rank: exact (0), whole-query prefix (1), all terms (2).
     sql.bind(
@@ -184,19 +235,7 @@ fn ranked_sql(request: &SearchRequest, fts_match: String) -> Sql {
         request.title_key.clone(),
     );
     push_contains_all_terms(&mut sql);
-    // A title-only hit that title recall admits keeps rank 0. A title that
-    // only the tokenizer matches (`cafe` finds `Café`) keeps its bm25 rank, so
-    // it still leads body hits.
-    sql.bind(
-        " THEN 2 ELSE 3 END,
-          CASE WHEN instr(coalesce(lexical.snippet, ''), ?) > 0 OR NOT (",
-        String::from(HIGHLIGHT_START),
-    );
-    push_contains_all_terms(&mut sql);
-    sql.push(
-        ") THEN coalesce(lexical.rank, 0) ELSE 0 END,
-          fn.is_pinned DESC, fn.mtime DESC, fn.path ASC",
-    );
+    sql.push(" THEN 2 ELSE 3 END, score, fn.is_pinned DESC, fn.mtime DESC, fn.path ASC");
     sql.limit(request.limit);
     sql
 }
@@ -231,7 +270,11 @@ fn recall(conn: &Connection, request: &SearchRequest) -> AppResult<Vec<SearchHit
         RECENT_ORDER
     });
     sql.limit(request.limit);
-    run(conn, sql, recall_hit)
+    let hits = conn
+        .prepare_cached(&sql.text)?
+        .query_map(params_from_iter(sql.params), recall_hit)?
+        .collect::<Result<_, _>>()?;
+    Ok(hits)
 }
 
 #[cfg(test)]
@@ -240,7 +283,11 @@ pub(crate) fn ranked_query_plan(
     request: &SearchRequest,
 ) -> AppResult<Vec<String>> {
     let fts_match = build_fts_match(&request.text).unwrap_or_default();
-    let sql = ranked_sql(request, fts_match);
+    let options = RankedOptions {
+        exclude_private: false,
+        snippet_tokens: 10,
+    };
+    let sql = ranked_sql(request, fts_match, options);
     let plan = conn
         .prepare(&format!("EXPLAIN QUERY PLAN {}", sql.text))?
         .query_map(params_from_iter(sql.params), |row| row.get(3))?

@@ -1,4 +1,6 @@
-//! The read queries of the index: plain functions over a [`Connection`].
+//! The read queries of the index: plain functions over a [`Connection`]. The
+//! public ones are those the `reflect` CLI also runs, on its own read-only
+//! connection.
 //! [`IndexSession::read`] runs each command's queries in one read
 //! transaction.
 //!
@@ -12,9 +14,9 @@ pub(crate) mod daily;
 pub(crate) mod embed;
 pub(crate) mod lists;
 pub(crate) mod meta;
-pub(crate) mod notes;
-pub(crate) mod search;
+pub mod notes;
+pub mod search;
 pub(crate) mod stats;
 pub(crate) mod suggest;
 pub(crate) mod tasks;
-pub(crate) mod wiki;
+pub mod wiki;
