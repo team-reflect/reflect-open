@@ -11,7 +11,7 @@ export * from './bookmark-envelope.ts'
 
 /**
  * The platform-agnostic capture envelope (Plan 11): the contract between
- * every capture producer and the app's drain. The Chrome extension's
+ * every capture producer and the app's drain. The browser extension's
  * native-messaging host writes one `<id>.json` envelope (plus an optional
  * sibling screenshot) into the graph's capture inbox; the iOS share
  * extension writes the same shape into the App Group inbox the main app
@@ -25,7 +25,7 @@ export * from './bookmark-envelope.ts'
  */
 
 /**
- * Where a link capture originated: the Chrome extension (through the
+ * Where a link capture originated: the browser extension (through the
  * native-messaging host) or the iOS share extension (through the App Group
  * inbox the main app relays on foreground). Provenance only — every source
  * produces the same envelope shape.

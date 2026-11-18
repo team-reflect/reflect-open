@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   captureXPostRequest,
   getXPostKind,
+  normalizeXPostRequest,
   parseXPostId,
   registerXPostObserver,
+  type RawXPostRequest,
   type XPostRequest,
 } from './x-post-capture.ts'
 import { readLikeSettings } from './like-settings.ts'
@@ -12,7 +14,7 @@ import { readBookmarkSettings } from './bookmark-settings.ts'
 
 const { tabMock, observe } = vi.hoisted(() => ({
   tabMock: vi.fn(() => Promise.resolve({ incognito: false })),
-  observe: vi.fn(),
+  observe: vi.fn<(listener: (details: RawXPostRequest) => void, ...rest: unknown[]) => void>(),
 }))
 vi.mock('wxt/browser', () => ({
   browser: { tabs: { get: tabMock }, webRequest: { onBeforeRequest: { addListener: observe } } },
@@ -35,7 +37,7 @@ function request(body = '{"variables":{"tweet_id":"20"}}'): XPostRequest {
   return {
     method: 'POST',
     url: 'https://x.com/i/api/graphql/hash/CreateBookmark',
-    initiator: 'https://x.com',
+    origin: 'https://x.com',
     tabId: 1,
     timeStamp: Date.UTC(2026, 8, 9, 4),
     requestBody: { raw: [{ bytes: new TextEncoder().encode(body).buffer }] },
@@ -47,12 +49,34 @@ describe('getXPostKind', () => {
     { method: 'GET' },
     { url: 'https://x.com/i/api/graphql/hash/DeleteBookmark' },
     { url: 'https://x.com.evil.test/i/api/graphql/hash/CreateBookmark' },
-    { initiator: 'https://evil.test' },
-    { initiator: undefined },
+    { origin: 'https://evil.test' },
+    { origin: undefined },
     { tabId: -1 },
     { url: 'invalid' },
   ])('ignores unrelated requests: %j', (patch) => {
     expect(getXPostKind({ ...request(), ...patch })).toBeUndefined()
+  })
+})
+
+describe('normalizeXPostRequest', () => {
+  function raw(patch: Partial<RawXPostRequest>): RawXPostRequest {
+    const { origin: _origin, ...rest } = request()
+    return { ...rest, ...patch }
+  }
+
+  it.each([
+    ['chromium', { initiator: 'https://x.com', originUrl: 'https://evil.test/' }, 'https://x.com'],
+    ['chromium', { originUrl: 'https://x.com/home' }, undefined],
+    [
+      'firefox',
+      { originUrl: 'https://x.com/home', initiator: 'https://evil.test' },
+      'https://x.com',
+    ],
+    ['firefox', { originUrl: 'https://evil.test/x.com/home' }, 'https://evil.test'],
+    ['firefox', { originUrl: 'not a url' }, undefined],
+    ['firefox', { initiator: 'https://x.com' }, undefined],
+  ] as const)('reads the %s origin field from %j', (browser, patch, origin) => {
+    expect(normalizeXPostRequest(raw(patch), browser).origin).toBe(origin)
   })
 })
 
@@ -137,7 +161,7 @@ it('ignores a tab that disappears before inspection', async () => {
 })
 
 it('registers both narrow operations synchronously at worker start', () => {
-  registerXPostObserver()
+  registerXPostObserver('chromium')
   expect(observe).toHaveBeenCalledWith(
     expect.any(Function),
     {
@@ -148,4 +172,17 @@ it('registers both narrow operations synchronously at worker start', () => {
     },
     ['requestBody'],
   )
+})
+
+it('normalizes observed requests for the browser it was registered with', async () => {
+  registerXPostObserver('firefox')
+  const [listener] = observe.mock.calls[0]!
+  const { origin: _origin, ...details } = request()
+  listener({ ...details, originUrl: 'https://x.com/home' })
+  await vi.waitFor(() => {
+    expect(saveXPost).toHaveBeenCalledWith(1, '20', '2026-09-09T04:00:00.000Z', {
+      kind: 'x-bookmark',
+      shouldAdmit: expect.any(Function) as () => Promise<boolean>,
+    })
+  })
 })

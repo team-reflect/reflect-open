@@ -36,3 +36,18 @@ it('still drops a bookmark the host rejects', async () => {
   send.mockResolvedValueOnce({ ok: false, code: 'invalid-payload', message: 'bad capture' })
   expect(await sendToHost(wire('x-bookmark'))).toMatchObject({ kind: 'rejected' })
 })
+
+it.each([
+  'Specified native messaging host not found.',
+  'Access to the specified native messaging host is forbidden.',
+  'No such native application app.reflect.capture',
+  'This extension does not have permission to use native application app.reflect.capture (or the application is not installed)',
+])('holds as no-host when the browser cannot reach the host: %s', async (message) => {
+  send.mockRejectedValueOnce(new Error(message))
+  expect(await sendToHost(wire('x-bookmark'))).toMatchObject({ kind: 'held', reason: 'no-host' })
+})
+
+it('holds other native-messaging failures as io', async () => {
+  send.mockRejectedValueOnce(new Error('An unexpected error occurred'))
+  expect(await sendToHost(wire('x-bookmark'))).toMatchObject({ kind: 'held', reason: 'io' })
+})

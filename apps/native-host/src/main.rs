@@ -1,6 +1,6 @@
 //! Binary entry point: wire stdin/stdout to the host loop. Stdout is the
 //! native-messaging channel — nothing else may write to it; diagnostics go to
-//! stderr (Chrome surfaces them in its extension logs).
+//! stderr (the browser surfaces them in its extension logs).
 
 use std::process::ExitCode;
 
