@@ -86,7 +86,7 @@ loads under the ID the host allowlists; there is no `key` dance.
 
   ```
   web-ext run --target firefox-desktop \
-    --source-dir apps/extension/.output/firefox-mv3-dev \
+    --source-dir .output/firefox-mv3-dev \
     --no-reload
   ```
 - **Side-load a build:** `pnpm build:firefox`, then navigate to `about:debugging` in
@@ -96,7 +96,7 @@ loads under the ID the host allowlists; there is no `key` dance.
 - **Keep it installed:** release Firefox only installs signed add-ons. Either
   sign the `pnpm zip:firefox` artifact as an unlisted add-on on
   addons.mozilla.org `web-ext sign --channel=unlisted`, which also requires
-  installing `web-ext` or use Developer
+  installing `web-ext`, or use Developer
   Edition / Nightly with `xpinstall.signatures.required` set to `false` in
   `about:config` and install the zip (renamed to `.xpi`) from `about:addons` →
   gear → **Install Add-on From File…**.
