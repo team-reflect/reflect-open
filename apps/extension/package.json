@@ -9,7 +9,6 @@
     "build:safari": "wxt build -b safari --mv3",
     "zip": "WXT_STORE_BUILD=true wxt zip",
     "zip:unpacked": "wxt zip",
-    "test": "vitest run",
     "gen:wxt": "wxt prepare"
   },
   "dependencies": {

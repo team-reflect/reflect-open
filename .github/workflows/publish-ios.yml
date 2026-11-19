@@ -83,7 +83,6 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache: ${{ inputs.cache }}
-          cache-key: publish-ios
 
       - uses: ./.github/actions/setup-mise
         with:

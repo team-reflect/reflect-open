@@ -12,13 +12,13 @@ concurrency:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   classify:
     runs-on: ubuntu-slim
     timeout-minutes: 10
     outputs:
-      build-index-wasm: ${{ steps.classify.outputs.build-index-wasm }}
       lint-node: ${{ steps.classify.outputs.lint-node }}
       test-node: ${{ steps.classify.outputs.test-node }}
       test-chromium: ${{ steps.classify.outputs.test-chromium }}
@@ -132,7 +132,6 @@ jobs:
           fi
 
           {
-            echo "build-index-wasm=$js"
             echo "lint-node=$js"
             echo "test-node=$js"
             echo "test-chromium=$js"
@@ -143,10 +142,9 @@ jobs:
             echo "test-rust=$rust"
           } | tee -a "$GITHUB_OUTPUT"
 
-  # Builds the Rust index to wasm once; the TypeScript jobs download it.
-  build-index-wasm:
-    needs: classify
-    if: needs.classify.outputs.build-index-wasm == 'true'
+  lint-node:
+    needs: [classify]
+    if: needs.classify.outputs.lint-node == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -156,42 +154,10 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-        with:
-          cache-key: index-wasm
 
       - uses: ./.github/actions/setup-mise
 
-      - name: Build
-        run: pnpm build:index-wasm
-
-      - name: Upload the index wasm build
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: index-wasm
-          path: |
-            packages/index-wasm/pkg
-            !packages/index-wasm/pkg/*.d.ts
-          retention-days: 1
-
-  lint-node:
-    needs: [classify, build-index-wasm]
-    if: needs.classify.outputs.lint-node == 'true'
-    runs-on: ubuntu-24.04
-    env:
-      # The job downloads the wasm build of the index; it has no Rust toolchain.
-      REFLECT_INDEX_WASM_PREBUILT: '1'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-node
-
-      - name: Download the index wasm build
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: index-wasm
-          path: packages/index-wasm/pkg
+      - uses: ./.github/actions/setup-turbo
 
       - name: Verify the generated iOS CSP is current
         run: |
@@ -199,22 +165,13 @@ jobs:
           git diff --exit-code apple/Sources/WebHostKit/ContentSecurityPolicy.gen.swift \
             || (echo "::error::ContentSecurityPolicy.gen.swift is stale. Run 'pnpm gen:ios-csp' and commit the result." && exit 1)
 
-      - name: Lint
-        run: pnpm lint
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Build
-        run: pnpm build
+      - name: Lint, typecheck and build
+        run: pnpm turbo run lint typecheck build --filter=// --filter='@reflect/*'
 
   test-node:
-    needs: [classify, build-index-wasm]
+    needs: [classify]
     if: needs.classify.outputs.test-node == 'true'
     runs-on: ubuntu-24.04
-    env:
-      # The job downloads the wasm build of the index; it has no Rust toolchain.
-      REFLECT_INDEX_WASM_PREBUILT: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -222,17 +179,17 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      - name: Download the index wasm build
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: index-wasm
-          path: packages/index-wasm/pkg
+      - uses: ./.github/actions/setup-rust
+
+      - uses: ./.github/actions/setup-mise
+
+      - uses: ./.github/actions/setup-turbo
 
       - name: Test
-        run: pnpm run test:node
+        run: pnpm turbo run test:node
 
   test-chromium:
-    needs: [classify, build-index-wasm]
+    needs: [classify]
     if: needs.classify.outputs.test-chromium == 'true'
     runs-on: ubuntu-24.04
     strategy:
@@ -241,8 +198,6 @@ jobs:
         shard: [1, 2, 3]
     name: test-chromium (${{ matrix.shard }}/3)
     env:
-      # The job downloads the wasm build of the index; it has no Rust toolchain.
-      REFLECT_INDEX_WASM_PREBUILT: '1'
       REFLECT_TEST_BROWSER: chromium
       # Chromium on Linux does not promptly free the iframe of a finished
       # test file (https://issues.chromium.org/issues/530892387), so one
@@ -260,26 +215,28 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      - name: Download the index wasm build
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: index-wasm
-          path: packages/index-wasm/pkg
+      - uses: ./.github/actions/setup-rust
+
+      - uses: ./.github/actions/setup-mise
+
+      - uses: ./.github/actions/setup-turbo
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:chromium
 
+      - name: Build the index wasm
+        run: pnpm build:index-wasm
+
+      # `--only` passes `--shard` to the test task alone, not to the wasm build.
       - name: Test
-        run: pnpm run test:browser --shard=${{ matrix.shard }}/3
+        run: pnpm turbo run test:browser --only -- --shard=${{ matrix.shard }}/3
 
   # Not part of `all-green`: a WebKit failure does not block merging.
   test-webkit:
-    needs: [classify, build-index-wasm, test-chromium]
+    needs: [classify, test-chromium]
     if: needs.classify.outputs.test-webkit == 'true'
     runs-on: xcode-27
     env:
-      # The job downloads the wasm build of the index; it has no Rust toolchain.
-      REFLECT_INDEX_WASM_PREBUILT: '1'
       REFLECT_TEST_BROWSER: webkit
       # Suspected workaround, root cause unknown: WebContent sometimes
       # segfaults in JavaScriptCore JIT code ("The webkit page crashed") in
@@ -296,25 +253,29 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      - name: Download the index wasm build
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: index-wasm
-          path: packages/index-wasm/pkg
+      - uses: ./.github/actions/setup-rust
+
+      - uses: ./.github/actions/setup-mise
+
+      - uses: ./.github/actions/setup-turbo
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:webkit
 
+      - name: Build the index wasm
+        run: pnpm build:index-wasm
+
       # WebKit keeps the memory of every finished test file, so each shard
-      # runs in its own Vitest process to restart the browser.
+      # runs in its own Vitest process to restart the browser. `--only` passes
+      # `--shard` to the test task alone, not to the wasm build.
       - name: Test browser (shard 1/3)
-        run: pnpm run test:browser --shard=1/3
+        run: pnpm turbo run test:browser --only -- --shard=1/3
 
       - name: Test browser (shard 2/3)
-        run: pnpm run test:browser --shard=2/3
+        run: pnpm turbo run test:browser --only -- --shard=2/3
 
       - name: Test browser (shard 3/3)
-        run: pnpm run test:browser --shard=3/3
+        run: pnpm turbo run test:browser --only -- --shard=3/3
 
   test-swift:
     needs: classify
@@ -360,8 +321,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-        with:
-          cache-key: test-ios
 
       - uses: ./.github/actions/setup-mise
 
@@ -397,7 +356,6 @@ jobs:
             os: ubuntu-24.04
           - name: macOS
             os: xcode-27
-            args: --target aarch64-apple-darwin
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -411,23 +369,24 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
 
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets ${{ matrix.args }}
+      - uses: ./.github/actions/setup-node
 
-      # The iOS app links the core crates through `reflect-ffi`. The Tauri
-      # shell (`reflect-open`) builds for desktop only.
+      - uses: ./.github/actions/setup-turbo
+
+      - name: Clippy
+        run: pnpm turbo run lint --filter=reflect-workspace
+
+      # The iOS app links the core crates through `reflect-ffi`.
       - name: Clippy (iOS simulator)
         if: matrix.name == 'macOS'
-        run: cargo clippy --workspace --exclude reflect-open --all-targets --target aarch64-apple-ios-sim
+        run: pnpm turbo run lint:ios --filter=reflect-workspace
 
       - name: Clippy (wasm)
         if: matrix.name == 'Linux'
-        run: |
-          export AR_wasm32_unknown_unknown="$(rustc --print sysroot)/lib/rustlib/$(rustc -vV | sed -n 's/host: //p')/bin/llvm-ar"
-          cargo clippy --package reflect-index-wasm --target wasm32-unknown-unknown
+        run: pnpm turbo run lint:wasm --filter=reflect-workspace
 
       - name: Format check
-        run: cargo fmt --all -- --check
+        run: pnpm turbo run format:check --filter=reflect-workspace
 
       - if: matrix.name == 'Linux'
         uses: ./.github/actions/setup-mise
@@ -464,8 +423,12 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
 
+      - uses: ./.github/actions/setup-node
+
+      - uses: ./.github/actions/setup-turbo
+
       - name: Test
-        run: cargo test --workspace
+        run: pnpm turbo run test --filter=reflect-workspace
 
   # A single job for branch protection to require, instead of listing every
   # job as a required status check.
@@ -476,7 +439,6 @@ jobs:
     if: always()
     needs:
       - classify
-      - build-index-wasm
       - lint-node
       - test-node
       - test-chromium

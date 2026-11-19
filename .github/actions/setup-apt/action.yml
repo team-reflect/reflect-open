@@ -44,14 +44,22 @@ runs:
         # has since removed. Only the download runs under `timeout`, since
         # killing `dpkg` mid-install would break the retry.
         download() {
-          sudo timeout 120 apt-get update &&
-            sudo timeout 180 apt-get install $opts --download-only $packages
+          echo "Updating package index..."
+          sudo timeout 120 apt-get update
+          echo "Done updating package index."
+          echo "Downloading packages..."
+          sudo timeout 180 apt-get install $opts --download-only $packages
+          echo "Done downloading packages."
         }
+
         if ! download; then
           # The Azure mirror can trickle at ~50 kB/s without tripping apt's failover: https://github.com/actions/runner-images/issues/14823
+          echo "Retrying with the Azure mirror disabled..."
           sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
           download
         fi
+
+        echo "Installing packages..."
         sudo apt-get install $opts $packages
 
     - name: Save the apt package cache

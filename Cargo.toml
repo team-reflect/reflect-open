@@ -19,6 +19,9 @@ members = [
   "crates/types",
 ]
 
+[workspace.metadata]
+name = "reflect-workspace"
+
 [workspace.package]
 authors = ["Reflect App, LLC"]
 edition = "2024"

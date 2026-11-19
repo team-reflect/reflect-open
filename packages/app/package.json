@@ -8,9 +8,6 @@
     ".": "./src/index.ts",
     "./testing": "./src/testing/index.ts"
   },
-  "scripts": {
-    "test": "node ../../scripts/build-index-wasm.ts && vitest run --config ../../vitest.config.ts --project app"
-  },
   "dependencies": {
     "@ocavue/utils": "^1.12.0",
     "@reflect/core": "workspace:*",

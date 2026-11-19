@@ -1,0 +1,81 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "futureFlags": {
+    "githubActionsRemoteBaseRefFallback": true,
+    "experimentalCargoWorkspaces": true,
+    "experimentalTaskCommand": true,
+  },
+  "globalPassThroughEnv": ["CI", "GITHUB_ACTIONS"],
+  "cacheMaxAge": "7d",
+  "cacheMaxSize": "4GB",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "env": ["TAURI_ENV_PLATFORM"],
+      "outputs": ["dist/**", ".output/**"],
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "env": ["TAURI_ENV_PLATFORM"],
+      "cache": false,
+      "persistent": true,
+    },
+
+    // TypeScript checks and tests (root scripts, whole repo).
+    "//#lint": {
+      "dependsOn": ["@reflect/index-wasm#build"],
+      "outputs": [".eslintcache"],
+    },
+    "//#typecheck": {
+      "outputs": ["**/*.tsbuildinfo"],
+    },
+    "//#test:node": {
+      "dependsOn": ["@reflect/index-wasm#build"],
+    },
+    "//#test:browser": {
+      "dependsOn": ["@reflect/index-wasm#build"],
+      "env": ["REFLECT_TEST_BROWSER"],
+      "passThroughEnv": ["VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB", "__XPC_JSC_useJIT"],
+    },
+
+    // Rust checks and tests (the whole Cargo workspace).
+    "reflect-workspace#lint": {
+      "command": ["cargo", "clippy", "--workspace", "--all-targets", "--locked"],
+      "env": ["TAURI_CONFIG"],
+      "passThroughEnv": ["ORT_CACHE_DIR"],
+    },
+    "reflect-workspace#lint:ios": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--exclude",
+        "reflect-open",
+        "--all-targets",
+        "--locked",
+        "--target",
+        "aarch64-apple-ios-sim",
+      ],
+      "env": ["TAURI_CONFIG"],
+      "passThroughEnv": ["ORT_CACHE_DIR"],
+    },
+    "reflect-workspace#lint:wasm": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--package",
+        "reflect-index-wasm",
+        "--target",
+        "wasm32-unknown-unknown",
+        "--locked",
+      ],
+    },
+    "reflect-workspace#format:check": {
+      "command": ["cargo", "fmt", "--all", "--", "--check"],
+    },
+    "reflect-workspace#test": {
+      "env": ["TAURI_CONFIG"],
+      "passThroughEnv": ["ORT_CACHE_DIR"],
+    },
+  },
+}

@@ -1,0 +1,24 @@
+# Put setup-turbo after setup-rust and setup-node
+
+name: Set up turborepo
+description: Set up turborepo
+
+inputs:
+  cache:
+    description: Whether to restore and save the cache.
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: echo "DO_NOT_TRACK=1" >> $GITHUB_ENV
+
+    - uses: vercel/setup-turborepo-remote-cache-action@49d7b1b46ba4c9251e1977986bfe18336feabc8f # v1.1.0
+      if: >-
+        inputs.cache == 'true'
+        && github.repository == 'team-reflect/reflect-open'
+        && github.event.pull_request.head.repo.fork != true
+      with:
+        team: team-reflect

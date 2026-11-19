@@ -7,7 +7,7 @@ inputs:
     required: false
     default: 'true'
   cache-key:
-    description: An extra key for the cargo build cache, for jobs that must not share one.
+    description: An extra key for the cargo build cache.
     required: false
     default: ''
 
