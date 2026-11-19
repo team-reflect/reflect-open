@@ -362,11 +362,8 @@ jobs:
         include:
           - name: Linux
             os: ubuntu-24.04
-            extra-tasks: lint:wasm
           - name: macOS
             os: xcode-27
-            # The iOS app links the core crates through `reflect-ffi`.
-            extra-tasks: lint:ios
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -386,8 +383,20 @@ jobs:
         with:
           team: ${{ vars.TURBO_TEAM }}
 
-      - name: Clippy and format check
-        run: pnpm turbo run lint ${{ matrix.extra-tasks }} format:check --filter=reflect-workspace
+      - name: Clippy
+        run: pnpm turbo run lint --filter=reflect-workspace
+
+      # The iOS app links the core crates through `reflect-ffi`.
+      - name: Clippy (iOS simulator)
+        if: matrix.name == 'macOS'
+        run: pnpm turbo run lint:ios --filter=reflect-workspace
+
+      - name: Clippy (wasm)
+        if: matrix.name == 'Linux'
+        run: pnpm turbo run lint:wasm --filter=reflect-workspace
+
+      - name: Format check
+        run: pnpm turbo run format:check --filter=reflect-workspace
 
       - if: matrix.name == 'Linux'
         uses: ./.github/actions/setup-mise
