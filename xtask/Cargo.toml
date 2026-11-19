@@ -1,0 +1,12 @@
+[package]
+name = "xtask"
+version = "0.0.0"
+description = "Repository automation, run as `cargo xtask <command>`."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+cbindgen = { workspace = true }
+wasm-bindgen-cli-support = { workspace = true }
