@@ -20,7 +20,7 @@ members = [
 ]
 
 [workspace.metadata]
-name = "reflect-rust"
+name = "reflect-workspace"
 
 [workspace.package]
 authors = ["Reflect App, LLC"]
