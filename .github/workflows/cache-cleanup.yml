@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [closed]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions: {}
 
 jobs:
