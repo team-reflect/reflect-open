@@ -31,9 +31,42 @@ fi
 #   with the same value compiled.
 # - MISE_TRUSTED_CONFIG_PATHS stays, so the mise shims load mise.toml, whose
 #   [settings] block needs trust.
+# - The CI variables that .github/actions/setup-rust sets stay, so the Rust
+#   build runs through sccache and its GitHub Actions cache.
+keep=(
+  DEVELOPER_DIR
+  CARGO_INCREMENTAL
+  MISE_TRUSTED_CONFIG_PATHS
+  CARGO_PROFILE_RELEASE_DEBUG
+  CARGO_HTTP_MULTIPLEXING
+  ORT_CACHE_DIR
+  RUSTC_WRAPPER
+  SCCACHE_PATH
+  SCCACHE_CONF
+  SCCACHE_DIR
+  SCCACHE_CACHE_SIZE
+  SCCACHE_CACHE_ZSTD_LEVEL
+  SCCACHE_IDLE_TIMEOUT
+  SCCACHE_SERVER_PORT
+  SCCACHE_LOG
+  SCCACHE_ERROR_LOG
+  SCCACHE_GHA_ENABLED
+  SCCACHE_GHA_RW_MODE
+  SCCACHE_GHA_VERSION
+  SCCACHE_MULTILEVEL_CHAIN
+  SCCACHE_MULTILEVEL_WRITE_ERROR_POLICY
+  SCCACHE_SKIP_CACHE_CHECK
+  ACTIONS_CACHE_URL
+  ACTIONS_CACHE_SERVICE_V2
+  ACTIONS_RESULTS_URL
+  ACTIONS_RUNTIME_TOKEN
+)
+env_args=()
+for name in "${keep[@]}"; do
+  if [ -n "${!name:-}" ]; then
+    env_args+=("$name=${!name}")
+  fi
+done
 exec env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
-  ${DEVELOPER_DIR:+DEVELOPER_DIR="$DEVELOPER_DIR"} \
-  ${CARGO_INCREMENTAL:+CARGO_INCREMENTAL="$CARGO_INCREMENTAL"} \
-  ${MISE_TRUSTED_CONFIG_PATHS:+MISE_TRUSTED_CONFIG_PATHS="$MISE_TRUSTED_CONFIG_PATHS"} \
-  ${CARGO_PROFILE_RELEASE_DEBUG:+CARGO_PROFILE_RELEASE_DEBUG="$CARGO_PROFILE_RELEASE_DEBUG"} \
+  ${env_args[@]+"${env_args[@]}"} \
   node scripts/build-ffi.ts "${args[@]}"
