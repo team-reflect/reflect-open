@@ -9,9 +9,9 @@
 # removes the mirror that apt tries first and runs the step again.
 #
 # Usage:
-#   scripts/ci-apt.sh update
-#   scripts/ci-apt.sh list-downloads <package>...
-#   scripts/ci-apt.sh install <archives-dir> <package>...
+#   scripts/ci-apt.sh <archives-dir> <package>...
+#
+# <archives-dir> holds the downloaded package files, so CI can cache it.
 
 set -euo pipefail
 
@@ -104,19 +104,6 @@ update_package_lists() {
   run_apt_with_retry "$UPDATE_TIMEOUT_SECONDS" update
 }
 
-# Prints one line for each package file that installing the packages needs:
-#   '<url>' <file name> <size> <hash>
-# apt-get prints only the files that are missing from the archives directory,
-# so an empty directory makes it print all of them.
-list_downloads() {
-  local empty_dir
-  empty_dir=$(mktemp -d)
-  sudo apt-get install --print-uris --quiet --quiet --yes --no-install-recommends \
-    -o "Dir::Cache::Archives=$empty_dir" "$@" |
-    grep "^'"
-  rmdir "$empty_dir"
-}
-
 # Downloads the packages into $1, installs them, and removes old package files from $1.
 install_packages() {
   local archives_dir=$1
@@ -130,44 +117,15 @@ install_packages() {
   # It has no time limit: stopping dpkg halfway leaves packages half installed.
   sudo DEBIAN_FRONTEND=noninteractive apt-get --quiet install --no-download "${options[@]}" "$@"
 
-  remove_old_package_files "$archives_dir" "$@"
+  # Removes the package files whose versions are no longer in the package lists,
+  # so the cache keeps only the current versions.
+  sudo apt-get --quiet autoclean -o "Dir::Cache::Archives=$archives_dir"
 }
 
-# Removes the package files in $1 that the packages no longer need,
-# so the cache keeps only the current versions.
-remove_old_package_files() {
-  local archives_dir=$1
-  shift
-
-  local needed_files
-  needed_files=$(list_downloads "$@" | cut -d ' ' -f 2)
-
-  local file
-  for file in "$archives_dir"/*.deb; do
-    if ! grep -q -x -F "$(basename "$file")" <<< "$needed_files"; then
-      echo "Removing the old package file $(basename "$file")"
-      sudo rm "$file"
-    fi
-  done
-}
-
-command=${1:-}
-if [ "$#" -gt 0 ]; then
-  shift
+if [ "$#" -lt 2 ]; then
+  echo "Usage: $0 <archives-dir> <package>..." >&2
+  exit 2
 fi
 
-case "$command" in
-  update)
-    update_package_lists
-    ;;
-  list-downloads)
-    list_downloads "$@"
-    ;;
-  install)
-    install_packages "$@"
-    ;;
-  *)
-    echo "Usage: $0 update | list-downloads <package>... | install <archives-dir> <package>..." >&2
-    exit 2
-    ;;
-esac
+update_package_lists
+install_packages "$@"

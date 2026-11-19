@@ -10,10 +10,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Update the apt package lists
-      shell: bash
-      run: '"$GITHUB_WORKSPACE/scripts/ci-apt.sh" update'
-
     - name: Compute the apt cache key and directory
       id: apt
       shell: bash
@@ -24,10 +20,14 @@ runs:
         # `libappindicator3-dev`, as in the Tauri prerequisites page.
         # https://github.com/tauri-apps/tauri-docs/blob/5e49cc6e48597060f1618e0b62cb91b071b1b4a9/src/content/docs/distribute/Pipelines/github.mdx?plain=1#L105
         packages="libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils"
-        hash=$("$GITHUB_WORKSPACE/scripts/ci-apt.sh" list-downloads $packages | sha256sum | cut -d ' ' -f 1)
+        hash=$(echo "$packages" | sha256sum | cut -d ' ' -f 1)
+        # Ubuntu publishes new package versions all the time, so the cache key
+        # changes every week (ISO year and week, e.g. 2026-W47). A new key
+        # restores last week's cache and downloads only the changed packages.
+        week=$(date -u +%G-W%V)
         echo "packages=$packages" >> "$GITHUB_OUTPUT"
-        echo "key=apt-$ImageOS-$RUNNER_ARCH-$hash" >> "$GITHUB_OUTPUT"
-        echo "restore-key=apt-$ImageOS-$RUNNER_ARCH-" >> "$GITHUB_OUTPUT"
+        echo "key=apt-$ImageOS-$RUNNER_ARCH-$hash-$week" >> "$GITHUB_OUTPUT"
+        echo "restore-key=apt-$ImageOS-$RUNNER_ARCH-$hash-" >> "$GITHUB_OUTPUT"
         echo "dir=$RUNNER_TEMP/apt-archives" >> "$GITHUB_OUTPUT"
 
     - name: Restore the apt package cache
@@ -44,7 +44,7 @@ runs:
       env:
         archives: ${{ steps.apt.outputs.dir }}
         packages: ${{ steps.apt.outputs.packages }}
-      run: '"$GITHUB_WORKSPACE/scripts/ci-apt.sh" install "$archives" $packages'
+      run: '"$GITHUB_WORKSPACE/scripts/ci-apt.sh" "$archives" $packages'
 
     - name: Save the apt package cache
       if: inputs.cache == 'true' && steps.apt-cache.outputs.cache-hit != 'true'
