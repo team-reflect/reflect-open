@@ -16,6 +16,9 @@ runs:
       run: echo "DO_NOT_TRACK=1" >> $GITHUB_ENV
 
     - uses: vercel/setup-turborepo-remote-cache-action@49d7b1b46ba4c9251e1977986bfe18336feabc8f # v1.1.0
-      if: ${{ inputs.cache == 'true' }}
+      if: >-
+        inputs.cache == 'true'
+        && vars.TURBO_TEAM != ''
+        && github.repository == 'team-reflect/reflect-open'
       with:
         team: ${{ vars.TURBO_TEAM }}

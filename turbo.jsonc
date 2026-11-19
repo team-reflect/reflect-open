@@ -17,8 +17,6 @@
       "cache": false,
       "persistent": true,
     },
-    "test": {},
-    "lint": {},
 
     "rust:src": {
       "command": ["true"],
