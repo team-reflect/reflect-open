@@ -42,6 +42,17 @@ runs:
       run: |
         echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
         echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
+        # Look up the local disk first, then the GitHub Actions cache. A GHA
+        # hit is copied to the disk, and a write goes to both levels.
+        # https://github.com/mozilla/sccache/blob/v0.19.0/docs/MultiLevel.md
+        echo "SCCACHE_DIR=$RUNNER_TEMP/sccache" >> "$GITHUB_ENV"
+        echo "SCCACHE_MULTILEVEL_CHAIN=disk,gha" >> "$GITHUB_ENV"
+        # Write every level before the compile returns, so that no write is
+        # still running in the background when the job ends.
+        echo "SCCACHE_MULTILEVEL_WRITE_ERROR_POLICY=all" >> "$GITHUB_ENV"
+        # Without this, sccache writes a probe file to GHA before every write,
+        # and a rate-limited probe makes it skip the write.
+        echo "SCCACHE_SKIP_CACHE_CHECK=true" >> "$GITHUB_ENV"
 
     - name: Cache cargo registry
       if: inputs.cache == 'true'

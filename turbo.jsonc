@@ -5,7 +5,9 @@
     "experimentalCargoWorkspaces": true,
     "experimentalTaskCommand": true,
   },
-  "globalPassThroughEnv": ["CI", "GITHUB_ACTIONS"],
+  // sccache reads its config and the GitHub Actions cache token from these.
+  // turbo starts cargo, and the first rustc call starts the sccache server.
+  "globalPassThroughEnv": ["CI", "GITHUB_ACTIONS", "SCCACHE_*", "ACTIONS_*"],
   "cacheMaxAge": "7d",
   "cacheMaxSize": "4GB",
   "tasks": {
