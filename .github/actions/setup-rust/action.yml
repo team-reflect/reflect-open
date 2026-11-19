@@ -10,6 +10,10 @@ inputs:
     description: An extra key for the cargo build cache. The job id is already in the key, so only jobs of one matrix need it.
     required: false
     default: ''
+  cache-targets:
+    description: Whether to cache `target/`. With `false`, only `~/.cargo` is cached.
+    required: false
+    default: 'true'
 
 runs:
   using: composite
@@ -57,6 +61,7 @@ runs:
       uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       with:
         key: ${{ inputs.cache-key }}
+        cache-targets: ${{ inputs.cache-targets }}
         env-vars: ORT_CACHE_DIR
         cache-directories: ${{ env.ORT_CACHE_DIR }}
 
