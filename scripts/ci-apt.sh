@@ -14,15 +14,20 @@
 set -euo pipefail
 
 MIRROR_LIST=/etc/apt/apt-mirrors.txt
+MAX_ATTEMPTS=3
+UPDATE_TIMEOUT_SECONDS=180
+DOWNLOAD_TIMEOUT_SECONDS=240
 
-# Runs apt-get up to 3 times, each attempt within 240 seconds.
+# Runs apt-get up to MAX_ATTEMPTS times, each attempt within $1 seconds.
 retry_apt_get() {
+  local seconds=$1
+  shift
   local attempt
-  for attempt in 1 2 3; do
-    if sudo DEBIAN_FRONTEND=noninteractive timeout --kill-after=10 240 apt-get --quiet "$@"; then
+  for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+    if sudo DEBIAN_FRONTEND=noninteractive timeout --kill-after=10 "$seconds" apt-get --quiet "$@"; then
       return 0
     fi
-    echo "::warning::apt-get $1 failed or ran past 240s (attempt $attempt of 3)"
+    echo "::warning::apt-get $1 failed or ran past ${seconds}s (attempt $attempt of $MAX_ATTEMPTS)"
     # The list is sorted by priority, so its first mirror is the one apt tries first.
     if [ "$(grep -c '^http' "$MIRROR_LIST")" -gt 1 ]; then
       sudo sed -i '0,/^http/{/^http/d}' "$MIRROR_LIST"
@@ -32,8 +37,8 @@ retry_apt_get() {
 }
 
 cat "$MIRROR_LIST"
-retry_apt_get update
-retry_apt_get install --download-only --yes --no-install-recommends "$@"
+retry_apt_get "$UPDATE_TIMEOUT_SECONDS" update
+retry_apt_get "$DOWNLOAD_TIMEOUT_SECONDS" install --download-only --yes --no-install-recommends "$@"
 # Every package file is downloaded now. This step has no time limit: stopping
 # dpkg halfway leaves packages half installed.
 sudo DEBIAN_FRONTEND=noninteractive apt-get --quiet install --no-download --yes --no-install-recommends "$@"
