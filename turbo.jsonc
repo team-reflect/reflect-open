@@ -24,5 +24,83 @@
       "command": ["true"],
       "dependsOn": ["^rust:src"],
     },
+
+    "reflect-index-wasm#build:wasm": {
+      "command": ["node", "../../scripts/build-index-wasm.ts"],
+      "dependsOn": ["^rust:src"],
+      "env": ["TAURI_ENV_PLATFORM"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/build-index-wasm.ts",
+        "$TURBO_ROOT$/rust-toolchain.toml",
+        "$TURBO_ROOT$/mise.toml",
+      ],
+      "outputs": [
+        "$TURBO_ROOT$/packages/index-wasm/pkg/**",
+        "!$TURBO_ROOT$/packages/index-wasm/pkg/*.d.ts",
+      ],
+    },
+
+    "@reflect/index-wasm#build": {
+      "dependsOn": ["reflect-index-wasm#build:wasm"],
+    },
+
+    // TypeScript checks and tests (root scripts, whole repo).
+    "//#lint": {
+      "dependsOn": ["@reflect/index-wasm#build"],
+      "outputs": [".eslintcache"],
+    },
+    "//#typecheck": {
+      "outputs": ["**/*.tsbuildinfo"],
+    },
+    "//#test:node": {
+      "dependsOn": ["@reflect/index-wasm#build"],
+    },
+    "//#test:browser": {
+      "dependsOn": ["@reflect/index-wasm#build"],
+      "env": ["REFLECT_TEST_BROWSER", "REFLECT_TEST_SHARD"],
+      "passThroughEnv": ["VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB", "__XPC_JSC_useJIT"],
+    },
+
+    // Rust checks and tests (the whole Cargo workspace).
+    "reflect-rust#lint": {
+      "command": ["cargo", "clippy", "--workspace", "--all-targets", "--locked"],
+      "env": ["TAURI_CONFIG"],
+      "passThroughEnv": ["ORT_CACHE_DIR"],
+    },
+    "reflect-rust#lint:ios": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--exclude",
+        "reflect-open",
+        "--all-targets",
+        "--locked",
+        "--target",
+        "aarch64-apple-ios-sim",
+      ],
+      "env": ["TAURI_CONFIG"],
+      "passThroughEnv": ["ORT_CACHE_DIR"],
+    },
+    "reflect-rust#lint:wasm": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--package",
+        "reflect-index-wasm",
+        "--target",
+        "wasm32-unknown-unknown",
+        "--locked",
+      ],
+      "passThroughEnv": ["AR_wasm32_unknown_unknown"],
+    },
+    "reflect-rust#format:check": {
+      "command": ["cargo", "fmt", "--all", "--", "--check"],
+    },
+    "reflect-rust#test": {
+      "env": ["TAURI_CONFIG"],
+      "passThroughEnv": ["ORT_CACHE_DIR"],
+    },
   },
 }
