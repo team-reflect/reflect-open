@@ -20,9 +20,9 @@ jobs:
       actions: write
     steps:
       - run: |
-          gh cache list --ref "refs/pull/$PR_NUMBER/merge" --sort size_in_bytes --limit 100 --json key,id --jq '.[] | "\(.id) \(.key)"' |
-            while read -r id key; do
-              echo "Deleting $key"
+          gh cache list --ref "refs/pull/$PR_NUMBER/merge" --sort size_in_bytes --limit 100 --json key,id,sizeInBytes --jq '.[] | "\(.id) \(.sizeInBytes / 1024 | floor) \(.key)"' |
+            while read -r id size key; do
+              echo "Deleting $key ($size KiB)"
               gh cache delete "$id" || true
               sleep 1
             done
