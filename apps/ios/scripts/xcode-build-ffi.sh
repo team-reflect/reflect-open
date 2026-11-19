@@ -23,41 +23,37 @@ if [ "${CONFIGURATION:?}" = "Debug-Dev" ]; then
   args+=(--debug)
 fi
 
-# A clean environment: Xcode's SDKROOT and deployment target variables would
-# otherwise leak into the host build scripts that cargo compiles for macOS.
-#
-# - DEVELOPER_DIR stays, so the Rust build uses the Xcode that runs this build.
-# - CARGO_INCREMENTAL stays, so cargo reuses the crates that an earlier build
-#   with the same value compiled.
-# - MISE_TRUSTED_CONFIG_PATHS stays, so the mise shims load mise.toml, whose
-#   [settings] block needs trust.
-# - The CI variables that .github/actions/setup-rust sets stay, so the Rust
-#   build runs through sccache and its GitHub Actions cache.
 keep=(
+  # The Xcode that runs this build.
   DEVELOPER_DIR
-  CARGO_INCREMENTAL
+  # Trust for mise.toml, whose [settings] block the mise shims load.
   MISE_TRUSTED_CONFIG_PATHS
-  CARGO_PROFILE_RELEASE_DEBUG
+  # cargo and build script settings. A changed CARGO_INCREMENTAL rebuilds
+  # every crate.
   CARGO_HTTP_MULTIPLEXING
+  CARGO_INCREMENTAL
+  CARGO_PROFILE_RELEASE_DEBUG
   ORT_CACHE_DIR
+  # sccache, set by .github/actions/setup-rust.
   RUSTC_WRAPPER
-  SCCACHE_PATH
-  SCCACHE_CONF
-  SCCACHE_DIR
   SCCACHE_CACHE_SIZE
   SCCACHE_CACHE_ZSTD_LEVEL
-  SCCACHE_IDLE_TIMEOUT
-  SCCACHE_SERVER_PORT
-  SCCACHE_LOG
+  SCCACHE_CONF
+  SCCACHE_DIR
   SCCACHE_ERROR_LOG
   SCCACHE_GHA_ENABLED
   SCCACHE_GHA_RW_MODE
   SCCACHE_GHA_VERSION
+  SCCACHE_IDLE_TIMEOUT
+  SCCACHE_LOG
   SCCACHE_MULTILEVEL_CHAIN
   SCCACHE_MULTILEVEL_WRITE_ERROR_POLICY
+  SCCACHE_PATH
+  SCCACHE_SERVER_PORT
   SCCACHE_SKIP_CACHE_CHECK
-  ACTIONS_CACHE_URL
+  # The GitHub Actions cache service that sccache writes to.
   ACTIONS_CACHE_SERVICE_V2
+  ACTIONS_CACHE_URL
   ACTIONS_RESULTS_URL
   ACTIONS_RUNTIME_TOKEN
 )
@@ -67,6 +63,9 @@ for name in "${keep[@]}"; do
     env_args+=("$name=${!name}")
   fi
 done
+
+# A clean environment: Xcode's SDKROOT and deployment target variables would
+# otherwise leak into the host build scripts that cargo compiles for macOS.
 exec env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
   ${env_args[@]+"${env_args[@]}"} \
   node scripts/build-ffi.ts "${args[@]}"
