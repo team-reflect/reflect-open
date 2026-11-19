@@ -6,11 +6,6 @@ cargo-binstall = "1.27.0"
 "github:Boshen/cargo-shear" = "1.14.0"
 "github:EmbarkStudios/cargo-about" = "0.9.3"
 
-[env]
-# The `llvm-ar` of the Rust toolchain, for the wasm build of SQLite: the macOS
-# `ar` writes an archive with no symbol index for wasm objects.
-AR_wasm32_unknown_unknown = '''{{ exec(command="echo $(rustc --print sysroot)/lib/rustlib/$(rustc -vV | sed -n 's/host: //p')/bin/llvm-ar") }}'''
-
 [settings]
 # cbindgen ships no macOS binary, so allow the signed QuickInstall builds
 # instead of compiling it from source.

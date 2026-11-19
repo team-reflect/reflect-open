@@ -28,14 +28,6 @@ runs:
       shell: bash
       run: rustc --version --verbose
 
-    # The wasm build of SQLite needs the `llvm-ar` of the toolchain: the macOS
-    # `ar` writes an archive with no symbol index for wasm objects.
-    - name: Set the wasm archiver
-      shell: bash
-      run: |
-        host="$(rustc -vV | sed -n 's/host: //p')"
-        echo "AR_wasm32_unknown_unknown=$(rustc --print sysroot)/lib/rustlib/$host/bin/llvm-ar" >> "$GITHUB_ENV"
-
     # Build scripts (ort-sys, swift-rs) write the path of Xcode's clang runtime
     # into their cached output, and cargo does not rerun them when Xcode
     # changes. rust-cache hashes RUST_* variables into its key, so a new Xcode

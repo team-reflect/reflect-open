@@ -102,7 +102,6 @@
         "wasm32-unknown-unknown",
         "--locked",
       ],
-      "passThroughEnv": ["AR_wasm32_unknown_unknown"],
     },
     "reflect-workspace#format:check": {
       "command": ["cargo", "fmt", "--all", "--", "--check"],
