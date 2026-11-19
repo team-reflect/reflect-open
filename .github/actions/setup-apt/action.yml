@@ -13,9 +13,21 @@ runs:
     - name: Compute the apt cache key and directory
       id: apt
       shell: bash
-      # `ImageOS` and `ImageVersion` are runner environment variables.
       run: |
-        echo "key=apt-$ImageOS-$ImageVersion-$RUNNER_ARCH" >> "$GITHUB_OUTPUT"
+        # Tauri v2 build dependencies (the crate links the WebView + GTK stack):
+        # the Tauri docs list, minus `patchelf`, which the runner image already
+        # has. `libayatana-appindicator3-dev` replaces the deprecated
+        # `libappindicator3-dev`, as in the Tauri prerequisites page.
+        # https://github.com/tauri-apps/tauri-docs/blob/5e49cc6e48597060f1618e0b62cb91b071b1b4a9/src/content/docs/distribute/Pipelines/github.mdx?plain=1#L105
+        packages="libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils"
+        hash=$(echo "$packages" | sha256sum | cut -d ' ' -f 1)
+        # Ubuntu publishes new package versions all the time, so the cache key
+        # changes every day (UTC). A new key restores the latest cache and
+        # downloads only the changed packages.
+        day=$(date -u +%Y-%m-%d)
+        echo "packages=$packages" >> "$GITHUB_OUTPUT"
+        echo "key=apt-$ImageOS-$RUNNER_ARCH-$hash-$day" >> "$GITHUB_OUTPUT"
+        echo "restore-key=apt-$ImageOS-$RUNNER_ARCH-$hash-" >> "$GITHUB_OUTPUT"
         echo "dir=$RUNNER_TEMP/apt-archives" >> "$GITHUB_OUTPUT"
 
     - name: Restore the apt package cache
@@ -25,42 +37,14 @@ runs:
       with:
         path: ${{ steps.apt.outputs.dir }}/*.deb
         key: ${{ steps.apt.outputs.key }}
+        restore-keys: ${{ steps.apt.outputs.restore-key }}
 
     - name: Install apt packages
       shell: bash
       env:
         archives: ${{ steps.apt.outputs.dir }}
-      run: |
-        # Tauri v2 build dependencies (the crate links the WebView + GTK stack):
-        # the Tauri docs list, minus `patchelf`, which the runner image already
-        # has. `libayatana-appindicator3-dev` replaces the deprecated
-        # `libappindicator3-dev`, as in the Tauri prerequisites page.
-        # https://github.com/tauri-apps/tauri-docs/blob/5e49cc6e48597060f1618e0b62cb91b071b1b4a9/src/content/docs/distribute/Pipelines/github.mdx?plain=1#L105
-        packages="libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils"
-        opts="--yes --no-install-recommends -o Dir::Cache::Archives=$archives"
-        mkdir -p "$archives"
-
-        # Update first: the image's package index can name versions the archive
-        # has since removed. Only the download runs under `timeout`, since
-        # killing `dpkg` mid-install would break the retry.
-        download() {
-          echo "Updating package index..."
-          sudo timeout 120 apt-get update
-          echo "Done updating package index."
-          echo "Downloading packages..."
-          sudo timeout 180 apt-get install $opts --download-only $packages
-          echo "Done downloading packages."
-        }
-
-        if ! download; then
-          # The Azure mirror can trickle at ~50 kB/s without tripping apt's failover: https://github.com/actions/runner-images/issues/14823
-          echo "Retrying with the Azure mirror disabled..."
-          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
-          download
-        fi
-
-        echo "Installing packages..."
-        sudo apt-get install $opts $packages
+        packages: ${{ steps.apt.outputs.packages }}
+      run: '"$GITHUB_WORKSPACE/scripts/ci-apt.sh" "$archives" $packages'
 
     - name: Save the apt package cache
       if: inputs.cache == 'true' && steps.apt-cache.outputs.cache-hit != 'true'
