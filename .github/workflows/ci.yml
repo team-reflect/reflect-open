@@ -153,7 +153,10 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
+      # `target/` is left out: Turbo's remote cache has the index wasm.
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-targets: false
 
       - uses: ./.github/actions/setup-mise
 
@@ -181,7 +184,10 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
+      # `target/` is left out: Turbo's remote cache has the index wasm.
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-targets: false
 
       - uses: ./.github/actions/setup-mise
 
@@ -219,7 +225,10 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
+      # `target/` is left out: Turbo's remote cache has the index wasm.
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-targets: false
 
       - uses: ./.github/actions/setup-mise
 
@@ -257,7 +266,10 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
+      # `target/` is left out: Turbo's remote cache has the index wasm.
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-targets: false
 
       - uses: ./.github/actions/setup-mise
 
