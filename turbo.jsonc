@@ -1,0 +1,28 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "futureFlags": {
+    "experimentalCargoWorkspaces": true,
+    "experimentalTaskCommand": true,
+  },
+  "globalPassThroughEnv": ["CI", "GITHUB_ACTIONS"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "env": ["TAURI_ENV_PLATFORM"],
+      "outputs": ["dist/**", ".output/**"],
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "env": ["TAURI_ENV_PLATFORM"],
+      "cache": false,
+      "persistent": true,
+    },
+    "test": {},
+    "lint": {},
+
+    "rust:src": {
+      "command": ["true"],
+      "dependsOn": ["^rust:src"],
+    },
+  },
+}
