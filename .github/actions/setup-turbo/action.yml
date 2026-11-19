@@ -4,10 +4,6 @@ name: Set up turborepo
 description: Set up turborepo
 
 inputs:
-  team:
-    description: The Vercel team of the Remote Cache.
-    required: false
-    default: ''
   cache:
     description: Whether to restore and save the cache.
     required: false
@@ -22,8 +18,7 @@ runs:
     - uses: vercel/setup-turborepo-remote-cache-action@49d7b1b46ba4c9251e1977986bfe18336feabc8f # v1.1.0
       if: >-
         inputs.cache == 'true'
-        && inputs.team != ''
         && github.repository == 'team-reflect/reflect-open'
         && github.event.pull_request.head.repo.fork != true
       with:
-        team: ${{ inputs.team }}
+        team: team-reflect

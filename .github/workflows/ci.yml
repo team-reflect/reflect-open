@@ -158,8 +158,6 @@ jobs:
       - uses: ./.github/actions/setup-mise
 
       - uses: ./.github/actions/setup-turbo
-        with:
-          team: ${{ vars.TURBO_TEAM }}
 
       - name: Verify the generated iOS CSP is current
         run: |
@@ -186,8 +184,6 @@ jobs:
       - uses: ./.github/actions/setup-mise
 
       - uses: ./.github/actions/setup-turbo
-        with:
-          team: ${{ vars.TURBO_TEAM }}
 
       - name: Test
         run: pnpm turbo run test:node
@@ -224,8 +220,6 @@ jobs:
       - uses: ./.github/actions/setup-mise
 
       - uses: ./.github/actions/setup-turbo
-        with:
-          team: ${{ vars.TURBO_TEAM }}
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:chromium
@@ -264,8 +258,6 @@ jobs:
       - uses: ./.github/actions/setup-mise
 
       - uses: ./.github/actions/setup-turbo
-        with:
-          team: ${{ vars.TURBO_TEAM }}
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:webkit
@@ -380,8 +372,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-turbo
-        with:
-          team: ${{ vars.TURBO_TEAM }}
 
       - name: Clippy
         run: pnpm turbo run lint --filter=reflect-workspace
@@ -436,8 +426,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-turbo
-        with:
-          team: ${{ vars.TURBO_TEAM }}
 
       - name: Test
         run: pnpm turbo run test --filter=reflect-workspace
