@@ -64,7 +64,7 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
         with:
-          cache-key: build-${{ matrix.name }}
+          cache-key: ${{ matrix.name }}
 
       # The Rust build of the Swift shell runs cbindgen.
       - uses: ./.github/actions/setup-mise

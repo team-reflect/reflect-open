@@ -7,7 +7,7 @@ inputs:
     required: false
     default: 'true'
   cache-key:
-    description: An extra key for the cargo build cache, for jobs that must not share one.
+    description: An extra key for the cargo build cache. The job id is already in the key, so only jobs of one matrix need it.
     required: false
     default: ''
 

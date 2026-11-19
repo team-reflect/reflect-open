@@ -154,8 +154,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-        with:
-          cache-key: index-wasm
 
       - uses: ./.github/actions/setup-mise
 
@@ -184,8 +182,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-        with:
-          cache-key: index-wasm
 
       - uses: ./.github/actions/setup-mise
 
@@ -224,8 +220,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-        with:
-          cache-key: index-wasm
 
       - uses: ./.github/actions/setup-mise
 
@@ -264,8 +258,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-        with:
-          cache-key: index-wasm
 
       - uses: ./.github/actions/setup-mise
 
@@ -337,8 +329,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-        with:
-          cache-key: test-ios
 
       - uses: ./.github/actions/setup-mise
 
