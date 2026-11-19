@@ -6,6 +6,8 @@
     "experimentalTaskCommand": true,
   },
   "globalPassThroughEnv": ["CI", "GITHUB_ACTIONS"],
+  "cacheMaxAge": "7d",
+  "cacheMaxSize": "4GB",
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
