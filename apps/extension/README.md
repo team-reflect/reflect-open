@@ -135,7 +135,7 @@ a normal `build`, not a store ZIP.
 ### Manual packaging fallback
 
 Run `pnpm check` at the repository root and
-`pnpm --filter @reflect/extension test`, then
+`pnpm test apps/extension`, then
 `pnpm --filter @reflect/extension zip`. Upload
 `apps/extension/.output/reflect-capture-<version>-chrome.zip` to the existing
 listing only after checking its current published and submitted versions.

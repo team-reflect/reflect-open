@@ -8,8 +8,5 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/mise.toml"],
       "outputs": ["pkg/**", "!pkg/*.d.ts"],
     },
-    "test": {
-      "dependsOn": ["build"],
-    },
   },
 }
