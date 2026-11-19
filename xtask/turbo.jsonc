@@ -1,0 +1,12 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // A host binary: the remote cache serves Linux and macOS, so cache nothing.
+    // The task orders `xtask` before its users and adds its hash to theirs.
+    "build": {
+      "env": [],
+      "outputs": [],
+    },
+  },
+}

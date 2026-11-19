@@ -7,9 +7,6 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "scripts": {
-    "build": "wasm-bindgen ../../target/wasm32-unknown-unknown/wasm/reflect_index_wasm.wasm --target web --no-typescript --out-dir pkg"
-  },
   "dependencies": {
     "@reflect/types": "workspace:*"
   },

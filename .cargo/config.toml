@@ -12,3 +12,7 @@ global-min-publish-age = "24 hours"
 # Rust toolchain: the macOS `ar` writes no symbol index for wasm objects.
 [env]
 AR_wasm32_unknown_unknown = { value = "scripts/llvm-ar", relative = true }
+
+# `cargo xtask <command>` runs the repository automation in `xtask/`.
+[alias]
+xtask = "run --package xtask --locked --"

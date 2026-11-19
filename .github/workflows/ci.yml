@@ -86,7 +86,8 @@ jobs:
             'Cargo.lock'
             'Cargo.toml'
             'rust-toolchain.toml'
-            'mise.toml'
+            'xtask/*'
+            '.cargo/config.toml'
           )
           swift_files=(
             '.github/*'
@@ -159,8 +160,6 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
 
-      - uses: ./.github/actions/setup-mise
-
       - uses: ./.github/actions/setup-turbo
 
       - name: Verify the generated iOS CSP is current
@@ -184,8 +183,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-
-      - uses: ./.github/actions/setup-mise
 
       - uses: ./.github/actions/setup-turbo
 
@@ -220,8 +217,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-
-      - uses: ./.github/actions/setup-mise
 
       - uses: ./.github/actions/setup-turbo
 
@@ -258,8 +253,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-
-      - uses: ./.github/actions/setup-mise
 
       - uses: ./.github/actions/setup-turbo
 

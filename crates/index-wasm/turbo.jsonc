@@ -2,24 +2,17 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   "tasks": {
-    // cargo builds the .wasm, then `@reflect/index-wasm` runs wasm-bindgen on
-    // it. Overriding the crate's `build` keeps the Cargo inputs, which include
-    // the sources of the local crates it depends on.
+    // `cargo xtask index-wasm` builds the .wasm and writes its bindings to
+    // `packages/index-wasm/pkg`. Overriding the crate's `build` keeps the Cargo
+    // inputs, which include the sources of the local crates it depends on.
     "build": {
-      "command": [
-        "cargo",
-        "build",
-        "--package",
-        "reflect-index-wasm",
-        "--target",
-        "wasm32-unknown-unknown",
-        "--profile",
-        "wasm",
-        "--locked",
-      ],
-      "dependsOn": [],
+      "command": ["cargo", "xtask", "index-wasm"],
+      "dependsOn": ["xtask#build"],
       "env": [],
-      "outputs": ["$TURBO_ROOT$/target/wasm32-unknown-unknown/wasm/reflect_index_wasm.wasm"],
+      "outputs": [
+        "$TURBO_ROOT$/packages/index-wasm/pkg/*.js",
+        "$TURBO_ROOT$/packages/index-wasm/pkg/*.wasm",
+      ],
     },
   },
 }

@@ -59,11 +59,11 @@ the service plus members that seed, drive or observe it.
   (chat history, embeddings, `index_meta`). `database.query(sql, params)` runs
   one read-only statement, for rows that no read command returns.
   `database.getReads()` lists the read commands a test ran.
-- The tests need the wasm build of the index. `pnpm test` builds it first; it
-  needs the Rust toolchain and the `wasm-bindgen` CLI (`mise install`). After a
-  change in `crates/index`, `crates/index-schema`, `crates/index-wasm` or
-  `crates/types`, run `pnpm build:index-wasm` before a test that is already in
-  watch mode.
+- The tests need the wasm build of the index. `pnpm test` builds it first with
+  `cargo xtask index-wasm`; it needs only the Rust toolchain. After a change in
+  `crates/index`, `crates/index-schema`, `crates/index-wasm`, `crates/types` or
+  `xtask`, run `pnpm build:index-wasm` before a test that is already in watch
+  mode.
 
 ## The service containers
 
