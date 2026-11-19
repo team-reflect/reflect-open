@@ -1,5 +1,9 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "futureFlags": {
+    "experimentalCargoWorkspaces": true,
+    "experimentalTaskCommand": true
+  },
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
