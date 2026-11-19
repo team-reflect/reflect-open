@@ -5,7 +5,7 @@ on:
     types: [closed]
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-refs/pull/${{ github.event.pull_request.number }}/merge
   cancel-in-progress: false
 
 permissions: {}
