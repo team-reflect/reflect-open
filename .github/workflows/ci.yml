@@ -153,6 +153,7 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
+      # FIXME: remove this comment
       # Turbo reads the Cargo workspace, and builds the index wasm on a cache miss.
       - uses: ./.github/actions/setup-rust
         with:
@@ -184,6 +185,7 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
+      # FIXME: remove this comment
       # Turbo reads the Cargo workspace, and builds the index wasm on a cache miss.
       - uses: ./.github/actions/setup-rust
         with:
@@ -225,6 +227,7 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
+      # FIXME: remove this comment
       # Turbo reads the Cargo workspace, and builds the index wasm on a cache miss.
       - uses: ./.github/actions/setup-rust
         with:
@@ -266,6 +269,7 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
+      # FIXME: remove this comment
       # Turbo reads the Cargo workspace, and builds the index wasm on a cache miss.
       - uses: ./.github/actions/setup-rust
         with:
