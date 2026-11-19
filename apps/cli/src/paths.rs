@@ -44,7 +44,7 @@ pub fn date_from_daily_path(path: &str) -> Option<&str> {
 /// Today's local date as `YYYY-MM-DD` (timezone- and DST-correct via jiff,
 /// matching the desktop's date-fns local "today").
 pub fn today_date() -> String {
-    jiff::Zoned::now().date().to_string()
+    jiff::ZonedDateTime::now().date().to_string()
 }
 
 #[cfg(test)]

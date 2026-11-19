@@ -77,7 +77,7 @@ ignore = "0.4.34"
 image = { version = "0.25.10", default-features = false }
 infer = "0.22.0"
 js-sys = "0.3.103"
-jiff = { version = "0.2.45", default-features = false, features = ["std"] }
+jiff = { version = "1.0.1", default-features = false, features = ["std"] }
 keyring-core = "1.0.1"
 log = "0.4.35"
 notify-debouncer-full = "0.8.0-rc.3"
