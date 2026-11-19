@@ -15,8 +15,7 @@ permissions:
   id-token: write
 
 env:
-  # On master, always run the tasks and upload the results to the turbo remote
-  # cache. PRs read and write the remote cache as usual.
+  # On master, run every task instead of skipping it on a turbo cache hit.
   TURBO_CACHE: ${{ github.event_name == 'push' && 'local:rw,remote:w' || '' }}
 
 jobs:
