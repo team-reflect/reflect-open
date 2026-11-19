@@ -1,5 +1,7 @@
+# Put setup-turbo after setup-rust and setup-node
+
 name: Set up turborepo
-description: Setup turborepo cache
+description: Set up turborepo cache.
 
 inputs:
   cache:
