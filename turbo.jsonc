@@ -18,29 +18,39 @@
       "persistent": true,
     },
 
-    "rust:src": {
-      "command": ["true"],
-      "dependsOn": ["^rust:src"],
-    },
-
-    "reflect-index-wasm#build:wasm": {
-      "command": ["node", "../../scripts/build-index-wasm.ts"],
-      "dependsOn": ["^rust:src"],
-      "env": ["TAURI_ENV_PLATFORM"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/scripts/build-index-wasm.ts",
-        "$TURBO_ROOT$/rust-toolchain.toml",
-        "$TURBO_ROOT$/mise.toml",
+    // The index wasm: cargo builds the .wasm, then wasm-bindgen writes the npm
+    // package. Overriding the crate's `build` keeps the Cargo inputs, which
+    // include the sources of the local crates it depends on.
+    "reflect-index-wasm#build": {
+      "command": [
+        "cargo",
+        "build",
+        "--package",
+        "reflect-index-wasm",
+        "--target",
+        "wasm32-unknown-unknown",
+        "--profile",
+        "wasm",
+        "--locked",
       ],
-      "outputs": [
-        "$TURBO_ROOT$/packages/index-wasm/pkg/**",
-        "!$TURBO_ROOT$/packages/index-wasm/pkg/*.d.ts",
-      ],
+      "outputs": ["$TURBO_ROOT$/target/wasm32-unknown-unknown/wasm/reflect_index_wasm.wasm"],
     },
-
     "@reflect/index-wasm#build": {
-      "dependsOn": ["reflect-index-wasm#build:wasm"],
+      "dependsOn": ["reflect-index-wasm#build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/mise.toml"],
+      "outputs": ["pkg/**", "!pkg/*.d.ts"],
+    },
+    "@reflect/index-wasm#test": {
+      "dependsOn": ["build"],
+    },
+    "@reflect/app#test": {
+      "dependsOn": ["^build"],
+    },
+    "@reflect/core#test": {
+      "dependsOn": ["^build"],
+    },
+    "@reflect/web#test": {
+      "dependsOn": ["^build"],
     },
 
     // TypeScript checks and tests (root scripts, whole repo).
@@ -61,12 +71,12 @@
     },
 
     // Rust checks and tests (the whole Cargo workspace).
-    "reflect-rust#lint": {
+    "reflect-workspace#lint": {
       "command": ["cargo", "clippy", "--workspace", "--all-targets", "--locked"],
       "env": ["TAURI_CONFIG"],
       "passThroughEnv": ["ORT_CACHE_DIR"],
     },
-    "reflect-rust#lint:ios": {
+    "reflect-workspace#lint:ios": {
       "command": [
         "cargo",
         "clippy",
@@ -81,7 +91,7 @@
       "env": ["TAURI_CONFIG"],
       "passThroughEnv": ["ORT_CACHE_DIR"],
     },
-    "reflect-rust#lint:wasm": {
+    "reflect-workspace#lint:wasm": {
       "command": [
         "cargo",
         "clippy",
@@ -93,10 +103,10 @@
       ],
       "passThroughEnv": ["AR_wasm32_unknown_unknown"],
     },
-    "reflect-rust#format:check": {
+    "reflect-workspace#format:check": {
       "command": ["cargo", "fmt", "--all", "--", "--check"],
     },
-    "reflect-rust#test": {
+    "reflect-workspace#test": {
       "env": ["TAURI_CONFIG"],
       "passThroughEnv": ["ORT_CACHE_DIR"],
     },
