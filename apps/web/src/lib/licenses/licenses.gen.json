@@ -1635,6 +1635,15 @@
       ]
     },
     {
+      "name": "cbindgen",
+      "ecosystem": "cargo",
+      "license": "MPL-2.0",
+      "url": "https://github.com/mozilla/cbindgen",
+      "texts": [
+        "S4nU"
+      ]
+    },
+    {
       "name": "ccount",
       "ecosystem": "npm",
       "license": "MIT",
@@ -2840,6 +2849,15 @@
       ]
     },
     {
+      "name": "gimli",
+      "ecosystem": "cargo",
+      "license": "MIT",
+      "url": "https://github.com/gimli-rs/gimli",
+      "texts": [
+        "AzqT"
+      ]
+    },
+    {
       "name": "gio",
       "ecosystem": "cargo",
       "license": "MIT",
@@ -3344,6 +3362,15 @@
       ]
     },
     {
+      "name": "id-arena",
+      "ecosystem": "cargo",
+      "license": "MIT",
+      "url": "https://github.com/fitzgen/id-arena",
+      "texts": [
+        "hOG7"
+      ]
+    },
+    {
       "name": "ident_case",
       "ecosystem": "cargo",
       "license": "MIT",
@@ -3647,6 +3674,24 @@
       "url": "https://gitlab.com/rust-kqueue/rust-kqueue-sys",
       "texts": [
         "IIaT"
+      ]
+    },
+    {
+      "name": "leb128",
+      "ecosystem": "cargo",
+      "license": "MIT",
+      "url": "https://github.com/gimli-rs/leb128",
+      "texts": [
+        "AzqT"
+      ]
+    },
+    {
+      "name": "leb128fmt",
+      "ecosystem": "cargo",
+      "license": "MIT",
+      "url": "https://github.com/bluk/leb128fmt",
+      "texts": [
+        "MP78"
       ]
     },
     {
@@ -5631,6 +5676,15 @@
       ]
     },
     {
+      "name": "rustc-demangle",
+      "ecosystem": "cargo",
+      "license": "MIT",
+      "url": "https://github.com/rust-lang/rustc-demangle",
+      "texts": [
+        "hOG7"
+      ]
+    },
+    {
       "name": "rustc-hash",
       "ecosystem": "cargo",
       "license": "MIT",
@@ -7121,12 +7175,66 @@
       ]
     },
     {
+      "name": "walrus",
+      "ecosystem": "cargo",
+      "license": "MIT",
+      "url": "https://github.com/rustwasm/walrus",
+      "texts": [
+        "jK0_"
+      ]
+    },
+    {
+      "name": "walrus-macro",
+      "ecosystem": "cargo",
+      "license": "MIT",
+      "url": "https://github.com/rustwasm/walrus/tree/crates/macro",
+      "texts": [
+        "jK0_"
+      ]
+    },
+    {
       "name": "want",
       "ecosystem": "cargo",
       "license": "MIT",
       "url": "https://github.com/seanmonstar/want",
       "texts": [
         "99__"
+      ]
+    },
+    {
+      "name": "wasm-bindgen-cli-support",
+      "ecosystem": "cargo",
+      "license": "MIT",
+      "url": "https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/cli-support",
+      "texts": [
+        "hOG7"
+      ]
+    },
+    {
+      "name": "wasm-bindgen-shared",
+      "ecosystem": "cargo",
+      "license": "MIT",
+      "url": "https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/shared",
+      "texts": [
+        "hOG7"
+      ]
+    },
+    {
+      "name": "wasm-encoder",
+      "ecosystem": "cargo",
+      "license": "MIT",
+      "url": "https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasm-encoder",
+      "texts": [
+        "B8eZ"
+      ]
+    },
+    {
+      "name": "wasmparser",
+      "ecosystem": "cargo",
+      "license": "MIT",
+      "url": "https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasmparser",
+      "texts": [
+        "B8eZ"
       ]
     },
     {
@@ -7977,6 +8085,7 @@
     "if-W": "MIT License\n\nCopyright (c) 2017 - Present Tauri Apps Contributors\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.",
     "igh1": "The MIT License (MIT)\n\nCopyright (c) 2013-2021, The Gtk-rs Project Developers.\nCopyright (c) 2021, Tauri Programme within The Commons Conservancy.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.",
     "j9iY": "The MIT License (MIT)\n\nCopyright (c) 2015 Danny Guo\nCopyright (c) 2016 Titus Wormer <tituswormer@gmail.com>\nCopyright (c) 2018 Akash Kurdekar\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.",
+    "jK0_": "Copyright (c) 2018 Nick Fitzgerald\n\nPermission is hereby granted, free of charge, to any\nperson obtaining a copy of this software and associated\ndocumentation files (the \"Software\"), to deal in the\nSoftware without restriction, including without\nlimitation the rights to use, copy, modify, merge,\npublish, distribute, sublicense, and/or sell copies of\nthe Software, and to permit persons to whom the Software\nis furnished to do so, subject to the following\nconditions:\n\nThe above copyright notice and this permission notice\nshall be included in all copies or substantial portions\nof the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF\nANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED\nTO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A\nPARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT\nSHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY\nCLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION\nOF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR\nIN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER\nDEALINGS IN THE SOFTWARE.",
     "jLkQ": "MIT License\n\nCopyright (C) 2024 by Marijn Haverbeke <marijnh@gmail.com> and others\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in\nall copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN\nTHE SOFTWARE.",
     "jR-B": "Copyright (c) 2016 The Rust Project Developers\n\nPermission is hereby granted, free of charge, to any\nperson obtaining a copy of this software and associated\ndocumentation files (the \"Software\"), to deal in the\nSoftware without restriction, including without\nlimitation the rights to use, copy, modify, merge,\npublish, distribute, sublicense, and/or sell copies of\nthe Software, and to permit persons to whom the Software\nis furnished to do so, subject to the following\nconditions:\n\nThe above copyright notice and this permission notice\nshall be included in all copies or substantial portions\nof the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF\nANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED\nTO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A\nPARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT\nSHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY\nCLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION\nOF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR\nIN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER\nDEALINGS IN THE SOFTWARE.",
     "jYKR": "Boost Software License - Version 1.0 - August 17th, 2003\n\nPermission is hereby granted, free of charge, to any person or organization\nobtaining a copy of the software and accompanying documentation covered by\nthis license (the \"Software\") to use, reproduce, display, distribute,\nexecute, and transmit the Software, and to prepare derivative works of the\nSoftware, and to permit third-parties to whom the Software is furnished to\ndo so, all subject to the following:\n\nThe copyright notices in the Software and this entire statement, including\nthe above license grant, this restriction and the following disclaimer,\nmust be included in all copies of the Software, in whole or in part, and\nall derivative works of the Software, unless such copies or derivative\nworks are solely in the form of machine-executable object code generated by\na source language processor.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT. IN NO EVENT\nSHALL THE COPYRIGHT HOLDERS OR ANYONE DISTRIBUTING THE SOFTWARE BE LIABLE\nFOR ANY DAMAGES OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT OR OTHERWISE,\nARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER\nDEALINGS IN THE SOFTWARE.",
