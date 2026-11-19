@@ -22,11 +22,11 @@ runs:
         packages="libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils"
         hash=$(echo "$packages" | sha256sum | cut -d ' ' -f 1)
         # Ubuntu publishes new package versions all the time, so the cache key
-        # changes every week (ISO year and week, e.g. 2026-W47). A new key
-        # restores last week's cache and downloads only the changed packages.
-        week=$(date -u +%G-W%V)
+        # changes every day (UTC). A new key restores the latest cache and
+        # downloads only the changed packages.
+        day=$(date -u +%Y-%m-%d)
         echo "packages=$packages" >> "$GITHUB_OUTPUT"
-        echo "key=apt-$ImageOS-$RUNNER_ARCH-$hash-$week" >> "$GITHUB_OUTPUT"
+        echo "key=apt-$ImageOS-$RUNNER_ARCH-$hash-$day" >> "$GITHUB_OUTPUT"
         echo "restore-key=apt-$ImageOS-$RUNNER_ARCH-$hash-" >> "$GITHUB_OUTPUT"
         echo "dir=$RUNNER_TEMP/apt-archives" >> "$GITHUB_OUTPUT"
 
