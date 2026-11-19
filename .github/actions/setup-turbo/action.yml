@@ -26,7 +26,5 @@ runs:
         inputs.cache == 'true'
         && inputs.team != ''
         && github.repository == 'team-reflect/reflect-open'
-        && (github.event_name != 'pull_request'
-        || github.event.pull_request.head.repo.full_name == github.repository)
       with:
         team: ${{ inputs.team }}
