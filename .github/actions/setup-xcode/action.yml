@@ -1,4 +1,3 @@
-# Run before setup-rust, which keys its cache on `xcrun clang`.
 name: Set up Xcode
 description: Select a fixed Xcode version
 inputs:
