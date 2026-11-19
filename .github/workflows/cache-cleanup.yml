@@ -19,7 +19,13 @@ jobs:
     permissions:
       actions: write
     steps:
-      - run: gh cache delete --all --succeed-on-no-caches --ref "refs/pull/$PR_NUMBER/merge"
+      - run: |
+          gh cache list --ref "refs/pull/$PR_NUMBER/merge" --sort size_in_bytes --limit 100 --json key,id,sizeInBytes --jq '.[] | "\(.id) \(.sizeInBytes / 1024 | floor) \(.key)"' |
+            while read -r id size key; do
+              echo "Deleting $key ($size KiB)"
+              gh cache delete "$id" || true
+              sleep 1
+            done
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
