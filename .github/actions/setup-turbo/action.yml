@@ -5,7 +5,7 @@ description: Set up turborepo
 
 inputs:
   team:
-    description: The Vercel team of the Remote Cache. Pass `vars.TURBO_TEAM`; a composite action cannot read `vars`.
+    description: The Vercel team of the Remote Cache.
     required: false
     default: ''
   cache:
