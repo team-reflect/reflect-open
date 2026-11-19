@@ -19,7 +19,11 @@ jobs:
     permissions:
       actions: write
     steps:
-      - run: gh cache delete --all --succeed-on-no-caches --ref "refs/pull/$PR_NUMBER/merge"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - run: scripts/ci-delete-pr-caches.sh "$PR_NUMBER"
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
