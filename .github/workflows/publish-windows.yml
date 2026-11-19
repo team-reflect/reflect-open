@@ -26,11 +26,6 @@ defaults:
   run:
     shell: bash
 
-# A release never reads the Turborepo Remote Cache. The local cache stays, so a
-# task that runs twice in one job runs once.
-env:
-  TURBO_CACHE: local:rw
-
 jobs:
   windows:
     name: Windows ${{ matrix.name }}

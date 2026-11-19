@@ -26,11 +26,6 @@ concurrency:
 permissions:
   contents: write
 
-# A release never reads the Turborepo Remote Cache. The local cache stays, so a
-# task that runs twice in one job runs once.
-env:
-  TURBO_CACHE: local:rw
-
 jobs:
   publish:
     name: Build, release and submit
