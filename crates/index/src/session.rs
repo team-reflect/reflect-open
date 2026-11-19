@@ -4,7 +4,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
-use rusqlite::{Connection, params};
+use rusqlite::Connection;
+use sea_query::{OnConflict, Query};
 
 use reflect_types::{
     AppError, AppResult, ChatConversation, ChatMessageRow, EmbeddedChunk, FileMeta, IndexTouch,
@@ -14,6 +15,8 @@ use reflect_types::{
 use crate::chat_write;
 use crate::embed_write;
 use crate::scan;
+use crate::schema::IndexMeta;
+use crate::sql;
 use crate::write;
 
 /// Where a session gets its connections when it opens a root.
@@ -309,11 +312,18 @@ impl IndexSession {
     /// [`clear`]: IndexSession::clear
     pub fn set_meta(&self, generation: u64, key: &str, value: &str) -> AppResult<Applied> {
         Self::applied(self.write(generation, |conn| {
-            conn.prepare_cached(
-                "INSERT INTO index_meta(key, value) VALUES(?1, ?2)
-                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-            )?
-            .execute(params![key, value])?;
+            sql::execute(
+                conn,
+                Query::insert()
+                    .into_table(IndexMeta::Table)
+                    .columns([IndexMeta::Key, IndexMeta::Value])
+                    .values_panic([key.into(), value.into()])
+                    .on_conflict(
+                        OnConflict::column(IndexMeta::Key)
+                            .update_column(IndexMeta::Value)
+                            .to_owned(),
+                    ),
+            )?;
             Ok(())
         }))
     }

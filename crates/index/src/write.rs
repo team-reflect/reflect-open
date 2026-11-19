@@ -4,9 +4,16 @@
 //! plain functions over a [`Connection`] so the command layer ([`super`]) owns
 //! transactions and generation gating while these stay directly unit-testable.
 
-use rusqlite::{Connection, params};
+use rusqlite::Connection;
+use sea_query::{Expr, ExprTrait, Query};
 
 use reflect_types::{AppError, AppResult, IndexedNote, MovedNoteAddress};
+
+use crate::schema::{
+    Aliases, Assets, EmbeddingChunks, EmbeddingVectors, Links, NoteClaims, NoteEmails, Notes,
+    SearchFts, Tags, Tasks,
+};
+use crate::sql::{self, lit};
 
 /// Precedence of the spellings a note answers to (`note_claims.tier`): the
 /// lowest tier claiming a key wins it. Mirrors `CLAIM_TIER` in
@@ -36,101 +43,157 @@ pub(super) mod claim_tier {
 /// 09 embeddings, etc.) need no change to this function.
 pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()> {
     remove_note(conn, &note.path)?;
+    let path = note.path.as_str();
 
-    conn.prepare_cached(
-        "INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, gist_url, gist_stale, file_hash, mtime, updated_at, preview, has_content)
-         VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?14, ?15, ?16)",
-    )?
-    .execute(params![
-        note.path,
-        note.id,
-        note.title,
-        note.title_key,
-        note.path_key,
-        note.kind.as_str(),
-        note.daily_date,
-        i64::from(note.is_private),
-        i64::from(note.is_pinned),
-        note.pinned_order,
-        note.gist_url,
-        i64::from(note.gist_stale),
-        note.file_hash,
-        note.mtime,
-        note.preview,
-        i64::from(note.has_content),
-    ])?;
-    {
-        let mut stmt = conn.prepare_cached(
-            "INSERT INTO links(source_path, kind, target_raw, target_key, target_path_key, alias, pos_from, pos_to)
-             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-        )?;
-        for link in &note.links {
-            stmt.execute(params![
-                note.path,
-                link.kind.as_str(),
-                link.target_raw,
-                link.target_key,
-                link.target_path_key,
-                link.alias,
-                link.pos_from,
-                link.pos_to
-            ])?;
-        }
-    }
-    {
-        let mut stmt =
-            conn.prepare_cached("INSERT INTO tags(note_path, tag, tag_key) VALUES(?1, ?2, ?3)")?;
-        for tag in &note.tags {
-            stmt.execute(params![note.path, tag.tag, tag.tag_key])?;
-        }
-    }
-    {
-        let mut stmt = conn.prepare_cached(
-            "INSERT INTO aliases(note_path, alias, alias_key) VALUES(?1, ?2, ?3)",
-        )?;
-        for alias in &note.aliases {
-            stmt.execute(params![note.path, alias.alias, alias.alias_key])?;
-        }
-    }
-    {
-        let mut stmt = conn
-            .prepare_cached("INSERT INTO note_claims(note_path, key, tier) VALUES(?1, ?2, ?3)")?;
-        for claim in &note.claims {
-            stmt.execute(params![note.path, claim.key, claim.tier])?;
-        }
-    }
-    {
-        let mut stmt = conn.prepare_cached(
-            "INSERT INTO note_emails(note_path, email, email_key) VALUES(?1, ?2, ?3)",
-        )?;
-        for email in &note.emails {
-            stmt.execute(params![note.path, email.email, email.email_key])?;
-        }
-    }
-    {
-        let mut stmt =
-            conn.prepare_cached("INSERT INTO assets(note_path, asset_path) VALUES(?1, ?2)")?;
-        for asset in &note.assets {
-            stmt.execute(params![note.path, asset])?;
-        }
-    }
-    {
-        let mut stmt = conn.prepare_cached(
-            "INSERT INTO tasks(note_path, ast_path, markdown, breadcrumbs, checked, due_date) VALUES(?1, ?2, ?3, ?4, ?5, ?6)",
-        )?;
-        for task in &note.tasks {
+    sql::execute(
+        conn,
+        Query::insert()
+            .into_table(Notes::Table)
+            .columns([
+                Notes::Path,
+                Notes::Id,
+                Notes::Title,
+                Notes::TitleKey,
+                Notes::PathKey,
+                Notes::Kind,
+                Notes::DailyDate,
+                Notes::IsPrivate,
+                Notes::IsPinned,
+                Notes::PinnedOrder,
+                Notes::GistUrl,
+                Notes::GistStale,
+                Notes::FileHash,
+                Notes::Mtime,
+                Notes::UpdatedAt,
+                Notes::Preview,
+                Notes::HasContent,
+            ])
+            .values_panic([
+                path.into(),
+                note.id.as_deref().into(),
+                note.title.as_str().into(),
+                note.title_key.as_str().into(),
+                note.path_key.as_str().into(),
+                note.kind.as_str().into(),
+                note.daily_date.as_deref().into(),
+                note.is_private.into(),
+                note.is_pinned.into(),
+                note.pinned_order.into(),
+                note.gist_url.as_deref().into(),
+                note.gist_stale.into(),
+                note.file_hash.as_str().into(),
+                note.mtime.into(),
+                note.mtime.into(),
+                note.preview.as_str().into(),
+                note.has_content.into(),
+            ]),
+    )?;
+    sql::insert_rows(
+        conn,
+        Links::Table,
+        [
+            Links::SourcePath,
+            Links::Kind,
+            Links::TargetRaw,
+            Links::TargetKey,
+            Links::TargetPathKey,
+            Links::Alias,
+            Links::PosFrom,
+            Links::PosTo,
+        ],
+        note.links.iter().map(|link| {
+            Ok([
+                path.into(),
+                link.kind.as_str().into(),
+                link.target_raw.as_str().into(),
+                link.target_key.as_str().into(),
+                link.target_path_key.as_deref().into(),
+                link.alias.as_deref().into(),
+                link.pos_from.into(),
+                link.pos_to.into(),
+            ])
+        }),
+    )?;
+    sql::insert_rows(
+        conn,
+        Tags::Table,
+        [Tags::NotePath, Tags::Tag, Tags::TagKey],
+        note.tags.iter().map(|tag| {
+            Ok([
+                path.into(),
+                tag.tag.as_str().into(),
+                tag.tag_key.as_str().into(),
+            ])
+        }),
+    )?;
+    sql::insert_rows(
+        conn,
+        Aliases::Table,
+        [Aliases::NotePath, Aliases::Alias, Aliases::AliasKey],
+        note.aliases.iter().map(|alias| {
+            Ok([
+                path.into(),
+                alias.alias.as_str().into(),
+                alias.alias_key.as_str().into(),
+            ])
+        }),
+    )?;
+    sql::insert_rows(
+        conn,
+        NoteClaims::Table,
+        [NoteClaims::NotePath, NoteClaims::Key, NoteClaims::Tier],
+        note.claims
+            .iter()
+            .map(|claim| Ok([path.into(), claim.key.as_str().into(), claim.tier.into()])),
+    )?;
+    sql::insert_rows(
+        conn,
+        NoteEmails::Table,
+        [
+            NoteEmails::NotePath,
+            NoteEmails::Email,
+            NoteEmails::EmailKey,
+        ],
+        note.emails.iter().map(|email| {
+            Ok([
+                path.into(),
+                email.email.as_str().into(),
+                email.email_key.as_str().into(),
+            ])
+        }),
+    )?;
+    sql::insert_rows(
+        conn,
+        Assets::Table,
+        [Assets::NotePath, Assets::AssetPath],
+        note.assets
+            .iter()
+            .map(|asset| Ok([path.into(), asset.as_str().into()])),
+    )?;
+    sql::insert_rows(
+        conn,
+        Tasks::Table,
+        [
+            Tasks::NotePath,
+            Tasks::AstPath,
+            Tasks::Markdown,
+            Tasks::Breadcrumbs,
+            Tasks::Checked,
+            Tasks::DueDate,
+        ],
+        note.tasks.iter().map(|task| {
             let breadcrumbs = serde_json::to_string(&task.breadcrumbs)
                 .map_err(|err| AppError::io(format!("serialize task breadcrumbs: {err}")))?;
-            stmt.execute(params![
-                note.path,
-                task.ast_path,
-                task.markdown,
-                breadcrumbs,
-                i64::from(task.checked),
-                task.due_date
-            ])?;
-        }
-    }
+            Ok([
+                path.into(),
+                task.ast_path.as_str().into(),
+                task.markdown.as_str().into(),
+                breadcrumbs.into(),
+                task.checked.into(),
+                task.due_date.as_deref().into(),
+            ])
+        }),
+    )?;
     // The FTS body carries the note text plus any referenced assets' description
     // text (Plan 20), so a query matching a description surfaces the note. Only
     // the search index is enriched — `preview` and the AI-reachable text above
@@ -140,8 +203,13 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
     } else {
         format!("{}\n{}", note.text, note.asset_text)
     };
-    conn.prepare_cached("INSERT INTO search_fts(path, title, body) VALUES(?1, ?2, ?3)")?
-        .execute(params![note.path, note.title, search_body])?;
+    sql::execute(
+        conn,
+        Query::insert()
+            .into_table(SearchFts::Table)
+            .columns([SearchFts::Path, SearchFts::Title, SearchFts::Body])
+            .values_panic([path.into(), note.title.as_str().into(), search_body.into()]),
+    )?;
     Ok(())
 }
 
@@ -167,58 +235,103 @@ pub(super) fn move_note(
     to: &str,
     address: &MovedNoteAddress,
 ) -> AppResult<()> {
-    let occupied: bool = conn
-        .prepare_cached("SELECT 1 FROM notes WHERE path = ?1")?
-        .exists(params![to])?;
+    let occupied = sql::exists(
+        conn,
+        Query::select()
+            .expr(lit(1))
+            .from(Notes::Table)
+            .and_where(Expr::col(Notes::Path).eq(to)),
+    )?;
     if occupied {
         return Err(AppError::io(format!(
             "cannot move note: {to} is already indexed"
         )));
     }
-    let moved = conn
-        .prepare_cached("UPDATE notes SET path = ?2, path_key = ?3 WHERE path = ?1")?
-        .execute(params![from, to, address.path_key])?;
-    conn.prepare_cached("UPDATE note_claims SET note_path = ?2 WHERE note_path = ?1")?
-        .execute(params![from, to])?;
+    let moved = sql::execute(
+        conn,
+        Query::update()
+            .table(Notes::Table)
+            .value(Notes::Path, to)
+            .value(Notes::PathKey, address.path_key.as_str())
+            .and_where(Expr::col(Notes::Path).eq(from)),
+    )?;
+    move_rows(conn, NoteClaims::Table, NoteClaims::NotePath, from, to)?;
     if moved > 0 {
         // Title and alias claims live in the content and ride along; the
         // path-derived tiers are re-stated for the destination. The NOT EXISTS
         // guard mirrors `projectNoteClaims`'s seen-set: a key a carried claim
         // already holds is not claimed again. (A move that changes which tier
         // should own a key converges on the next reprojection.)
-        conn.prepare_cached("DELETE FROM note_claims WHERE note_path = ?1 AND tier IN (?2, ?3)")?
-            .execute(params![to, claim_tier::DAILY_DATE, claim_tier::BASENAME])?;
+        sql::execute(
+            conn,
+            Query::delete()
+                .from_table(NoteClaims::Table)
+                .and_where(Expr::col(NoteClaims::NotePath).eq(to))
+                .and_where(
+                    Expr::col(NoteClaims::Tier)
+                        .is_in([claim_tier::DAILY_DATE, claim_tier::BASENAME]),
+                ),
+        )?;
         if let Some(daily_date) = &address.daily_date {
-            conn.prepare_cached(
-                "INSERT INTO note_claims(note_path, key, tier)
-                 SELECT ?1, ?2, ?3
-                 WHERE NOT EXISTS (SELECT 1 FROM note_claims WHERE note_path = ?1 AND key = ?2)",
-            )?
-            .execute(params![to, daily_date, claim_tier::DAILY_DATE])?;
+            claim_unless_held(conn, to, daily_date, claim_tier::DAILY_DATE)?;
         }
-        conn.prepare_cached(
-            "INSERT INTO note_claims(note_path, key, tier)
-             SELECT ?1, ?2, ?3
-             WHERE NOT EXISTS (SELECT 1 FROM note_claims WHERE note_path = ?1 AND key = ?2)",
-        )?
-        .execute(params![to, address.basename_key, claim_tier::BASENAME])?;
+        claim_unless_held(conn, to, &address.basename_key, claim_tier::BASENAME)?;
     }
-    conn.prepare_cached("UPDATE links SET source_path = ?2 WHERE source_path = ?1")?
-        .execute(params![from, to])?;
-    conn.prepare_cached("UPDATE tags SET note_path = ?2 WHERE note_path = ?1")?
-        .execute(params![from, to])?;
-    conn.prepare_cached("UPDATE aliases SET note_path = ?2 WHERE note_path = ?1")?
-        .execute(params![from, to])?;
-    conn.prepare_cached("UPDATE note_emails SET note_path = ?2 WHERE note_path = ?1")?
-        .execute(params![from, to])?;
-    conn.prepare_cached("UPDATE assets SET note_path = ?2 WHERE note_path = ?1")?
-        .execute(params![from, to])?;
-    conn.prepare_cached("UPDATE tasks SET note_path = ?2 WHERE note_path = ?1")?
-        .execute(params![from, to])?;
-    conn.prepare_cached("UPDATE embedding_chunks SET note_path = ?2 WHERE note_path = ?1")?
-        .execute(params![from, to])?;
-    conn.prepare_cached("UPDATE search_fts SET path = ?2 WHERE path = ?1")?
-        .execute(params![from, to])?;
+    move_rows(conn, Links::Table, Links::SourcePath, from, to)?;
+    move_rows(conn, Tags::Table, Tags::NotePath, from, to)?;
+    move_rows(conn, Aliases::Table, Aliases::NotePath, from, to)?;
+    move_rows(conn, NoteEmails::Table, NoteEmails::NotePath, from, to)?;
+    move_rows(conn, Assets::Table, Assets::NotePath, from, to)?;
+    move_rows(conn, Tasks::Table, Tasks::NotePath, from, to)?;
+    move_rows(
+        conn,
+        EmbeddingChunks::Table,
+        EmbeddingChunks::NotePath,
+        from,
+        to,
+    )?;
+    move_rows(conn, SearchFts::Table, SearchFts::Path, from, to)?;
+    Ok(())
+}
+
+/// Sets `path_column` of `table` to `to` in the rows where it is `from`.
+fn move_rows<T: sea_query::Iden + Copy + 'static>(
+    conn: &Connection,
+    table: T,
+    path_column: T,
+    from: &str,
+    to: &str,
+) -> AppResult<()> {
+    sql::execute(
+        conn,
+        Query::update()
+            .table(table)
+            .value(path_column, to)
+            .and_where(Expr::col(path_column).eq(from)),
+    )?;
+    Ok(())
+}
+
+/// Claims `key` in `tier` for the note at `path`, unless the note holds a
+/// claim to the key.
+fn claim_unless_held(conn: &Connection, path: &str, key: &str, tier: i64) -> AppResult<()> {
+    let held = Query::select()
+        .expr(lit(1))
+        .from(NoteClaims::Table)
+        .and_where(Expr::col(NoteClaims::NotePath).eq(path))
+        .and_where(Expr::col(NoteClaims::Key).eq(key))
+        .take();
+    let claim = Query::select()
+        .exprs([Expr::val(path), Expr::val(key), Expr::val(tier)])
+        .and_where(Expr::exists(held).not())
+        .take();
+    let mut insert = Query::insert();
+    insert
+        .into_table(NoteClaims::Table)
+        .columns([NoteClaims::NotePath, NoteClaims::Key, NoteClaims::Tier])
+        .select_from(claim)
+        .map_err(|err| AppError::io(err.to_string()))?;
+    sql::execute(conn, &insert)?;
     Ok(())
 }
 
@@ -226,10 +339,10 @@ pub(super) fn move_note(
 /// cascades to every child table; `search_fts` (a virtual table, no FK) is
 /// cleared explicitly. `index_meta` is intentionally preserved across a rebuild.
 pub(super) fn clear_index(conn: &Connection) -> AppResult<()> {
-    conn.execute_batch(
-        "DELETE FROM notes; DELETE FROM search_fts;
-         DELETE FROM embedding_vectors; DELETE FROM embedding_chunks;",
-    )?;
+    sql::execute(conn, Query::delete().from_table(Notes::Table))?;
+    sql::execute(conn, Query::delete().from_table(SearchFts::Table))?;
+    sql::execute(conn, Query::delete().from_table(EmbeddingVectors::Table))?;
+    sql::execute(conn, Query::delete().from_table(EmbeddingChunks::Table))?;
     Ok(())
 }
 
@@ -239,17 +352,31 @@ pub(super) fn clear_index(conn: &Connection) -> AppResult<()> {
 /// — otherwise the stale stamp costs a re-read on every future pass. A path
 /// with no row matches nothing: a touch must never resurrect a removed note.
 pub(super) fn touch_note(conn: &Connection, path: &str, mtime: i64) -> AppResult<()> {
-    conn.prepare_cached("UPDATE notes SET mtime = ?2, updated_at = ?2 WHERE path = ?1")?
-        .execute(params![path, mtime])?;
+    sql::execute(
+        conn,
+        Query::update()
+            .table(Notes::Table)
+            .value(Notes::Mtime, mtime)
+            .value(Notes::UpdatedAt, mtime)
+            .and_where(Expr::col(Notes::Path).eq(path)),
+    )?;
     Ok(())
 }
 
 /// Drop every row belonging to `path` (the `notes` row cascades to child
 /// tables; `search_fts` is standalone).
 pub(super) fn remove_note(conn: &Connection, path: &str) -> AppResult<()> {
-    conn.prepare_cached("DELETE FROM notes WHERE path = ?1")?
-        .execute(params![path])?;
-    conn.prepare_cached("DELETE FROM search_fts WHERE path = ?1")?
-        .execute(params![path])?;
+    sql::execute(
+        conn,
+        Query::delete()
+            .from_table(Notes::Table)
+            .and_where(Expr::col(Notes::Path).eq(path)),
+    )?;
+    sql::execute(
+        conn,
+        Query::delete()
+            .from_table(SearchFts::Table)
+            .and_where(Expr::col(SearchFts::Path).eq(path)),
+    )?;
     Ok(())
 }

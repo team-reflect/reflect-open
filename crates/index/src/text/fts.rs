@@ -155,7 +155,7 @@ pub fn title_recall_needles(title_key: &str) -> Vec<String> {
 
 /// The palette search's bm25 column weights (`filtered-search.ts`): path
 /// unranked, title boosted 10× over body. Must stay in lockstep.
-pub const RANK_EXPR: &str = "bm25(search_fts, 0, 10.0, 1.0)";
+pub const RANK_WEIGHTS: [f64; 3] = [0.0, 10.0, 1.0];
 
 #[cfg(test)]
 mod tests {
