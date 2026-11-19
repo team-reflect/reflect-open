@@ -19,8 +19,8 @@ set -euo pipefail
 
 MIRROR_LIST=/etc/apt/apt-mirrors.txt
 MAX_ATTEMPTS=3
-UPDATE_TIMEOUT_SECONDS=90
-DOWNLOAD_TIMEOUT_SECONDS=120
+UPDATE_TIMEOUT_SECONDS=180
+DOWNLOAD_TIMEOUT_SECONDS=240
 
 # Runs apt-get as root and stops it after $1 seconds.
 run_apt() {

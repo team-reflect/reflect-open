@@ -74,8 +74,6 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
 
-      - uses: ./.github/actions/setup-mise
-
       - name: Resolve build number
         id: build_number
         run: |

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // No outputs: `cargo xtask` is `cargo run`, which trusts only the Cargo
+    // fingerprints in `target/`, so it rebuilds a restored binary anyway. The
+    // task builds `xtask` first and adds its hash to the tasks that use it.
+    "build": {
+      "env": [],
+      "outputs": [],
+    },
+  },
+}
