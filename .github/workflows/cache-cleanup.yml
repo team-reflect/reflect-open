@@ -19,11 +19,13 @@ jobs:
     permissions:
       actions: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - run: scripts/ci-delete-pr-caches.sh "$PR_NUMBER"
+      - run: |
+          gh cache list --ref "refs/pull/$PR_NUMBER/merge" --sort size_in_bytes --limit 100 --json key,id --jq '.[] | "\(.id) \(.key)"' |
+            while read -r id key; do
+              echo "Deleting $key"
+              gh cache delete "$id" || true
+              sleep 1
+            done
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
