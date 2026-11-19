@@ -16,7 +16,7 @@ permissions:
 
 env:
   # On master, run every task instead of skipping it on a turbo cache hit.
-  TURBO_CACHE: ${{ github.event_name == 'push' && 'local:rw,remote:w' || '' }}
+  TURBO_CACHE: ${{ github.event_name == 'push' && 'local:rw' || '' }}
 
 jobs:
   classify:
