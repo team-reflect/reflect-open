@@ -21,13 +21,20 @@ runs:
         # https://github.com/tauri-apps/tauri-docs/blob/5e49cc6e48597060f1618e0b62cb91b071b1b4a9/src/content/docs/distribute/Pipelines/github.mdx?plain=1#L105
         packages="libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils"
         hash=$(echo "$packages" | sha256sum | cut -d ' ' -f 1)
+        archives=$RUNNER_TEMP/apt-archives
+        lists=$RUNNER_TEMP/apt-lists
+        mkdir -p "$archives" "$lists"
+        # apt keeps the package files and lists in directories that the runner
+        # user can restore and save.
+        printf 'Dir::Cache::Archives "%s";\nDir::State::Lists "%s";\n' "$archives" "$lists" \
+          | sudo tee /etc/apt/apt.conf.d/99ci-cache > /dev/null
+        echo "packages=$packages" >> "$GITHUB_OUTPUT"
         # The cache holds the package lists and the package files of one runner
         # image version, so a cache hit installs without the network. A new
         # image version (about once a week) downloads everything again.
-        echo "packages=$packages" >> "$GITHUB_OUTPUT"
         echo "key=apt-$ImageOS-${ImageVersion:?}-$RUNNER_ARCH-$hash" >> "$GITHUB_OUTPUT"
-        echo "archives=$RUNNER_TEMP/apt-archives" >> "$GITHUB_OUTPUT"
-        echo "lists=$RUNNER_TEMP/apt-lists" >> "$GITHUB_OUTPUT"
+        echo "archives=$archives" >> "$GITHUB_OUTPUT"
+        echo "lists=$lists" >> "$GITHUB_OUTPUT"
 
     - name: Restore the apt package cache
       id: apt-cache
@@ -42,20 +49,20 @@ runs:
           ${{ steps.apt.outputs.lists }}/*_*
         key: ${{ steps.apt.outputs.key }}
 
-    - name: Install apt packages
+    # The cache matches this runner image, so it needs no network.
+    - name: Install apt packages from the cache
+      if: steps.apt-cache.outputs.cache-hit == 'true'
       shell: bash
       env:
-        archives: ${{ steps.apt.outputs.archives }}
-        lists: ${{ steps.apt.outputs.lists }}
         packages: ${{ steps.apt.outputs.packages }}
-        cache_hit: ${{ steps.apt-cache.outputs.cache-hit }}
-      run: |
-        options=()
-        if [ "$cache_hit" = true ]; then
-          options+=(--offline)
-        fi
-        # shellcheck disable=SC2086 # $packages is a space-separated list.
-        "$GITHUB_WORKSPACE/scripts/ci-apt.sh" "${options[@]}" "$archives" "$lists" $packages
+      run: sudo DEBIAN_FRONTEND=noninteractive apt-get --quiet install --no-download --yes --no-install-recommends $packages
+
+    - name: Download and install apt packages
+      if: steps.apt-cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        packages: ${{ steps.apt.outputs.packages }}
+      run: '"$GITHUB_WORKSPACE/scripts/ci-apt.sh" $packages'
 
     - name: Save the apt package cache
       if: inputs.cache == 'true' && steps.apt-cache.outputs.cache-hit != 'true'
