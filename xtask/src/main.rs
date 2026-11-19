@@ -2,6 +2,8 @@
 //!
 //! - `index-wasm`: builds `reflect-index-wasm` for `wasm32-unknown-unknown` and
 //!   writes its bindings to `packages/index-wasm/pkg`.
+//! - `ffi-header`: writes the C header of `reflect-ffi` to
+//!   `crates/ffi/include/reflect_core.h`.
 
 use std::env;
 use std::error::Error;
@@ -21,14 +23,20 @@ fn main() -> Result {
         .as_slice()
     {
         ["index-wasm"] => index_wasm(),
-        _ => Err("usage: cargo xtask index-wasm".into()),
+        ["ffi-header"] => ffi_header(),
+        _ => Err("usage: cargo xtask <index-wasm | ffi-header>".into()),
     }
 }
 
-fn index_wasm() -> Result {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+/// The repository root.
+fn root() -> Result<&'static Path> {
+    Ok(Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
-        .ok_or("the xtask crate has no parent directory")?;
+        .ok_or("the xtask crate has no parent directory")?)
+}
+
+fn index_wasm() -> Result {
+    let root = root()?;
     let cargo = env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
     let status = Command::new(cargo)
         .current_dir(root)
@@ -55,5 +63,18 @@ fn index_wasm() -> Result {
         .web(true)?
         .omit_default_module_path(false)
         .generate(root.join("packages/index-wasm/pkg"))?;
+    Ok(())
+}
+
+fn ffi_header() -> Result {
+    let crate_dir = root()?.join("crates/ffi");
+    // The same output as
+    // `cbindgen --config cbindgen.toml --output include/reflect_core.h crates/ffi`.
+    let config = cbindgen::Config::from_file(crate_dir.join("cbindgen.toml"))?;
+    cbindgen::Builder::new()
+        .with_config(config)
+        .with_crate(&crate_dir)
+        .generate()?
+        .write_to_file(crate_dir.join("include/reflect_core.h"));
     Ok(())
 }

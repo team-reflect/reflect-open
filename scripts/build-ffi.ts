@@ -99,17 +99,10 @@ async function main(): Promise<void> {
     },
   })
 
-  await exec(
-    'cbindgen',
-    [
-      '--config',
-      join(CRATE_DIR, 'cbindgen.toml'),
-      '--output',
-      join(CRATE_INCLUDE_DIR, 'reflect_core.h'),
-      CRATE_DIR,
-    ],
-    INHERIT,
-  )
+  await exec('cargo', ['xtask', 'ffi-header'], {
+    ...INHERIT,
+    nodeOptions: { ...INHERIT.nodeOptions, cwd: ROOT_DIR },
+  })
   const libraryPaths = targets.map((target) => {
     return join(TARGET_DIR, target, profile, 'libreflect_ffi.a')
   })

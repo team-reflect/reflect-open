@@ -49,6 +49,8 @@ reflect-types = { path = "crates/types" }
 apple-native-keyring-store = "1.0.2"
 base64 = "0.23.1"
 block2 = "0.6.2"
+# The library only: the default `clap` feature builds the CLI.
+cbindgen = { version = "0.29.4", default-features = false }
 clap = "4.6.7"
 console_error_panic_hook = "0.1.7"
 core-foundation = "0.10.1"

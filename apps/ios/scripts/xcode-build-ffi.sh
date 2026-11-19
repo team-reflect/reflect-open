@@ -11,7 +11,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
 
 # Xcode launched from the Dock runs script phases with the minimal launchd
-# PATH. This file adds node, cargo and the mise shims to it.
+# PATH. This file adds node and cargo to it.
 if [ ! -f apps/ios/.xcode.env.local ]; then
   echo "error: apps/ios/.xcode.env.local is missing; run \`pnpm install\` once from a terminal" >&2
   exit 1
@@ -26,8 +26,6 @@ fi
 keep=(
   # The Xcode that runs this build.
   DEVELOPER_DIR
-  # Trust for mise.toml, whose [settings] block the mise shims load.
-  MISE_TRUSTED_CONFIG_PATHS
   # cargo and build script settings. A changed CARGO_INCREMENTAL rebuilds
   # every crate.
   CARGO_HTTP_MULTIPLEXING

@@ -319,8 +319,6 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
 
-      - uses: ./.github/actions/setup-mise
-
       # The script prints the time of each of its steps.
       - name: Build and run the tests
         run: pnpm test:ios
@@ -397,7 +395,7 @@ jobs:
       - name: Verify the generated C header is current
         if: matrix.name == 'Linux'
         run: |
-          cbindgen --config crates/ffi/cbindgen.toml --output crates/ffi/include/reflect_core.h crates/ffi
+          cargo xtask ffi-header
           git diff --exit-code crates/ffi/include/reflect_core.h \
             || (echo "::error::reflect_core.h is stale. Run 'pnpm build:ffi' and commit the result." && exit 1)
 
