@@ -19,12 +19,12 @@ runs:
     - shell: bash
       run: echo "DO_NOT_TRACK=1" >> $GITHUB_ENV
 
-    # Without a token, turbo runs with the local cache only.
-    - continue-on-error: true
-      uses: vercel/setup-turborepo-remote-cache-action@49d7b1b46ba4c9251e1977986bfe18336feabc8f # v1.1.0
+    # Fork PRs get no OIDC token, so they run with the local cache only.
+    - uses: vercel/setup-turborepo-remote-cache-action@49d7b1b46ba4c9251e1977986bfe18336feabc8f # v1.1.0
       if: >-
         inputs.cache == 'true'
         && inputs.team != ''
         && github.repository == 'team-reflect/reflect-open'
+        && github.event.pull_request.head.repo.fork != true
       with:
         team: ${{ inputs.team }}
