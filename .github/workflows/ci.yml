@@ -398,10 +398,7 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
 
-      # Only the root package: it has `turbo`.
       - uses: ./.github/actions/setup-node
-        with:
-          filter: '@reflect/monorepo'
 
       - uses: ./.github/actions/setup-turbo
         with:
@@ -445,10 +442,7 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
 
-      # Only the root package: it has `turbo`.
       - uses: ./.github/actions/setup-node
-        with:
-          filter: '@reflect/monorepo'
 
       - uses: ./.github/actions/setup-turbo
         with:

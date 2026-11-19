@@ -6,10 +6,6 @@ inputs:
     description: Whether to restore and save the cache.
     required: false
     default: 'true'
-  filter:
-    description: A pnpm filter that limits the installed packages.
-    required: false
-    default: ''
 
 runs:
   using: composite
@@ -31,6 +27,4 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      env:
-        FILTER: ${{ inputs.filter }}
-      run: pnpm install --frozen-lockfile ${FILTER:+--filter "$FILTER"}
+      run: pnpm install --frozen-lockfile
