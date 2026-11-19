@@ -17,7 +17,7 @@
     "web-inspector": "node scripts/web-inspector.ts",
     "typecheck": "tsc -b",
     "test": "pnpm build:index-wasm --output-logs=errors-only && vitest",
-    "test:browser": "vitest run --project '*browser*' ${REFLECT_TEST_SHARD:+--shard=$REFLECT_TEST_SHARD}",
+    "test:browser": "vitest run --project '*browser*'",
     "test:node": "vitest run --project '!*browser*'",
     "test:ios": "node scripts/test-ios.ts",
     "test:swift": "swift test --package-path apple",

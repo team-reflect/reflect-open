@@ -239,10 +239,12 @@ jobs:
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:chromium
 
+      - name: Build the index wasm
+        run: pnpm build:index-wasm
+
+      # `--only` passes `--shard` to the test task alone, not to the wasm build.
       - name: Test
-        run: pnpm turbo run test:browser
-        env:
-          REFLECT_TEST_SHARD: ${{ matrix.shard }}/3
+        run: pnpm turbo run test:browser --only -- --shard=${{ matrix.shard }}/3
 
   # Not part of `all-green`: a WebKit failure does not block merging.
   test-webkit:
@@ -280,22 +282,20 @@ jobs:
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:webkit
 
+      - name: Build the index wasm
+        run: pnpm build:index-wasm
+
       # WebKit keeps the memory of every finished test file, so each shard
-      # runs in its own Vitest process to restart the browser.
+      # runs in its own Vitest process to restart the browser. `--only` passes
+      # `--shard` to the test task alone, not to the wasm build.
       - name: Test browser (shard 1/3)
-        run: pnpm turbo run test:browser
-        env:
-          REFLECT_TEST_SHARD: 1/3
+        run: pnpm turbo run test:browser --only -- --shard=1/3
 
       - name: Test browser (shard 2/3)
-        run: pnpm turbo run test:browser
-        env:
-          REFLECT_TEST_SHARD: 2/3
+        run: pnpm turbo run test:browser --only -- --shard=2/3
 
       - name: Test browser (shard 3/3)
-        run: pnpm turbo run test:browser
-        env:
-          REFLECT_TEST_SHARD: 3/3
+        run: pnpm turbo run test:browser --only -- --shard=3/3
 
   test-swift:
     needs: classify

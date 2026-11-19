@@ -67,7 +67,7 @@
     },
     "//#test:browser": {
       "dependsOn": ["@reflect/index-wasm#build"],
-      "env": ["REFLECT_TEST_BROWSER", "REFLECT_TEST_SHARD"],
+      "env": ["REFLECT_TEST_BROWSER"],
       "passThroughEnv": ["VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB", "__XPC_JSC_useJIT"],
     },
 
