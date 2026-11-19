@@ -3,6 +3,7 @@
 # pins one SQLite everywhere — the desktop writer and the CLI reader can
 # never skew.
 [workspace]
+name = "reflect-rust"
 resolver = "3"
 members = [
   "apps/cli",
