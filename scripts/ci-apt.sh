@@ -9,9 +9,11 @@
 # removes the mirror that apt tries first and runs the step again.
 #
 # Usage:
-#   scripts/ci-apt.sh <archives-dir> <package>...
+#   scripts/ci-apt.sh [--offline] <archives-dir> <lists-dir> <package>...
 #
-# <archives-dir> holds the downloaded package files, so CI can cache it.
+# <archives-dir> holds the downloaded package files and <lists-dir> the package
+# lists, so CI can cache both. With --offline, the script installs from these
+# directories without the network, and downloads only if that fails.
 
 set -euo pipefail
 
@@ -26,7 +28,7 @@ run_apt() {
   shift
   sudo DEBIAN_FRONTEND=noninteractive \
     timeout --kill-after=10 "$seconds" \
-    apt-get --quiet "$@"
+    apt-get --quiet "${APT_DIRS[@]}" "$@"
 }
 
 # Runs apt-get up to MAX_ATTEMPTS times, each attempt within $1 seconds.
@@ -104,27 +106,47 @@ update_package_lists() {
   run_apt_with_retry "$UPDATE_TIMEOUT_SECONDS" update
 }
 
-# Downloads the packages into $1, installs them, and removes old package files from $1.
+# Installs the packages from the files in the archives directory, without the network.
+# It has no time limit: stopping dpkg halfway leaves packages half installed.
+install_downloaded() {
+  sudo DEBIAN_FRONTEND=noninteractive apt-get --quiet "${APT_DIRS[@]}" \
+    install --no-download --yes --no-install-recommends "$@"
+}
+
+# Downloads the packages into the archives directory, installs them, and removes
+# old package files from it.
 install_packages() {
-  local archives_dir=$1
-  shift
-  local options=(--yes --no-install-recommends -o "Dir::Cache::Archives=$archives_dir")
-
-  mkdir -p "$archives_dir"
-  run_apt_with_retry "$DOWNLOAD_TIMEOUT_SECONDS" install --download-only "${options[@]}" "$@"
-
-  # Every package file is in the archives directory now, so this step needs no network.
-  # It has no time limit: stopping dpkg halfway leaves packages half installed.
-  sudo DEBIAN_FRONTEND=noninteractive apt-get --quiet install --no-download "${options[@]}" "$@"
+  run_apt_with_retry "$DOWNLOAD_TIMEOUT_SECONDS" \
+    install --download-only --yes --no-install-recommends "$@"
+  install_downloaded "$@"
 
   # Removes the package files whose versions are no longer in the package lists,
   # so the cache keeps only the current versions.
-  sudo apt-get --quiet autoclean -o "Dir::Cache::Archives=$archives_dir"
+  sudo apt-get --quiet "${APT_DIRS[@]}" autoclean
 }
 
-if [ "$#" -lt 2 ]; then
-  echo "Usage: $0 <archives-dir> <package>..." >&2
+offline=false
+if [ "${1:-}" = "--offline" ]; then
+  offline=true
+  shift
+fi
+
+if [ "$#" -lt 3 ]; then
+  echo "Usage: $0 [--offline] <archives-dir> <lists-dir> <package>..." >&2
   exit 2
+fi
+
+archives_dir=$1
+lists_dir=$2
+shift 2
+APT_DIRS=(-o "Dir::Cache::Archives=$archives_dir" -o "Dir::State::Lists=$lists_dir")
+mkdir -p "$archives_dir" "$lists_dir"
+
+if [ "$offline" = true ]; then
+  if install_downloaded "$@"; then
+    exit 0
+  fi
+  echo "::warning::apt: the cached packages did not install, so downloading them"
 fi
 
 update_package_lists

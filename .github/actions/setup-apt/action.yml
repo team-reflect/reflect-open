@@ -10,7 +10,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Compute the apt cache key and directory
+    - name: Compute the apt cache key and directories
       id: apt
       shell: bash
       run: |
@@ -21,36 +21,50 @@ runs:
         # https://github.com/tauri-apps/tauri-docs/blob/5e49cc6e48597060f1618e0b62cb91b071b1b4a9/src/content/docs/distribute/Pipelines/github.mdx?plain=1#L105
         packages="libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils"
         hash=$(echo "$packages" | sha256sum | cut -d ' ' -f 1)
-        # Ubuntu publishes new package versions all the time, so the cache key
-        # changes every day (UTC). A new key restores the latest cache and
-        # downloads only the changed packages.
-        day=$(date -u +%Y-%m-%d)
+        # The cache holds the package lists and the package files of one runner
+        # image version, so a cache hit installs without the network. A new
+        # image version (about once a week) downloads everything again.
         echo "packages=$packages" >> "$GITHUB_OUTPUT"
-        echo "key=apt-$ImageOS-$RUNNER_ARCH-$hash-$day" >> "$GITHUB_OUTPUT"
-        echo "restore-key=apt-$ImageOS-$RUNNER_ARCH-$hash-" >> "$GITHUB_OUTPUT"
-        echo "dir=$RUNNER_TEMP/apt-archives" >> "$GITHUB_OUTPUT"
+        echo "key=apt-$ImageOS-${ImageVersion:?}-$RUNNER_ARCH-$hash" >> "$GITHUB_OUTPUT"
+        echo "archives=$RUNNER_TEMP/apt-archives" >> "$GITHUB_OUTPUT"
+        echo "lists=$RUNNER_TEMP/apt-lists" >> "$GITHUB_OUTPUT"
 
     - name: Restore the apt package cache
       id: apt-cache
       if: inputs.cache == 'true'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ${{ steps.apt.outputs.dir }}/*.deb
+        # The globs skip the `lock` file and `partial/` directory that apt
+        # keeps next to the files, which only root and `_apt` can read. Every
+        # package list file name has an underscore.
+        path: |
+          ${{ steps.apt.outputs.archives }}/*.deb
+          ${{ steps.apt.outputs.lists }}/*_*
         key: ${{ steps.apt.outputs.key }}
-        restore-keys: ${{ steps.apt.outputs.restore-key }}
 
     - name: Install apt packages
       shell: bash
       env:
-        archives: ${{ steps.apt.outputs.dir }}
+        archives: ${{ steps.apt.outputs.archives }}
+        lists: ${{ steps.apt.outputs.lists }}
         packages: ${{ steps.apt.outputs.packages }}
-      run: '"$GITHUB_WORKSPACE/scripts/ci-apt.sh" "$archives" $packages'
+        cache_hit: ${{ steps.apt-cache.outputs.cache-hit }}
+      run: |
+        options=()
+        if [ "$cache_hit" = true ]; then
+          options+=(--offline)
+        fi
+        # shellcheck disable=SC2086 # $packages is a space-separated list.
+        "$GITHUB_WORKSPACE/scripts/ci-apt.sh" "${options[@]}" "$archives" "$lists" $packages
 
     - name: Save the apt package cache
       if: inputs.cache == 'true' && steps.apt-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        # The glob skips the `lock` file and `partial/` directory that apt
-        # keeps next to the packages, which only root and `_apt` can read.
-        path: ${{ steps.apt.outputs.dir }}/*.deb
+        # The globs skip the `lock` file and `partial/` directory that apt
+        # keeps next to the files, which only root and `_apt` can read. Every
+        # package list file name has an underscore.
+        path: |
+          ${{ steps.apt.outputs.archives }}/*.deb
+          ${{ steps.apt.outputs.lists }}/*_*
         key: ${{ steps.apt.outputs.key }}
