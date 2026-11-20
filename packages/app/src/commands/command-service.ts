@@ -1,6 +1,6 @@
 import type { MaybePromise } from '@reflect/utils'
 import type { LoggerService, PlatformFacts } from '@reflect/core'
-import { APP_COMMANDS, type AppCommandId, type Commands } from './app-commands.ts'
+import { APP_COMMANDS, type AppCommandId, type Command } from './app-commands.ts'
 import { normalizeBinding } from './keybindings.ts'
 
 /**
@@ -30,7 +30,7 @@ export interface CommandService {
   /**
    * Every declared command, in declaration order.
    */
-  list(): Commands
+  list(): readonly Command[]
   /**
    * Make `handler` the handler of `id` until `signal` aborts.
    */
@@ -136,7 +136,7 @@ class CommandServiceImpl implements CommandService {
   readonly #deps: CommandServiceDeps
   readonly #handlers = new Map<AppCommandId, CommandHandler>()
   readonly #blocks: (readonly AppCommandId[])[] = []
-  readonly #commands: Commands
+  readonly #commands: readonly Command[]
   /**
    * Normalized binding → command id, for Apple platforms and for the others.
    */
@@ -157,7 +157,7 @@ class CommandServiceImpl implements CommandService {
     }
   }
 
-  list(): Commands {
+  list(): readonly Command[] {
     return this.#commands
   }
 

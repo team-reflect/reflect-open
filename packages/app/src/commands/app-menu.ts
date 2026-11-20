@@ -31,88 +31,85 @@ function separator(): AppMenuEntry {
 }
 
 /**
- * The menu structure, as pure data so tests can hold it against the command
- * registry. macOS replaces the first submenu's title with the app name.
- // * FIXME: just export const APP_MENU_LAYOUT: readonly AppSubmenuLayout[] = [ ... ]
+ * The native menu structure. macOS replaces the first submenu's title with the
+ * app name.
  */
-export function appMenuLayout(): AppSubmenuLayout[] {
-  return [
-    {
-      text: 'Reflect',
-      entries: [
-        predefined({ About: null }, 'About Reflect'),
-        separator(),
-        command('settings.open', 'Settings…'),
-        separator(),
-        predefined('Services'),
-        separator(),
-        predefined('Hide', 'Hide Reflect'),
-        predefined('HideOthers'),
-        predefined('ShowAll'),
-        separator(),
-        predefined('Quit', 'Quit Reflect'),
-      ],
-    },
-    {
-      text: 'File',
-      entries: [
-        command('note.new'),
-        command('note.attachFile'),
-        separator(),
-        predefined('CloseWindow'),
-      ],
-    },
-    {
-      text: 'Edit',
-      entries: [
-        predefined('Undo'),
-        predefined('Redo'),
-        separator(),
-        predefined('Cut'),
-        predefined('Copy'),
-        predefined('Paste'),
-        predefined('SelectAll'),
-        separator(),
-        command('note.find'),
-        command('note.findNext'),
-        command('note.findPrevious'),
-      ],
-    },
-    {
-      text: 'View',
-      entries: [
-        command('palette.open'),
-        command('nav.today'),
-        command('nav.allNotes'),
-        command('chat.open'),
-        separator(),
-        command('history.back'),
-        command('history.forward'),
-        separator(),
-        command('sidebar.toggle'),
-        separator(),
-        command('dev.toggleDevtools'),
-      ],
-    },
-    {
-      text: 'Window',
-      nsAppRole: 'windows',
-      entries: [
-        command('note.openInNewWindow'),
-        separator(),
-        predefined('Minimize'),
-        predefined('Maximize', 'Zoom'),
-        separator(),
-        predefined('BringAllToFront'),
-      ],
-    },
-    {
-      text: 'Help',
-      nsAppRole: 'help',
-      entries: [command('shortcuts.show')],
-    },
-  ]
-}
+export const APP_MENU_LAYOUT: readonly AppSubmenuLayout[] = [
+  {
+    text: 'Reflect',
+    entries: [
+      predefined({ About: null }, 'About Reflect'),
+      separator(),
+      command('settings.open', 'Settings…'),
+      separator(),
+      predefined('Services'),
+      separator(),
+      predefined('Hide', 'Hide Reflect'),
+      predefined('HideOthers'),
+      predefined('ShowAll'),
+      separator(),
+      predefined('Quit', 'Quit Reflect'),
+    ],
+  },
+  {
+    text: 'File',
+    entries: [
+      command('note.new'),
+      command('note.attachFile'),
+      separator(),
+      predefined('CloseWindow'),
+    ],
+  },
+  {
+    text: 'Edit',
+    entries: [
+      predefined('Undo'),
+      predefined('Redo'),
+      separator(),
+      predefined('Cut'),
+      predefined('Copy'),
+      predefined('Paste'),
+      predefined('SelectAll'),
+      separator(),
+      command('note.find'),
+      command('note.findNext'),
+      command('note.findPrevious'),
+    ],
+  },
+  {
+    text: 'View',
+    entries: [
+      command('palette.open'),
+      command('nav.today'),
+      command('nav.allNotes'),
+      command('chat.open'),
+      separator(),
+      command('history.back'),
+      command('history.forward'),
+      separator(),
+      command('sidebar.toggle'),
+      separator(),
+      command('dev.toggleDevtools'),
+    ],
+  },
+  {
+    text: 'Window',
+    nsAppRole: 'windows',
+    entries: [
+      command('note.openInNewWindow'),
+      separator(),
+      predefined('Minimize'),
+      predefined('Maximize', 'Zoom'),
+      separator(),
+      predefined('BringAllToFront'),
+    ],
+  },
+  {
+    text: 'Help',
+    nsAppRole: 'help',
+    entries: [command('shortcuts.show')],
+  },
+]
 
 /**
  * Build the application menu and install it, replacing Tauri's default.
@@ -128,5 +125,5 @@ export function appMenuLayout(): AppSubmenuLayout[] {
  * macOS application menu.
  */
 export async function installNativeMenu(nativeMenu: NativeMenuService): Promise<void> {
-  await nativeMenu.install(appMenuLayout())
+  await nativeMenu.install(APP_MENU_LAYOUT)
 }

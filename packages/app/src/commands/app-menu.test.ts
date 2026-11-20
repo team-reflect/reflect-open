@@ -2,17 +2,17 @@ import { isNotNullish } from '@ocavue/utils'
 import { describe, expect, it } from 'vitest'
 import type { AppCommandId } from './app-commands.ts'
 import { keybindingFor } from './app-commands.ts'
-import { appMenuLayout } from './app-menu.ts'
+import { APP_MENU_LAYOUT } from './app-menu.ts'
 
 function referencedCommandIds(): AppCommandId[] {
-  return appMenuLayout().flatMap((submenu) => {
+  return APP_MENU_LAYOUT.flatMap((submenu) => {
     return submenu.entries
       .map((entry) => (entry.kind === 'command' ? entry.commandId : null))
       .filter(isNotNullish)
   })
 }
 
-describe('appMenuLayout', () => {
+describe('APP_MENU_LAYOUT', () => {
   it('surfaces every ported V1 menu shortcut', () => {
     const referenced = new Set(referencedCommandIds())
     // The V1 Electron menu items that have a V2 command: Preferences ⌘,
@@ -39,7 +39,7 @@ describe('appMenuLayout', () => {
   })
 
   it('exposes the selected note’s new-window shortcut in the native Window menu', () => {
-    const windowMenu = appMenuLayout().find((submenu) => submenu.text === 'Window')
+    const windowMenu = APP_MENU_LAYOUT.find((submenu) => submenu.text === 'Window')
     expect(windowMenu?.entries).toContainEqual({
       kind: 'command',
       commandId: 'note.openInNewWindow',
@@ -48,7 +48,7 @@ describe('appMenuLayout', () => {
     expect(keybindingFor('note.openInNewWindow')).toBe('Mod-Shift-o')
   })
   it('puts note Find commands and their browser-standard shortcuts in Edit', () => {
-    const editMenu = appMenuLayout().find((submenu) => submenu.text === 'Edit')
+    const editMenu = APP_MENU_LAYOUT.find((submenu) => submenu.text === 'Edit')
     expect(editMenu?.entries).toEqual(
       expect.arrayContaining([
         { kind: 'command', commandId: 'note.find', text: undefined },
