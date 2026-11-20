@@ -1,7 +1,8 @@
 /// <reference lib="dom" />
 // Composes the App Store screenshots from the raw screens: a caption at the
-// top and the whole device below it, in Apple's bezel ("12z44"). Shots 1, 3
-// and 5 use the light theme, 2 and 4 the dark one. Writes
+// top (on the left of a landscape canvas) and the whole device in Apple's
+// bezel ("12z44"). Shots 1, 3 and 5 use the light theme, 2 and 4 the dark
+// one. Writes
 // `screenshots/<device>/NN-<screen>.png` (committed) at the App Store size.
 //
 // `balanceCaption` runs in the page, hence the DOM types.
@@ -46,7 +47,7 @@ function screenshotHtml(device: DeviceName, screen: Screen, theme: Theme): strin
   const bezel = BEZELS[device]
   const look = LOOKS[theme]
   const u = Math.min(W, H) / 100
-  // A landscape canvas (the inner screen of the Duo) has the caption on the
+  // A landscape canvas (the iPad) has the caption on the
   // left and the device on the right, a portrait one the caption on top.
   const wide = W > H
   const mx = W * (wide ? 0.06 : 0.08)

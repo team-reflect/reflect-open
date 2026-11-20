@@ -1,9 +1,9 @@
-// Sets the hinge angle of an iPhone Duo simulator: 0 is closed, 180 is open.
-// It runs inside the simulator and posts the vendor-defined HID event that the
-// hinge slider of the Simulator app sends. Private API, from
+// Closes an iPhone Duo simulator, so its outer screen shows. It runs inside
+// the simulator and posts the vendor-defined HID event that the hinge slider
+// of the Simulator app sends, at 0 degrees. Private API, from
 // https://github.com/artemnovichkov/hinge
 //
-//   xcrun simctl spawn <udid> duo-hinge <degrees>
+//   xcrun simctl spawn <udid> duo-close
 #import <Foundation/Foundation.h>
 #include <mach/mach_time.h>
 #include <unistd.h>
@@ -16,16 +16,14 @@ extern IOHIDEventSystemClientRef IOHIDEventSystemClientCreateWithType(CFAllocato
 extern void IOHIDEventSystemClientDispatchEvent(IOHIDEventSystemClientRef, IOHIDEventRef);
 extern CFDataRef IOCFSerialize(CFTypeRef, CFOptionFlags);
 
-int main(int argc, char **argv) {
-    if (argc != 2) { fprintf(stderr, "usage: duo-hinge <degrees>\n"); return 64; }
-    double degrees = fmin(fmax(atof(argv[1]), 0), 180);
+int main(void) {
     IOHIDEventSystemClientRef client = IOHIDEventSystemClientCreateWithType(NULL, 4, NULL);
-    if (!client) { fprintf(stderr, "duo-hinge: no HID client\n"); return 1; }
+    if (!client) { fprintf(stderr, "duo-close: no HID client\n"); return 1; }
     NSDictionary *payload = @{
         @"provider": @"com.apple.Virtualization.VirtualMachines",
         @"source": @"hinge-slider-control",
         @"type": @"range",
-        @"value": @(degrees),
+        @"value": @0,
     };
     CFDataRef data = IOCFSerialize((__bridge CFTypeRef)payload, 1);
     IOHIDEventRef event = IOHIDEventCreateVendorDefinedEvent(NULL, mach_absolute_time(), 0xFF61, 0x5B, 0,

@@ -26,47 +26,26 @@ export interface Bezel {
 }
 
 export const BEZELS: Record<DeviceName, Bezel> = {
-  iphone: {
-    dmg: 'Bezel-iPhone-18.dmg',
-    png: 'iPhone 18 Pro Max - Black - Portrait.png',
-    size: [1470, 3000],
-    hole: { x: 75, y: 66 },
-    radius: 188,
-  },
-  'iphone-medium': {
+  'iphone_6.3_inch': {
     dmg: 'Bezel-iPhone-18.dmg',
     png: 'iPhone 18 Pro - Black - Portrait.png',
     size: [1350, 2760],
     hole: { x: 72, y: 69 },
     radius: 188,
   },
-  ipad: {
-    dmg: 'Bezel-iPad-Pro-(M5).dmg',
-    png: 'iPad Pro (M5) 13" - Space Black - Portrait.png',
-    size: [2300, 3000],
-    hole: { x: 118, y: 124 },
-    radius: 58,
-  },
-  'ipad-11': {
-    dmg: 'Bezel-iPad-Pro-(M5).dmg',
-    png: 'iPad Pro (M5) 11" - Space Black - Portrait.png',
-    size: [1880, 2640],
-    hole: { x: 106, y: 110 },
-    radius: 58,
-  },
-  'duo-outer': {
+  iphone_duo_outer: {
     dmg: 'Bezel-iPhone-Duo.dmg',
     png: 'iPhone Duo - Night Sky - Outer Closed Portrait.png',
     size: [1574, 2194],
     hole: { x: 88, y: 80 },
     radius: [24, 174, 174, 24],
   },
-  'duo-inner': {
-    dmg: 'Bezel-iPhone-Duo.dmg',
-    png: 'iPhone Duo - Night Sky - Inner Open Landscape.png',
-    size: [3093, 2247],
-    hole: { x: 120, y: 120 },
-    radius: 160,
+  ipad_13_inch: {
+    dmg: 'Bezel-iPad-Pro-(M5).dmg',
+    png: 'iPad Pro (M5) 13" - Space Black - Landscape.png',
+    size: [3000, 2300],
+    hole: { x: 124, y: 118 },
+    radius: 58,
   },
 }
 

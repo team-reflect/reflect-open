@@ -5,6 +5,7 @@ import XCTest
 ///
 /// - `STORE_SCREENSHOTS_FIXTURE`: the path of the `UITestFixture` JSON.
 /// - `STORE_SCREENSHOTS_DIR`: the directory that gets one PNG per screen.
+/// - `STORE_SCREENSHOTS_LANDSCAPE`: `true` turns the device to landscape.
 ///
 /// The texts that the test waits for come from
 /// `apps/ios/store-screenshots/fixture.ts`.
@@ -21,6 +22,8 @@ final class StoreScreenshotsUITests: XCTestCase {
       throw XCTSkip("Runs only from `pnpm store-screenshots`")
     }
     continueAfterFailure = false
+    XCUIDevice.shared.orientation =
+      environment["STORE_SCREENSHOTS_LANDSCAPE"] == "true" ? .landscapeLeft : .portrait
     self.directory = URL(fileURLWithPath: directory)
     app.useSession(UUID())
     app.launchEnvironment["REFLECT_UITEST_FIXTURE"] = fixture
@@ -63,23 +66,7 @@ final class StoreScreenshotsUITests: XCTestCase {
     // The text can show while a push or a tab change still moves the screen,
     // and no element reports the end of the animation.
     Thread.sleep(forTimeInterval: 1)
-    try screenshot().pngRepresentation
+    try XCUIScreen.main.screenshot().pngRepresentation
       .write(to: directory.appendingPathComponent("\(name).png"))
-  }
-
-  /// The screen of the app. An open iPhone Duo has two screens, and
-  /// `XCUIScreen.main` is the outer one, so it is the screen with the shape
-  /// of the app's window: the ratio of the short side to the long side, as
-  /// the image of the inner screen is portrait with a landscape tag.
-  private func screenshot() -> XCUIScreenshot {
-    let shape = { (width: CGFloat, height: CGFloat) in min(width, height) / max(width, height) }
-    let window = app.windows.firstMatch.frame.size
-    let shots = XCUIScreen.screens.map { $0.screenshot() }
-    return shots.first { shot in
-      guard let image = shot.image.cgImage else { return false }
-      return abs(
-        shape(CGFloat(image.width), CGFloat(image.height)) - shape(window.width, window.height))
-        < 0.005
-    } ?? XCUIScreen.main.screenshot()
   }
 }

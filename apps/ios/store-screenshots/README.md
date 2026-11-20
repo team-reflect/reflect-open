@@ -4,15 +4,15 @@
 pnpm store-screenshots
 ```
 
-Writes the five screenshots of each App Store size to `screenshots/<device>/`, ready to upload. They are committed, so a run shows its changes in the diff.
-It takes about 10 minutes, most of it in the simulator.
+Writes the five screenshots of each App Store size to `screenshots/<device>/`, ready to upload.
+They are committed, so a run shows its changes in the diff. It takes about 5 minutes, most of it in
+the simulator.
 
-| Device | Simulator | Size (px) | App Store Connect |
-| --- | --- | --- | --- |
-| `iphone` | iPhone 18 Pro Max | 1320 × 2868 | iPhone 6.9" |
-| `iphone-medium` | iPhone 18 Pro | 1206 × 2622 | iPhone 6.3" |
-| `ipad` | iPad Pro 13-inch (M5) | 2064 × 2752 | iPad 13" |
-| `ipad-11` | iPad Pro 11-inch (M5) | 1668 × 2420 | iPad 11" |
+| Device | Simulator | Size (px) |
+| --- | --- | --- |
+| `iphone_6.3_inch` | iPhone 18 Pro | 1206 × 2622 |
+| `iphone_duo_outer` | iPhone Duo, closed | 1398 × 2034 |
+| `ipad_13_inch` | iPad Pro 13-inch (M5), landscape | 2752 × 2064 |
 
 Options:
 
@@ -27,11 +27,14 @@ Options:
 2. **Capture** (`capture.ts`): for each device, one simulator at a time, in light and dark:
    `StoreScreenshotsUITests` starts the app with the demo graph of `fixture.ts` and saves
    `out/raw/<device>/<theme>/<screen>.png`. The app reads the graph through `UITestFixture`
-   (Debug builds only): notes, settings, the AI key, and the answer of the AI provider.
-3. **Compose** (`compose.ts`): the caption of `copy.ts` above the raw screen in Apple's bezel.
+   (Debug builds only): notes, settings, the AI key, the answer of the AI provider, and
+   `localStorage`.
+3. **Compose** (`compose.ts`): the caption of `copy.ts` and the raw screen in Apple's bezel, the
+   caption above a portrait device and left of a landscape one.
 
-Each device has its own simulator, `reflect-store-<device>`, kept for the next run. The script sets
-its locale to en-US and its iPad windows to full screen before each boot.
+Each device has its own simulator, `reflect-store-<device>`, kept for the next run. Before each
+boot, the script sets its locale to en-US and its iPad windows to full screen. It closes the
+iPhone Duo with `duo-close.m`, and the test turns the iPad to landscape, which shows the sidebar.
 
 ## Dates
 
@@ -44,6 +47,4 @@ shows 9:41 on it.
 The device frames come from [Apple Design Resources](https://developer.apple.com/design/resources/).
 Their license allows them only in mock-ups of apps for Apple platforms, and not their
 redistribution, so the script downloads them into `out/bezels/` (git-ignored). Never commit them.
-
-The composed screenshots in `screenshots/` are app mock-ups, which the license allows. The bezel
-PNGs on their own stay out of git.
+The composed screenshots in `screenshots/` are app mock-ups, which the license allows.

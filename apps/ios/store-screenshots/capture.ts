@@ -57,11 +57,11 @@ export async function build(): Promise<void> {
 }
 
 /**
- * Builds `duo-hinge.m` for the simulator, once. It runs inside the simulator,
+ * Builds `duo-close.m` for the simulator, once. It runs inside the simulator,
  * so it needs the iOS Simulator SDK and an ad-hoc signature.
  */
-async function buildHinge(): Promise<string> {
-  const binary = join(OUT_DIR, 'duo-hinge')
+async function buildDuoClose(): Promise<string> {
+  const binary = join(OUT_DIR, 'duo-close')
   if (!existsSync(binary)) {
     await run('xcrun', [
       '-sdk',
@@ -77,7 +77,7 @@ async function buildHinge(): Promise<string> {
       'Foundation',
       '-o',
       binary,
-      join(import.meta.dirname, 'duo-hinge.m'),
+      join(import.meta.dirname, 'duo-close.m'),
     ])
     await run('codesign', ['-f', '-s', '-', binary])
   }
@@ -167,9 +167,9 @@ export async function capture(device: DeviceName, today: string): Promise<void> 
       '--batteryLevel',
       '100',
     )
-    const { hinge } = DEVICES[device] as Device
-    if (hinge !== undefined) {
-      await simctl('spawn', udid, await buildHinge(), String(hinge))
+    const { canvas, closed } = DEVICES[device] as Device
+    if (closed) {
+      await simctl('spawn', udid, await buildDuoClose())
     }
     // simctl takes only this ISO form; the status bar shows local 9:41.
     await simctl(
@@ -196,6 +196,7 @@ export async function capture(device: DeviceName, today: string): Promise<void> 
         {
           TEST_RUNNER_STORE_SCREENSHOTS_FIXTURE: fixture,
           TEST_RUNNER_STORE_SCREENSHOTS_DIR: dir,
+          TEST_RUNNER_STORE_SCREENSHOTS_LANDSCAPE: String(canvas[0] > canvas[1]),
         },
       )
     }
