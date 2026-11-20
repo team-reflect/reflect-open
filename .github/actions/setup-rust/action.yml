@@ -35,28 +35,37 @@ runs:
       shell: bash
       run: echo "ORT_CACHE_DIR=$RUNNER_TEMP/ort_cache" >> "$GITHUB_ENV"
 
+    # Skip sccache on Windows because of error "The filename or extension is too long" (os error 206). See https://github.com/mozilla/sccache/issues/2397
     - name: Install sccache
-      if: inputs.cache == 'true'
+      if: inputs.cache == 'true' && runner.os != 'Windows'
       uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
 
     - name: Enable sccache
-      if: inputs.cache == 'true'
+      if: inputs.cache == 'true' && runner.os != 'Windows'
       shell: bash
       run: |
         echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
         echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
         echo "SCCACHE_IDLE_TIMEOUT=0" >> "$GITHUB_ENV"
+
         # Look up the local disk first, then the GitHub Actions cache. A GHA
         # hit is copied to the disk, and a write goes to both levels.
         # https://github.com/mozilla/sccache/blob/v0.19.0/docs/MultiLevel.md
         echo "SCCACHE_DIR=$RUNNER_TEMP/sccache" >> "$GITHUB_ENV"
         echo "SCCACHE_MULTILEVEL_CHAIN=disk,gha" >> "$GITHUB_ENV"
+
         # Write every level before the compile returns, so that no write is
         # still running in the background when the job ends.
         echo "SCCACHE_MULTILEVEL_WRITE_ERROR_POLICY=all" >> "$GITHUB_ENV"
+
         # Without this, sccache writes a probe file to GHA before every write,
         # and a rate-limited probe makes it skip the write.
         echo "SCCACHE_SKIP_CACHE_CHECK=true" >> "$GITHUB_ENV"
+
+        # Upload to the GitHub Actions cache only on master.
+        if [ "$GITHUB_REF" != "refs/heads/master" ]; then
+          echo "SCCACHE_GHA_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
+        fi
 
     - name: Cache cargo registry
       if: inputs.cache == 'true'
@@ -64,3 +73,4 @@ runs:
       with:
         cache-targets: ${{ inputs.cache-targets }}
         cache-directories: ${{ env.ORT_CACHE_DIR }}
+        save-if: ${{ github.ref == 'refs/heads/master' }}

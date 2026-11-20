@@ -40,10 +40,9 @@ jobs:
           fetch-depth: 2
           filter: blob:none
 
-      # Warms the pnpm store cache before the jobs that need it start.
-      - uses: ./.github/actions/setup-node
-        with:
-          save-pnpm-cache: true
+      - name: Warm up the pnpm store cache
+        uses: ./.github/actions/setup-node
+        if: github.ref == 'refs/heads/master'
 
       - id: classify
         env:
