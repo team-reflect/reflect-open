@@ -26,21 +26,21 @@ export interface Bezel {
 }
 
 export const BEZELS: Record<DeviceName, Bezel> = {
-  'iphone_6.3_inch': {
+  'iPhone-18-Pro': {
     dmg: 'Bezel-iPhone-18.dmg',
     png: 'iPhone 18 Pro - Black - Portrait.png',
     size: [1350, 2760],
     hole: { x: 72, y: 69 },
     radius: 188,
   },
-  iphone_duo_outer: {
+  'iPhone-Duo-outer': {
     dmg: 'Bezel-iPhone-Duo.dmg',
     png: 'iPhone Duo - Night Sky - Outer Closed Portrait.png',
     size: [1574, 2194],
     hole: { x: 88, y: 80 },
     radius: [24, 174, 174, 24],
   },
-  ipad_13_inch: {
+  'iPad-Pro-13-inch-M5-landscape': {
     dmg: 'Bezel-iPad-Pro-(M5).dmg',
     png: 'iPad Pro (M5) 13" - Space Black - Landscape.png',
     size: [3000, 2300],

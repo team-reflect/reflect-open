@@ -13,9 +13,9 @@ export interface Device {
 }
 
 export const DEVICES = {
-  'iphone_6.3_inch': { simulator: 'iPhone-18-Pro', canvas: [1206, 2622] },
-  iphone_duo_outer: { simulator: 'iPhone-Duo', canvas: [1398, 2034], closed: true },
-  ipad_13_inch: { simulator: 'iPad-Pro-13-inch-M5-12GB', canvas: [2752, 2064] },
+  'iPhone-18-Pro': { simulator: 'iPhone-18-Pro', canvas: [1206, 2622] },
+  'iPhone-Duo-outer': { simulator: 'iPhone-Duo', canvas: [1398, 2034], closed: true },
+  'iPad-Pro-13-inch-M5-landscape': { simulator: 'iPad-Pro-13-inch-M5-12GB', canvas: [2752, 2064] },
 } as const satisfies Record<string, Device>
 
 export type DeviceName = keyof typeof DEVICES

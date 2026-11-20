@@ -10,9 +10,9 @@ the simulator.
 
 | Device | Simulator | Size (px) |
 | --- | --- | --- |
-| `iphone_6.3_inch` | iPhone 18 Pro | 1206 × 2622 |
-| `iphone_duo_outer` | iPhone Duo, closed | 1398 × 2034 |
-| `ipad_13_inch` | iPad Pro 13-inch (M5), landscape | 2752 × 2064 |
+| `iPhone-18-Pro` | iPhone 18 Pro | 1206 × 2622 |
+| `iPhone-Duo-outer` | iPhone Duo, closed | 1398 × 2034 |
+| `iPad-Pro-13-inch-M5-landscape` | iPad Pro 13-inch (M5), landscape | 2752 × 2064 |
 
 Options:
 
