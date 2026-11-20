@@ -14,6 +14,8 @@ struct UITestFixture: Decodable, Sendable {
   /// Response bodies by request URL, sent as an event stream by
   /// `HTTPProxy` without a request to the network.
   var responses: [String: String]
+  /// `localStorage` entries of the web app, set before its scripts run.
+  var localStorage: [String: String]
 
   struct File: Decodable, Sendable {
     var contents: String
@@ -36,6 +38,12 @@ struct UITestFixture: Decodable, Sendable {
       fatalError("REFLECT_UITEST_FIXTURE \(path): \(error)")
     }
   }()
+
+  /// The script that sets `localStorage` at the start of each page load.
+  var localStorageScript: String {
+    let entries = (try? JSONEncoder().encode(localStorage)).flatMap { String(data: $0, encoding: .utf8) }
+    return "for (const [k, v] of Object.entries(\(entries ?? "{}"))) localStorage.setItem(k, v)"
+  }
 
   /// Writes `files` into `home`.
   func write(into home: URL, fileManager: FileManager) throws {

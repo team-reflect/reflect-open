@@ -46,15 +46,19 @@ function screenshotHtml(device: DeviceName, screen: Screen, theme: Theme): strin
   const bezel = BEZELS[device]
   const look = LOOKS[theme]
   const u = Math.min(W, H) / 100
-  const mx = W * 0.08
+  // A landscape canvas (the inner screen of the Duo) has the caption on the
+  // left and the device on the right, a portrait one the caption on top.
+  const wide = W > H
+  const mx = W * (wide ? 0.06 : 0.08)
   const edge = H * 0.06
-  const titleSize = u * 11.5
-  const textSize = u * 3.6
+  const captionWidth = wide ? W * 0.27 : W - 2 * mx
+  const titleSize = u * (wide ? 8 : 11.5)
+  const textSize = u * (wide ? 3 : 3.6)
 
   // The caption area fits the longest caption of the set, so every device
   // sits at the same height in all five shots.
   const lines = (text: string, size: number, k: number) =>
-    Math.ceil((text.length * k * size) / (W - 2 * mx))
+    Math.ceil((text.length * k * size) / captionWidth)
   const captionHeight = Math.max(
     ...SCREENS.map(
       (s) =>
@@ -63,23 +67,28 @@ function screenshotHtml(device: DeviceName, screen: Screen, theme: Theme): strin
         lines(s.subtitle, textSize, 0.5) * textSize * 1.4,
     ),
   )
+  const captionTop = wide ? (H - captionHeight) / 2 : edge
 
-  // The screen is as large as fits below the caption, with the bezel inside
-  // 88% of the width. All sizes below are relative to the screen width.
-  const top = edge + captionHeight + u * 3.5
-  const areaHeight = H - top - H * 0.025
+  // The device, bezel included, is as large as fits in its area. All sizes
+  // below are relative to the screen width.
+  const area = wide
+    ? { x: W * 0.36, y: H * 0.07, width: W * 0.61, height: H * 0.86 }
+    : (() => {
+        const top = edge + captionHeight + u * 3.5
+        return { x: W * 0.06, y: top, width: W * 0.88, height: H - top - H * 0.025 - u * 4 }
+      })()
   const fx = bezel.hole.x / W
   const fy = bezel.hole.y / W
   const ratio = H / W
   const width = Math.min(
-    (areaHeight - u * 4) / (ratio + 2 * fy),
-    W * 0.78,
-    (W * 0.88) / (1 + 2 * fx),
+    area.height / (ratio + 2 * fy),
+    area.width / (1 + 2 * fx),
+    wide ? Infinity : W * 0.78,
   )
   const k = width / W
   const height = width * ratio
-  const left = (W - width) / 2
-  const screenTop = top + (areaHeight - height - 2 * fy * width) / 2 + fy * width
+  const left = area.x + (area.width - width) / 2
+  const screenTop = area.y + (area.height + (wide ? 0 : u * 4) - height) / 2
   const corners = [bezel.radius]
     .flat()
     .map((r) => `${r * k * 0.92}px`)
@@ -89,7 +98,7 @@ function screenshotHtml(device: DeviceName, screen: Screen, theme: Theme): strin
   return `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="${FONT}"><style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{width:${W}px;height:${H}px;overflow:hidden;position:relative;background:${look.paint};-webkit-font-smoothing:antialiased}
-.cap{position:absolute;left:${mx}px;top:${edge}px;width:${W - 2 * mx}px}
+.cap{position:absolute;left:${mx}px;top:${captionTop}px;width:${captionWidth}px}
 h1{font:800 ${titleSize}px/0.98 Geist,sans-serif;letter-spacing:-0.05em;color:${look.ink};text-wrap:balance}
 em{font-style:normal;color:${look.accent}}
 p{font:500 ${textSize}px/1.4 Geist,sans-serif;color:${look.muted};margin-top:${u * 2.4}px}
@@ -97,15 +106,15 @@ p{font:500 ${textSize}px/1.4 Geist,sans-serif;color:${look.muted};margin-top:${u
 .screen{position:absolute;inset:0;border-radius:${corners};background:url(${dataUrl(join(RAW_DIR, device, theme, `${screen.id}.png`))}) 0 0/100% 100%}
 .bezel{position:absolute;left:${-bezel.hole.x * k}px;top:${-bezel.hole.y * k}px;width:${bezel.size[0] * k}px;height:${bezel.size[1] * k}px;background:url(${dataUrl(bezelPath(device))}) 0 0/100% 100%}
 </style></head><body>
-<div class="cap"><h1>${title}</h1><p>${screen.subtitle}</p></div>
+<div class="cap${wide ? '' : ' centered'}"><h1>${title}</h1><p>${screen.subtitle}</p></div>
 <div class="device"><div class="screen"></div><div class="bezel"></div></div>
 </body></html>`
 }
 
 /**
- * Runs in the page: centers the caption on the canvas by its widest line, and
- * wraps the subtitle to the width of the title (at least 72% of the caption),
- * so the margins left and right of the text match.
+ * Runs in the page: wraps the subtitle to the width of the title (at least
+ * 72% of the caption), and centers a `.centered` caption on the canvas by its
+ * widest line, so the margins left and right of the text match.
  */
 function balanceCaption(): void {
   const extent = (elements: Element[]) => {
@@ -129,6 +138,9 @@ function balanceCaption(): void {
   }
   const titleExtent = extent([title])
   subtitle.style.width = `${Math.max(titleExtent.right - titleExtent.left, caption.clientWidth * 0.72)}px`
+  if (!caption.classList.contains('centered')) {
+    return
+  }
   const { left, right } = extent([title, subtitle])
   caption.style.left = `${caption.offsetLeft + (document.body.clientWidth - right - left) / 2}px`
 }

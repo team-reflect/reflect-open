@@ -5,6 +5,11 @@
 // `today`, every weekday in the text is the weekday of a date in the graph,
 // and every note changed before the 9:41 of the status bar.
 
+import { WHATS_NEW } from '../../../packages/app/src/whats-new/whats-new-content.ts'
+
+/** `WHATS_NEW_SEEN_STORAGE_KEY` of packages/app/src/whats-new/whats-new-service.ts. */
+const WHATS_NEW_SEEN = 'reflect.whats-new.seen'
+
 /** A calendar day as `YYYY-MM-DD`, in local time. */
 type Day = string
 
@@ -162,6 +167,12 @@ export function storeFixture(today: Day): string {
     files,
     secrets: { [`ai-api-key:${PROVIDER_ID}`]: 'sk-ant-store-screenshots' },
     responses: { 'https://api.anthropic.com/v1/messages': anthropicStream(answer) },
+    // Every item seen: no What's New dialog over the first screen.
+    localStorage: {
+      [WHATS_NEW_SEEN]: JSON.stringify(
+        Object.values(WHATS_NEW).flatMap((items) => items.map((item) => item.id)),
+      ),
+    },
   })
 }
 

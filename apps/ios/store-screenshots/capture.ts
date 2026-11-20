@@ -11,7 +11,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { exec } from 'tinyexec'
 
-import { DEVICES, THEMES, type DeviceName } from './devices.ts'
+import { DEVICES, THEMES, type Device, type DeviceName } from './devices.ts'
 import { storeFixture } from './fixture.ts'
 
 const ROOT_DIR = join(import.meta.dirname, '..', '..', '..')
@@ -54,6 +54,34 @@ export async function build(): Promise<void> {
     '-destination',
     'generic/platform=iOS Simulator',
   ])
+}
+
+/**
+ * Builds `duo-hinge.m` for the simulator, once. It runs inside the simulator,
+ * so it needs the iOS Simulator SDK and an ad-hoc signature.
+ */
+async function buildHinge(): Promise<string> {
+  const binary = join(OUT_DIR, 'duo-hinge')
+  if (!existsSync(binary)) {
+    await run('xcrun', [
+      '-sdk',
+      'iphonesimulator',
+      'clang',
+      '-arch',
+      'arm64',
+      '-mios-simulator-version-min=17.0',
+      '-fobjc-arc',
+      '-framework',
+      'IOKit',
+      '-framework',
+      'Foundation',
+      '-o',
+      binary,
+      join(import.meta.dirname, 'duo-hinge.m'),
+    ])
+    await run('codesign', ['-f', '-s', '-', binary])
+  }
+  return binary
 }
 
 /** The simulator of `device`, made on first use. */
@@ -139,6 +167,10 @@ export async function capture(device: DeviceName, today: string): Promise<void> 
       '--batteryLevel',
       '100',
     )
+    const { hinge } = DEVICES[device] as Device
+    if (hinge !== undefined) {
+      await simctl('spawn', udid, await buildHinge(), String(hinge))
+    }
     // simctl takes only this ISO form; the status bar shows local 9:41.
     await simctl(
       'status_bar',

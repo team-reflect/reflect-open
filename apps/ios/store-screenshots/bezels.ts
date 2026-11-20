@@ -54,6 +54,20 @@ export const BEZELS: Record<DeviceName, Bezel> = {
     hole: { x: 106, y: 110 },
     radius: 58,
   },
+  'duo-outer': {
+    dmg: 'Bezel-iPhone-Duo.dmg',
+    png: 'iPhone Duo - Night Sky - Outer Closed Portrait.png',
+    size: [1574, 2194],
+    hole: { x: 88, y: 80 },
+    radius: [24, 174, 174, 24],
+  },
+  'duo-inner': {
+    dmg: 'Bezel-iPhone-Duo.dmg',
+    png: 'iPhone Duo - Night Sky - Inner Open Landscape.png',
+    size: [3093, 2247],
+    hole: { x: 120, y: 120 },
+    radius: 160,
+  },
 }
 
 /** The bezel PNG of `device`. */
