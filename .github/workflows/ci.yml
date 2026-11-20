@@ -159,6 +159,8 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node
+        with:
+          save-pnpm-cache: ${{ github.ref == 'refs/heads/master' }}
 
       - uses: ./.github/actions/setup-rust
 
