@@ -16,7 +16,6 @@ on:
         required: false
       S3_SCCACHE_BUCKET:
         required: false
-      # The read-write key comes from the `release_app` environment.
       S3_SCCACHE_ACCESS_KEY_ID:
         required: false
       S3_SCCACHE_SECRET_ACCESS_KEY:

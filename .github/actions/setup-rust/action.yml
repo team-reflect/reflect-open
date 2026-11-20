@@ -11,7 +11,7 @@ inputs:
     required: false
     default: 'false'
   s3-endpoint:
-    description: S3 endpoint of the sccache bucket. With all four S3 inputs, S3 is the third sccache level.
+    description: S3 endpoint of the sccache bucket.
     required: false
     default: ''
   s3-bucket:
@@ -69,9 +69,7 @@ runs:
         echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
         echo "SCCACHE_IDLE_TIMEOUT=0" >> "$GITHUB_ENV"
 
-        # Look up the local disk first, then the GitHub Actions cache, then S3
-        # when the job has the S3 secrets (fork PRs do not). A hit is copied to
-        # the faster writable levels, and a write goes to every writable level.
+        # Look up the local disk first, then the GitHub Actions cache, then S3.
         # https://github.com/mozilla/sccache/blob/v0.19.0/docs/MultiLevel.md
         # https://github.com/mozilla/sccache/blob/v0.19.0/docs/S3.md
         echo "SCCACHE_DIR=$RUNNER_TEMP/sccache" >> "$GITHUB_ENV"
