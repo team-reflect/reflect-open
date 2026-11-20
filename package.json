@@ -50,7 +50,7 @@
     "@ocavue/eslint-config": "^4.26.0",
     "@ocavue/tsconfig": "^0.7.1",
     "@types/node": "^24.0.0",
-    "eslint": "^10.14.0",
+    "eslint": "^10.15.0",
     "knip": "^6.46.0",
     "nano-staged": "^1.0.2",
     "oxfmt": "^0.76.0",
