@@ -113,7 +113,7 @@ async function renderPalette(query: string, handlers?: Partial<Record<AppCommand
     window: createTestWindowService({ openNoteWindow }),
   })
   const commandHandlers = new AbortController()
-  for (const { id } of APP_COMMANDS) {
+  for (const id of Object.keys(APP_COMMANDS) as AppCommandId[]) {
     appLayer.commands.handle(id, handlers?.[id] ?? noop, commandHandlers.signal)
   }
   const view = await renderInApp(

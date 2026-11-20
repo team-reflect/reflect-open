@@ -1,7 +1,7 @@
 import { isNotNullish } from '@ocavue/utils'
 import { describe, expect, it } from 'vitest'
 import type { AppCommandId } from './app-commands.ts'
-import { APP_COMMANDS, keybindingFor } from './app-commands.ts'
+import { keybindingFor } from './app-commands.ts'
 import { appMenuLayout } from './app-menu.ts'
 
 function referencedCommandIds(): AppCommandId[] {
@@ -13,15 +13,6 @@ function referencedCommandIds(): AppCommandId[] {
 }
 
 describe('appMenuLayout', () => {
-  it('references only registered command ids', () => {
-    const known = new Set(APP_COMMANDS.map((appCommand) => appCommand.id))
-    const referenced = referencedCommandIds()
-    expect(referenced.length).toBeGreaterThan(0)
-    for (const commandId of referenced) {
-      expect(known).toContain(commandId)
-    }
-  })
-
   it('surfaces every ported V1 menu shortcut', () => {
     const referenced = new Set(referencedCommandIds())
     // The V1 Electron menu items that have a V2 command: Preferences ⌘,

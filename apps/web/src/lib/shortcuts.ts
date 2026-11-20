@@ -13,9 +13,11 @@ export interface Shortcut {
  * the ⌘/ cheat-sheet and the Keyboard settings section can't drift from the
  * bindings that actually fire.
  */
-export const APP_SHORTCUTS: Shortcut[] = APP_COMMANDS.map((command) => {
-  return command.keybinding ? { binding: command.keybinding, description: command.title } : null
-}).filter(isNotNullish)
+export const APP_SHORTCUTS: Shortcut[] = Object.values(APP_COMMANDS)
+  .map((command) => {
+    return command.keybinding ? { binding: command.keybinding, description: command.title } : null
+  })
+  .filter(isNotNullish)
 
 export const EDITOR_SHORTCUTS: Shortcut[] = Object.entries(EDITOR_BINDING_DESCRIPTIONS).map(
   ([binding, description]) => ({ binding, description }),

@@ -136,6 +136,7 @@ class CommandServiceImpl implements CommandService {
   readonly #deps: CommandServiceDeps
   readonly #handlers = new Map<AppCommandId, CommandHandler>()
   readonly #blocks: (readonly AppCommandId[])[] = []
+  readonly #commands: Commands
   /**
    * Normalized binding → command id, for Apple platforms and for the others.
    */
@@ -144,7 +145,11 @@ class CommandServiceImpl implements CommandService {
 
   constructor(deps: CommandServiceDeps) {
     this.#deps = deps
-    for (const command of APP_COMMANDS) {
+    this.#commands = Object.entries(APP_COMMANDS).map(([id, declaration]) => ({
+      id: id as AppCommandId,
+      ...declaration,
+    }))
+    for (const command of this.#commands) {
       if (command.keybinding) {
         this.#appleBindingToId.set(normalizeBinding(command.keybinding, true), command.id)
         this.#otherBindingToId.set(normalizeBinding(command.keybinding, false), command.id)
@@ -153,7 +158,7 @@ class CommandServiceImpl implements CommandService {
   }
 
   list(): Commands {
-    return APP_COMMANDS
+    return this.#commands
   }
 
   handle(id: AppCommandId, handler: CommandHandler, signal: AbortSignal): void {

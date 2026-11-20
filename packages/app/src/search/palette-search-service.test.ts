@@ -149,7 +149,7 @@ describe('PaletteSearchService', () => {
 
   it('merges the data with the commands that have a handler', () => {
     const { service, commands } = setup()
-    const toggleTheme = APP_COMMANDS.find((command) => command.id === 'theme.toggle')
+    const toggleTheme = { id: 'theme.toggle', ...APP_COMMANDS['theme.toggle'] }
     const handlers = new AbortController()
     commands.handle('nav.today', noop, handlers.signal)
     commands.handle('theme.toggle', noop, handlers.signal)

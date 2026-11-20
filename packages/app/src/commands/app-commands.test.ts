@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { APP_COMMANDS, keybindingFor } from './app-commands.ts'
 
 describe('APP_COMMANDS', () => {
-  it('declares each command once, with a title', () => {
-    const ids = APP_COMMANDS.map((command) => command.id)
-    expect(new Set(ids).size).toBe(ids.length)
-    expect(APP_COMMANDS.filter((command) => command.title.trim() === '')).toEqual([])
+  it('gives each command a title', () => {
+    expect(Object.values(APP_COMMANDS).filter((command) => command.title.trim() === '')).toEqual([])
   })
 })
 

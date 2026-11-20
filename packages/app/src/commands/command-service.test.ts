@@ -29,7 +29,7 @@ function keyDown(overrides: Partial<CommandKeyEvent>): CommandKeyEvent {
 describe('createCommandService', () => {
   it('lists the declared commands in order', () => {
     const { commands } = setup()
-    expect(commands.list()).toBe(APP_COMMANDS)
+    expect(commands.list().map((command) => command.id)).toEqual(Object.keys(APP_COMMANDS))
   })
 
   it('runs the handler of a command', async () => {
