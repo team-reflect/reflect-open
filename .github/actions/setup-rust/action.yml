@@ -6,15 +6,18 @@ inputs:
     description: Whether to restore and save the cache.
     required: false
     default: 'true'
+  cache-targets:
+    description: Whether to cache the target directory.
+    required: false
+    default: 'false'
 
 runs:
   using: composite
   steps:
-    # Cargo registry fetches can intermittently fail on GitHub runners with
-    # curl HTTP/2 framing errors. HTTP/1.1 is slower but steadier.
-    - name: Disable HTTP/2 multiplexing in cargo
+    - name: Configure cargo
       shell: bash
-      run: echo "CARGO_HTTP_MULTIPLEXING=false" >> "$GITHUB_ENV"
+      run: |
+        echo "CARGO_PROFILE_DEV_DEBUG=line-tables-only" >> "$GITHUB_ENV"
 
     - name: Install Rust toolchain
       shell: bash
@@ -42,6 +45,7 @@ runs:
       run: |
         echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
         echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
+        echo "SCCACHE_IDLE_TIMEOUT=0" >> "$GITHUB_ENV"
         # Look up the local disk first, then the GitHub Actions cache. A GHA
         # hit is copied to the disk, and a write goes to both levels.
         # https://github.com/mozilla/sccache/blob/v0.19.0/docs/MultiLevel.md
@@ -58,10 +62,5 @@ runs:
       if: inputs.cache == 'true'
       uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       with:
-        cache-targets: false
+        cache-targets: ${{ inputs.cache-targets }}
         cache-directories: ${{ env.ORT_CACHE_DIR }}
-
-    # Fails if Cargo.lock is out of date.
-    - name: Check Cargo.lock
-      shell: bash
-      run: cargo update --workspace --locked

@@ -5,8 +5,8 @@ The iOS app is the Swift shell in `apps/ios`. It loads the web app from
 
 ```bash
 pnpm install                                   # also writes apps/ios/.xcode.env.local
-pnpm --filter @reflect/ios build:web           # apps/web/dist/mobile
-pnpm build:ffi --debug --sdk iphonesimulator   # the Rust core
+pnpm build:web:ios                             # apps/web/dist/mobile
+pnpm build:ffi:iphonesimulator                 # the Rust core
 open apps/ios/Reflect.xcodeproj                # run the Reflect scheme
 ```
 
@@ -45,10 +45,11 @@ pnpm test:ios    # the same run as the test-ios CI job
 ```
 
 `pnpm test:ios` builds the web app and the Rust core, creates a simulator for the run, builds the
-app and its tests, runs the Reflect test plan, and deletes the simulator. It prints the time of
-each step. The result bundle goes to `apps/ios/build/test-ios`; open it in Xcode for the
-screenshots and the steps of each test. After a failed test run that directory also holds the log
-of the simulator.
+app and its tests, turns off the background services of the simulator that the tests do not need
+([simslim](https://github.com/MobAI-App/simslim), installed by `mise install`), runs the Reflect
+test plan, and deletes the simulator. It prints the time of each step. The result bundle goes to
+`apps/ios/build/test-ios`; open it in Xcode for the screenshots and the steps of each test. After a
+failed test run that directory also holds the log of the simulator.
 
 | Tests | Where they run |
 | --- | --- |

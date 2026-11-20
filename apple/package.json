@@ -1,0 +1,10 @@
+{
+  "name": "@reflect/apple",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "test:swift": "swift test",
+    "build:ios-simulator": "xcodebuild build -scheme ReflectApple-Package -destination 'generic/platform=iOS Simulator' -quiet",
+    "build:ios-device": "xcodebuild build -scheme ReflectApple-Package -destination 'generic/platform=iOS' -quiet"
+  }
+}

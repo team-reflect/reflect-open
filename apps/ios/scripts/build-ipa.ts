@@ -109,8 +109,10 @@ async function main(): Promise<void> {
     await exec('xcodebuild', archive, {
       throwOnError: true,
       nodeOptions: {
-        // Without line tables the dSYM cannot symbolicate Rust frames.
-        env: { CARGO_PROFILE_RELEASE_DEBUG: 'line-tables-only' },
+        env: {
+          // Without line tables the dSYM cannot symbolicate Rust frames.
+          CARGO_PROFILE_RELEASE_DEBUG: 'line-tables-only',
+        },
         stdio: 'inherit',
       },
     })

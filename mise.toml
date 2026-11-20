@@ -1,3 +1,4 @@
 [tools]
 "github:Boshen/cargo-shear" = "1.14.0"
 "github:EmbarkStudios/cargo-about" = "0.9.3"
+"github:MobAI-App/simslim" = { version = "0.15.0", os = ["macos"] }

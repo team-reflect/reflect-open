@@ -16,7 +16,7 @@ permissions:
 
 env:
   # On master, run every task instead of skipping it on a turbo cache hit.
-  TURBO_CACHE: ${{ github.event_name == 'push' && 'local:rw' || '' }}
+  TURBO_CACHE: ${{ github.event_name == 'push' && 'local:rw' || 'local:rw,remote:rw' }}
 
 jobs:
   classify:
@@ -96,7 +96,9 @@ jobs:
             'apple/*'
             'apps/ios/*'
             'apps/safari-extension/*'
+            'package.json'
             'scripts/build-ffi.ts'
+            'scripts/ios-simulator.ts'
             'scripts/test-ios.ts'
           )
 
@@ -291,16 +293,18 @@ jobs:
       - run: git ls-files -z '*.swift' | xargs -0 swift format lint --strict --parallel
       - run: git diff --exit-code '*.swift'
 
+      - uses: ./.github/actions/setup-node
+
+      - uses: ./.github/actions/setup-turbo
+
       - name: Test apple/
-        run: swift test --package-path apple
+        run: pnpm turbo run test:swift --filter=@reflect/apple
 
       - name: Build apple/ for the iOS Simulator
-        working-directory: apple
-        run: xcodebuild build -scheme ReflectApple-Package -destination 'generic/platform=iOS Simulator' -quiet
+        run: pnpm turbo run build:ios-simulator --filter=@reflect/apple
 
       - name: Build apple/ for iOS devices
-        working-directory: apple
-        run: xcodebuild build -scheme ReflectApple-Package -destination 'generic/platform=iOS' -quiet
+        run: pnpm turbo run build:ios-device --filter=@reflect/apple
 
   # Builds the Swift shell in apps/ios and runs its unit and UI tests in a simulator.
   test-ios:
@@ -318,9 +322,48 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-targets: 'true'
 
-      # The script prints the time of each of its steps.
+      - uses: ./.github/actions/setup-turbo
+
+      - uses: ./.github/actions/setup-mise
+
+      # A simulator that is slim and done with the work of its first boot. That
+      # work takes minutes and slows the whole runner.
+      - name: Pick the simulator cache key
+        id: simulator
+        env:
+          HASH: ${{ hashFiles('.github/actions/setup-xcode/action.yml', 'mise.toml', 'scripts/ios-simulator.ts') }}
+        run: echo "key=ios-simulator-$ImageOS-$ImageVersion-$HASH" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the prepared simulator
+        id: restore
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/ios-simulator
+          key: ${{ steps.simulator.outputs.key }}
+
+      - name: Prepare the simulator
+        if: steps.restore.outputs.cache-hit != 'true'
+        run: node scripts/ios-simulator.ts prepare "$RUNNER_TEMP/ios-simulator"
+
+      - name: Save the prepared simulator
+        if: steps.restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/ios-simulator
+          key: ${{ steps.simulator.outputs.key }}
+
+      - name: Build web
+        run: pnpm build:web:ios
+
+      - name: Build ffi
+        run: pnpm build:ffi:iphonesimulator
+
       - name: Build and run the tests
+        env:
+          IOS_SIMULATOR_SNAPSHOT: ${{ runner.temp }}/ios-simulator
         run: pnpm test:ios
 
       # The result bundle has the screenshots and the steps of each failed test.
@@ -367,6 +410,10 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-turbo
+
+      # Fails if Cargo.lock is out of date.
+      - name: Check Cargo.lock
+        run: cargo metadata --locked --format-version 1 > /dev/null
 
       - name: Clippy
         run: pnpm turbo run lint --filter=reflect-workspace
