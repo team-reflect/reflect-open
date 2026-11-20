@@ -71,7 +71,11 @@ async function main(): Promise<void> {
   ]
 
   await step('Resolve the Swift packages', async () => {
-    await run('xcodebuild', ['-resolvePackageDependencies', ...projectArgs])
+    await run('xcodebuild', [
+      '-resolvePackageDependencies',
+      '-onlyUsePackageVersionsFromResolvedFile',
+      ...projectArgs,
+    ])
   })
 
   const simulator = await step('Create the simulator', async () => {
