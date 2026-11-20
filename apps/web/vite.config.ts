@@ -8,7 +8,7 @@ import react from '@vitejs/plugin-react'
 import pkg from './package.json' with { type: 'json' }
 
 // `TAURI_ENV_PLATFORM` picks the platform root and the output directory. The
-// Tauri CLI sets it for desktop builds; `apps/ios` sets it to `ios`.
+// Tauri CLI sets it for desktop builds; `pnpm build:web:ios` sets it to `ios`.
 const platform: 'mobile' | 'desktop' | 'unknown' = (() => {
   const env = process.env.TAURI_ENV_PLATFORM
   if (!env) {

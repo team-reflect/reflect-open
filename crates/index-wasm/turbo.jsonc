@@ -7,7 +7,7 @@
     // inputs, which include the sources of the local crates it depends on.
     "build": {
       "command": ["cargo", "xtask", "index-wasm"],
-      "dependsOn": ["xtask#build"],
+      "dependsOn": ["xtask#build", "transit"],
       "env": [],
       "outputs": [
         "$TURBO_ROOT$/packages/index-wasm/pkg/*.js",

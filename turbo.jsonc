@@ -11,8 +11,11 @@
   "cacheMaxAge": "7d",
   "cacheMaxSize": "4GB",
   "tasks": {
+    "transit": {
+      "dependsOn": ["^transit"],
+    },
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "transit"],
       "env": ["TAURI_ENV_PLATFORM"],
       "outputs": ["dist/**", ".output/**"],
     },
@@ -36,6 +39,15 @@
     },
     "//#test:browser": {
       "dependsOn": ["@reflect/index-wasm#build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!.github/**",
+        "!docs/**",
+        "!apple/**",
+        "!apps/ios/**",
+        "!crates/**",
+        "!scripts/**",
+      ],
       "env": ["REFLECT_TEST_BROWSER"],
       "passThroughEnv": ["VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB", "__XPC_JSC_useJIT"],
     },

@@ -89,3 +89,14 @@ checksum = "sha256:9e2942533ef1c592c4a70bdb384cae1550a3f5fc9ae40379b6662e3d2f16f
 checksum_source = "mise-versions"
 url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.3/cargo-about-0.9.3-x86_64-pc-windows-msvc.tar.gz"
 url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/677833098"
+
+[[tools."github:MobAI-App/simslim"]]
+version = "0.15.0"
+backend = "github:MobAI-App/simslim"
+specifiers = ["0.15.0"]
+
+[tools."github:MobAI-App/simslim"."platforms.macos-arm64"]
+checksum = "sha256:8db2d7b9c41f7cbc925c883a2907a2941e8b8bf8d6fc8cc4ce7343a830d61a31"
+checksum_source = "mise-versions"
+url = "https://github.com/MobAI-App/simslim/releases/download/v0.15.0/simslim-v0.15.0-macos-arm64.tar.gz"
+url_api = "https://api.github.com/repos/MobAI-App/simslim/releases/assets/758048374"
