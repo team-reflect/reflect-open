@@ -30,9 +30,25 @@
     "//#lint": {
       "dependsOn": ["@reflect/index-wasm#build"],
       "outputs": [".eslintcache"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!.github/**",
+        "!docs/**",
+        "!apple/**",
+        "!apps/ios/**",
+        "!crates/**",
+      ],
     },
     "//#typecheck": {
       "outputs": ["**/*.tsbuildinfo"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!.github/**",
+        "!docs/**",
+        "!apple/**",
+        "!apps/ios/**",
+        "!crates/**",
+      ],
     },
     "//#test:node": {
       "dependsOn": ["@reflect/index-wasm#build"],
@@ -43,7 +59,6 @@
         "!apple/**",
         "!apps/ios/**",
         "!crates/**",
-        "!scripts/**",
       ],
     },
     "//#test:browser": {
@@ -55,7 +70,6 @@
         "!apple/**",
         "!apps/ios/**",
         "!crates/**",
-        "!scripts/**",
       ],
       "env": ["REFLECT_TEST_BROWSER"],
       "passThroughEnv": ["VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB", "__XPC_JSC_useJIT"],
