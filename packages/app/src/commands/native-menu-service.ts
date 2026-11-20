@@ -119,7 +119,13 @@ export function createUnsupportedNativeMenuHost(): NativeMenuHost {
 
 export type MenuCommandDispatch<CommandId extends string> = (commandId: CommandId) => void
 
-const FocusedNoteMenuCommandSchema = z.enum(['note.find', 'note.findNext', 'note.findPrevious'])
+const FocusedNoteMenuCommandSchema = z.enum([
+  'note.find',
+  'note.findNext',
+  'note.findPrevious',
+  'history.back',
+  'history.forward',
+])
 
 /**
  * Native menu commands whose target is the focused note webview.
@@ -159,13 +165,14 @@ export interface NativeMenuService<CommandId extends string> {
    */
   setCommandDispatch(dispatch: MenuCommandDispatch<CommandId> | null): void
   /**
-   * Forward a native menu activation to the focused webview. Find commands are
-   * note-window-local; all other commands go to the published dispatcher. A
-   * function property: menu items hold it as their detached action.
+   * Forward a native menu activation to the focused webview. Find and history
+   * commands are note-window-local; all other commands go to the published
+   * dispatcher. A function property: menu items hold it as their detached action.
    */
   dispatchCommand: (commandId: string) => void
   /**
-   * Listen for native Find menu commands routed to this focused note window.
+   * Listen for native Find and history menu commands routed to this focused
+   * note window.
    */
   subscribeFocusedNoteCommands(listener: (commandId: FocusedNoteMenuCommand) => void): Unlisten
   /**

@@ -7,6 +7,7 @@ import { useNoteWindowTitle } from '@/hooks/use-note-window-title.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { dailyPath, displayNoteTitle, formatDayLabel } from '@reflect/core'
 import { useDateFormat } from '@/providers/settings-provider.tsx'
+import { useNoteWindowShortcuts } from '@/routing/note-window-shortcuts.ts'
 import { useRouterState } from '@/routing/router.tsx'
 
 /**
@@ -23,6 +24,7 @@ export function NoteWindowContent(): ReactElement {
   const { route } = useRouterState()
   const dateFormat = useDateFormat()
   const today = useToday()
+  useNoteWindowShortcuts()
   const dailyDate = route.kind === 'daily' ? route.date : route.kind === 'today' ? today : null
 
   // The OS window title follows the shown note — the day label for dailies,
