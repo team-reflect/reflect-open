@@ -1,10 +1,5 @@
 import type { MaybePromise } from '@reflect/utils'
-import {
-  APP_COMMANDS,
-  deepLinkForRoute,
-  formatBinding,
-  type TriggerableCommandId,
-} from '@reflect/app'
+import { APP_COMMANDS, deepLinkForRoute, formatBinding, type AppCommandId } from '@reflect/app'
 import { createTestWindowService, createTestAppServices } from '@reflect/app/testing'
 import { userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -93,10 +88,7 @@ function RouteProbe(): ReactNode {
  * Render the palette over a window where every declared command has a
  * handler: the one in `handlers`, or a no-op.
  */
-async function renderPalette(
-  query: string,
-  handlers?: { readonly [Id in TriggerableCommandId]?: () => void },
-) {
+async function renderPalette(query: string, handlers?: Partial<Record<AppCommandId, () => void>>) {
   const core = createTestCoreServices({
     database: createTestDatabaseService(),
     suggestions: {
@@ -122,8 +114,7 @@ async function renderPalette(
   })
   const commandHandlers = new AbortController()
   for (const { id } of APP_COMMANDS) {
-    const handler = handlers?.[id] ?? noop
-    appLayer.commands.handle(id, handler, commandHandlers.signal)
+    appLayer.commands.handle(id, handlers?.[id] ?? noop, commandHandlers.signal)
   }
   const view = await renderInApp(
     <PaletteProvider>

@@ -7,7 +7,7 @@ import {
 } from '@reflect/core/testing'
 import { createTestNativeMenuService } from '../testing/commands.ts'
 import { createTestWindowService } from '../testing/window.ts'
-import type { TriggerableCommandId } from './app-commands.ts'
+import type { AppCommandId } from './app-commands.ts'
 import { createCommandService } from './command-service.ts'
 import type { AppSubmenuLayout, NativeMenuItem } from './native-menu-service.ts'
 import { returnNull } from '@ocavue/utils'
@@ -29,7 +29,7 @@ function setup(options?: {
   label?: string
   platform?: TestPlatformOptions
   failPaste?: boolean
-  handled?: readonly TriggerableCommandId[]
+  handled?: readonly AppCommandId[]
 }) {
   const logger = createTestLoggerService()
   const commands = createCommandService({
@@ -141,7 +141,7 @@ describe('install', () => {
       menu.install([
         {
           text: 'File',
-          entries: [{ kind: 'command', commandId: 'no.such' as TriggerableCommandId }],
+          entries: [{ kind: 'command', commandId: 'no.such' as AppCommandId }],
         },
       ]),
     ).rejects.toThrow('native menu references unknown command: no.such')

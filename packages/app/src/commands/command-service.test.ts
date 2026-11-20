@@ -32,43 +32,28 @@ describe('createCommandService', () => {
     expect(commands.list()).toBe(APP_COMMANDS)
   })
 
-  it('runs the current handler and returns its result', async () => {
+  it('runs the handler of a command', async () => {
     const { commands } = setup()
     const ran: string[] = []
-    const controller = new AbortController()
-    commands.handle(
-      'note.random',
-      () => {
-        ran.push('random')
-        return Promise.resolve()
-      },
-      controller.signal,
-    )
-    expect(commands.isHandled('note.random')).toBe(true)
-    await commands.run('note.random')
-    expect(ran).toEqual(['random'])
+    commands.handle('nav.today', () => void ran.push('today'), new AbortController().signal)
+    expect(commands.isHandled('nav.today')).toBe(true)
+    await commands.run('nav.today')
+    expect(ran).toEqual(['today'])
   })
 
-  it('does nothing for a command without a handler', () => {
+  it('does nothing for a command without a handler', async () => {
     const { commands } = setup()
     expect(commands.isHandled('nav.today')).toBe(false)
-    expect(commands.run('nav.today')).toBeUndefined()
+    await expect(commands.run('nav.today')).resolves.toBeUndefined()
     expect(commands.trigger('nav.today')).toBe(false)
   })
 
-  it('lets a later handler shadow an earlier one until it is removed', () => {
+  it('removes a handler when its signal aborts', () => {
     const { commands } = setup()
-    const ran: string[] = []
-    const outer = new AbortController()
-    const inner = new AbortController()
-    commands.handle('nav.today', () => void ran.push('outer'), outer.signal)
-    commands.handle('nav.today', () => void ran.push('inner'), inner.signal)
-    commands.run('nav.today')
-    inner.abort()
-    commands.run('nav.today')
-    outer.abort()
-    expect(commands.run('nav.today')).toBeUndefined()
-    expect(ran).toEqual(['inner', 'outer'])
+    const controller = new AbortController()
+    commands.handle('nav.today', noop, controller.signal)
+    controller.abort()
+    expect(commands.isHandled('nav.today')).toBe(false)
   })
 
   it('ignores a handler whose signal already aborted', () => {
@@ -88,7 +73,7 @@ describe('createCommandService', () => {
     expect(commands.trigger('nav.today')).toBe(false)
     expect(commands.trigger('shortcuts.show')).toBe(true)
     // A direct run is the caller's decision, so blocks do not apply to it.
-    commands.run('nav.today')
+    void commands.run('nav.today')
     block.abort()
     expect(commands.trigger('nav.today')).toBe(true)
     expect(ran).toEqual(['shortcuts', 'today', 'today'])

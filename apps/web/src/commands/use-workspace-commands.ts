@@ -1,10 +1,4 @@
-import {
-  enableSemanticSearch,
-  newNoteRoute,
-  switchToRecentGraph,
-  type AppCommandId,
-  type GraphSwitchPosition,
-} from '@reflect/app'
+import { newNoteRoute, type AppCommandId } from '@reflect/app'
 import { usePalette } from '@/components/command-palette/palette-provider.tsx'
 import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
 import { useNoteFindActions } from '@/providers/note-find-provider.tsx'
@@ -45,20 +39,25 @@ export function useWorkspaceCommands(): void {
   // The workspace can outlive the open graph, and its chat session with it.
   const chat = useMaybeGraphServices()?.chat
 
-  const switchGraph = (position: GraphSwitchPosition) => () => {
-    return switchToRecentGraph(services.graphSession, app.graphBoot, position)
+  // `index` is zero-based: `graph.switch1` opens `recents[0]`.
+  const switchGraph = (index: number) => async () => {
+    const { recents, graph } = services.graphSession.get()
+    const recent = recents[index]
+    if (recent !== undefined && recent.root !== graph?.root) {
+      await app.graphBoot.openRecent(recent.root)
+    }
   }
 
   useCommands({
-    'graph.switch1': switchGraph(1),
-    'graph.switch2': switchGraph(2),
-    'graph.switch3': switchGraph(3),
-    'graph.switch4': switchGraph(4),
-    'graph.switch5': switchGraph(5),
-    'graph.switch6': switchGraph(6),
-    'graph.switch7': switchGraph(7),
-    'graph.switch8': switchGraph(8),
-    'graph.switch9': switchGraph(9),
+    'graph.switch1': switchGraph(0),
+    'graph.switch2': switchGraph(1),
+    'graph.switch3': switchGraph(2),
+    'graph.switch4': switchGraph(3),
+    'graph.switch5': switchGraph(4),
+    'graph.switch6': switchGraph(5),
+    'graph.switch7': switchGraph(6),
+    'graph.switch8': switchGraph(7),
+    'graph.switch9': switchGraph(8),
     // ⌘D is a capture gesture, not just navigation: the arrival asks the
     // stream to focus today's editor with the caret at the end of its
     // content, ready to append. Ordinary daily links and history moves stay
@@ -101,7 +100,13 @@ export function useWorkspaceCommands(): void {
     'settings.open': () => navigate({ kind: 'settings', page: 'main' }),
     'whatsNew.show': () => app.whatsNew.setOverride(true),
     'shortcuts.show': () => (shortcutsOpen ? closeShortcuts() : openShortcuts()),
-    'semantic.enable': () => enableSemanticSearch(services),
+    // Downloading the local model (~90MB) is the user's call, never automatic:
+    // EmbeddingsSync loads it when the flag flips on. A `failed` runtime
+    // retries only on an explicit action like this one.
+    'semantic.enable': () => {
+      services.settings.update({ semanticSearchEnabled: true })
+      void services.semanticSearch.retryFailedModel()
+    },
     'index.rebuild': () => services.indexLifecycle.rebuildVisibly(),
     // The web inspector ships in every build (see `apps/tauri/src/devtools.rs`).
     // Plain-browser dev has no native shell, and its own DevTools.

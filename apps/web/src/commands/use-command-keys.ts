@@ -1,14 +1,14 @@
 import { useEffect } from 'react'
 import { getIsComposing } from '@meowdown/core'
-import type { TriggerableCommandId } from '@reflect/app'
+import type { AppCommandId } from '@reflect/app'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
-const HISTORY_COMMAND_IDS = new Set<TriggerableCommandId>(['history.back', 'history.forward'])
+const HISTORY_COMMAND_IDS = new Set<AppCommandId>(['history.back', 'history.forward'])
 
 // AppKit owns these key equivalents on macOS. Keep them in the registry for
 // display, collision detection, and the plain-browser/non-macOS fallback, but
 // do not consume their keydown in the webview before the native menu sees it.
-const NATIVE_MACOS_MENU_COMMAND_IDS = new Set<TriggerableCommandId>([
+const NATIVE_MACOS_MENU_COMMAND_IDS = new Set<AppCommandId>([
   'sidebar.toggle',
   'note.find',
   'note.findNext',

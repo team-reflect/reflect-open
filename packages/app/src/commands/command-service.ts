@@ -1,11 +1,6 @@
+import type { MaybePromise } from '@reflect/utils'
 import type { LoggerService, PlatformFacts } from '@reflect/core'
-import {
-  APP_COMMANDS,
-  type AppCommandId,
-  type AppCommands,
-  type Commands,
-  type TriggerableCommandId,
-} from './app-commands.ts'
+import { APP_COMMANDS, type AppCommandId, type Commands } from './app-commands.ts'
 import { normalizeBinding } from './keybindings.ts'
 
 /**
@@ -22,6 +17,11 @@ export interface CommandKeyEvent {
 }
 
 /**
+ * What a command does in the current window.
+ */
+export type CommandHandler = () => MaybePromise<void>
+
+/**
  * The app command registry of one window. The declarations are static
  * ({@link APP_COMMANDS}); the handlers are registered at run time by the UI
  * that implements them, and removed when it goes away.
@@ -32,30 +32,24 @@ export interface CommandService {
    */
   list(): Commands
   /**
-   * Make `handler` the handler of `id` until `signal` aborts. A later handler
-   * for the same id shadows an earlier one; when it is removed, the earlier
-   * one runs again.
+   * Make `handler` the handler of `id` until `signal` aborts.
    */
-  handle<Id extends AppCommandId>(id: Id, handler: AppCommands[Id], signal: AbortSignal): void
+  handle(id: AppCommandId, handler: CommandHandler, signal: AbortSignal): void
   /**
    * Whether `id` has a handler.
    */
   isHandled(id: AppCommandId): boolean
   /**
-   * Call the current handler of `id` and return its result, or `undefined`
-   * when `id` has no handler. Blocks do not apply: a caller that runs a
-   * command directly (a button, the palette) owns that decision.
+   * Run the handler of `id`, if any. Blocks do not apply: a caller that runs
+   * a command directly (a button, the palette) owns that decision.
    */
-  run<Id extends AppCommandId>(
-    id: Id,
-    ...args: Parameters<AppCommands[Id]>
-  ): ReturnType<AppCommands[Id]> | undefined
+  run(id: AppCommandId): Promise<void>
   /**
    * Run `id` for a key or a menu item. Returns whether a handler ran: false
    * when `id` has no handler or a block stops it. The handler's failure is
    * logged, not thrown.
    */
-  trigger(id: TriggerableCommandId): boolean
+  trigger(id: AppCommandId): boolean
   /**
    * Stop {@link trigger} for every command except `allow` until `signal`
    * aborts. A modal screen blocks while it is open.
@@ -65,7 +59,7 @@ export interface CommandService {
    * The id of the command whose keybinding `event` types, or `null`. Only
    * chords with ⌘ or Ctrl match, and a held key (`repeat`) never does.
    */
-  commandForKeyDown(event: CommandKeyEvent): TriggerableCommandId | null
+  commandForKeyDown(event: CommandKeyEvent): AppCommandId | null
 }
 
 export interface CommandServiceDeps {
@@ -138,29 +132,19 @@ function bindingLookupsFor(event: CommandKeyEvent): BindingKeyLookup[] {
   return lookups
 }
 
-type StoredHandler = (...args: readonly unknown[]) => unknown
-
 class CommandServiceImpl implements CommandService {
   readonly #deps: CommandServiceDeps
-  readonly #handlers = new Map<AppCommandId, StoredHandler[]>()
+  readonly #handlers = new Map<AppCommandId, CommandHandler>()
   readonly #blocks: (readonly AppCommandId[])[] = []
   /**
    * Normalized binding → command id, for Apple platforms and for the others.
    */
-  readonly #appleBindingToId = new Map<string, TriggerableCommandId>()
-  readonly #otherBindingToId = new Map<string, TriggerableCommandId>()
+  readonly #appleBindingToId = new Map<string, AppCommandId>()
+  readonly #otherBindingToId = new Map<string, AppCommandId>()
 
   constructor(deps: CommandServiceDeps) {
     this.#deps = deps
-    const ids = new Set<AppCommandId>()
     for (const command of APP_COMMANDS) {
-      if (command.title.trim() === '') {
-        throw new Error(`command title cannot be empty: ${command.id}`)
-      }
-      if (ids.has(command.id)) {
-        throw new Error(`command declared twice: ${command.id}`)
-      }
-      ids.add(command.id)
       if (command.keybinding) {
         this.#appleBindingToId.set(normalizeBinding(command.keybinding, true), command.id)
         this.#otherBindingToId.set(normalizeBinding(command.keybinding, false), command.id)
@@ -172,47 +156,39 @@ class CommandServiceImpl implements CommandService {
     return APP_COMMANDS
   }
 
-  handle<Id extends AppCommandId>(id: Id, handler: AppCommands[Id], signal: AbortSignal): void {
+  handle(id: AppCommandId, handler: CommandHandler, signal: AbortSignal): void {
     if (signal.aborted) {
       return
     }
-    const stored = handler
-    let stack = this.#handlers.get(id)
-    if (stack === undefined) {
-      stack = []
-      this.#handlers.set(id, stack)
-    }
-    stack.push(stored)
-    signal.addEventListener('abort', () => stack.splice(stack.lastIndexOf(stored), 1), {
-      once: true,
-    })
+    this.#handlers.set(id, handler)
+    signal.addEventListener(
+      'abort',
+      () => {
+        if (this.#handlers.get(id) === handler) {
+          this.#handlers.delete(id)
+        }
+      },
+      { once: true },
+    )
   }
 
   isHandled(id: AppCommandId): boolean {
-    return this.#current(id) !== undefined
+    return this.#handlers.has(id)
   }
 
-  run<Id extends AppCommandId>(
-    id: Id,
-    ...args: Parameters<AppCommands[Id]>
-  ): ReturnType<AppCommands[Id]> | undefined {
-    const handler = this.#current(id)
-    if (handler === undefined) {
-      return undefined
-    }
-    return handler(...args) as ReturnType<AppCommands[Id]>
+  async run(id: AppCommandId): Promise<void> {
+    await this.#handlers.get(id)?.()
   }
 
-  trigger(id: TriggerableCommandId): boolean {
+  trigger(id: AppCommandId): boolean {
     const block = this.#blocks.at(-1)
     if (block !== undefined && !block.includes(id)) {
       return false
     }
-    const handler = this.#current(id)
-    if (handler === undefined) {
+    if (!this.#handlers.has(id)) {
       return false
     }
-    void this.#settle(id, handler())
+    void this.#runLogged(id)
     return true
   }
 
@@ -230,7 +206,7 @@ class CommandServiceImpl implements CommandService {
     )
   }
 
-  commandForKeyDown(event: CommandKeyEvent): TriggerableCommandId | null {
+  commandForKeyDown(event: CommandKeyEvent): AppCommandId | null {
     if ((!event.metaKey && !event.ctrlKey) || event.repeat) {
       return null // held keys must not spam navigations (e.g. a stack of new notes)
     }
@@ -253,13 +229,9 @@ class CommandServiceImpl implements CommandService {
     return null
   }
 
-  #current(id: AppCommandId): StoredHandler | undefined {
-    return this.#handlers.get(id)?.at(-1)
-  }
-
-  async #settle(id: AppCommandId, result: unknown): Promise<void> {
+  async #runLogged(id: AppCommandId): Promise<void> {
     try {
-      await result
+      await this.run(id)
     } catch (cause) {
       this.#deps.logger.error(`command failed: ${id}`, cause)
     }

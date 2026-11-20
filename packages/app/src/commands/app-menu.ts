@@ -1,4 +1,4 @@
-import type { TriggerableCommandId } from './app-commands.ts'
+import type { AppCommandId } from './app-commands.ts'
 import type {
   AppMenuEntry,
   AppSubmenuLayout,
@@ -18,7 +18,7 @@ import type {
  * exactly like keystrokes do.
  */
 
-function command(commandId: TriggerableCommandId, text?: string): AppMenuEntry {
+function command(commandId: AppCommandId, text?: string): AppMenuEntry {
   return { kind: 'command', commandId, text }
 }
 

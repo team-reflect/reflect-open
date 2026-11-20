@@ -2,7 +2,7 @@ import type { MaybePromise } from '@reflect/utils'
 import type { IpcBridgeService, LoggerService, PlatformFacts, Unlisten } from '@reflect/core'
 import { MAIN_WINDOW_LABEL, type WindowService } from '../app/window-service.ts'
 import { bindingToAccelerator } from './accelerator.ts'
-import type { TriggerableCommandId } from './app-commands.ts'
+import type { AppCommandId } from './app-commands.ts'
 import type { CommandService } from './command-service.ts'
 
 /**
@@ -29,7 +29,7 @@ export type NativeMenuPredefinedItem =
   | { About: null }
 
 export type AppMenuEntry =
-  | { kind: 'command'; commandId: TriggerableCommandId; text?: string | undefined }
+  | { kind: 'command'; commandId: AppCommandId; text?: string | undefined }
   | { kind: 'predefined'; item: NativeMenuPredefinedItem; text?: string | undefined }
 
 export interface AppSubmenuLayout {
@@ -253,7 +253,7 @@ class NativeMenuServiceImpl implements NativeMenuService {
     await this.#deps.host.popup(options.items)
   }
 
-  async #dispatchToFocusedWindow(commandId: TriggerableCommandId): Promise<void> {
+  async #dispatchToFocusedWindow(commandId: AppCommandId): Promise<void> {
     const { window, logger } = this.#deps
     let focusedLabel: string | null = null
     try {
@@ -283,7 +283,7 @@ class NativeMenuServiceImpl implements NativeMenuService {
     }
   }
 
-  async #handOffToMainWindow(commandId: TriggerableCommandId): Promise<void> {
+  async #handOffToMainWindow(commandId: AppCommandId): Promise<void> {
     try {
       await this.#deps.window.emitTo(MAIN_WINDOW_LABEL, MENU_COMMAND_EVENT, commandId)
     } catch (cause) {
@@ -295,7 +295,7 @@ class NativeMenuServiceImpl implements NativeMenuService {
    * The declared command id that `commandId` names, or `null`. The host
    * returns menu item ids as plain strings.
    */
-  #declaredId(commandId: string): TriggerableCommandId | null {
+  #declaredId(commandId: string): AppCommandId | null {
     return this.#deps.commands.list().find((command) => command.id === commandId)?.id ?? null
   }
 

@@ -13,7 +13,7 @@ import {
 } from '@reflect/core'
 import {
   type GraphBootService,
-  type TriggerableCommandId,
+  type AppCommandId,
   type NativeContextMenuOptions,
   deepLinkForRoute,
   type Route,
@@ -86,7 +86,7 @@ beforeEach(() => {
   openNativeContextMenu.mockClear()
 })
 
-const SIDEBAR_COMMANDS: readonly TriggerableCommandId[] = [
+const SIDEBAR_COMMANDS: readonly AppCommandId[] = [
   'nav.today',
   'nav.allNotes',
   'nav.tasks',

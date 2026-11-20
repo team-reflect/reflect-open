@@ -124,15 +124,10 @@ export {
 } from './daily/week-window.ts'
 export {
   APP_COMMANDS,
-  GRAPH_SWITCH_POSITIONS,
-  isGraphSwitchPosition,
   keybindingFor,
   newNoteRoute,
   type AppCommandId,
-  type AppCommands,
   type Command,
-  type GraphSwitchPosition,
-  type TriggerableCommandId,
 } from './commands/app-commands.ts'
 export { installNativeMenu } from './commands/app-menu.ts'
 export { attachFilesToNote } from './commands/attach-files.ts'
@@ -141,9 +136,7 @@ export {
   copyNotePath,
   publishGistAndCopyLink,
 } from './commands/clipboard-actions.ts'
-export { type CommandService } from './commands/command-service.ts'
-export { switchToRecentGraph } from './commands/graph-switch.ts'
-export { enableSemanticSearch } from './commands/semantic-search.ts'
+export { type CommandHandler, type CommandService } from './commands/command-service.ts'
 export { formatBinding } from './commands/keybindings.ts'
 export { type KeymapService } from './commands/keymap-service.ts'
 export {

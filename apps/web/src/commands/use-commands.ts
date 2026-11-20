@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { AppCommandId, AppCommands } from '@reflect/app'
+import type { AppCommandId, CommandHandler } from '@reflect/app'
 import { useAppServices } from '@/services/services-provider.tsx'
 
 /**
@@ -7,30 +7,7 @@ import { useAppServices } from '@/services/services-provider.tsx'
  * caller can offer a command only in some states (a note on screen, the chat
  * route).
  */
-export type CommandHandlers = {
-  readonly [Id in AppCommandId]?: AppCommands[Id] | undefined
-}
-
-/**
- * The ids of the defined handlers, as one stable string.
- */
-function handlerIdsOf(handlers: CommandHandlers): string {
-  return Object.entries(handlers)
-    .filter(([, handler]) => handler !== undefined)
-    .map(([id]) => id)
-    .join(' ')
-}
-
-/**
- * A handler for `id` that calls the latest handler that `read` returns.
- */
-function forwardTo<Id extends AppCommandId>(id: Id, read: () => CommandHandlers): AppCommands[Id] {
-  const forward = (...args: readonly unknown[]): unknown => {
-    const handler = read()[id] as ((...args: readonly unknown[]) => unknown) | undefined
-    return handler?.(...args)
-  }
-  return forward as AppCommands[Id]
-}
+export type CommandHandlers = Partial<Record<AppCommandId, CommandHandler | undefined>>
 
 /**
  * Register `handlers` while the calling component is mounted. The latest
@@ -42,15 +19,17 @@ export function useCommands(handlers: CommandHandlers): void {
   useEffect(() => {
     handlersRef.current = handlers
   })
-  const ids = handlerIdsOf(handlers)
+  // Re-register only when the set of handled ids changes.
+  const ids = Object.keys(handlers)
+    .filter((id) => handlers[id as AppCommandId] !== undefined)
+    .join(' ')
   useEffect(() => {
     if (ids === '') {
       return
     }
     const controller = new AbortController()
-    const read = () => handlersRef.current
     for (const id of ids.split(' ') as AppCommandId[]) {
-      commands.handle(id, forwardTo(id, read), controller.signal)
+      commands.handle(id, () => handlersRef.current[id]?.(), controller.signal)
     }
     return () => controller.abort()
   }, [commands, ids])

@@ -1,4 +1,4 @@
-import { isGraphSwitchPosition, keybindingFor } from '@reflect/app'
+import { keybindingFor, type AppCommandId } from '@reflect/app'
 import { useRef, useState, type ReactElement } from 'react'
 import type { GraphInfo, GitSyncState } from '@reflect/core'
 import { FolderOpen, GraduationCap, LocateFixed, PanelsTopLeft, Settings } from 'lucide-react'
@@ -27,10 +27,21 @@ import { useAppServices, useCoreServices } from '@/services/services-provider.ts
 const MENU_ITEM_CLASS = 'h-8 gap-2 px-2 py-0 text-[13px] text-text-secondary'
 const SETTINGS_BINDING = keybindingFor('settings.open')
 
+const GRAPH_SWITCH_COMMAND_IDS: readonly AppCommandId[] = [
+  'graph.switch1',
+  'graph.switch2',
+  'graph.switch3',
+  'graph.switch4',
+  'graph.switch5',
+  'graph.switch6',
+  'graph.switch7',
+  'graph.switch8',
+  'graph.switch9',
+]
+
 function graphSwitchBindingFor(index: number): string | null {
-  // Recent rows are zero-based; `graph.switchN` commands and keycaps are one-based.
-  const position = index + 1
-  return isGraphSwitchPosition(position) ? keybindingFor(`graph.switch${position}`) : null
+  const id = GRAPH_SWITCH_COMMAND_IDS[index]
+  return id === undefined ? null : keybindingFor(id)
 }
 
 type SyncStatus = Extract<GitSyncState, { phase: 'connected' }>['status']
