@@ -61,11 +61,11 @@ export interface Command {
   /**
    * Extra match terms for palette filtering.
    */
-  readonly keywords?: readonly string[]
+  readonly keywords?: readonly string[] | undefined
   /**
    * Keymap-registry binding (app scope), e.g. `Mod-d`.
    */
-  readonly keybinding?: string
+  readonly keybinding?: string | undefined
 }
 
 /**
