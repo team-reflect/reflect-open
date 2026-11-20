@@ -10,6 +10,22 @@ inputs:
     description: Whether to cache the target directory.
     required: false
     default: 'false'
+  s3-endpoint:
+    description: S3 endpoint of the sccache bucket. With all four S3 inputs, S3 is the third sccache level.
+    required: false
+    default: ''
+  s3-bucket:
+    description: Name of the sccache bucket.
+    required: false
+    default: ''
+  s3-access-key-id:
+    description: Access key ID for the sccache bucket.
+    required: false
+    default: ''
+  s3-secret-access-key:
+    description: Secret access key for the sccache bucket.
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -43,25 +59,44 @@ runs:
     - name: Enable sccache
       if: inputs.cache == 'true' && runner.os != 'Windows'
       shell: bash
+      env:
+        S3_ENDPOINT: ${{ inputs.s3-endpoint }}
+        S3_BUCKET: ${{ inputs.s3-bucket }}
+        S3_ACCESS_KEY_ID: ${{ inputs.s3-access-key-id }}
+        S3_SECRET_ACCESS_KEY: ${{ inputs.s3-secret-access-key }}
       run: |
         echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
         echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
         echo "SCCACHE_IDLE_TIMEOUT=0" >> "$GITHUB_ENV"
 
         # Look up the local disk first, then the GitHub Actions cache, then S3
+        # when the job has the S3 secrets (fork PRs do not). A hit is copied to
+        # the faster writable levels, and a write goes to every writable level.
         # https://github.com/mozilla/sccache/blob/v0.19.0/docs/MultiLevel.md
+        # https://github.com/mozilla/sccache/blob/v0.19.0/docs/S3.md
         echo "SCCACHE_DIR=$RUNNER_TEMP/sccache" >> "$GITHUB_ENV"
-        echo "SCCACHE_MULTILEVEL_CHAIN=disk,gha" >> "$GITHUB_ENV"
+        if [ -n "$S3_ENDPOINT" ] && [ -n "$S3_BUCKET" ] && [ -n "$S3_ACCESS_KEY_ID" ] && [ -n "$S3_SECRET_ACCESS_KEY" ]; then
+          echo "SCCACHE_MULTILEVEL_CHAIN=disk,gha,s3" >> "$GITHUB_ENV"
+          echo "SCCACHE_ENDPOINT=$S3_ENDPOINT" >> "$GITHUB_ENV"
+          echo "SCCACHE_BUCKET=$S3_BUCKET" >> "$GITHUB_ENV"
+          echo "SCCACHE_REGION=auto" >> "$GITHUB_ENV"
+          echo "SCCACHE_S3_KEY_PREFIX=sccache/" >> "$GITHUB_ENV"
+          echo "AWS_ACCESS_KEY_ID=$S3_ACCESS_KEY_ID" >> "$GITHUB_ENV"
+          echo "AWS_SECRET_ACCESS_KEY=$S3_SECRET_ACCESS_KEY" >> "$GITHUB_ENV"
+        else
+          echo "No S3 secrets: sccache uses the disk and the GitHub Actions cache only."
+          echo "SCCACHE_MULTILEVEL_CHAIN=disk,gha" >> "$GITHUB_ENV"
+        fi
 
         # Write every level before the compile returns, so that no write is
         # still running in the background when the job ends.
         echo "SCCACHE_MULTILEVEL_WRITE_ERROR_POLICY=all" >> "$GITHUB_ENV"
 
-        # Without this, sccache writes a probe file to GHA before every write,
-        # and a rate-limited probe makes it skip the write.
+        # Without this, sccache writes a probe file before every write, and a
+        # rate-limited probe makes it skip the write.
         echo "SCCACHE_SKIP_CACHE_CHECK=true" >> "$GITHUB_ENV"
 
-        # Upload only on master.
+        # Upload to the remote caches only on master.
         if [ "$GITHUB_REF" != "refs/heads/master" ]; then
           echo "SCCACHE_GHA_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
           echo "SCCACHE_S3_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
