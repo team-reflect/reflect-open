@@ -4,7 +4,7 @@ inputs:
   version:
     description: Xcode version
     required: false
-    default: '27.1'
+    default: '27.2'
 runs:
   using: composite
   steps:
