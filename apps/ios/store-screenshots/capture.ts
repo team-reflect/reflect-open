@@ -117,13 +117,12 @@ export async function capture(device: DeviceName, today: string): Promise<void> 
   try {
     // Boots the simulator when it is shut down, and waits for the boot.
     await simctl('bootstatus', udid, '-b')
+    // Two overrides: with the other flags in the same call, the iPad shows
+    // a wrong weekday next to the date.
     await simctl(
       'status_bar',
       udid,
       'override',
-      '--time',
-      // simctl takes only this ISO form; the status bar shows local 9:41.
-      new Date(`${today}T09:41:00`).toISOString(),
       '--dataNetwork',
       'wifi',
       '--wifiMode',
@@ -139,6 +138,14 @@ export async function capture(device: DeviceName, today: string): Promise<void> 
       'discharging',
       '--batteryLevel',
       '100',
+    )
+    // simctl takes only this ISO form; the status bar shows local 9:41.
+    await simctl(
+      'status_bar',
+      udid,
+      'override',
+      '--time',
+      new Date(`${today}T09:41:00`).toISOString(),
     )
     for (const theme of THEMES) {
       const dir = join(RAW_DIR, device, theme)
