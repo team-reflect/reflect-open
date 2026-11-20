@@ -33,6 +33,7 @@ function separator(): AppMenuEntry {
 /**
  * The menu structure, as pure data so tests can hold it against the command
  * registry. macOS replaces the first submenu's title with the app name.
+ // * FIXME: just export const APP_MENU_LAYOUT: readonly AppSubmenuLayout[] = [ ... ]
  */
 export function appMenuLayout(): AppSubmenuLayout[] {
   return [
