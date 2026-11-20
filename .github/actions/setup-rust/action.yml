@@ -65,9 +65,6 @@ runs:
         if [ "$GITHUB_REF" != "refs/heads/master" ]; then
           echo "SCCACHE_GHA_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
           echo "SCCACHE_S3_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
-        else
-          echo "SCCACHE_GHA_RW_MODE=READ_WRITE" >> "$GITHUB_ENV"
-          echo "SCCACHE_S3_RW_MODE=READ_WRITE" >> "$GITHUB_ENV"
         fi
 
     - name: Cache cargo registry
