@@ -43,8 +43,6 @@ runs:
     - name: Enable sccache
       if: inputs.cache == 'true' && runner.os != 'Windows'
       shell: bash
-      env:
-        IS_MASTER: ${{ github.ref == 'refs/heads/master' }}
       run: |
         echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
         echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
@@ -64,8 +62,8 @@ runs:
         # and a rate-limited probe makes it skip the write.
         echo "SCCACHE_SKIP_CACHE_CHECK=true" >> "$GITHUB_ENV"
 
-        # The GHA cache is read-only on non-master branches, so sccache must not
-        if [ "$IS_MASTER" = false ]; then
+        # Do not upload to GitHub Actions cache on pull requests.
+        if [ "$GITHUB_REF" != "refs/heads/master" ]; then
           echo "SCCACHE_GHA_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
         fi
 
@@ -75,3 +73,4 @@ runs:
       with:
         cache-targets: ${{ inputs.cache-targets }}
         cache-directories: ${{ env.ORT_CACHE_DIR }}
+        save-if: ${{ github.ref == 'refs/heads/master' }}
