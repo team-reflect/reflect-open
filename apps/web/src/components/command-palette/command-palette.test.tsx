@@ -1,5 +1,10 @@
 import type { MaybePromise } from '@reflect/utils'
-import { type CommandContext, deepLinkForRoute, formatBinding } from '@reflect/app'
+import {
+  APP_COMMANDS,
+  deepLinkForRoute,
+  formatBinding,
+  type TriggerableCommandId,
+} from '@reflect/app'
 import { createTestWindowService, createTestAppServices } from '@reflect/app/testing'
 import { userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -22,7 +27,7 @@ import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { CommandPalette } from './command-palette.tsx'
 import { PaletteProvider, usePalette } from './palette-provider.tsx'
-import { noop, returnNull } from '@ocavue/utils'
+import { noop } from '@ocavue/utils'
 
 // The palette runs on the real `PaletteSearchService` of the test app
 // services; each test scripts the index reads below it.
@@ -84,8 +89,14 @@ function RouteProbe(): ReactNode {
   return <output data-testid="route">{JSON.stringify(route)}</output>
 }
 
-async function renderPalette(query: string, context?: Partial<CommandContext>) {
-  const navigate = vi.fn()
+/**
+ * Render the palette over a window where every declared command has a
+ * handler: the one in `handlers`, or a no-op.
+ */
+async function renderPalette(
+  query: string,
+  handlers?: { readonly [Id in TriggerableCommandId]?: () => void },
+) {
   const core = createTestCoreServices({
     database: createTestDatabaseService(),
     suggestions: {
@@ -109,38 +120,15 @@ async function renderPalette(query: string, context?: Partial<CommandContext>) {
   const appLayer = createTestAppServices(core, {
     window: createTestWindowService({ openNoteWindow }),
   })
-  const fullContext: CommandContext = {
-    services: core,
-    app: appLayer,
-    navigate,
-    route: () => ({ kind: 'today' }),
-    noteEditor: returnNull,
-    notePath: returnNull,
-    back: vi.fn(),
-    forward: vi.fn(),
-    selectSection: vi.fn(),
-    clearScrollState: vi.fn(),
-    togglePin: vi.fn(noop),
-    togglePrivate: vi.fn(noop),
-    toggleTheme: vi.fn(),
-    toggleSidebar: vi.fn(),
-    newChat: vi.fn(),
-    openNoteFind: vi.fn(),
-    findNextInNote: vi.fn(),
-    findPreviousInNote: vi.fn(),
-    switchGraph: vi.fn(),
-    toggleAudioMemo: vi.fn(),
-    openPalette: vi.fn(),
-    openShortcuts: vi.fn(),
-    openTemplatePicker: vi.fn(),
-    openTemplateCreate: vi.fn(),
-    enableSemanticSearch: vi.fn(),
-    ...context,
+  const commandHandlers = new AbortController()
+  for (const { id } of APP_COMMANDS) {
+    const handler = handlers?.[id] ?? noop
+    appLayer.commands.handle(id, handler, commandHandlers.signal)
   }
   const view = await renderInApp(
     <PaletteProvider>
       <OpenOnMount query={query} />
-      <CommandPalette context={fullContext} />
+      <CommandPalette />
       <RouteProbe />
     </PaletteProvider>,
     {
@@ -150,7 +138,7 @@ async function renderPalette(query: string, context?: Partial<CommandContext>) {
       settings: { semanticSearchEnabled: semanticEnabled, dateFormat: 'mdy' },
     },
   )
-  return { view, navigate, core }
+  return { view, core }
 }
 
 describe('CommandPalette', () => {
@@ -196,10 +184,12 @@ describe('CommandPalette', () => {
   it('ends a typed query with an Ask row that leads to Settings with no AI provider', async () => {
     suggestWikiTargets.mockResolvedValue([])
     searchWithFilters.mockResolvedValue([])
-    const { view, navigate } = await renderPalette('pricing plans')
+    const { view } = await renderPalette('pricing plans')
     await expect.element(view.getByText('No results')).toBeInTheDocument()
     await view.getByText('Ask “pricing plans”').click()
-    expect(navigate).toHaveBeenCalledWith({ kind: 'settings', page: 'main' })
+    await expect
+      .element(view.getByTestId('route'))
+      .toMatchTextContent(JSON.stringify({ kind: 'settings', page: 'main' }))
     expect(view.getByTestId('palette-overlay').query()).toBeNull()
   })
 
@@ -417,7 +407,7 @@ describe('CommandPalette', () => {
     suggestWikiTargets.mockResolvedValue([])
     searchWithFilters.mockResolvedValue([])
     const toggleTheme = vi.fn()
-    const { view } = await renderPalette('toggle theme', { toggleTheme })
+    const { view } = await renderPalette('toggle theme', { 'theme.toggle': toggleTheme })
     await expect.element(view.getByText('Toggle theme', { exact: true })).toBeInTheDocument()
 
     await userEvent.keyboard('{Enter}')

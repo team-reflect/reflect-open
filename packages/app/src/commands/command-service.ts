@@ -1,172 +1,12 @@
-import type { MaybePromise } from '@reflect/utils'
-import type {
-  AttachmentInsertTarget,
-  CoreServices,
-  LoggerService,
-  PlatformFacts,
-} from '@reflect/core'
-import type { ClipboardService } from '../app/clipboard-service.ts'
-import type { DialogService } from '../app/dialog-service.ts'
-import type { OperationsService } from '../app/operations-service.ts'
-import type { WindowService } from '../app/window-service.ts'
-import type { LinkNavigationService } from '../navigation/link-navigation-service.ts'
-import type { NavigateOptions } from '../navigation/navigation-service.ts'
-import type { Route, Section } from '../navigation/route.ts'
-import type { WhatsNewService } from '../whats-new/whats-new-service.ts'
+import type { LoggerService, PlatformFacts } from '@reflect/core'
+import {
+  APP_COMMANDS,
+  type AppCommandId,
+  type AppCommands,
+  type Commands,
+  type TriggerableCommandId,
+} from './app-commands.ts'
 import { normalizeBinding } from './keybindings.ts'
-
-/**
- * What a command runs with (Plan 08). Commands receive their capabilities
- * here rather than importing app state, so the registry stays testable and
- * host-agnostic.
- */
-export interface CommandContext {
-  /**
-   * The core services, for the commands that call one directly.
-   */
-  services: CoreServices
-  app: CommandAppServices
-  navigate: (route: Route, options?: NavigateOptions) => void
-  /**
-   * Go to a section: where it was left from elsewhere, its root from within.
-   */
-  selectSection: (section: Section, options?: NavigateOptions) => void
-  /** The current route, read at run time. */
-  route: () => Route
-  /**
-   * The note file note-scoped commands (pin, private, publish) act on, or null
-   * for screens that edit no note. Usually the routed note, but in the daily
-   * stream it's the **focused** day — the same note the context sidebar
-   * describes — so a command and the sidebar never target different days.
-   */
-  notePath: () => string | null
-  /**
-   * The mounted editor of the note at `path`, or null when none is on screen.
-   */
-  noteEditor: (path: string) => AttachmentInsertTarget | null
-  /** Toggle the focused note pin with immediate shared feedback. */
-  togglePin: () => MaybePromise<void>
-  /** Toggle the focused note privacy with immediate shared feedback. */
-  togglePrivate: () => MaybePromise<void>
-  back: () => void
-  forward: () => void
-  /** Discard the current view's saved scroll offsets so it re-anchors when revisited. */
-  clearScrollState: () => void
-  toggleTheme: () => void
-  /** Collapse/expand the workspace and contextual sidebars. */
-  toggleSidebar: () => void
-  /** Start a fresh chat conversation. */
-  newChat: () => void
-  /** Open Find for the note currently targeted by {@link notePath}. */
-  openNoteFind: () => void
-  /** Advance the active or most recently closed note Find query. */
-  findNextInNote: () => void
-  /** Move backward through the active or most recently closed Find query. */
-  findPreviousInNote: () => void
-  /** Switch to a recent graph by zero-based position in the graph switcher. */
-  switchGraph: (index: number) => void
-  /** Start an audio memo, or stop-and-save the one recording. */
-  toggleAudioMemo: () => void
-  /** Open the ⌘K palette (optionally pre-filled). */
-  openPalette: (query?: string) => void
-  /** Open the ⌘/ shortcuts cheat-sheet. */
-  openShortcuts: () => void
-  /** Open the "Insert template…" picker (inserts into {@link notePath}'s editor). */
-  openTemplatePicker: () => void
-  /** Open the "New template" name dialog. */
-  openTemplateCreate: () => void
-  /**
-   * Persist the semantic-search opt-in (`semanticSearchEnabled`).
-   * EmbeddingsSync reacts to the setting by loading — first time:
-   * downloading — the model, so flipping the flag is the whole command.
-   */
-  enableSemanticSearch: () => void
-}
-
-/**
- * The 1-based position of a recent graph that a `graph.switch` command opens.
- */
-export type GraphSwitchPosition = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
-
-/**
- * The id of an app command.
- */
-export type AppCommandId =
-  | `graph.switch${GraphSwitchPosition}`
-  | 'nav.today'
-  | 'nav.allNotes'
-  | 'nav.tasks'
-  | 'note.new'
-  | 'note.openInNewWindow'
-  | 'note.find'
-  | 'note.findNext'
-  | 'note.findPrevious'
-  | 'chat.open'
-  | 'chat.new'
-  | 'history.back'
-  | 'history.forward'
-  | 'palette.open'
-  | 'note.togglePin'
-  | 'note.togglePrivate'
-  | 'note.publishGist'
-  | 'note.attachFile'
-  | 'note.copyDeepLink'
-  | 'note.copyPath'
-  | 'note.random'
-  | 'template.insert'
-  | 'template.new'
-  | 'audioMemo.toggle'
-  | 'theme.toggle'
-  | 'sidebar.toggle'
-  | 'settings.open'
-  | 'whatsNew.show'
-  | 'shortcuts.show'
-  | 'semantic.enable'
-  | 'index.rebuild'
-  | 'dev.toggleDevtools'
-
-/**
- * The app services a command reaches through {@link CommandContext.app}.
- */
-export interface CommandAppServices {
-  readonly window: WindowService
-  readonly dialog: DialogService
-  readonly clipboard: ClipboardService
-  readonly operations: OperationsService
-  readonly linkNavigation: LinkNavigationService
-  readonly whatsNew: WhatsNewService
-  readonly commands: CommandService
-}
-
-/**
- * The typed command contract: one registry powers the ⌘K palette, the
- * app-scope keybindings, and the native menu. A command receives its
- * capabilities through {@link CommandContext}, an object the app assembles.
- */
-export interface Command {
-  /**
-   * Stable id — the deep-link/CLI name (e.g. `nav.today`).
-   */
-  id: AppCommandId
-  /**
-   * Palette display title.
-   */
-  title: string
-  /**
-   * Extra match terms for palette filtering.
-   */
-  keywords?: string[]
-  /**
-   * Keymap-registry binding (app scope), e.g. `Mod-d`.
-   */
-  keybinding?: string
-  run: (context: CommandContext) => MaybePromise<void>
-}
-
-/**
- * A list of commands, in registration order.
- */
-export type Commands = readonly Command[]
 
 /**
  * The fields of a `keydown` event that {@link CommandService.commandForKeyDown} reads.
@@ -182,26 +22,50 @@ export interface CommandKeyEvent {
 }
 
 /**
- * A flat, collision-checked id → command map.
+ * The app command registry of one window. The declarations are static
+ * ({@link APP_COMMANDS}); the handlers are registered at run time by the UI
+ * that implements them, and removed when it goes away.
  */
 export interface CommandService {
   /**
-   * Register commands; duplicate or blank ids/titles are programmer errors.
+   * Every declared command, in declaration order.
    */
-  register(definitions: Commands): void
+  list(): Commands
   /**
-   * Every registered command, in registration order.
+   * Make `handler` the handler of `id` until `signal` aborts. A later handler
+   * for the same id shadows an earlier one; when it is removed, the earlier
+   * one runs again.
    */
-  list(): Command[]
+  handle<Id extends AppCommandId>(id: Id, handler: AppCommands[Id], signal: AbortSignal): void
   /**
-   * Run a command by id; unknown ids are a loud no-op (deep links may dangle).
+   * Whether `id` has a handler.
    */
-  run(id: AppCommandId, context: CommandContext): Promise<void>
+  isHandled(id: AppCommandId): boolean
+  /**
+   * Call the current handler of `id` and return its result, or `undefined`
+   * when `id` has no handler. Blocks do not apply: a caller that runs a
+   * command directly (a button, the palette) owns that decision.
+   */
+  run<Id extends AppCommandId>(
+    id: Id,
+    ...args: Parameters<AppCommands[Id]>
+  ): ReturnType<AppCommands[Id]> | undefined
+  /**
+   * Run `id` for a key or a menu item. Returns whether a handler ran: false
+   * when `id` has no handler or a block stops it. The handler's failure is
+   * logged, not thrown.
+   */
+  trigger(id: TriggerableCommandId): boolean
+  /**
+   * Stop {@link trigger} for every command except `allow` until `signal`
+   * aborts. A modal screen blocks while it is open.
+   */
+  block(allow: readonly AppCommandId[], signal: AbortSignal): void
   /**
    * The id of the command whose keybinding `event` types, or `null`. Only
    * chords with ⌘ or Ctrl match, and a held key (`repeat`) never does.
    */
-  commandForKeyDown(event: CommandKeyEvent): AppCommandId | null
+  commandForKeyDown(event: CommandKeyEvent): TriggerableCommandId | null
 }
 
 export interface CommandServiceDeps {
@@ -274,31 +138,29 @@ function bindingLookupsFor(event: CommandKeyEvent): BindingKeyLookup[] {
   return lookups
 }
 
+type StoredHandler = (...args: readonly unknown[]) => unknown
+
 class CommandServiceImpl implements CommandService {
   readonly #deps: CommandServiceDeps
-  readonly #commands = new Map<AppCommandId, Command>()
+  readonly #handlers = new Map<AppCommandId, StoredHandler[]>()
+  readonly #blocks: (readonly AppCommandId[])[] = []
   /**
    * Normalized binding → command id, for Apple platforms and for the others.
    */
-  readonly #appleBindingToId = new Map<string, AppCommandId>()
-  readonly #otherBindingToId = new Map<string, AppCommandId>()
+  readonly #appleBindingToId = new Map<string, TriggerableCommandId>()
+  readonly #otherBindingToId = new Map<string, TriggerableCommandId>()
 
   constructor(deps: CommandServiceDeps) {
     this.#deps = deps
-  }
-
-  register(definitions: Commands): void {
-    for (const command of definitions) {
-      if (command.id.trim() === '') {
-        throw new Error('command id cannot be empty')
-      }
+    const ids = new Set<AppCommandId>()
+    for (const command of APP_COMMANDS) {
       if (command.title.trim() === '') {
         throw new Error(`command title cannot be empty: ${command.id}`)
       }
-      if (this.#commands.has(command.id)) {
-        throw new Error(`command id already registered: ${command.id}`)
+      if (ids.has(command.id)) {
+        throw new Error(`command declared twice: ${command.id}`)
       }
-      this.#commands.set(command.id, command)
+      ids.add(command.id)
       if (command.keybinding) {
         this.#appleBindingToId.set(normalizeBinding(command.keybinding, true), command.id)
         this.#otherBindingToId.set(normalizeBinding(command.keybinding, false), command.id)
@@ -306,20 +168,69 @@ class CommandServiceImpl implements CommandService {
     }
   }
 
-  list(): Command[] {
-    return [...this.#commands.values()]
+  list(): Commands {
+    return APP_COMMANDS
   }
 
-  async run(id: AppCommandId, context: CommandContext): Promise<void> {
-    const command = this.#commands.get(id)
-    if (!command) {
-      this.#deps.logger.error(`unknown command: ${id}`)
+  handle<Id extends AppCommandId>(id: Id, handler: AppCommands[Id], signal: AbortSignal): void {
+    if (signal.aborted) {
       return
     }
-    await command.run(context)
+    const stored = handler
+    let stack = this.#handlers.get(id)
+    if (stack === undefined) {
+      stack = []
+      this.#handlers.set(id, stack)
+    }
+    stack.push(stored)
+    signal.addEventListener('abort', () => stack.splice(stack.lastIndexOf(stored), 1), {
+      once: true,
+    })
   }
 
-  commandForKeyDown(event: CommandKeyEvent): AppCommandId | null {
+  isHandled(id: AppCommandId): boolean {
+    return this.#current(id) !== undefined
+  }
+
+  run<Id extends AppCommandId>(
+    id: Id,
+    ...args: Parameters<AppCommands[Id]>
+  ): ReturnType<AppCommands[Id]> | undefined {
+    const handler = this.#current(id)
+    if (handler === undefined) {
+      return undefined
+    }
+    return handler(...args) as ReturnType<AppCommands[Id]>
+  }
+
+  trigger(id: TriggerableCommandId): boolean {
+    const block = this.#blocks.at(-1)
+    if (block !== undefined && !block.includes(id)) {
+      return false
+    }
+    const handler = this.#current(id)
+    if (handler === undefined) {
+      return false
+    }
+    void this.#settle(id, handler())
+    return true
+  }
+
+  block(allow: readonly AppCommandId[], signal: AbortSignal): void {
+    if (signal.aborted) {
+      return
+    }
+    this.#blocks.push(allow)
+    signal.addEventListener(
+      'abort',
+      () => this.#blocks.splice(this.#blocks.lastIndexOf(allow), 1),
+      {
+        once: true,
+      },
+    )
+  }
+
+  commandForKeyDown(event: CommandKeyEvent): TriggerableCommandId | null {
     if ((!event.metaKey && !event.ctrlKey) || event.repeat) {
       return null // held keys must not spam navigations (e.g. a stack of new notes)
     }
@@ -340,6 +251,18 @@ class CommandServiceImpl implements CommandService {
       }
     }
     return null
+  }
+
+  #current(id: AppCommandId): StoredHandler | undefined {
+    return this.#handlers.get(id)?.at(-1)
+  }
+
+  async #settle(id: AppCommandId, result: unknown): Promise<void> {
+    try {
+      await result
+    } catch (cause) {
+      this.#deps.logger.error(`command failed: ${id}`, cause)
+    }
   }
 }
 

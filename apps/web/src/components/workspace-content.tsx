@@ -15,7 +15,7 @@ import { TemplateCreateDialog } from '@/components/templates/template-create-dia
 import { TemplatePicker } from '@/components/templates/template-picker.tsx'
 import { useDailyContextTarget } from '@/providers/focused-daily-provider.tsx'
 import { useSidebar } from '@/providers/sidebar-provider.tsx'
-import { useAppShortcuts } from '@/routing/app-shortcuts.ts'
+import { useWorkspaceCommands } from '@/commands/use-workspace-commands.ts'
 
 interface WorkspaceContentProps {
   graph: GraphInfo
@@ -43,7 +43,7 @@ function contextSidebarFor(target: ContextSidebarTarget | null): ReactElement | 
  */
 export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement {
   const { collapsed } = useSidebar()
-  const commandContext = useAppShortcuts()
+  useWorkspaceCommands()
   // Daily routes get the day's contextual panel and note routes the note's;
   // search/settings get none (AppShell omits the region when context is absent).
   // In the daily stream the route stays put while focus moves between days, so
@@ -52,7 +52,7 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
 
   return (
     <AppShell
-      sidebar={collapsed ? undefined : <Sidebar graph={graph} context={commandContext} />}
+      sidebar={collapsed ? undefined : <Sidebar graph={graph} />}
       sidebarEdge={<SidebarResizeHandle panel="workspace" />}
       context={collapsed ? undefined : contextSidebarFor(contextTarget)}
       contextEdge={<SidebarResizeHandle panel="context" />}
@@ -63,10 +63,10 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
         </div>
 
         <NoteFindBar />
-        <CommandPalette context={commandContext} />
+        <CommandPalette />
         <ShortcutsDialog />
-        <TemplatePicker context={commandContext} />
-        <TemplateCreateDialog context={commandContext} />
+        <TemplatePicker />
+        <TemplateCreateDialog />
         <EmbeddingsSync />
       </div>
     </AppShell>

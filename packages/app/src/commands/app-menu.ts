@@ -1,4 +1,4 @@
-import type { AppCommandId } from './command-service.ts'
+import type { TriggerableCommandId } from './app-commands.ts'
 import type {
   AppMenuEntry,
   AppSubmenuLayout,
@@ -13,12 +13,12 @@ import type {
  * cheat-sheet read — so the menu cannot drift from the bindings that fire.
  * Everything else is a predefined (native role) item.
  *
- * Activations route through `dispatchMenuCommand` into the same guarded
- * dispatch `useAppShortcuts` runs keydown bindings through, so menu clicks
- * respect the modal palette/cheat-sheet exactly like keystrokes do.
+ * Activations run through `CommandService.trigger`, the same path as
+ * keydown bindings, so menu clicks respect the blocks of modal screens
+ * exactly like keystrokes do.
  */
 
-function command(commandId: AppCommandId, text?: string): AppMenuEntry {
+function command(commandId: TriggerableCommandId, text?: string): AppMenuEntry {
   return { kind: 'command', commandId, text }
 }
 
@@ -121,7 +121,7 @@ export function appMenuLayout(): AppSubmenuLayout[] {
  * macOS-only for now: other desktop platforms would render an in-window
  * menubar we haven't designed for, and every shortcut already works there
  * through the keydown path. Most keyboard equivalents the webview handles are
- * consumed before the menu sees them (`useAppShortcuts` prevents the default),
+ * consumed before the menu sees them (`useCommandKeys` prevents the default),
  * so a focused webview never double-fires a command. The sidebar toggle is
  * deliberately exempted there so its key equivalent belongs to this native
  * macOS application menu.

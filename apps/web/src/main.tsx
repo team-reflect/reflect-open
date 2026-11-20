@@ -1,5 +1,5 @@
 // Must stay the first import: see `boot.ts`.
-import { registerAppCommands, installNativeMenu } from '@reflect/app'
+import { installNativeMenu } from '@reflect/app'
 import { appServices, coreServices } from '@/boot.ts'
 
 import { StrictMode } from 'react'
@@ -18,7 +18,8 @@ import '@/styles/index.css'
 // Start the platform root's boot-critical work (on mobile, the
 // iCloud-container resolve) now, ahead of React's first render.
 warmPlatformRoot()
-registerAppCommands(appServices.commands)
+// Menu commands that another window sends here run in this window.
+appServices.nativeMenu.connect()
 registerAppKeymaps(appServices.keymap)
 installNativeMenu(appServices.nativeMenu).catch((cause: unknown) => {
   coreServices.logger.error('failed to install the native menu', cause)

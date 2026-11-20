@@ -1,10 +1,9 @@
 import { noteEditorHandleFor } from '@/editor/editor-handle-registry.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
-import { focusedNotePathForRoute, type FocusedNoteMenuCommand } from '@reflect/app'
+import { focusedNotePathForRoute } from '@reflect/app'
 import { useRouterState } from '@/routing/router.tsx'
-import { useAppServices } from '@/services/services-provider.tsx'
-import { getIsComposing, isModEvent, type SearchStatus } from '@meowdown/core'
+import { getIsComposing, type SearchStatus } from '@meowdown/core'
 import {
   createContext,
   use,
@@ -55,7 +54,6 @@ const NoteFindReportContext = createContext<(path: string, status: SearchStatus)
 
 /** One note-local Find session for the current webview window. */
 export function NoteFindProvider({ children }: { children: ReactNode }): ReactElement {
-  const { nativeMenu, window: windowService } = useAppServices()
   const { route, arrivalSeq } = useRouterState()
   const today = useToday()
   const focusedDailyDate = useFocusedDailyDate()
@@ -148,48 +146,6 @@ export function NoteFindProvider({ children }: { children: ReactNode }): ReactEl
     window.addEventListener('keydown', onEscape)
     return () => window.removeEventListener('keydown', onEscape)
   }, [close, target])
-
-  // A detached note window renders no command palette and installs no menu, so
-  // it listens for the shortcuts and the routed menu events itself.
-  useEffect(() => {
-    if (windowService.isMainWindow()) return
-
-    function onMenuCommand(command: FocusedNoteMenuCommand): void {
-      switch (command) {
-        case 'note.find':
-          openForPath(notePath)
-          break
-        case 'note.findNext':
-          next()
-          break
-        case 'note.findPrevious':
-          previous()
-          break
-      }
-    }
-
-    const unlistenMenu = nativeMenu.subscribeFocusedNoteCommands(onMenuCommand)
-
-    function onKeyDown(event: KeyboardEvent): void {
-      if (event.defaultPrevented || event.altKey || event.repeat || getIsComposing()) return
-      if (!isModEvent(event)) return
-      const key = event.key.toLowerCase()
-      if (key === 'f' && !event.shiftKey) {
-        if (openForPath(notePath)) event.preventDefault()
-        return
-      }
-      if (key === 'g' && (target !== null || query.length > 0)) {
-        event.preventDefault()
-        if (event.shiftKey) previous()
-        else next()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => {
-      unlistenMenu()
-      window.removeEventListener('keydown', onKeyDown)
-    }
-  }, [nativeMenu, next, notePath, openForPath, previous, query, target, windowService])
 
   const value = useMemo<NoteFindValue>(
     () => ({

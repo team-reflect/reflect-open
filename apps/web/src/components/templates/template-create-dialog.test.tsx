@@ -1,5 +1,4 @@
-import type { CommandContext } from '@reflect/app'
-import { createTestAppServices } from '@reflect/app/testing'
+import { createTestAppServices, type TestAppServices } from '@reflect/app/testing'
 import type { ReactElement } from 'react'
 import { page } from 'vitest/browser'
 import { expect, it, vi } from 'vitest'
@@ -11,7 +10,6 @@ import {
 import { NoteTemplatesProvider, useNoteTemplates } from '@/providers/note-templates-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { TemplateCreateDialog } from './template-create-dialog.tsx'
-import { noop, returnNull } from '@ocavue/utils'
 
 function Opener(): ReactElement {
   const { openTemplateCreate } = useNoteTemplates()
@@ -22,44 +20,17 @@ function Opener(): ReactElement {
   )
 }
 
-async function renderDialog(): Promise<{ context: CommandContext; core: TestCoreServices }> {
+async function renderDialog(): Promise<{ core: TestCoreServices; appLayer: TestAppServices }> {
   const core = createTestCoreServices({ database: createTestDatabaseService() })
-  core.graphSession.setGraph({ generation: 1 })
-  const context: CommandContext = {
-    services: core,
-    app: createTestAppServices(core),
-    navigate: vi.fn(),
-    route: () => ({ kind: 'today' }),
-    noteEditor: returnNull,
-    notePath: returnNull,
-    back: vi.fn(),
-    forward: vi.fn(),
-    selectSection: vi.fn(),
-    clearScrollState: vi.fn(),
-    togglePin: vi.fn(noop),
-    togglePrivate: vi.fn(noop),
-    toggleTheme: vi.fn(),
-    toggleSidebar: vi.fn(),
-    newChat: vi.fn(),
-    openNoteFind: vi.fn(),
-    findNextInNote: vi.fn(),
-    findPreviousInNote: vi.fn(),
-    switchGraph: vi.fn(),
-    toggleAudioMemo: vi.fn(),
-    openPalette: vi.fn(),
-    openShortcuts: vi.fn(),
-    openTemplatePicker: vi.fn(),
-    openTemplateCreate: vi.fn(),
-    enableSemanticSearch: vi.fn(),
-  }
+  const appLayer = createTestAppServices(core)
   await renderInApp(
     <NoteTemplatesProvider>
       <Opener />
-      <TemplateCreateDialog context={context} />
+      <TemplateCreateDialog />
     </NoteTemplatesProvider>,
-    { core, servicesOnly: true },
+    { core, appServices: appLayer, graph: { root: '/g', name: 'g', generation: 1 } },
   )
-  return { context, core }
+  return { core, appLayer }
 }
 
 async function openDialog(): Promise<void> {
@@ -94,7 +65,7 @@ it('drops the validation error between opens', async () => {
 })
 
 it('starts empty after a successful create, and drops a stale submit error', async () => {
-  const { context, core } = await renderDialog()
+  const { core, appLayer } = await renderDialog()
   vi.spyOn(core.noteFile, 'write').mockRejectedValueOnce(new Error('disk full'))
   await openDialog()
 
@@ -106,7 +77,7 @@ it('starts empty after a successful create, and drops a stale submit error', asy
   // Second attempt succeeds: the dialog closes and navigates.
   await page.getByRole('button', { name: 'Create' }).click()
   await expect.element(page.getByRole('dialog', { name: 'New template' })).not.toBeInTheDocument()
-  expect(context.navigate).toHaveBeenCalledWith({
+  expect(appLayer.navigation.get().route).toEqual({
     kind: 'note',
     path: 'templates/meeting-notes.md',
   })

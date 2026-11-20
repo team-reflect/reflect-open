@@ -1,14 +1,13 @@
-import type { CommandContext } from '@reflect/app'
 import { useState, type ReactElement } from 'react'
 import { useForm } from 'react-hook-form'
 import { errorMessage } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { InlineAlert } from '@/components/inline-alert.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 interface TemplateCreateFormProps {
-  context: CommandContext
   onClose: () => void
 }
 
@@ -16,19 +15,20 @@ interface TemplateCreateValues {
   name: string
 }
 
-export function TemplateCreateForm({ context, onClose }: TemplateCreateFormProps): ReactElement {
+export function TemplateCreateForm({ onClose }: TemplateCreateFormProps): ReactElement {
   const { register, handleSubmit, formState } = useForm<TemplateCreateValues>({
     defaultValues: { name: '' },
   })
   const [submitError, setSubmitError] = useState<string | null>(null)
   const { templates } = useCoreServices()
+  const { navigate } = useRouterActions()
 
   const submit = handleSubmit(async (values) => {
     setSubmitError(null)
     try {
       const path = await templates.createTemplate(values.name)
       onClose()
-      context.navigate({ kind: 'note', path })
+      navigate({ kind: 'note', path })
     } catch (cause: unknown) {
       setSubmitError(errorMessage(cause))
     }

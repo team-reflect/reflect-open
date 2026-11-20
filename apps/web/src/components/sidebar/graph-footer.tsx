@@ -1,4 +1,4 @@
-import { isGraphSwitchPosition, keybindingFor, type CommandContext } from '@reflect/app'
+import { isGraphSwitchPosition, keybindingFor } from '@reflect/app'
 import { useRef, useState, type ReactElement } from 'react'
 import type { GraphInfo, GitSyncState } from '@reflect/core'
 import { FolderOpen, GraduationCap, LocateFixed, PanelsTopLeft, Settings } from 'lucide-react'
@@ -68,8 +68,6 @@ function GitSyncDot(): ReactElement | null {
 
 interface GraphFooterProps {
   graph: GraphInfo
-  /** Commands run with this — the same context the palette/shortcuts use. */
-  context: CommandContext
 }
 
 /**
@@ -78,11 +76,11 @@ interface GraphFooterProps {
  * The swatch pulses while the graph indexes; a small dot reports backup state.
  * Menu content matches the trigger width to stay inset from the sidebar edges.
  */
-export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement {
+export function GraphFooter({ graph }: GraphFooterProps): ReactElement {
   const [appsOpen, setAppsOpen] = useState(false)
   const graphTriggerRef = useRef<HTMLButtonElement>(null)
   const { logger } = useCoreServices()
-  const { opener, window: appWindow } = useAppServices()
+  const { opener, window: appWindow, commands } = useAppServices()
   const recents = useGraphRecents()
   const indexing = useGraphIndexing()
   const { openRecent, chooseGraph } = useGraphActions()
@@ -160,7 +158,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
           ) : null}
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            onClick={() => void context.app.commands.run('settings.open', context)}
+            onClick={() => commands.run('settings.open')}
             className={MENU_ITEM_CLASS}
           >
             <Settings aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
@@ -192,7 +190,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
               size="icon-sm"
               aria-label="Open settings"
               aria-current={settingsActive ? 'page' : undefined}
-              onClick={() => void context.app.commands.run('settings.open', context)}
+              onClick={() => commands.run('settings.open')}
               className={cn(
                 'size-7 shrink-0 text-text-muted transition-colors duration-100 hover:bg-surface-hover hover:text-text-secondary',
                 settingsActive

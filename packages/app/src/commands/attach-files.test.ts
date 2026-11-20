@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   createTestDatabaseService,
   createTestCoreServices,
@@ -6,7 +6,6 @@ import {
 } from '@reflect/core/testing'
 import type { AttachmentInsertTarget } from '@reflect/core'
 import { createTestAppServices, type TestAppServices } from '../testing/services.ts'
-import type { CommandContext } from './command-service.ts'
 import { attachFilesToNote } from './attach-files.ts'
 import { noop } from '@ocavue/utils'
 
@@ -26,34 +25,8 @@ afterEach(() => {
   editors.clear()
 })
 
-function contextFor(notePath: string | null): CommandContext {
-  return {
-    services: core,
-    app: appLayer,
-    navigate: vi.fn(),
-    route: () => ({ kind: 'today' }),
-    noteEditor: (path) => editors.get(path) ?? null,
-    notePath: () => notePath,
-    back: vi.fn(),
-    forward: vi.fn(),
-    togglePin: vi.fn(noop),
-    togglePrivate: vi.fn(noop),
-    toggleTheme: vi.fn(),
-    toggleSidebar: vi.fn(),
-    newChat: vi.fn(),
-    openNoteFind: vi.fn(),
-    findNextInNote: vi.fn(),
-    findPreviousInNote: vi.fn(),
-    switchGraph: vi.fn(),
-    toggleAudioMemo: vi.fn(),
-    openPalette: vi.fn(),
-    openShortcuts: vi.fn(),
-    openTemplatePicker: vi.fn(),
-    openTemplateCreate: vi.fn(),
-    enableSemanticSearch: vi.fn(),
-    selectSection: vi.fn(),
-    clearScrollState: vi.fn(),
-  }
+function attachToPlan(): Promise<void> {
+  return attachFilesToNote(core, appLayer.dialog, () => editors.get('notes/plan.md') ?? null)
 }
 
 function editorHandle(): AttachmentInsertTarget {
@@ -61,12 +34,12 @@ function editorHandle(): AttachmentInsertTarget {
 }
 
 describe('attachFilesToNote', () => {
-  it("attaches the picked files into the routed note's editor, looked up on every call", async () => {
+  it("attaches the picked files into the note's editor, looked up on every call", async () => {
     const handle = editorHandle()
     editors.set('notes/plan.md', handle)
     appLayer.dialog.setFiles(['/tmp/a.pdf'])
 
-    await attachFilesToNote(contextFor('notes/plan.md'))
+    await attachToPlan()
 
     expect(appLayer.dialog.calls()).toEqual([
       { kind: 'files', options: { multiple: true, title: 'Attach files' } },
@@ -78,17 +51,16 @@ describe('attachFilesToNote', () => {
     expect(request?.findEditor()).toBeNull()
   })
 
-  it('does nothing without a routed note, an editor, a graph session or a pick', async () => {
+  it('does nothing without an editor, a graph session or a pick', async () => {
     appLayer.dialog.setFiles(['/tmp/a.pdf'])
-    await attachFilesToNote(contextFor(null))
-    await attachFilesToNote(contextFor('notes/plan.md'))
+    await attachToPlan()
     const handle = editorHandle()
     editors.set('notes/plan.md', handle)
     core.graphSession.setGraph(null)
-    await attachFilesToNote(contextFor('notes/plan.md'))
+    await attachToPlan()
     core.graphSession.setGraph({ generation: 4 })
     appLayer.dialog.setFiles(null)
-    await attachFilesToNote(contextFor('notes/plan.md'))
+    await attachToPlan()
     editors.delete('notes/plan.md')
 
     expect(core.attachments.attachRequests()).toEqual([])

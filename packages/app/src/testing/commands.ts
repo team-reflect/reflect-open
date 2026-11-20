@@ -11,8 +11,6 @@ import { type CommandService, createCommandService } from '../commands/command-s
 import {
   createNativeMenuService,
   type AppSubmenuLayout,
-  type FocusedNoteMenuCommand,
-  type MenuCommandDispatch,
   type NativeAppMenu,
   type NativeContextMenuItem,
   type NativeContextMenuOptions,
@@ -79,7 +77,7 @@ export function createTestNativeMenuHost(): TestNativeMenuHost {
 
 export interface TestNativeMenuServiceOptions {
   /**
-   * Defaults to an empty registry.
+   * Defaults to a registry with no handlers.
    */
   commands?: CommandService
   /**
@@ -123,12 +121,8 @@ class TestNativeMenuServiceImpl implements TestNativeMenuService {
     return this.#inner.isInstalled()
   }
 
-  setCommandDispatch(dispatch: MenuCommandDispatch | null): void {
-    this.#inner.setCommandDispatch(dispatch)
-  }
-
-  subscribeFocusedNoteCommands(listener: (commandId: FocusedNoteMenuCommand) => void): Unlisten {
-    return this.#inner.subscribeFocusedNoteCommands(listener)
+  connect(): Unlisten {
+    return this.#inner.connect()
   }
 
   openContextMenu(options: NativeContextMenuOptions): Promise<void> {

@@ -1,9 +1,9 @@
 import type { MaybePromise } from '@reflect/utils'
-import { z } from 'zod'
 import type { IpcBridgeService, LoggerService, PlatformFacts, Unlisten } from '@reflect/core'
 import { MAIN_WINDOW_LABEL, type WindowService } from '../app/window-service.ts'
 import { bindingToAccelerator } from './accelerator.ts'
-import type { AppCommandId, CommandService } from './command-service.ts'
+import type { TriggerableCommandId } from './app-commands.ts'
+import type { CommandService } from './command-service.ts'
 
 /**
  * A menu item whose behavior the operating system implements.
@@ -29,7 +29,7 @@ export type NativeMenuPredefinedItem =
   | { About: null }
 
 export type AppMenuEntry =
-  | { kind: 'command'; commandId: AppCommandId; text?: string | undefined }
+  | { kind: 'command'; commandId: TriggerableCommandId; text?: string | undefined }
   | { kind: 'predefined'; item: NativeMenuPredefinedItem; text?: string | undefined }
 
 export interface AppSubmenuLayout {
@@ -117,16 +117,10 @@ export function createUnsupportedNativeMenuHost(): NativeMenuHost {
   return { buildAppMenu: unsupported, popup: unsupported }
 }
 
-export type MenuCommandDispatch = (commandId: AppCommandId) => void
-
-const FocusedNoteMenuCommandSchema = z.enum(['note.find', 'note.findNext', 'note.findPrevious'])
-
 /**
- * Native menu commands whose target is the focused note webview.
+ * The window event that carries a menu command to the webview that runs it.
  */
-export type FocusedNoteMenuCommand = z.infer<typeof FocusedNoteMenuCommandSchema>
-
-const FOCUSED_NOTE_MENU_EVENT = 'reflect://focused-note-menu-command'
+const MENU_COMMAND_EVENT = 'reflect://menu-command'
 
 /**
  * The native macOS application menu and native context menus. Command items
@@ -134,10 +128,10 @@ const FOCUSED_NOTE_MENU_EVENT = 'reflect://focused-note-menu-command'
  * one command definition — so the menu cannot drift from the bindings that
  * fire.
  *
- * The menu is built once at startup, before the UI mounts, so item
- * activations go to {@link NativeMenuService.dispatchCommand} and from there
- * to the dispatcher that the mounted workspace published. While no dispatcher
- * is set, menu items are inert.
+ * The menu is built once at startup, before the UI mounts. An item
+ * activation runs its command in the focused webview; a note window hands a
+ * command it has no handler for to the main window. A command with no
+ * handler anywhere does nothing.
  */
 export interface NativeMenuService {
   /**
@@ -155,19 +149,15 @@ export interface NativeMenuService {
    */
   isInstalled(): boolean
   /**
-   * Publish (or with `null`, withdraw) the active menu-command dispatcher.
-   */
-  setCommandDispatch(dispatch: MenuCommandDispatch | null): void
-  /**
-   * Forward a native menu activation to the focused webview. Find commands are
-   * note-window-local; all other commands go to the published dispatcher. A
-   * function property: menu items hold it as their detached action.
+   * Run a native menu activation in the focused webview. A function property:
+   * menu items hold it as their detached action.
    */
   dispatchCommand: (commandId: string) => void
   /**
-   * Listen for native Find menu commands routed to this focused note window.
+   * Run the menu commands that other webviews send to this one. Call once per
+   * webview at startup.
    */
-  subscribeFocusedNoteCommands(listener: (commandId: FocusedNoteMenuCommand) => void): Unlisten
+  connect(): Unlisten
   /**
    * Open a native context menu. Outside a native shell, this is a no-op so
    * browser and test shells can call the same path without platform guards.
@@ -187,7 +177,6 @@ export interface NativeMenuServiceDeps {
 class NativeMenuServiceImpl implements NativeMenuService {
   readonly #deps: NativeMenuServiceDeps
   #installed = false
-  #current: MenuCommandDispatch | null = null
   readonly #mainWindow: boolean
 
   constructor(deps: NativeMenuServiceDeps) {
@@ -233,25 +222,27 @@ class NativeMenuServiceImpl implements NativeMenuService {
     return this.#installed
   }
 
-  setCommandDispatch(dispatch: MenuCommandDispatch | null): void {
-    this.#current = dispatch
-  }
-
   readonly dispatchCommand = (commandId: string): void => {
-    const focusedNoteCommand = FocusedNoteMenuCommandSchema.safeParse(commandId)
-    if (this.#deps.platform.isNativeShell && focusedNoteCommand.success) {
-      void this.#dispatchToFocusedWindow(focusedNoteCommand.data)
+    const id = this.#declaredId(commandId)
+    if (id === null) {
       return
     }
-    this.#dispatchToCurrent(commandId)
+    if (!this.#deps.platform.isNativeShell) {
+      this.#deps.commands.trigger(id)
+      return
+    }
+    void this.#dispatchToFocusedWindow(id)
   }
 
-  subscribeFocusedNoteCommands(listener: (commandId: FocusedNoteMenuCommand) => void): Unlisten {
-    return this.#deps.window.subscribeWindowEvent(FOCUSED_NOTE_MENU_EVENT, (payload) => {
-      const command = FocusedNoteMenuCommandSchema.safeParse(payload)
-      if (command.success) {
-        listener(command.data)
+  connect(): Unlisten {
+    return this.#deps.window.subscribeWindowEvent(MENU_COMMAND_EVENT, (payload) => {
+      const id = typeof payload === 'string' ? this.#declaredId(payload) : null
+      if (id === null || this.#deps.commands.trigger(id) || this.#mainWindow) {
+        return
       }
+      // App-wide commands (New note, Settings, ...) have their handlers in the
+      // main window only.
+      void this.#handOffToMainWindow(id)
     })
   }
 
@@ -262,7 +253,7 @@ class NativeMenuServiceImpl implements NativeMenuService {
     await this.#deps.host.popup(options.items)
   }
 
-  async #dispatchToFocusedWindow(commandId: FocusedNoteMenuCommand): Promise<void> {
+  async #dispatchToFocusedWindow(commandId: TriggerableCommandId): Promise<void> {
     const { window, logger } = this.#deps
     let focusedLabel: string | null = null
     try {
@@ -279,28 +270,33 @@ class NativeMenuServiceImpl implements NativeMenuService {
       return
     }
 
-    if (focusedLabel !== MAIN_WINDOW_LABEL) {
-      try {
-        await window.emitTo(focusedLabel, FOCUSED_NOTE_MENU_EVENT, commandId)
-      } catch (cause) {
-        // Never fall through to the main note: the command belongs to the
-        // focused detached window, even if its event channel just disappeared.
-        logger.error('focused note menu dispatch failed:', cause)
-      }
+    if (focusedLabel === MAIN_WINDOW_LABEL) {
+      this.#deps.commands.trigger(commandId)
       return
     }
-    this.#dispatchToCurrent(commandId)
+    try {
+      await window.emitTo(focusedLabel, MENU_COMMAND_EVENT, commandId)
+    } catch (cause) {
+      // Never fall through to the main window: the command belongs to the
+      // focused window, even if its event channel just disappeared.
+      logger.error('focused window menu dispatch failed:', cause)
+    }
+  }
+
+  async #handOffToMainWindow(commandId: TriggerableCommandId): Promise<void> {
+    try {
+      await this.#deps.window.emitTo(MAIN_WINDOW_LABEL, MENU_COMMAND_EVENT, commandId)
+    } catch (cause) {
+      this.#deps.logger.error('menu command handoff to the main window failed:', cause)
+    }
   }
 
   /**
-   * Hands the registered command of `commandId` to the current dispatcher.
-   * The host returns menu item ids as plain strings.
+   * The declared command id that `commandId` names, or `null`. The host
+   * returns menu item ids as plain strings.
    */
-  #dispatchToCurrent(commandId: string): void {
-    const command = this.#deps.commands.list().find((candidate) => candidate.id === commandId)
-    if (command) {
-      this.#current?.(command.id)
-    }
+  #declaredId(commandId: string): TriggerableCommandId | null {
+    return this.#deps.commands.list().find((command) => command.id === commandId)?.id ?? null
   }
 
   #menuItem(entry: AppMenuEntry): NativeMenuItem {

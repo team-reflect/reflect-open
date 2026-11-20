@@ -1,4 +1,4 @@
-import type { Command } from '../commands/command-service.ts'
+import type { Command } from '../commands/app-commands.ts'
 import {
   aliasHint,
   dailyPath,

@@ -1,5 +1,14 @@
 import { errorMessage, type CoreServices } from '@reflect/core'
-import type { CommandAppServices } from './command-service.ts'
+import type { ClipboardService } from '../app/clipboard-service.ts'
+import type { OperationsService } from '../app/operations-service.ts'
+
+/**
+ * The app services that the clipboard actions copy and report with.
+ */
+export interface ClipboardActionServices {
+  readonly clipboard: ClipboardService
+  readonly operations: OperationsService
+}
 
 /**
  * Put the note's deep link on the clipboard and confirm through the
@@ -7,7 +16,7 @@ import type { CommandAppServices } from './command-service.ts'
  */
 export async function copyNoteDeepLink(
   { noteActions, graphSession }: CoreServices,
-  { clipboard, operations }: CommandAppServices,
+  { clipboard, operations }: ClipboardActionServices,
   path: string,
 ): Promise<void> {
   if (graphSession.get().session === null) {
@@ -34,7 +43,7 @@ export async function copyNoteDeepLink(
  */
 export async function copyNotePath(
   { noteActions, graphSession }: CoreServices,
-  { clipboard, operations }: CommandAppServices,
+  { clipboard, operations }: ClipboardActionServices,
   path: string,
 ): Promise<void> {
   if (graphSession.get().session === null) {
@@ -55,7 +64,7 @@ export async function copyNotePath(
  */
 export async function publishGistAndCopyLink(
   { gistPublish }: CoreServices,
-  { clipboard, operations }: CommandAppServices,
+  { clipboard, operations }: ClipboardActionServices,
   path: string,
 ): Promise<void> {
   const result = await gistPublish.publish(path)

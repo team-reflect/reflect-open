@@ -11,7 +11,7 @@ import {
 /**
  * Open state for the template surfaces (docs/porting/note-templates.md):
  * the "Insert template…" picker and the "New template" name dialog — provided
- * once per workspace so the palette commands (via CommandContext) and the
+ * once per workspace so the template commands and the
  * dialogs themselves share one definition of "open", the same shape as the
  * shortcuts provider.
  */

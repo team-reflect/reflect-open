@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { useNoteWindowCommands } from '@/commands/use-note-window-commands.ts'
 import { NoteFindBar } from '@/components/note-find-bar.tsx'
 import { RouteContent } from '@/components/route-content.tsx'
 import { SingleNoteView } from '@/components/single-note-view.tsx'
@@ -20,6 +21,7 @@ import { useRouterState } from '@/routing/router.tsx'
  * placeholder behavior).
  */
 export function NoteWindowContent(): ReactElement {
+  useNoteWindowCommands()
   const { route } = useRouterState()
   const dateFormat = useDateFormat()
   const today = useToday()

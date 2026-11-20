@@ -1,7 +1,9 @@
 import { createTestAppServices, type TestAppServices } from '@reflect/app/testing'
 import { act } from '@/test-utils/act.ts'
 import {
+  buildIndexedNote,
   isOstensiblyEmptyNoteSource,
+  parseNote,
   type ChatSession,
   type GraphSessionService,
   type NoteDocumentService,
@@ -35,8 +37,8 @@ import { ShortcutsProvider, useShortcuts } from '@/providers/shortcuts-provider.
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider.tsx'
 import { MOD_KEY, NON_MOD_KEY } from '@/test-utils/mod-key.ts'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
-import { useAppShortcuts } from './app-shortcuts.ts'
-import { useRouterActions, useRouterHandlers, useRouterState } from './router.tsx'
+import { useRouterActions, useRouterHandlers, useRouterState } from '@/routing/router.tsx'
+import { useWorkspaceCommands } from './use-workspace-commands.ts'
 import { noop, returnFalse } from '@ocavue/utils'
 
 const GRAPH = { root: '/g', name: 'g', generation: 1 } satisfies TestOpenGraph
@@ -115,9 +117,8 @@ async function shortcutsHook() {
   })
   return await renderHookInApp(
     () => {
-      const context = useAppShortcuts()
+      useWorkspaceCommands()
       return {
-        context,
         setFocusedDailyDate: useSetFocusedDailyDate(),
         routerState: useRouterState(),
         routerHandlers: useRouterHandlers(),
@@ -177,7 +178,7 @@ function pressFrom(target: EventTarget, key: string, options: KeyboardEventInit 
   )
 }
 
-describe('app shortcuts', () => {
+describe('workspace commands', () => {
   it('CMD+O updates the shelf before the file write resolves', async () => {
     const write = Promise.withResolvers<void>()
     commitNoteFrontmatter.mockReturnValueOnce(write.promise)
@@ -196,22 +197,22 @@ describe('app shortcuts', () => {
     })
   })
 
-  it('palette pin targets the focused daily note through the same context', async () => {
+  it('the pin command targets the focused daily note', async () => {
     const { result } = await shortcutsHook()
     await act(() => result.current.routerActions.navigate({ kind: 'daily', date: '2026-09-08' }))
     await act(() => result.current.setFocusedDailyDate('2026-09-07'))
-    await act(() => result.current.context.togglePin())
+    await act(() => appLayer.commands.run('note.togglePin'))
     expect(commitNoteFrontmatter).toHaveBeenCalledWith('daily/2026-09-07.md', { pinned: 1024 }, 1)
     expect(core.noteRows.get().get('daily/2026-09-07.md')).toMatchObject({ isPinned: true })
   })
 
-  it('palette privacy updates the focused daily note row before the write resolves', async () => {
+  it('the privacy command updates the focused daily note row before the write resolves', async () => {
     const write = Promise.withResolvers<void>()
     commitNoteFrontmatter.mockReturnValueOnce(write.promise)
     const { result } = await shortcutsHook()
     await act(() => result.current.routerActions.navigate({ kind: 'daily', date: '2026-09-08' }))
     await act(() => result.current.setFocusedDailyDate('2026-09-07'))
-    const action = result.current.context.togglePrivate()
+    const action = appLayer.commands.run('note.togglePrivate')
     await vi.waitFor(() => {
       expect(commitNoteFrontmatter).toHaveBeenCalledWith(
         'daily/2026-09-07.md',
@@ -228,11 +229,11 @@ describe('app shortcuts', () => {
     const { result } = await shortcutsHook()
     await act(() => result.current.routerActions.navigate({ kind: 'settings', page: 'main' }))
     await act(() => press('o'))
-    await act(() => result.current.context.togglePrivate())
+    await act(() => appLayer.commands.run('note.togglePrivate'))
     await act(() => core.graphSession.setGraph(null))
     await act(() => result.current.routerActions.navigate({ kind: 'note', path: 'notes/a.md' }))
     await act(() => press('o'))
-    await act(() => result.current.context.togglePrivate())
+    await act(() => appLayer.commands.run('note.togglePrivate'))
     expect(commitNoteFrontmatter).not.toHaveBeenCalled()
   })
 
@@ -542,9 +543,49 @@ describe('app shortcuts', () => {
     })
     expect(result.current.routerState.route).toEqual({ kind: 'today' })
   })
+
+  it('offers the note commands only while a note is on screen', async () => {
+    const { result } = await shortcutsHook()
+    const { commands } = appLayer
+    expect(commands.isHandled('note.togglePin')).toBe(true)
+    expect(commands.isHandled('template.insert')).toBe(true)
+
+    await act(() => result.current.routerActions.navigate({ kind: 'settings', page: 'main' }))
+    expect(commands.isHandled('note.togglePin')).toBe(false)
+    expect(commands.isHandled('note.copyPath')).toBe(false)
+    expect(commands.isHandled('template.insert')).toBe(false)
+    expect(commands.isHandled('nav.today')).toBe(true)
+
+    await act(() => result.current.routerActions.navigate({ kind: 'note', path: 'notes/a.md' }))
+    expect(commands.isHandled('note.togglePin')).toBe(true)
+  })
+
+  it('offers New chat only on the chat route', async () => {
+    const { result } = await shortcutsHook()
+    expect(appLayer.commands.isHandled('chat.new')).toBe(false)
+    await act(() => result.current.routerActions.navigate({ kind: 'chat', conversationId: null }))
+    expect(appLayer.commands.isHandled('chat.new')).toBe(true)
+  })
+
+  it('note.random opens the picked note, and stays put on an empty graph', async () => {
+    const { result } = await shortcutsHook()
+    await act(() => appLayer.commands.run('note.random'))
+    expect(result.current.routerState.route).toEqual({ kind: 'today' })
+
+    const source = '# Lucky\n'
+    core.database.applyProjection(
+      buildIndexedNote(parseNote({ path: 'notes/lucky.md', source }), {
+        fileHash: 'hash',
+        mtime: 1,
+        source,
+      }),
+    )
+    await act(() => appLayer.commands.run('note.random'))
+    expect(result.current.routerState.route).toEqual({ kind: 'note', path: 'notes/lucky.md' })
+  })
 })
 
-describe('app shortcuts on macOS', () => {
+describe('workspace commands on macOS', () => {
   beforeEach(() => {
     platform = { isNativeShell: false }
   })

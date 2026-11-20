@@ -1,4 +1,3 @@
-import type { CommandContext } from '@reflect/app'
 import {
   Dialog,
   DialogContent,
@@ -16,19 +15,12 @@ import { lazy, Suspense, useState, type ReactElement } from 'react'
  * the `templates/` folder — the graph is never seeded with one.
  */
 
-interface TemplateCreateDialogProps {
-  /**
-   * The command capabilities (navigate).
-   */
-  context: CommandContext
-}
-
 const TemplateCreateForm = lazy(async () => {
   const { TemplateCreateForm } = await import('@/components/templates/template-create-form.tsx')
   return { default: TemplateCreateForm }
 })
 
-export function TemplateCreateDialog({ context }: TemplateCreateDialogProps): ReactElement {
+export function TemplateCreateDialog(): ReactElement {
   const { createOpen, closeTemplateCreate } = useNoteTemplates()
   const [showForm, setShowForm] = useState(createOpen)
 
@@ -59,7 +51,7 @@ export function TemplateCreateDialog({ context }: TemplateCreateDialogProps): Re
             </DialogDescription>
           </DialogHeader>
 
-          {showForm ? <TemplateCreateForm onClose={closeTemplateCreate} context={context} /> : null}
+          {showForm ? <TemplateCreateForm onClose={closeTemplateCreate} /> : null}
         </DialogContent>
       </Suspense>
     </Dialog>

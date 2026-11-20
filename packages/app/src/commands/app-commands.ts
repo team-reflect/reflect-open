@@ -1,20 +1,153 @@
 import type { NoteCreationService } from '@reflect/core'
-import { routeForPath, type Route } from '../navigation/route.ts'
-import { attachFilesToNote } from './attach-files.ts'
-import { copyNoteDeepLink, copyNotePath, publishGistAndCopyLink } from './clipboard-actions.ts'
-import type {
-  AppCommandId,
-  Command,
-  CommandContext,
-  Commands,
-  CommandService,
-  GraphSwitchPosition,
-} from './command-service.ts'
+import type { Route } from '../navigation/route.ts'
 
 /**
- * The app commands. Each command defines its keybinding and its behavior
- * together.
+ * The 1-based position of a recent graph that a `graph.switch` command opens.
  */
+export type GraphSwitchPosition = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+
+/**
+ * Every {@link GraphSwitchPosition}, in order.
+ */
+export const GRAPH_SWITCH_POSITIONS: readonly GraphSwitchPosition[] = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+/**
+ * The handler signature of every app command, by id. A window registers the
+ * handlers it supports with `CommandService.handle`; a command without a
+ * handler in the current window does nothing.
+ *
+ * A command with no parameters can have a {@link Command} declaration, which
+ * puts it in the palette, the native menu, and the keybindings. A command with
+ * parameters is only reachable through `CommandService.run`.
+ */
+export interface AppCommands extends Record<
+  `graph.switch${GraphSwitchPosition}`,
+  () => Promise<void>
+> {
+  readonly 'nav.today': () => void
+  readonly 'nav.allNotes': () => void
+  readonly 'nav.tasks': () => void
+  readonly 'note.new': () => void
+  /**
+   * Open the focused note in its own window.
+   */
+  readonly 'note.openInNewWindow': () => Promise<void>
+  /**
+   * Open Find for the focused note.
+   */
+  readonly 'note.find': () => void
+  /**
+   * Advance the active or most recently closed note Find query.
+   */
+  readonly 'note.findNext': () => void
+  /**
+   * Move backward through the active or most recently closed note Find query.
+   */
+  readonly 'note.findPrevious': () => void
+  readonly 'chat.open': () => void
+  /**
+   * Start a fresh chat conversation.
+   */
+  readonly 'chat.new': () => void
+  readonly 'history.back': () => void
+  readonly 'history.forward': () => void
+  readonly 'palette.open': () => void
+  /**
+   * Flip the `pinned` frontmatter flag of the focused note.
+   */
+  readonly 'note.togglePin': () => Promise<void>
+  /**
+   * Flip the `private` frontmatter flag of the focused note: the hard block
+   * on sending its content to AI or any other external service.
+   */
+  readonly 'note.togglePrivate': () => Promise<void>
+  /**
+   * Publish the focused note to a secret GitHub gist and copy the link.
+   */
+  readonly 'note.publishGist': () => Promise<void>
+  /**
+   * Pick files and attach them at the caret of the focused note.
+   */
+  readonly 'note.attachFile': () => Promise<void>
+  /**
+   * Copy the `reflect://` address of the focused note.
+   */
+  readonly 'note.copyDeepLink': () => Promise<void>
+  /**
+   * Copy the absolute file path of the focused note.
+   */
+  readonly 'note.copyPath': () => Promise<void>
+  readonly 'note.random': () => Promise<void>
+  /**
+   * Open the "Insert template…" picker for the focused note.
+   */
+  readonly 'template.insert': () => void
+  /**
+   * Open the "New template" name dialog.
+   */
+  readonly 'template.new': () => void
+  /**
+   * Start an audio memo, or stop and save the one recording.
+   */
+  readonly 'audioMemo.toggle': () => void
+  readonly 'theme.toggle': () => void
+  /**
+   * Collapse or expand the workspace and contextual sidebars.
+   */
+  readonly 'sidebar.toggle': () => void
+  readonly 'settings.open': () => void
+  readonly 'whatsNew.show': () => void
+  /**
+   * Open the shortcuts cheat-sheet, or close it when it is open.
+   */
+  readonly 'shortcuts.show': () => void
+  /**
+   * Persist the semantic-search opt-in and retry a failed model load.
+   */
+  readonly 'semantic.enable': () => void
+  readonly 'index.rebuild': () => Promise<void>
+  readonly 'dev.toggleDevtools': () => Promise<void>
+}
+
+/**
+ * The id of an app command.
+ */
+export type AppCommandId = keyof AppCommands
+
+/**
+ * The id of an app command that takes no arguments, so that a key, a menu
+ * item, or a palette row can run it.
+ */
+export type TriggerableCommandId = {
+  [Id in AppCommandId]: Parameters<AppCommands[Id]> extends [] ? Id : never
+}[AppCommandId]
+
+/**
+ * How the palette, the native menu, and the keybindings present a command.
+ */
+export interface Command {
+  /**
+   * Stable id, e.g. `nav.today`.
+   */
+  readonly id: TriggerableCommandId
+  /**
+   * Palette display title.
+   */
+  readonly title: string
+  /**
+   * Extra match terms for palette filtering.
+   */
+  readonly keywords?: readonly string[]
+  /**
+   * Keymap-registry binding (app scope), e.g. `Mod-d`.
+   */
+  readonly keybinding?: string
+}
+
+/**
+ * A list of command declarations.
+ */
+export type Commands = readonly Command[]
 
 /**
  * A fresh note route; the file itself is created lazily on the first keystroke
@@ -26,373 +159,177 @@ export function newNoteRoute(noteCreation: NoteCreationService): Route {
 }
 
 /**
- * ⌘N from the daily stream leaves its saved scroll offsets behind as stale
- * state: the fresh note is where attention moves, so a later return to the
- * stream — ⌘[ back or the Daily nav tab — should re-anchor to its target, not
- * restore the pre-note position. Other routes keep their offsets; only the
- * stream re-anchors around note creation.
- */
-function openNewNote(context: CommandContext): void {
-  const route = context.route()
-  if (route.kind === 'today' || route.kind === 'daily') {
-    context.clearScrollState()
-  }
-  context.navigate(newNoteRoute(context.services.noteCreation))
-}
-
-/**
  * Whether `position` has a `graph.switch` command.
  */
 export function isGraphSwitchPosition(position: number): position is GraphSwitchPosition {
   return Number.isSafeInteger(position) && position >= 1 && position <= 9
 }
 
-/**
- * The command that switches to the recent graph at `position`.
- */
-function defineSwitchGraphCommand(position: GraphSwitchPosition): Command {
+function declareSwitchGraphCommand(position: GraphSwitchPosition): Command {
   return {
     id: `graph.switch${position}`,
     title: `Switch to graph ${position}`,
     keywords: ['graph', 'workspace', 'switch', 'recent'],
     keybinding: `Mod-${position}`,
-    run: (context) => context.switchGraph(position - 1),
   }
 }
 
-const APP_COMMANDS: Commands = [
-  defineSwitchGraphCommand(1),
-  defineSwitchGraphCommand(2),
-  defineSwitchGraphCommand(3),
-  defineSwitchGraphCommand(4),
-  defineSwitchGraphCommand(5),
-  defineSwitchGraphCommand(6),
-  defineSwitchGraphCommand(7),
-  defineSwitchGraphCommand(8),
-  defineSwitchGraphCommand(9),
-  {
-    id: 'nav.today',
-    title: 'Go to today',
-    keywords: ['daily', 'now'],
-    keybinding: 'Mod-d',
-    // ⌘D is a capture gesture, not just navigation: the arrival asks the
-    // stream to focus today's editor with the caret at the end of its
-    // content, ready to append — the same one-shot `focusEditor` intent as
-    // the mobile Daily-tab double-tap. Ordinary daily links and history
-    // moves stay on the calm default (focus at the note start, or none).
-    run: (context) => context.navigate({ kind: 'today' }, { focusEditor: true }),
-  },
+/**
+ * The declarations of the app commands, in palette order.
+ */
+export const APP_COMMANDS: Commands = [
+  ...GRAPH_SWITCH_POSITIONS.map(declareSwitchGraphCommand),
+  { id: 'nav.today', title: 'Go to today', keywords: ['daily', 'now'], keybinding: 'Mod-d' },
   {
     id: 'nav.allNotes',
     title: 'All notes',
     keywords: ['notes', 'list', 'browse', 'library'],
     keybinding: 'Mod-Shift-a',
-    run: (context) => context.selectSection('all'),
   },
   {
     id: 'nav.tasks',
     title: 'Tasks',
     keywords: ['todo', 'todos', 'checklist', 'checkbox', 'open'],
     keybinding: 'Mod-t',
-    run: (context) => context.selectSection('tasks'),
   },
-  {
-    id: 'note.new',
-    title: 'New note',
-    keywords: ['create'],
-    keybinding: 'Mod-n',
-    run: openNewNote,
-  },
+  { id: 'note.new', title: 'New note', keywords: ['create'], keybinding: 'Mod-n' },
   {
     id: 'note.openInNewWindow',
     title: 'Open note in new window',
     keywords: ['window', 'duplicate', 'pop out'],
     keybinding: 'Mod-Shift-o',
-    // `notePath` follows the focused day inside the daily stream. Converting
-    // that path back to a route also canonicalizes Today to a dated daily
-    // link, so every way of opening the day dedupes to the same window.
-    run: async (context) => {
-      const path = context.notePath()
-      if (path === null) {
-        return
-      }
-      await context.app.linkNavigation.openRouteInNewWindow(routeForPath(path))
-    },
   },
   {
     id: 'note.find',
     title: 'Find in note…',
     keywords: ['search', 'text', 'page'],
     keybinding: 'Mod-f',
-    run: (context) => context.openNoteFind(),
   },
   {
     id: 'note.findNext',
     title: 'Find next',
     keywords: ['search', 'match', 'forward'],
     keybinding: 'Mod-g',
-    run: (context) => context.findNextInNote(),
   },
   {
     id: 'note.findPrevious',
     title: 'Find previous',
     keywords: ['search', 'match', 'backward'],
     keybinding: 'Mod-Shift-g',
-    run: (context) => context.findPreviousInNote(),
   },
   {
     id: 'chat.open',
     title: 'Chat',
     keywords: ['ai', 'assistant', 'copilot', 'ask'],
     keybinding: 'Mod-j',
-    run: (context) => context.navigate({ kind: 'chat', conversationId: null }),
   },
   {
     id: 'chat.new',
     title: 'New chat',
     keywords: ['ai', 'assistant', 'copilot', 'conversation'],
     keybinding: 'Mod-Shift-n',
-    run: (context) => {
-      if (context.route().kind !== 'chat') {
-        return
-      }
-      context.newChat()
-    },
   },
-  {
-    id: 'history.back',
-    title: 'Back',
-    keybinding: 'Mod-[',
-    run: (context) => context.back(),
-  },
-  {
-    id: 'history.forward',
-    title: 'Forward',
-    keybinding: 'Mod-]',
-    run: (context) => context.forward(),
-  },
-  {
-    id: 'palette.open',
-    title: 'Search…',
-    keywords: ['find', 'open'],
-    keybinding: 'Mod-k',
-    run: (context) => context.openPalette(),
-  },
+  { id: 'history.back', title: 'Back', keybinding: 'Mod-[' },
+  { id: 'history.forward', title: 'Forward', keybinding: 'Mod-]' },
+  { id: 'palette.open', title: 'Search…', keywords: ['find', 'open'], keybinding: 'Mod-k' },
   {
     id: 'note.togglePin',
     title: 'Pin or unpin note',
     keywords: ['pinned', 'favorite', 'bookmark', 'sidebar'],
-    // The original app's pin shortcut. Flips the `pinned` frontmatter flag of
-    // the note the current route edits; on search/settings there is no such
-    // note and the command is a no-op.
+    // The original app's pin shortcut.
     keybinding: 'Mod-o',
-    run: (context) => context.togglePin(),
   },
+  // No default keybinding for the next three: the palette keeps them
+  // keyboard-reachable without spending a shortcut.
   {
     id: 'note.togglePrivate',
     title: 'Mark or un-mark note as private',
     keywords: ['privacy', 'lock', 'secret', 'hide', 'ai'],
-    // Flips the `private` frontmatter flag — the hard block on sending the
-    // note's content to AI or any other external service — of the note the
-    // current route edits. No default keybinding: the palette keeps it
-    // keyboard-reachable without spending a shortcut.
-    run: (context) => context.togglePrivate(),
   },
   {
     id: 'note.publishGist',
     title: 'Share with private link',
     keywords: ['gist', 'github', 'share', 'publish', 'private link', 'export'],
-    // Publishes the body of the note the current route edits to a secret
-    // GitHub gist (republishing to the same gist thereafter) and copies the
-    // link. No default keybinding: the palette keeps it keyboard-reachable
-    // without spending a shortcut. `GistPublishService.publish` owns the progress line
-    // and the failure surface; `publishGistAndCopyLink` owns the "link copied" confirmation.
-    run: async (context) => {
-      const path = context.notePath()
-      if (path === null) {
-        return
-      }
-      await publishGistAndCopyLink(context.services, context.app, path)
-    },
   },
   {
     id: 'note.attachFile',
     title: 'Attach file…',
     keywords: ['upload', 'attachment', 'import', 'pdf', 'document', 'insert'],
-    // Native file picker → copies into the graph's `assets/` → a markdown
-    // link per file at the caret (the keyboard-native twin of dropping a
-    // file on the note). No default keybinding: the palette keeps it
-    // keyboard-reachable without spending a shortcut.
-    run: (context) => attachFilesToNote(context),
   },
   {
     id: 'note.copyDeepLink',
     title: 'Copy deep link',
     keywords: ['url', 'share', 'clipboard', 'reflect://', 'address'],
-    // The original app's copy-link shortcut. Copies a `reflect://` address for
-    // the note the current route edits — id-shaped so it survives renames,
-    // minting the frontmatter id on first copy. `copyNoteDeepLink` owns all
-    // feedback (the "Deep link copied" status line and failure surfaces).
+    // The original app's copy-link shortcut.
     keybinding: 'Alt-Mod-l',
-    run: async (context) => {
-      const path = context.notePath()
-      if (path === null) {
-        return
-      }
-      await copyNoteDeepLink(context.services, context.app, path)
-    },
   },
   {
     id: 'note.copyPath',
     title: 'Copy note path',
     keywords: ['file', 'absolute', 'filesystem', 'clipboard', 'location'],
-    // The OS-path sibling of "Copy deep link": copies the note's absolute
-    // file path (Finder's Copy-as-Pathname chord) for use outside Reflect,
-    // where a reflect:// address cannot resolve. `copyNotePath` owns all
-    // feedback (the "Note path copied" status line and failure surfaces).
+    // Finder's Copy-as-Pathname chord.
     keybinding: 'Alt-Mod-c',
-    run: async (context) => {
-      const path = context.notePath()
-      if (path === null) {
-        return
-      }
-      await copyNotePath(context.services, context.app, path)
-    },
   },
-  {
-    id: 'note.random',
-    title: 'Open random note',
-    keywords: ['shuffle', 'serendipity'],
-    run: async (context) => {
-      const path = await context.services.indexQuery.randomNotePath()
-      if (path !== null) {
-        context.navigate({ kind: 'note', path })
-      }
-    },
-  },
+  { id: 'note.random', title: 'Open random note', keywords: ['shuffle', 'serendipity'] },
   {
     id: 'template.insert',
     title: 'Insert template…',
     keywords: ['snippet', 'boilerplate', 'stamp'],
-    // Inserts into the note the current route edits (the focused stream day on
-    // daily views); on screens with no note there is nothing to insert into.
-    // The picker itself carries the empty state — a "New template" row — so
-    // the command stays discoverable before any template exists.
-    run: (context) => {
-      if (context.notePath() === null) {
-        return
-      }
-      context.openTemplatePicker()
-    },
   },
   {
     id: 'template.new',
     title: 'New template',
     keywords: ['template', 'snippet', 'boilerplate', 'create'],
-    run: (context) => context.openTemplateCreate(),
   },
   {
     id: 'audioMemo.toggle',
     title: 'Record audio memo',
     keywords: ['voice', 'mic', 'dictate', 'transcribe', 'speech', 'capture'],
     keybinding: 'Mod-Shift-r',
-    run: (context) => context.toggleAudioMemo(),
   },
-  {
-    id: 'theme.toggle',
-    title: 'Toggle theme',
-    keywords: ['dark', 'light', 'appearance'],
-    run: (context) => context.toggleTheme(),
-  },
+  { id: 'theme.toggle', title: 'Toggle theme', keywords: ['dark', 'light', 'appearance'] },
   {
     id: 'sidebar.toggle',
     title: 'Toggle sidebar',
     keywords: ['collapse', 'expand', 'navigation', 'focus'],
     keybinding: 'Mod-\\',
-    run: (context) => context.toggleSidebar(),
   },
   {
     id: 'settings.open',
     title: 'Open settings',
     keywords: ['preferences', 'config', 'options'],
     keybinding: 'Mod-,',
-    run: (context) => context.navigate({ kind: 'settings', page: 'main' }),
   },
   {
     id: 'whatsNew.show',
     title: 'What’s New',
     keywords: ['changelog', 'release notes', 'update', 'version'],
-    run: (context) => context.app.whatsNew.setOverride(true),
   },
   {
     id: 'shortcuts.show',
     title: 'Keyboard shortcuts',
     keywords: ['cheat', 'sheet', 'keys', 'bindings', 'hotkeys', 'help'],
     keybinding: 'Mod-/',
-    run: (context) => context.openShortcuts(),
   },
   {
     id: 'semantic.enable',
     title: 'Enable semantic search',
     keywords: ['embeddings', 'ai', 'similar', 'model'],
-    // Downloads the local model (~90MB) — deliberately opt-in, never
-    // automatic: the first network fetch is the user's call. Persisting the
-    // setting is the entire command — EmbeddingsSync loads the model when the
-    // flag flips on and backfills once it's `ready`; later launches load from
-    // cache without asking again.
-    run: (context) => context.enableSemanticSearch(),
   },
-  {
-    id: 'index.rebuild',
-    title: 'Rebuild search index',
-    keywords: ['reindex', 'refresh'],
-    run: async (context) => {
-      await context.services.indexLifecycle.rebuildVisibly()
-    },
-  },
+  { id: 'index.rebuild', title: 'Rebuild search index', keywords: ['reindex', 'refresh'] },
   {
     id: 'dev.toggleDevtools',
     title: 'Developer tools',
     keywords: ['devtools', 'inspector', 'debug', 'console', 'inspect', 'web inspector'],
-    // The web inspector ships in every build (see `apps/tauri/src/devtools.rs`),
-    // so users can always debug. Plain-browser dev has no native shell — and its
-    // own DevTools — so this no-ops there rather than throwing through the
-    // bridge. Errors are swallowed: a debug affordance never interrupts the user.
     keybinding: 'Mod-Shift-i',
-    run: async (context) => {
-      if (!context.services.platform.isNativeShell) {
-        return
-      }
-      try {
-        await context.app.window.toggleDevtools()
-      } catch {
-        // Best effort — opening the inspector is never worth a surfaced failure.
-      }
-    },
   },
 ]
 
 /**
- * The registered keybinding for `commandId`, or `null` when the command has
- * none. UI hints — sidebar keycaps, "go to today" affordances — derive
- * bindings through this so they can never drift from the command definition,
- * and disappear if the binding ever does.
+ * The declared keybinding for `commandId`, or `null` when the command has
+ * none. UI hints (sidebar keycaps, "go to today" affordances) derive bindings
+ * through this so they can never drift from the declaration.
  */
-export function keybindingFor(commandId: AppCommandId): string | null {
+export function keybindingFor(commandId: TriggerableCommandId): string | null {
   return APP_COMMANDS.find((command) => command.id === commandId)?.keybinding ?? null
 }
-
-const registeredIn = new WeakSet<object>()
-
-/**
- * Register the app commands in `registry`. Idempotent per registry.
- */
-export function registerAppCommands(registry: CommandService): void {
-  if (registeredIn.has(registry)) {
-    return
-  }
-  registeredIn.add(registry)
-  registry.register(APP_COMMANDS)
-}
-
-export { APP_COMMANDS }

@@ -1,15 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createTestLoggerService, createTestPlatformService } from '@reflect/core/testing'
-import {
-  createCommandService,
-  type AppCommandId,
-  type CommandContext,
-  type CommandKeyEvent,
-} from './command-service.ts'
+import { APP_COMMANDS } from './app-commands.ts'
+import { createCommandService, type CommandKeyEvent } from './command-service.ts'
 import { noop } from '@ocavue/utils'
-
-// The registry passes the context through without reading it.
-const CONTEXT = {} as CommandContext
 
 function setup(options?: { isApplePlatform?: boolean }) {
   const logger = createTestLoggerService()
@@ -34,62 +27,93 @@ function keyDown(overrides: Partial<CommandKeyEvent>): CommandKeyEvent {
 }
 
 describe('createCommandService', () => {
-  it('registers, lists in order, and runs by id', async () => {
+  it('lists the declared commands in order', () => {
     const { commands } = setup()
-    const ran: CommandContext[] = []
-    commands.register([
-      { id: 'nav.today', title: 'A', run: noop },
-      { id: 'nav.allNotes', title: 'B', run: (context) => void ran.push(context) },
-    ])
-    expect(commands.list().map((command) => command.id)).toEqual(['nav.today', 'nav.allNotes'])
-    await commands.run('nav.allNotes', CONTEXT)
-    expect(ran).toEqual([CONTEXT])
+    expect(commands.list()).toBe(APP_COMMANDS)
   })
 
-  it('throws on a duplicate id (a programmer error, not a runtime state)', () => {
+  it('runs the current handler and returns its result', async () => {
     const { commands } = setup()
-    commands.register([{ id: 'nav.today', title: 'A', run: noop }])
-    expect(() => commands.register([{ id: 'nav.today', title: 'again', run: noop }])).toThrow(
-      /already registered/,
+    const ran: string[] = []
+    const controller = new AbortController()
+    commands.handle(
+      'note.random',
+      () => {
+        ran.push('random')
+        return Promise.resolve()
+      },
+      controller.signal,
     )
+    expect(commands.isHandled('note.random')).toBe(true)
+    await commands.run('note.random')
+    expect(ran).toEqual(['random'])
   })
 
-  it('throws on a blank id or title', () => {
+  it('does nothing for a command without a handler', () => {
     const { commands } = setup()
-    expect(() => commands.register([{ id: ' ' as AppCommandId, title: 'A', run: noop }])).toThrow(
-      'command id cannot be empty',
-    )
-    expect(() => commands.register([{ id: 'nav.today', title: '', run: noop }])).toThrow(
-      'command title cannot be empty: nav.today',
-    )
+    expect(commands.isHandled('nav.today')).toBe(false)
+    expect(commands.run('nav.today')).toBeUndefined()
+    expect(commands.trigger('nav.today')).toBe(false)
   })
 
-  it('an unknown id is a loud no-op (deep links may dangle)', async () => {
+  it('lets a later handler shadow an earlier one until it is removed', () => {
+    const { commands } = setup()
+    const ran: string[] = []
+    const outer = new AbortController()
+    const inner = new AbortController()
+    commands.handle('nav.today', () => void ran.push('outer'), outer.signal)
+    commands.handle('nav.today', () => void ran.push('inner'), inner.signal)
+    commands.run('nav.today')
+    inner.abort()
+    commands.run('nav.today')
+    outer.abort()
+    expect(commands.run('nav.today')).toBeUndefined()
+    expect(ran).toEqual(['inner', 'outer'])
+  })
+
+  it('ignores a handler whose signal already aborted', () => {
+    const { commands } = setup()
+    commands.handle('nav.today', noop, AbortSignal.abort())
+    expect(commands.isHandled('nav.today')).toBe(false)
+  })
+
+  it('stops triggers outside the allow list while a block is active', () => {
+    const { commands } = setup()
+    const ran: string[] = []
+    const handlers = new AbortController()
+    commands.handle('nav.today', () => void ran.push('today'), handlers.signal)
+    commands.handle('shortcuts.show', () => void ran.push('shortcuts'), handlers.signal)
+    const block = new AbortController()
+    commands.block(['shortcuts.show'], block.signal)
+    expect(commands.trigger('nav.today')).toBe(false)
+    expect(commands.trigger('shortcuts.show')).toBe(true)
+    // A direct run is the caller's decision, so blocks do not apply to it.
+    commands.run('nav.today')
+    block.abort()
+    expect(commands.trigger('nav.today')).toBe(true)
+    expect(ran).toEqual(['shortcuts', 'today', 'today'])
+  })
+
+  it('logs the failure of a triggered handler', async () => {
     const { commands, logger } = setup()
-    // Ids from outside, such as a deep link, are checked only at run time.
-    await commands.run('missing' as AppCommandId, CONTEXT)
-    expect(logger.getErrors()).toEqual([{ message: 'unknown command: missing', cause: undefined }])
+    const failure = new Error('boom')
+    commands.handle('note.random', () => Promise.reject(failure), new AbortController().signal)
+    expect(commands.trigger('note.random')).toBe(true)
+    await expect
+      .poll(() => logger.getErrors())
+      .toEqual([{ message: 'command failed: note.random', cause: failure }])
   })
 
   it('keeps each registry separate', () => {
     const { commands } = setup()
-    commands.register([{ id: 'nav.today', title: 'A', run: noop }])
-    expect(setup().commands.list()).toEqual([])
+    commands.handle('nav.today', noop, new AbortController().signal)
+    expect(setup().commands.isHandled('nav.today')).toBe(false)
   })
 })
 
 describe('commandForKeyDown', () => {
   function bound(options?: { isApplePlatform?: boolean }) {
-    const { commands } = setup(options)
-    commands.register([
-      { id: 'nav.today', title: 'Today', keybinding: 'Mod-d', run: noop },
-      { id: 'nav.allNotes', title: 'All notes', keybinding: 'Mod-Shift-a', run: noop },
-      { id: 'history.back', title: 'Back', keybinding: 'Mod-[', run: noop },
-      { id: 'note.copyDeepLink', title: 'Copy link', keybinding: 'Alt-Mod-l', run: noop },
-      { id: 'graph.switch2', title: 'Graph 2', keybinding: 'Mod-2', run: noop },
-      { id: 'theme.toggle', title: 'Unbound', run: noop },
-    ])
-    return commands
+    return setup(options).commands
   }
 
   it('matches ⌘ on Apple and Ctrl elsewhere', () => {

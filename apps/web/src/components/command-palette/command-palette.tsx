@@ -6,10 +6,12 @@ import { Kbd } from '@/components/kbd.tsx'
 import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import { displayNoteTitle, parseHighlights, formatDayLabel, type DateFormat } from '@reflect/core'
-import { type Command, type CommandContext, routeForPath, type NoteEntry } from '@reflect/app'
+import { type Command, routeForPath, type NoteEntry } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
 import { useChatActions, useChatProviders } from '@/providers/chat-provider.tsx'
 import { useDateFormat } from '@/providers/settings-provider.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
+import { useAppServices } from '@/services/services-provider.tsx'
 import { COMMAND_ICONS, FALLBACK_COMMAND_ICON } from './command-icons.ts'
 import { NotePreview } from './note-preview.tsx'
 import { usePalette } from './palette-provider.tsx'
@@ -25,11 +27,6 @@ import { usePaletteResults } from './use-palette-results.ts'
  * Note modes render two panes — results beside a live preview of the
  * highlighted note. Command mode (`>`) stays the original single narrow column.
  */
-
-interface CommandPaletteProps {
-  /** The capabilities commands run with (built by the shortcuts hook's owner). */
-  context: CommandContext
-}
 
 type PaletteItem =
   | { kind: 'note'; entry: NoteEntry }
@@ -57,7 +54,9 @@ const Snippet = memo(function Snippet({ snippet }: { snippet: string }): ReactEl
   )
 })
 
-export function CommandPalette({ context }: CommandPaletteProps): ReactElement | null {
+export function CommandPalette(): ReactElement | null {
+  const { commands } = useAppServices()
+  const { navigate } = useRouterActions()
   const { open, query, setQuery, closePalette } = usePalette()
   const dateFormat = useDateFormat()
   const { sections, resultsSettled, searchFailed } = usePaletteResults(open, query)
@@ -98,15 +97,15 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
         navigateNoteLink({ target: routeForPath(item.entry.path), openInNewWindow })
         return
       case 'command':
-        void context.app.commands.run(item.command.id, context)
+        void commands.run(item.command.id)
         return
       case 'ask':
         // With no AI provider, the row leads to Settings, where keys are added.
         if (hasProvider) {
           void ask(item.question)
-          context.navigate({ kind: 'chat', conversationId: null })
+          navigate({ kind: 'chat', conversationId: null })
         } else {
-          context.navigate({ kind: 'settings', page: 'main' })
+          navigate({ kind: 'settings', page: 'main' })
         }
     }
   }

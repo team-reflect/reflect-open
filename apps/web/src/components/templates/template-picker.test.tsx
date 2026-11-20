@@ -1,14 +1,11 @@
-import type { CommandContext } from '@reflect/app'
-import { createTestAppServices } from '@reflect/app/testing'
 import type { ReactElement } from 'react'
 import { page, userEvent } from 'vitest/browser'
-import { expect, it, vi } from 'vitest'
+import { expect, it } from 'vitest'
 import { createTestDatabaseService, createTestCoreServices, seedNotes } from '@reflect/core/testing'
 import { NoteTemplatesProvider, useNoteTemplates } from '@/providers/note-templates-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { TemplateCreateDialog } from './template-create-dialog.tsx'
 import { TemplatePicker } from './template-picker.tsx'
-import { noop, returnNull } from '@ocavue/utils'
 
 function Opener(): ReactElement {
   const { openTemplatePicker } = useNoteTemplates()
@@ -25,38 +22,11 @@ async function renderPicker(): Promise<void> {
     { path: 'templates/journal.md', markdown: '# Journal\n' },
     { path: 'templates/person.md', markdown: '# Person\n' },
   ])
-  const context: CommandContext = {
-    services: core,
-    app: createTestAppServices(core),
-    navigate: vi.fn(),
-    route: () => ({ kind: 'today' }),
-    noteEditor: returnNull,
-    notePath: returnNull,
-    back: vi.fn(),
-    forward: vi.fn(),
-    selectSection: vi.fn(),
-    clearScrollState: vi.fn(),
-    togglePin: vi.fn(noop),
-    togglePrivate: vi.fn(noop),
-    toggleTheme: vi.fn(),
-    toggleSidebar: vi.fn(),
-    newChat: vi.fn(),
-    openNoteFind: vi.fn(),
-    findNextInNote: vi.fn(),
-    findPreviousInNote: vi.fn(),
-    switchGraph: vi.fn(),
-    toggleAudioMemo: vi.fn(),
-    openPalette: vi.fn(),
-    openShortcuts: vi.fn(),
-    openTemplatePicker: vi.fn(),
-    openTemplateCreate: vi.fn(),
-    enableSemanticSearch: vi.fn(),
-  }
   await renderInApp(
     <NoteTemplatesProvider>
       <Opener />
-      <TemplatePicker context={context} />
-      <TemplateCreateDialog context={context} />
+      <TemplatePicker />
+      <TemplateCreateDialog />
     </NoteTemplatesProvider>,
     { core, graph: { root: '/g', name: 'g' } },
   )

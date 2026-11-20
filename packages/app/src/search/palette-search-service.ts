@@ -11,7 +11,8 @@ import {
   type UpdatedPreset,
   type WikiSuggestion,
 } from '@reflect/core'
-import type { Command, CommandService } from '../commands/command-service.ts'
+import type { Command } from '../commands/app-commands.ts'
+import type { CommandService } from '../commands/command-service.ts'
 import { buildPaletteSections, type PaletteHit, type PaletteSections } from './palette-entries.ts'
 
 /**
@@ -106,7 +107,11 @@ class PaletteSearchServiceImpl implements PaletteSearchService {
   }
 
   sections(input: PaletteSectionsInput): PaletteSections<Command> {
-    return buildPaletteSections({ ...input, commands: this.#deps.commands.list() })
+    const { commands } = this.#deps
+    // A command without a handler in this window does nothing, so the
+    // palette leaves it out.
+    const handled = commands.list().filter((command) => commands.isHandled(command.id))
+    return buildPaletteSections({ ...input, commands: handled })
   }
 
   updatedPresetFilter(preset: UpdatedPreset): UpdatedFilter {

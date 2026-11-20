@@ -7,9 +7,10 @@ import {
 } from '@reflect/core/testing'
 import { createTestNativeMenuService } from '../testing/commands.ts'
 import { createTestWindowService } from '../testing/window.ts'
+import type { TriggerableCommandId } from './app-commands.ts'
 import { createCommandService } from './command-service.ts'
 import type { AppSubmenuLayout, NativeMenuItem } from './native-menu-service.ts'
-import { noop, returnNull } from '@ocavue/utils'
+import { returnNull } from '@ocavue/utils'
 
 const LAYOUT: AppSubmenuLayout[] = [
   {
@@ -24,18 +25,23 @@ const LAYOUT: AppSubmenuLayout[] = [
   { text: 'Window', nsAppRole: 'windows', entries: [{ kind: 'predefined', item: 'Minimize' }] },
 ]
 
-function setup(options?: { label?: string; platform?: TestPlatformOptions; failPaste?: boolean }) {
+function setup(options?: {
+  label?: string
+  platform?: TestPlatformOptions
+  failPaste?: boolean
+  handled?: readonly TriggerableCommandId[]
+}) {
   const logger = createTestLoggerService()
   const commands = createCommandService({
     platform: createTestPlatformService(),
     logger: createTestLoggerService(),
   })
-  commands.register([
-    { id: 'sidebar.toggle', title: 'Toggle sidebar', keybinding: 'Mod-\\', run: noop },
-    { id: 'theme.toggle', title: 'Toggle theme', run: noop },
-    { id: 'note.find', title: 'Find in note…', run: noop },
-    { id: 'note.findNext', title: 'Find next', run: noop },
-  ])
+  // The commands that ran in this webview, in order.
+  const ran: string[] = []
+  const handlers = new AbortController()
+  for (const id of options?.handled ?? ['sidebar.toggle', 'theme.toggle', 'note.find']) {
+    commands.handle(id, () => void ran.push(id), handlers.signal)
+  }
   const windows = createTestWindowService(
     options?.label !== undefined ? { label: options.label } : {},
   )
@@ -50,14 +56,12 @@ function setup(options?: { label?: string; platform?: TestPlatformOptions; failP
     ipc,
     logger,
   })
-  return { menu, windows, ipc, logger }
+  return { menu, windows, ipc, logger, ran }
 }
 
 describe('install', () => {
   it('builds each submenu from the layout and the command registry', async () => {
-    const { menu } = setup()
-    const dispatch = vi.fn()
-    menu.setCommandDispatch(dispatch)
+    const { menu, ran } = setup({ platform: { isNativeShell: false } })
 
     await menu.install(LAYOUT)
 
@@ -82,7 +86,7 @@ describe('install', () => {
       throw new Error('expected a command item')
     }
     sidebarToggle.action('sidebar.toggle')
-    expect(dispatch).toHaveBeenCalledWith('sidebar.toggle')
+    expect(ran).toEqual(['sidebar.toggle'])
     expect(menu.isInstalled()).toBe(true)
   })
 
@@ -134,19 +138,22 @@ describe('install', () => {
     const { menu } = setup()
 
     await expect(
-      menu.install([{ text: 'File', entries: [{ kind: 'command', commandId: 'note.new' }] }]),
-    ).rejects.toThrow('native menu references unknown command: note.new')
+      menu.install([
+        {
+          text: 'File',
+          entries: [{ kind: 'command', commandId: 'no.such' as TriggerableCommandId }],
+        },
+      ]),
+    ).rejects.toThrow('native menu references unknown command: no.such')
     expect(menu.isInstalled()).toBe(false)
   })
 })
 
-describe('focused note menu dispatch', () => {
-  const event = 'reflect://focused-note-menu-command'
+describe('menu command dispatch', () => {
+  const event = 'reflect://menu-command'
 
-  it('routes Find menu actions to the focused secondary note window', async () => {
-    const { menu, windows } = setup()
-    const dispatch = vi.fn()
-    menu.setCommandDispatch(dispatch)
+  it('sends a menu action to the focused note window', async () => {
+    const { menu, windows, ran } = setup()
     windows.setFocusedWindowLabel('note-1')
 
     menu.dispatchCommand('note.find')
@@ -154,24 +161,20 @@ describe('focused note menu dispatch', () => {
     await vi.waitFor(() => {
       expect(windows.emitted()).toEqual([{ label: 'note-1', event, payload: 'note.find' }])
     })
-    expect(dispatch).not.toHaveBeenCalled()
+    expect(ran).toEqual([])
   })
 
-  it('runs Find menu actions in the main window when it has focus', async () => {
-    const { menu, windows } = setup()
-    const dispatch = vi.fn()
-    menu.setCommandDispatch(dispatch)
+  it('runs a menu action in the main window when it has focus', async () => {
+    const { menu, windows, ran } = setup()
 
-    menu.dispatchCommand('note.findNext')
+    menu.dispatchCommand('note.find')
 
-    await vi.waitFor(() => expect(dispatch).toHaveBeenCalledWith('note.findNext'))
+    await vi.waitFor(() => expect(ran).toEqual(['note.find']))
     expect(windows.emitted()).toEqual([])
   })
 
-  it('does not guess the main note when no webview is focused', async () => {
-    const { menu, windows } = setup()
-    const dispatch = vi.fn()
-    menu.setCommandDispatch(dispatch)
+  it('does not guess the main window when no webview is focused', async () => {
+    const { menu, windows, ran } = setup()
     windows.setFocusedWindowLabel(null)
     const focusedWindowLabel = vi.spyOn(windows, 'focusedWindowLabel')
 
@@ -180,41 +183,50 @@ describe('focused note menu dispatch', () => {
     await vi.waitFor(() => expect(focusedWindowLabel).toHaveBeenCalledTimes(1))
     await Promise.resolve()
     expect(windows.emitted()).toEqual([])
-    expect(dispatch).not.toHaveBeenCalled()
+    expect(ran).toEqual([])
   })
 
-  it('sends every other command, and Find outside a native shell, to the dispatcher', () => {
-    const { menu } = setup()
-    const dispatch = vi.fn()
-    menu.setCommandDispatch(dispatch)
-    menu.dispatchCommand('sidebar.toggle')
-    expect(dispatch).toHaveBeenLastCalledWith('sidebar.toggle')
-
-    const browser = setup({ platform: { isNativeShell: false } })
-    browser.menu.setCommandDispatch(dispatch)
-    browser.menu.dispatchCommand('note.find')
-    expect(dispatch).toHaveBeenLastCalledWith('note.find')
-
+  it('runs in place outside a native shell, and ignores undeclared ids', () => {
+    const { menu, ran } = setup({ platform: { isNativeShell: false } })
+    menu.dispatchCommand('note.find')
     menu.dispatchCommand('no.such.command')
-    expect(dispatch).toHaveBeenCalledTimes(2)
-
-    menu.setCommandDispatch(null)
-    menu.dispatchCommand('sidebar.toggle')
-    expect(dispatch).toHaveBeenCalledTimes(2)
+    expect(ran).toEqual(['note.find'])
   })
 
-  it('validates routed Find menu event payloads before dispatching them', () => {
-    const { menu, windows } = setup()
-    const dispatch = vi.fn()
-    const unlisten = menu.subscribeFocusedNoteCommands(dispatch)
+  it('runs the commands that arrive in this webview', () => {
+    const { menu, windows, ran } = setup({ label: 'note-1' })
+    const unlisten = menu.connect()
 
-    windows.emitWindowEvent(event, 'note.findNext')
-    windows.emitWindowEvent(event, { command: 'note.findNext' })
+    windows.emitWindowEvent(event, 'note.find')
+    windows.emitWindowEvent(event, { command: 'note.find' })
     unlisten()
     windows.emitWindowEvent(event, 'note.find')
 
-    expect(dispatch).toHaveBeenCalledTimes(1)
-    expect(dispatch).toHaveBeenCalledWith('note.findNext')
+    expect(ran).toEqual(['note.find'])
+    expect(windows.emitted()).toEqual([])
+  })
+
+  it('hands a command that a note window has no handler for to the main window', async () => {
+    const { menu, windows, ran } = setup({ label: 'note-1', handled: ['history.back'] })
+    menu.connect()
+
+    windows.emitWindowEvent(event, 'history.back')
+    windows.emitWindowEvent(event, 'note.new')
+
+    expect(ran).toEqual(['history.back'])
+    await vi.waitFor(() => {
+      expect(windows.emitted()).toEqual([{ label: 'main', event, payload: 'note.new' }])
+    })
+  })
+
+  it('drops a command that the main window has no handler for', () => {
+    const { menu, windows, ran } = setup({ handled: [] })
+    menu.connect()
+
+    windows.emitWindowEvent(event, 'note.new')
+
+    expect(ran).toEqual([])
+    expect(windows.emitted()).toEqual([])
   })
 })
 

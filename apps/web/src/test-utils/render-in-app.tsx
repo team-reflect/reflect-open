@@ -2,12 +2,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { onTestFinished } from 'vitest'
 import { render, renderHook, type RenderHookResult, type RenderResult } from 'vitest-browser-react'
-import {
-  registerAppCommands,
-  type AppServices,
-  type MobileOnboardingState,
-  type Route,
-} from '@reflect/app'
+import type { AppServices, MobileOnboardingState, Route } from '@reflect/app'
 import {
   createTestOperationsService,
   createTestAppServices,
@@ -241,8 +236,6 @@ async function prepare(options: AnyOptions | undefined): Promise<
     }
     appLayer.mobileOnboarding.setState(options.mobile)
   }
-  registerAppCommands(appLayer.commands)
-
   const route = options?.route
   const wrap = (children: ReactNode): ReactElement => {
     const wrapped = options?.wrapper === undefined ? children : options.wrapper(children)

@@ -10,14 +10,9 @@ import { PencilIcon } from '@/components/icons/pencil-icon.tsx'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { cn } from '@/lib/utils.ts'
-import {
-  keybindingFor,
-  type CommandContext,
-  notePathForRoute,
-  rootSectionForRoute,
-} from '@reflect/app'
-import { useRouterState } from '@/routing/router.tsx'
-import { useCoreServices } from '@/services/services-provider.tsx'
+import { keybindingFor, notePathForRoute, rootSectionForRoute } from '@reflect/app'
+import { useRouterActions, useRouterState } from '@/routing/router.tsx'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { GraphFooter } from './graph-footer.tsx'
 import { NavigateArrows } from './navigate-arrows.tsx'
 import { SidebarItem } from './sidebar-item.tsx'
@@ -26,8 +21,6 @@ import { SidebarSearch } from './sidebar-search.tsx'
 
 interface SidebarProps {
   graph: GraphInfo
-  /** Commands run with this — the same context the palette/shortcuts use. */
-  context: CommandContext
 }
 
 /**
@@ -40,8 +33,10 @@ interface SidebarProps {
  * capture gesture (today, caret at the end). (Sidebar collapse stays on
  * `Mod-\` via the command registry.)
  */
-export function Sidebar({ graph, context }: SidebarProps): ReactElement {
+export function Sidebar({ graph }: SidebarProps): ReactElement {
   const { platform } = useCoreServices()
+  const { commands } = useAppServices()
+  const { selectSection } = useRouterActions()
   const { route, section } = useRouterState()
   const onDailySurface = route.kind === 'today' || route.kind === 'daily'
   const today = useToday()
@@ -75,7 +70,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
       <div className="flex flex-none flex-col">
         <div className="mt-1 flex items-center gap-1.5 px-4">
           <div className="min-w-0 flex-1">
-            <SidebarSearch onOpen={() => context.openPalette()} />
+            <SidebarSearch onOpen={() => commands.run('palette.open')} />
           </div>
           <Tooltip>
             <TooltipTrigger
@@ -84,7 +79,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
                   variant="ghost"
                   size="icon-sm"
                   aria-label="New note"
-                  onClick={() => void context.app.commands.run('note.new', context)}
+                  onClick={() => commands.run('note.new')}
                   className="text-text-muted hover:text-text-secondary dark:hover:text-text"
                 >
                   <SquarePen aria-hidden strokeWidth={1.75} className="size-4" />
@@ -106,9 +101,9 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             active={sectionRowsLit && section === 'daily'}
             onClick={() => {
               if (onDailySurface) {
-                void context.app.commands.run('nav.today', context)
+                commands.run('nav.today')
               } else {
-                context.selectSection('daily')
+                selectSection('daily')
               }
             }}
           />
@@ -117,7 +112,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             label="All notes"
             binding={keybindingFor('nav.allNotes') ?? undefined}
             active={sectionRowsLit && section === 'all'}
-            onClick={() => void context.app.commands.run('nav.allNotes', context)}
+            onClick={() => commands.run('nav.allNotes')}
           />
           <SidebarItem
             icon={
@@ -128,7 +123,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             label="Tasks"
             binding={keybindingFor('nav.tasks') ?? undefined}
             active={sectionRowsLit && section === 'tasks'}
-            onClick={() => void context.app.commands.run('nav.tasks', context)}
+            onClick={() => commands.run('nav.tasks')}
           />
           <SidebarItem
             icon={
@@ -139,7 +134,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             label="Chat"
             binding={keybindingFor('chat.open') ?? undefined}
             active={sectionRowsLit && section === 'chat'}
-            onClick={() => void context.app.commands.run('chat.open', context)}
+            onClick={() => commands.run('chat.open')}
           />
         </nav>
       </div>
@@ -148,7 +143,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
         <SidebarPinned />
       </div>
 
-      <GraphFooter graph={graph} context={context} />
+      <GraphFooter graph={graph} />
     </div>
   )
 }

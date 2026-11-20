@@ -279,10 +279,10 @@ parameters: the services they use, or the container when they use three or
 more. A module that needs both layers takes two
 (`installQueryInvalidation(core, app)` in `lib/query-invalidation.ts`).
 
-**Commands** read `context.services` (core) and `context.app` (app)
-(`CommandContext` in `packages/app/src/commands/command-service.ts`). Never import
-`coreServices` or `appServices` from `boot.ts`: only `main.tsx` and the
-platform roots do.
+**Command handlers** are registered by the UI that implements them
+(`useCommands` in `apps/web/src/commands/use-commands.ts`) and read services
+through the React hooks. Never import `coreServices` or `appServices` from
+`boot.ts`: only `main.tsx` and the platform roots do.
 
 ## 9. If it needs a platform API
 
@@ -345,7 +345,6 @@ switch (`chatSessions.create({ session })`), or one instance per note pane
       `CoreServices` or `CoreInternalServices`. App: on
       `AppServices`, built in `createAppServices`
 - [ ] A test double only for a fake or a recording wrapper (§6)
-- [ ] Read with `useCoreServices()` / `useAppServices()`, module parameters, or
-      `CommandContext.services` / `.app`
+- [ ] Read with `useCoreServices()` / `useAppServices()` or module parameters
 - [ ] A platform API through `CoreAdapters`, `AppHost`, or a port (§9)
 - [ ] `pnpm typecheck && pnpm lint && pnpm test --run <touched paths>`
