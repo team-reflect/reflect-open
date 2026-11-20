@@ -34,10 +34,19 @@ runs:
       shell: bash
       run: pnpm install --frozen-lockfile
 
+    - name: Check OIDC
+      id: oidc
+      shell: bash
+      run: |
+        if [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] && [ -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+          echo "available=true" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Set up turborepo remote cache
       uses: vercel/setup-turborepo-remote-cache-action@49d7b1b46ba4c9251e1977986bfe18336feabc8f # v1.1.0
       if: >-
         inputs.cache == 'true'
+        && steps.oidc.outputs.available == 'true'
         && github.repository == 'team-reflect/reflect-open'
         && github.event.pull_request.head.repo.fork != true
       with:
