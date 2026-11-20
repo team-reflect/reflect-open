@@ -7,9 +7,9 @@ inputs:
     required: false
     default: 'true'
   save-pnpm-cache:
-    description: Whether to save the pnpm store cache at the end of the job.
+    description: Whether to save the pnpm store cache at the end of the job. Defaults to true only on master.
     required: false
-    default: 'false'
+    default: ${{ github.ref == 'refs/heads/master' }}
 
 runs:
   using: composite
