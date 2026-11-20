@@ -156,8 +156,8 @@ jobs:
     needs: [classify]
     if: needs.classify.outputs.lint-node == 'true'
     runs-on: ubuntu-24.04
-    environment: &sccache-environment
-      # Only master can use `sccache_write`, which holds the read-write S3 key.
+    environment:
+      &sccache-environment # Only master can use `sccache_write`, which holds the read-write S3 key.
       name: ${{ github.ref == 'refs/heads/master' && 'sccache_write' || 'sccache_read' }}
       deployment: false
     steps:
