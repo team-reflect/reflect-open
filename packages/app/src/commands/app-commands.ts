@@ -77,7 +77,7 @@ export interface Command extends CommandDeclaration {
 /**
  * A list of command declarations.
  */
-export type Commands = readonly Command[]
+export type Commands = readonly Command[] // FIXME: remove this COmmands type. It's useless. Just use readonly Command[] directly.
 
 /**
  * A fresh note route; the file itself is created lazily on the first keystroke
