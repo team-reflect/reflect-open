@@ -17,13 +17,10 @@ runs:
       run: git config --system core.longpaths true
 
     - name: Install pnpm
-      uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-
-    - name: Install Node
-      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      uses: pnpm/setup@v3
       with:
-        node-version: 24
-        cache: ${{ inputs.cache == 'true' && 'pnpm' || '' }}
+        cache: ${{ inputs.cache }}
+        install: false
 
     - name: Install dependencies
       shell: bash
