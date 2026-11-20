@@ -36,9 +36,27 @@
     },
     "//#test:node": {
       "dependsOn": ["@reflect/index-wasm#build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!.github/**",
+        "!docs/**",
+        "!apple/**",
+        "!apps/ios/**",
+        "!crates/**",
+        "!scripts/**",
+      ],
     },
     "//#test:browser": {
       "dependsOn": ["@reflect/index-wasm#build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!.github/**",
+        "!docs/**",
+        "!apple/**",
+        "!apps/ios/**",
+        "!crates/**",
+        "!scripts/**",
+      ],
       "env": ["REFLECT_TEST_BROWSER"],
       "passThroughEnv": ["VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB", "__XPC_JSC_useJIT"],
     },
