@@ -5,6 +5,9 @@ import XCTest
 ///
 /// - `STORE_SCREENSHOTS_FIXTURE`: the path of the `UITestFixture` JSON.
 /// - `STORE_SCREENSHOTS_DIR`: the directory that gets one PNG per screen.
+///
+/// The texts that the test waits for come from
+/// `apps/ios/store-screenshots/fixture.ts`.
 @MainActor
 final class StoreScreenshotsUITests: XCTestCase {
   private let app = XCUIApplication()
@@ -26,13 +29,41 @@ final class StoreScreenshotsUITests: XCTestCase {
   func testScreens() throws {
     app.launch()
     _ = app.waitForDailyNote()
-    try snap("daily")
+    try snap("daily", when: "30 minute run along the river")
+
+    try open("reflect://note/notes/ava-patel.md")
+    try snap("note", when: "Incoming backlinks")
+
+    try open("reflect://search?q=kyoto")
+    try snap("search", when: "Arashiyama")
+
+    try open("reflect://search?q=What%20does%20Ava%20want%20for%20the%20rebrand%3F")
+    element(containing: "Ask “What does Ava want").tap()
+    try snap("chat", when: "land best")
+
+    try open("reflect://tasks")
+    try snap("tasks", when: "Present three directions")
   }
 
-  /// Saves the screen as `<name>.png`, and the element tree as `<name>.txt`.
-  private func snap(_ name: String) throws {
+  private func open(_ url: String) throws {
+    app.open(try XCTUnwrap(URL(string: url)))
+  }
+
+  /// The first element whose label contains `text`, in the native chrome or the web view.
+  private func element(containing text: String) -> XCUIElement {
+    let element = app.descendants(matching: .any)
+      .matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+    XCTAssertTrue(element.waitForExistence(timeout: XCUIApplication.patience), "shows \(text)")
+    return element
+  }
+
+  /// Saves the screen as `<name>.png` once it shows `text`.
+  private func snap(_ name: String, when text: String) throws {
+    _ = element(containing: text)
+    // The text can show while a push or a tab change still moves the screen,
+    // and no element reports the end of the animation.
+    Thread.sleep(forTimeInterval: 1)
     try XCUIScreen.main.screenshot().pngRepresentation
       .write(to: directory.appendingPathComponent("\(name).png"))
-    try Data(app.debugDescription.utf8).write(to: directory.appendingPathComponent("\(name).txt"))
   }
 }

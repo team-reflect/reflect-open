@@ -85,8 +85,8 @@ export async function capture(device: DeviceName, today: string): Promise<void> 
   writeFileSync(fixture, storeFixture(today))
 
   const udid = await simulator(device)
-  await simctl('boot', udid).catch(() => {}) // already booted
   try {
+    // Boots the simulator when it is shut down, and waits for the boot.
     await simctl('bootstatus', udid, '-b')
     await simctl(
       'status_bar',
@@ -106,7 +106,8 @@ export async function capture(device: DeviceName, today: string): Promise<void> 
       '--cellularBars',
       '4',
       '--batteryState',
-      'charged',
+      // `charged` draws a charging bolt.
+      'discharging',
       '--batteryLevel',
       '100',
     )
