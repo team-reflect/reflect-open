@@ -128,8 +128,6 @@ export interface AppHost {
 
 /**
  * The app-layer services of one webview, built over the core services.
- * `CommandId` and `Context` are the id and context types of the app's
- * commands.
  */
 export interface AppServices {
   /**

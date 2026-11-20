@@ -52,7 +52,8 @@ export interface CommandService {
   trigger(id: AppCommandId): boolean
   /**
    * Stop {@link trigger} for every command except `allow` until `signal`
-   * aborts. A modal screen blocks while it is open.
+   * aborts. A modal screen blocks while it is open. Only the latest active
+   * block applies, so a modal opened on top of another decides alone.
    */
   block(allow: readonly AppCommandId[], signal: AbortSignal): void
   /**
@@ -165,11 +166,14 @@ class CommandServiceImpl implements CommandService {
     if (signal.aborted) {
       return
     }
-    this.#handlers.set(id, handler)
+    // A fresh function per registration, so an abort removes only its own
+    // registration, even when two registrations share one handler.
+    const registered: CommandHandler = () => handler()
+    this.#handlers.set(id, registered)
     signal.addEventListener(
       'abort',
       () => {
-        if (this.#handlers.get(id) === handler) {
+        if (this.#handlers.get(id) === registered) {
           this.#handlers.delete(id)
         }
       },

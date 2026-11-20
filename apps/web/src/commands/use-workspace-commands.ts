@@ -80,9 +80,12 @@ export function useWorkspaceCommands(): void {
         navigate({ kind: 'note', path })
       }
     },
-    'note.find': () => {
-      noteFind.openForPath(notePath)
-    },
+    'note.find':
+      notePath === null
+        ? undefined
+        : () => {
+            noteFind.openForPath(notePath)
+          },
     'note.findNext': noteFind.next,
     'note.findPrevious': noteFind.previous,
     'chat.open': () => navigate({ kind: 'chat', conversationId: null }),
@@ -103,9 +106,9 @@ export function useWorkspaceCommands(): void {
     // Downloading the local model (~90MB) is the user's call, never automatic:
     // EmbeddingsSync loads it when the flag flips on. A `failed` runtime
     // retries only on an explicit action like this one.
-    'semantic.enable': () => {
+    'semantic.enable': async () => {
       services.settings.update({ semanticSearchEnabled: true })
-      void services.semanticSearch.retryFailedModel()
+      await services.semanticSearch.retryFailedModel()
     },
     'index.rebuild': () => services.indexLifecycle.rebuildVisibly(),
     // The web inspector ships in every build (see `apps/tauri/src/devtools.rs`).

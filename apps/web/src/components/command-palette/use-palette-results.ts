@@ -21,6 +21,8 @@ import type { PaletteSections } from './entries.ts'
  * empty-state needs.
  */
 
+const CLOSED_SECTIONS: PaletteSections = { commandsOnly: false, notes: [], commands: [] }
+
 export interface PaletteResults {
   sections: PaletteSections
   /** True once the index has answered the *live* query (gates "No results"). */
@@ -98,6 +100,11 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
   const searchFailed = suggestionsError || hitsError
 
   const sections = useMemo(() => {
+    // The commands list only the handled ones, and the handlers change with
+    // the screen. Computing nothing while closed makes each open start fresh.
+    if (!open) {
+      return CLOSED_SECTIONS
+    }
     return paletteSearch.sections({
       query,
       dataQuery: trimmed,
@@ -105,7 +112,7 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
       hits: hits ?? [],
       filtered: parsed.filtered,
     })
-  }, [paletteSearch, query, trimmed, suggestions, hits, parsed.filtered])
+  }, [open, paletteSearch, query, trimmed, suggestions, hits, parsed.filtered])
 
   return { sections, resultsSettled, searchFailed }
 }

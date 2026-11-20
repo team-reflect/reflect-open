@@ -237,7 +237,12 @@ class NativeMenuServiceImpl implements NativeMenuService {
   connect(): Unlisten {
     return this.#deps.window.subscribeWindowEvent(MENU_COMMAND_EVENT, (payload) => {
       const id = typeof payload === 'string' ? this.#declaredId(payload) : null
-      if (id === null || this.#deps.commands.trigger(id) || this.#mainWindow) {
+      if (id === null) {
+        return
+      }
+      if (this.#mainWindow || this.#deps.commands.isHandled(id)) {
+        // A block in this window may stop the command; it never moves to main.
+        this.#deps.commands.trigger(id)
         return
       }
       // App-wide commands (New note, Settings, ...) have their handlers in the

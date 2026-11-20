@@ -271,6 +271,7 @@ describe('workspace commands', () => {
 
     await act(() => press('d'))
     expect(result.current.routerState.route).toEqual({ kind: 'today' })
+    expect(result.current.routerState.arrivalFocusEditor).toBe(true)
 
     await act(() => press('['))
     expect(result.current.routerState.route.kind).toBe('note')

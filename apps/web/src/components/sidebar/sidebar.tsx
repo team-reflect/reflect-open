@@ -101,7 +101,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
             active={sectionRowsLit && section === 'daily'}
             onClick={() => {
               if (onDailySurface) {
-                commands.run('nav.today')
+                void commands.run('nav.today')
               } else {
                 selectSection('daily')
               }

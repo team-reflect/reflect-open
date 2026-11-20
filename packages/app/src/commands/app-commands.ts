@@ -86,7 +86,7 @@ export function newNoteRoute(noteCreation: NoteCreationService): Route {
 /**
  * The declarations of the app commands, in palette order.
  */
-export const APP_COMMANDS: Record<AppCommandId, CommandDeclaration> = {
+export const APP_COMMANDS: Readonly<Record<AppCommandId, CommandDeclaration>> = {
   'graph.switch1': {
     title: 'Switch to graph 1',
     keywords: ['graph', 'workspace', 'switch', 'recent'],

@@ -1,6 +1,7 @@
 // Must stay the first import: see `boot.ts`.
-import { installNativeMenu } from '@reflect/app'
 import { appServices, coreServices } from '@/boot.ts'
+
+import { installNativeMenu } from '@reflect/app'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'

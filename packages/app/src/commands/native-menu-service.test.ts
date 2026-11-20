@@ -56,7 +56,7 @@ function setup(options?: {
     ipc,
     logger,
   })
-  return { menu, windows, ipc, logger, ran }
+  return { menu, commands, windows, ipc, logger, ran }
 }
 
 describe('install', () => {
@@ -217,6 +217,17 @@ describe('menu command dispatch', () => {
     await vi.waitFor(() => {
       expect(windows.emitted()).toEqual([{ label: 'main', event, payload: 'note.new' }])
     })
+  })
+
+  it('keeps a blocked command in the note window', () => {
+    const { menu, commands, windows, ran } = setup({ label: 'note-1', handled: ['history.back'] })
+    menu.connect()
+    commands.block([], new AbortController().signal)
+
+    windows.emitWindowEvent(event, 'history.back')
+
+    expect(ran).toEqual([])
+    expect(windows.emitted()).toEqual([])
   })
 
   it('drops a command that the main window has no handler for', () => {

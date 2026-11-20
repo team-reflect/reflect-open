@@ -56,6 +56,15 @@ describe('createCommandService', () => {
     expect(commands.isHandled('nav.today')).toBe(false)
   })
 
+  it('keeps a newer registration of the same handler when an older one aborts', () => {
+    const { commands } = setup()
+    const older = new AbortController()
+    commands.handle('nav.today', noop, older.signal)
+    commands.handle('nav.today', noop, new AbortController().signal)
+    older.abort()
+    expect(commands.isHandled('nav.today')).toBe(true)
+  })
+
   it('ignores a handler whose signal already aborted', () => {
     const { commands } = setup()
     commands.handle('nav.today', noop, AbortSignal.abort())
@@ -77,6 +86,39 @@ describe('createCommandService', () => {
     block.abort()
     expect(commands.trigger('nav.today')).toBe(true)
     expect(ran).toEqual(['shortcuts', 'today', 'today'])
+  })
+
+  it('applies only the latest active block', () => {
+    const { commands } = setup()
+    const handlers = new AbortController()
+    commands.handle('nav.today', noop, handlers.signal)
+    commands.handle('shortcuts.show', noop, handlers.signal)
+    const palette = new AbortController()
+    const sheet = new AbortController()
+    commands.block([], palette.signal)
+    commands.block(['shortcuts.show'], sheet.signal)
+    expect(commands.trigger('shortcuts.show')).toBe(true)
+    expect(commands.trigger('nav.today')).toBe(false)
+    palette.abort()
+    expect(commands.trigger('nav.today')).toBe(false)
+    sheet.abort()
+    expect(commands.trigger('nav.today')).toBe(true)
+  })
+
+  it('logs a handler that throws synchronously', async () => {
+    const { commands, logger } = setup()
+    const failure = new Error('boom')
+    commands.handle(
+      'note.random',
+      () => {
+        throw failure
+      },
+      new AbortController().signal,
+    )
+    expect(commands.trigger('note.random')).toBe(true)
+    await expect
+      .poll(() => logger.getErrors())
+      .toEqual([{ message: 'command failed: note.random', cause: failure }])
   })
 
   it('logs the failure of a triggered handler', async () => {
