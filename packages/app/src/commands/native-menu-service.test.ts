@@ -35,6 +35,7 @@ function setup(options?: { label?: string; platform?: TestPlatformOptions; failP
     { id: 'theme.toggle', title: 'Toggle theme', run: noop },
     { id: 'note.find', title: 'Find in note…', run: noop },
     { id: 'note.findNext', title: 'Find next', run: noop },
+    { id: 'history.back', title: 'Back', keybinding: 'Mod-[', run: noop },
   ])
   const windows = createTestWindowService(
     options?.label !== undefined ? { label: options.label } : {},
@@ -153,6 +154,20 @@ describe('focused note menu dispatch', () => {
 
     await vi.waitFor(() => {
       expect(windows.emitted()).toEqual([{ label: 'note-1', event, payload: 'note.find' }])
+    })
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+
+  it('routes history menu actions to the focused secondary note window', async () => {
+    const { menu, windows } = setup()
+    const dispatch = vi.fn()
+    menu.setCommandDispatch(dispatch)
+    windows.setFocusedWindowLabel('note-1')
+
+    menu.dispatchCommand('history.back')
+
+    await vi.waitFor(() => {
+      expect(windows.emitted()).toEqual([{ label: 'note-1', event, payload: 'history.back' }])
     })
     expect(dispatch).not.toHaveBeenCalled()
   })
