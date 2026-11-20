@@ -48,8 +48,7 @@ runs:
         echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
         echo "SCCACHE_IDLE_TIMEOUT=0" >> "$GITHUB_ENV"
 
-        # Look up the local disk first, then the GitHub Actions cache. A GHA
-        # hit is copied to the disk, and a write goes to both levels.
+        # Look up the local disk first, then the GitHub Actions cache, then S3
         # https://github.com/mozilla/sccache/blob/v0.19.0/docs/MultiLevel.md
         echo "SCCACHE_DIR=$RUNNER_TEMP/sccache" >> "$GITHUB_ENV"
         echo "SCCACHE_MULTILEVEL_CHAIN=disk,gha" >> "$GITHUB_ENV"
@@ -62,9 +61,13 @@ runs:
         # and a rate-limited probe makes it skip the write.
         echo "SCCACHE_SKIP_CACHE_CHECK=true" >> "$GITHUB_ENV"
 
-        # Upload to the GitHub Actions cache only on master.
+        # Upload only on master.
         if [ "$GITHUB_REF" != "refs/heads/master" ]; then
           echo "SCCACHE_GHA_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
+          echo "SCCACHE_S3_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
+        else
+          echo "SCCACHE_GHA_RW_MODE=READ_WRITE" >> "$GITHUB_ENV"
+          echo "SCCACHE_S3_RW_MODE=READ_WRITE" >> "$GITHUB_ENV"
         fi
 
     - name: Cache cargo registry
