@@ -2,7 +2,7 @@
 // Composes the App Store screenshots from the raw screens: a caption at the
 // top and the whole device below it, in Apple's bezel ("12z44"). Shots 1, 3
 // and 5 use the light theme, 2 and 4 the dark one. Writes
-// `out/screenshots/<device>/NN-<screen>.png` at the App Store size.
+// `screenshots/<device>/NN-<screen>.png` (committed) at the App Store size.
 //
 // `balanceCaption` runs in the page, hence the DOM types.
 
@@ -15,7 +15,7 @@ import { RAW_DIR } from './capture.ts'
 import { SCREENS, type Screen } from './copy.ts'
 import { DEVICES, type DeviceName, type Theme } from './devices.ts'
 
-export const SCREENSHOTS_DIR = join(import.meta.dirname, 'out', 'screenshots')
+export const SCREENSHOTS_DIR = join(import.meta.dirname, 'screenshots')
 
 const LOOKS = {
   light: {

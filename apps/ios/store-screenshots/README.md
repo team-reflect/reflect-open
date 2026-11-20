@@ -4,7 +4,7 @@
 pnpm store-screenshots
 ```
 
-Writes the five screenshots of each App Store size to `out/screenshots/<device>/`, ready to upload.
+Writes the five screenshots of each App Store size to `screenshots/<device>/`, ready to upload. They are committed, so a run shows its changes in the diff.
 It takes about 10 minutes, most of it in the simulator.
 
 | Device | Simulator | Size (px) | App Store Connect |
@@ -44,3 +44,6 @@ shows 9:41 on it.
 The device frames come from [Apple Design Resources](https://developer.apple.com/design/resources/).
 Their license allows them only in mock-ups of apps for Apple platforms, and not their
 redistribution, so the script downloads them into `out/bezels/` (git-ignored). Never commit them.
+
+The composed screenshots in `screenshots/` are app mock-ups, which the license allows. The bezel
+PNGs on their own stay out of git.
