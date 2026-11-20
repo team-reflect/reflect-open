@@ -6,7 +6,8 @@
 // Each device has its own simulator, `reflect-store-<device>`, kept between
 // runs so the next run skips the first boot.
 
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { exec } from 'tinyexec'
 
@@ -55,23 +56,47 @@ export async function build(): Promise<void> {
   ])
 }
 
-/** The UDID of the simulator of `device`, made on first use. */
-async function simulator(device: DeviceName): Promise<string> {
+/** The simulator of `device`, made on first use. */
+async function simulator(device: DeviceName): Promise<{ udid: string; booted: boolean }> {
   const name = `reflect-store-${device}`
   const { devices } = JSON.parse(await simctl('list', 'devices', '--json')) as {
-    devices: Record<string, { name: string; udid: string; isAvailable: boolean }[]>
+    devices: Record<string, { name: string; udid: string; state: string; isAvailable: boolean }[]>
   }
   const found = Object.values(devices)
     .flat()
     .find((entry) => entry.name === name && entry.isAvailable)
-  return (
-    found?.udid ??
-    (await simctl(
-      'create',
-      name,
-      `com.apple.CoreSimulator.SimDeviceType.${DEVICES[device].simulator}`,
-    ))
+  if (found) {
+    return { udid: found.udid, booted: found.state === 'Booted' }
+  }
+  const type = `com.apple.CoreSimulator.SimDeviceType.${DEVICES[device].simulator}`
+  return { udid: await simctl('create', name, type), booted: false }
+}
+
+/**
+ * Sets the preferences of the shut-down simulator `udid` that its status bar
+ * and its windows read at boot. `plutil` writes the files directly: `defaults`
+ * goes through the cache of the Mac's preferences daemon, which the
+ * simulator does not read.
+ */
+async function prepare(udid: string): Promise<void> {
+  const dir = join(
+    homedir(),
+    'Library/Developer/CoreSimulator/Devices',
+    udid,
+    'data/Library/Preferences',
   )
+  const springboard = join(dir, 'com.apple.springboard.plist')
+  if (!existsSync(springboard)) {
+    // The first boot writes the files.
+    await simctl('bootstatus', udid, '-b')
+    await simctl('shutdown', udid)
+  }
+  const global = join(dir, '.GlobalPreferences.plist')
+  // The US format, "Fri Nov 20", whatever the region of the Mac.
+  await run('plutil', ['-replace', 'AppleLocale', '-string', 'en_US', global])
+  await run('plutil', ['-replace', 'AppleLanguages', '-json', '["en-US"]', global])
+  // Full Screen Apps on iPad: no window corner and no app name in the status bar.
+  await run('plutil', ['-replace', 'SBMedusaMultitaskingEnabled', '-bool', 'false', springboard])
 }
 
 /**
@@ -84,7 +109,11 @@ export async function capture(device: DeviceName, today: string): Promise<void> 
   mkdirSync(OUT_DIR, { recursive: true })
   writeFileSync(fixture, storeFixture(today))
 
-  const udid = await simulator(device)
+  const { udid, booted } = await simulator(device)
+  if (booted) {
+    await simctl('shutdown', udid)
+  }
+  await prepare(udid)
   try {
     // Boots the simulator when it is shut down, and waits for the boot.
     await simctl('bootstatus', udid, '-b')
