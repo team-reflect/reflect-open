@@ -48,8 +48,8 @@ jobs:
     name: release-build-${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     environment:
-      # Only master can use `sccache-write`, which holds the read-write S3 key.
-      name: ${{ github.ref == 'refs/heads/master' && 'sccache-write' || 'sccache-read' }}
+      # Only master can use `sccache_write`, which holds the read-write S3 key.
+      name: ${{ github.ref == 'refs/heads/master' && 'sccache_write' || 'sccache_read' }}
       deployment: false
     timeout-minutes: 120
 
