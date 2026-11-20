@@ -86,10 +86,6 @@ runs:
           echo "SCCACHE_MULTILEVEL_CHAIN=disk,gha" >> "$GITHUB_ENV"
         fi
 
-        # Write every level before the compile returns, so that no write is
-        # still running in the background when the job ends.
-        echo "SCCACHE_MULTILEVEL_WRITE_ERROR_POLICY=all" >> "$GITHUB_ENV"
-
         # Without this, sccache writes a probe file before every write, and a
         # rate-limited probe makes it skip the write.
         echo "SCCACHE_SKIP_CACHE_CHECK=true" >> "$GITHUB_ENV"
