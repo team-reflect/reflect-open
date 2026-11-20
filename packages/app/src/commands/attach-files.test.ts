@@ -6,18 +6,18 @@ import {
 } from '@reflect/core/testing'
 import type { AttachmentInsertTarget } from '@reflect/core'
 import { createTestAppServices, type TestAppServices } from '../testing/services.ts'
-import type { AppCommandId, CommandContext } from './app-command.ts'
+import type { CommandContext } from './command-service.ts'
 import { attachFilesToNote } from './attach-files.ts'
 import { noop } from '@ocavue/utils'
 
 let core: TestCoreServices
-let appLayer: TestAppServices<AppCommandId, CommandContext>
+let appLayer: TestAppServices
 // The mounted note editors, by note path.
 const editors = new Map<string, AttachmentInsertTarget>()
 
 beforeEach(() => {
   core = createTestCoreServices({ database: createTestDatabaseService() })
-  appLayer = createTestAppServices<AppCommandId, CommandContext>(core)
+  appLayer = createTestAppServices(core)
   core.graphSession.setGraph({ generation: 4 })
 })
 

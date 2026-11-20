@@ -6,7 +6,7 @@ import { Kbd } from '@/components/kbd.tsx'
 import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import { displayNoteTitle, parseHighlights, formatDayLabel, type DateFormat } from '@reflect/core'
-import { type AppCommand, type CommandContext, routeForPath, type NoteEntry } from '@reflect/app'
+import { type Command, type CommandContext, routeForPath, type NoteEntry } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
 import { useChatActions, useChatProviders } from '@/providers/chat-provider.tsx'
 import { useDateFormat } from '@/providers/settings-provider.tsx'
@@ -33,7 +33,7 @@ interface CommandPaletteProps {
 
 type PaletteItem =
   | { kind: 'note'; entry: NoteEntry }
-  | { kind: 'command'; command: AppCommand }
+  | { kind: 'command'; command: Command }
   | { kind: 'ask'; question: string }
 
 interface PaletteGroup {

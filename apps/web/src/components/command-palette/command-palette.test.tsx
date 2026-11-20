@@ -1,6 +1,6 @@
 import type { MaybePromise } from '@reflect/utils'
 import { type CommandContext, deepLinkForRoute, formatBinding } from '@reflect/app'
-import { createTestWindowService } from '@reflect/app/testing'
+import { createTestWindowService, createTestAppServices } from '@reflect/app/testing'
 import { userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useEffect, type ReactNode } from 'react'
@@ -23,7 +23,6 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { CommandPalette } from './command-palette.tsx'
 import { PaletteProvider, usePalette } from './palette-provider.tsx'
 import { noop, returnNull } from '@ocavue/utils'
-import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
 // The palette runs on the real `PaletteSearchService` of the test app
 // services; each test scripts the index reads below it.
@@ -107,7 +106,7 @@ async function renderPalette(query: string, context?: Partial<CommandContext>) {
     }),
     noteFile: createTestNoteFileService({ files }),
   })
-  const appLayer = createWebTestAppServices(core, {
+  const appLayer = createTestAppServices(core, {
     window: createTestWindowService({ openNoteWindow }),
   })
   const fullContext: CommandContext = {

@@ -1,10 +1,18 @@
-import type { WebAppServices } from '@/services/services-provider.tsx'
 import type { ReactElement, ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { onTestFinished } from 'vitest'
 import { render, renderHook, type RenderHookResult, type RenderResult } from 'vitest-browser-react'
-import { registerAppCommands, type MobileOnboardingState, type Route } from '@reflect/app'
-import { createTestOperationsService } from '@reflect/app/testing'
+import {
+  registerAppCommands,
+  type AppServices,
+  type MobileOnboardingState,
+  type Route,
+} from '@reflect/app'
+import {
+  createTestOperationsService,
+  createTestAppServices,
+  type TestAppServices,
+} from '@reflect/app/testing'
 import type {
   CoreServices,
   GitSyncState,
@@ -33,7 +41,6 @@ import { ChromeRendererProvider } from '@/mobile/chrome/chrome-renderer-provider
 import { GraphProvider } from '@/providers/graph-provider.tsx'
 import { RouterProvider } from '@/routing/router.tsx'
 import { AppServicesProvider, CoreServicesProvider } from '@/services/services-provider.tsx'
-import { createWebTestAppServices, type WebTestAppServices } from '@/test-utils/app-services.ts'
 
 /**
  * The platform facts of the mobile app: pass as `platform` to render a mobile surface.
@@ -89,7 +96,7 @@ export interface RenderInAppOptions {
    * Replaces fields of the app layer built over `core`, e.g. `{ update }` or a whole
    * `createTestAppServices(core)` a test must share with the render.
    */
-  appServices?: Partial<WebAppServices> | undefined
+  appServices?: Partial<AppServices> | undefined
   /**
    * Wraps `ui` inside every provider, for providers this helper does not mount.
    */
@@ -108,7 +115,7 @@ interface InAppHandles<Core extends CoreServices> {
   /**
    * The app layer built over `core`.
    */
-  readonly appServices: WebTestAppServices
+  readonly appServices: TestAppServices
   readonly queryClient: QueryClient
   /**
    * The scripted git sync service when `sync` was a `GitSyncState`, else `null`.
@@ -227,7 +234,7 @@ async function prepare(options: AnyOptions | undefined): Promise<
 
   const queryClient =
     options?.queryClient ?? new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  const appLayer = createWebTestAppServices(core, options?.appServices)
+  const appLayer = createTestAppServices(core, options?.appServices)
   if (options?.mobile !== undefined) {
     if (!('setState' in appLayer.mobileOnboarding)) {
       throw new Error('renderInApp: `mobile` needs a test mobile onboarding service')

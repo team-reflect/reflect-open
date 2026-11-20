@@ -15,18 +15,18 @@ function hit(
 ): PaletteHit {
   return { path, title, snippet, dailyDate }
 }
-const COMMANDS: Command<string>[] = [
+const COMMANDS: Command[] = [
   { id: 'nav.today', title: 'Go to today', keywords: ['daily'], run: noop },
   { id: 'theme.toggle', title: 'Toggle theme', keywords: ['dark'], run: noop },
 ]
 
 /** Defaults for the common case; tests override what they exercise. */
 function sections(
-  overrides: Partial<Parameters<typeof buildPaletteSections<Command<string>>>[0]> & {
+  overrides: Partial<Parameters<typeof buildPaletteSections<Command>>[0]> & {
     query: string
   },
 ) {
-  return buildPaletteSections<Command<string>>({
+  return buildPaletteSections<Command>({
     dataQuery: overrides.query,
     suggestions: [],
     hits: [],

@@ -8,12 +8,7 @@ import { createSwiftIpcTransport } from '@/services/swift-ipc.ts'
 import { createSwiftLogger } from '@/services/swift-logger.ts'
 import { createTauriIpcTransport } from '@/services/tauri-ipc.ts'
 import { createTauriLogger } from '@/services/tauri-logger.ts'
-import {
-  type AppCommandId,
-  type CommandContext,
-  createAppGraphServices,
-  createAppServices,
-} from '@reflect/app'
+import { createAppGraphServices, createAppServices } from '@reflect/app'
 import {
   createConsoleLogger,
   createCoreServices,
@@ -80,7 +75,7 @@ export const coreServices = createCoreServices({
   },
 })
 
-export const appServices = createAppServices<AppCommandId, CommandContext>(coreServices, host)
+export const appServices = createAppServices(coreServices, host)
 
 // Runs before every module imported after this one, so exception telemetry
 // exists while the rest of the app's modules evaluate.

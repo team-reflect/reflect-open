@@ -1,14 +1,15 @@
 import type { NoteCreationService } from '@reflect/core'
 import { routeForPath, type Route } from '../navigation/route.ts'
-import type {
-  AppCommand,
-  AppCommandId,
-  CommandContext,
-  GraphSwitchPosition,
-} from './app-command.ts'
 import { attachFilesToNote } from './attach-files.ts'
 import { copyNoteDeepLink, copyNotePath, publishGistAndCopyLink } from './clipboard-actions.ts'
-import type { Commands, CommandService } from './command-service.ts'
+import type {
+  AppCommandId,
+  Command,
+  CommandContext,
+  Commands,
+  CommandService,
+  GraphSwitchPosition,
+} from './command-service.ts'
 
 /**
  * The app commands. Each command defines its keybinding and its behavior
@@ -49,7 +50,7 @@ export function isGraphSwitchPosition(position: number): position is GraphSwitch
 /**
  * The command that switches to the recent graph at `position`.
  */
-function defineSwitchGraphCommand(position: GraphSwitchPosition): AppCommand {
+function defineSwitchGraphCommand(position: GraphSwitchPosition): Command {
   return {
     id: `graph.switch${position}`,
     title: `Switch to graph ${position}`,
@@ -59,7 +60,7 @@ function defineSwitchGraphCommand(position: GraphSwitchPosition): AppCommand {
   }
 }
 
-const APP_COMMANDS: Commands<AppCommandId, CommandContext> = [
+const APP_COMMANDS: Commands = [
   defineSwitchGraphCommand(1),
   defineSwitchGraphCommand(2),
   defineSwitchGraphCommand(3),
@@ -386,7 +387,7 @@ const registeredIn = new WeakSet<object>()
 /**
  * Register the app commands in `registry`. Idempotent per registry.
  */
-export function registerAppCommands(registry: CommandService<AppCommandId, CommandContext>): void {
+export function registerAppCommands(registry: CommandService): void {
   if (registeredIn.has(registry)) {
     return
   }

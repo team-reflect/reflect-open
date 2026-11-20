@@ -1,3 +1,4 @@
+import { createTestAppServices } from '@reflect/app/testing'
 import { noop } from '@ocavue/utils'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -9,7 +10,6 @@ import {
 } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { DeepLinkProvider } from './deep-link-provider.tsx'
-import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
 describe('DeepLinkProvider navigation intent integration', () => {
   it('keeps a deferred note resolution current when a capture arrives', async () => {
@@ -30,7 +30,7 @@ describe('DeepLinkProvider navigation intent integration', () => {
         graphSession,
       }),
     })
-    const appServices = createWebTestAppServices(core)
+    const appServices = createTestAppServices(core)
     await renderInApp(<DeepLinkProvider search={noop}>{null}</DeepLinkProvider>, {
       core,
       appServices,

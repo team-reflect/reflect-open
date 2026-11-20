@@ -1,3 +1,4 @@
+import { createTestAppServices, type TestAppServices } from '@reflect/app/testing'
 import { act } from '@/test-utils/act.ts'
 import {
   isOstensiblyEmptyNoteSource,
@@ -37,7 +38,6 @@ import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { useAppShortcuts } from './app-shortcuts.ts'
 import { useRouterActions, useRouterHandlers, useRouterState } from './router.tsx'
 import { noop, returnFalse } from '@ocavue/utils'
-import { createWebTestAppServices, type WebTestAppServices } from '@/test-utils/app-services.ts'
 
 const GRAPH = { root: '/g', name: 'g', generation: 1 } satisfies TestOpenGraph
 
@@ -72,10 +72,10 @@ const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
 let platform: TestPlatformOptions
 // The services of the rendered app; set by `shortcutsHook`.
 let core: TestCoreServices
-let appLayer: WebTestAppServices
+let appLayer: TestAppServices
 let openRecent: MockInstance<GraphSessionService['openRecent']>
 let openRouteInNewWindow: MockInstance<LinkNavigationService['openRouteInNewWindow']>
-let isNativeMenuInstalled: MockInstance<WebTestAppServices['nativeMenu']['isInstalled']>
+let isNativeMenuInstalled: MockInstance<TestAppServices['nativeMenu']['isInstalled']>
 
 beforeEach(() => {
   platform = {
@@ -101,7 +101,7 @@ async function shortcutsHook() {
     },
   })
   core = services
-  appLayer = createWebTestAppServices(services)
+  appLayer = createTestAppServices(services)
   openRecent = vi.spyOn(services.graphSession, 'openRecent').mockResolvedValue(true)
   openRouteInNewWindow = vi
     .spyOn(appLayer.linkNavigation, 'openRouteInNewWindow')
@@ -237,7 +237,7 @@ describe('app shortcuts', () => {
   })
 
   it('registers the command keybindings in the central keymap registry', () => {
-    const { keymap } = createWebTestAppServices(
+    const { keymap } = createTestAppServices(
       createTestCoreServices({ database: createTestDatabaseService() }),
     )
     registerAppKeymaps(keymap)

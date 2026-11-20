@@ -280,7 +280,7 @@ more. A module that needs both layers takes two
 (`installQueryInvalidation(core, app)` in `lib/query-invalidation.ts`).
 
 **Commands** read `context.services` (core) and `context.app` (app)
-(`CommandContext` in `packages/app/src/commands/app-command.ts`). Never import
+(`CommandContext` in `packages/app/src/commands/command-service.ts`). Never import
 `coreServices` or `appServices` from `boot.ts`: only `main.tsx` and the
 platform roots do.
 

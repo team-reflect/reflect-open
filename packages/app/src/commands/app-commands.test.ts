@@ -14,7 +14,7 @@ import type { NavigateOptions } from '../navigation/navigation-service.ts'
 import { notePathForRoute, type Route } from '../navigation/route.ts'
 import { createTestAppServices } from '../testing/services.ts'
 import { createTestWindowService, type TestWindowService } from '../testing/window.ts'
-import type { AppCommandId, CommandContext } from './app-command.ts'
+import type { CommandContext } from './command-service.ts'
 import { APP_COMMANDS, keybindingFor } from './app-commands.ts'
 import { noop, returnNull } from '@ocavue/utils'
 
@@ -58,7 +58,7 @@ function fakeContext(overrides?: Partial<CommandContext>) {
   const navigated: Route[] = []
   const navigateOptions: (NavigateOptions | undefined)[] = []
   const route: () => Route = overrides?.route ?? (() => ({ kind: 'today' }))
-  const appLayer = createTestAppServices<AppCommandId, CommandContext>(core, { window: windows })
+  const appLayer = createTestAppServices(core, { window: windows })
   const context: CommandContext = {
     services: core,
     app: appLayer,

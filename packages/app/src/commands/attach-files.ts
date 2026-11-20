@@ -1,4 +1,4 @@
-import type { CommandContext } from './app-command.ts'
+import type { CommandContext } from './command-service.ts'
 
 /**
  * The Attach file… command for the routed note: the native file picker, then

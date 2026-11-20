@@ -57,7 +57,7 @@ function setup() {
       },
     ],
   })
-  const commands = createCommandService<string>({
+  const commands = createCommandService({
     platform: createTestPlatformService(),
     logger: createTestLoggerService(),
   })
@@ -149,7 +149,7 @@ describe('PaletteSearchService', () => {
 
   it('merges the data with the registered commands', () => {
     const { service, commands } = setup()
-    const toggleTheme: Command<string> = {
+    const toggleTheme: Command = {
       id: 'theme.toggle',
       title: 'Toggle theme',
       keywords: ['dark'],

@@ -1,6 +1,6 @@
 import { isNotNullish } from '@ocavue/utils'
 import { describe, expect, it } from 'vitest'
-import type { AppCommandId } from './app-command.ts'
+import type { AppCommandId } from './command-service.ts'
 import { APP_COMMANDS, keybindingFor } from './app-commands.ts'
 import { appMenuLayout } from './app-menu.ts'
 

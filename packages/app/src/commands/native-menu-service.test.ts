@@ -11,7 +11,7 @@ import { createCommandService } from './command-service.ts'
 import type { AppSubmenuLayout, NativeMenuItem } from './native-menu-service.ts'
 import { noop, returnNull } from '@ocavue/utils'
 
-const LAYOUT: AppSubmenuLayout<string>[] = [
+const LAYOUT: AppSubmenuLayout[] = [
   {
     text: 'View',
     entries: [

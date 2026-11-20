@@ -1,3 +1,4 @@
+import { createTestAppServices, type TestAppServices } from '@reflect/app/testing'
 import type { RenderResult } from 'vitest-browser-react'
 import { cdp, page, server, userEvent } from 'vitest/browser'
 import { mouse } from 'vitest-browser-commands/playwright'
@@ -36,7 +37,6 @@ import { quickOpenVisible } from '@/mobile/quick-open.tsx'
 import { MobileShell } from './mobile-shell.tsx'
 import { BACK_PAGER_OVERSHOOT_PX } from './use-back-pager.ts'
 import { noop, returnFalse, sleep } from '@ocavue/utils'
-import { createWebTestAppServices, type WebTestAppServices } from '@/test-utils/app-services.ts'
 
 const waitFor = vi.waitFor
 
@@ -117,13 +117,13 @@ const GRAPH: GraphInfo = { root: '/g', name: 'g', generation: 1 }
 
 // The services of the running test: the graph's files live in `core.noteFile`.
 let core: TestCoreServices
-let appServices: WebTestAppServices
+let appServices: TestAppServices
 let dailyDatesInRange: MockInstance<DailyNoteService['dailyDatesInRange']>
 
 beforeEach(async () => {
   await page.viewport(375, 700)
   core = createTestCoreServices({ database: createTestDatabaseService() })
-  appServices = createWebTestAppServices(core)
+  appServices = createTestAppServices(core)
   // The tests compute dates from the real clock.
   core.clock.setNow(Date.now())
   // The browser and the test preferences both prefer reduced motion.
@@ -724,7 +724,7 @@ describe('MobileShell', () => {
       secretStore: createTestSecretStoreService({ [aiKeySecretName(model.id)]: 'sk-test' }),
       chatEngine,
     })
-    appServices = createWebTestAppServices(core)
+    appServices = createTestAppServices(core)
     core.clock.setNow(Date.now())
     appServices.systemPreferences.reducedMotion.set(true)
     const view = await mount({ kind: 'allNotes', tag: null }, undefined, {

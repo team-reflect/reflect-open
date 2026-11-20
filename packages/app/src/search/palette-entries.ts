@@ -45,7 +45,7 @@ export interface NoteEntry {
 /**
  * What the palette reads off a command to match it against the query.
  */
-export type PaletteCommand = Pick<Command<string>, 'title' | 'keywords'>
+export type PaletteCommand = Pick<Command, 'title' | 'keywords'>
 
 export interface PaletteSections<AppCommand extends PaletteCommand = PaletteCommand> {
   /**
