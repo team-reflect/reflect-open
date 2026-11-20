@@ -232,7 +232,6 @@ jobs:
       - name: Test
         run: pnpm turbo run test:browser --only -- --shard=${{ matrix.shard }}/3
 
-  # Not part of `all-green`: a WebKit failure does not block merging.
   test-webkit:
     needs: [classify, test-chromium]
     if: needs.classify.outputs.test-webkit == 'true'
@@ -329,8 +328,6 @@ jobs:
 
       - uses: ./.github/actions/setup-mise
 
-      # A simulator that is slim and done with the work of its first boot. That
-      # work takes minutes and slows the whole runner.
       - name: Pick the simulator cache key
         id: simulator
         env:
@@ -487,6 +484,9 @@ jobs:
       - test-swift
       - lint-rust
       - test-rust
+      # Not part of `all-green`
+      # - test-webkit
+      # - test-ios
 
     steps:
       # A skipped job counts as passed: classify skips jobs on purpose.
