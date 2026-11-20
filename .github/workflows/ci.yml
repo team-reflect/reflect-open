@@ -20,8 +20,8 @@ env:
 
 jobs:
   classify:
-    runs-on: ubuntu-slim
-    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     outputs:
       lint-node: ${{ steps.classify.outputs.lint-node }}
       test-node: ${{ steps.classify.outputs.test-node }}
@@ -34,12 +34,16 @@ jobs:
     steps:
       # The merge commit's first parent is the base branch, so the diff
       # against it is the change that the PR brings in.
-      - if: github.event_name == 'pull_request'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 2
           filter: blob:none
+
+      # Warms the pnpm store cache before the jobs that need it start.
+      - uses: ./.github/actions/setup-node
+        with:
+          save-pnpm-cache: true
 
       - id: classify
         env:
@@ -162,16 +166,20 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
 
-      - uses: ./.github/actions/setup-turbo
-
       - name: Verify the generated iOS CSP is current
         run: |
           pnpm gen:ios-csp
           git diff --exit-code apple/Sources/WebHostKit/ContentSecurityPolicy.gen.swift \
             || (echo "::error::ContentSecurityPolicy.gen.swift is stale. Run 'pnpm gen:ios-csp' and commit the result." && exit 1)
 
-      - name: Lint, typecheck and build
-        run: pnpm turbo run lint typecheck build --filter=// --filter='@reflect/*'
+      - name: Lint
+        run: pnpm turbo run lint --filter=//
+
+      - name: Typecheck
+        run: pnpm turbo run typecheck --filter=//
+
+      - name: Build
+        run: pnpm run build
 
   test-node:
     needs: [classify]
@@ -185,8 +193,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-
-      - uses: ./.github/actions/setup-turbo
 
       - name: Test
         run: pnpm turbo run test:node
@@ -220,8 +226,6 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
 
-      - uses: ./.github/actions/setup-turbo
-
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:chromium
 
@@ -254,8 +258,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-
-      - uses: ./.github/actions/setup-turbo
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:webkit
@@ -294,8 +296,6 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      - uses: ./.github/actions/setup-turbo
-
       - name: Test apple/
         run: pnpm turbo run test:swift --filter=@reflect/apple
 
@@ -322,8 +322,6 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-targets: 'true'
-
-      - uses: ./.github/actions/setup-turbo
 
       - uses: ./.github/actions/setup-mise
 
@@ -405,8 +403,6 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      - uses: ./.github/actions/setup-turbo
-
       # Fails if Cargo.lock is out of date.
       - name: Check Cargo.lock
         run: cargo metadata --locked --format-version 1 > /dev/null
@@ -462,8 +458,6 @@ jobs:
       - uses: ./.github/actions/setup-rust
 
       - uses: ./.github/actions/setup-node
-
-      - uses: ./.github/actions/setup-turbo
 
       - name: Test
         run: pnpm turbo run test --filter=reflect-workspace
