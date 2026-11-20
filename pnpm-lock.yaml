@@ -8798,57 +8798,6 @@ snapshots:
 
   acorn@8.17.0: {}
 
-  addons-linter@10.14.0(express@5.2.1)(jiti@2.7.0)(supports-color@8.1.1):
-    dependencies:
-      '@fluent/syntax': 0.19.0
-      '@fregante/relaxed-json': 2.0.0
-      '@mdn/browser-compat-data': 8.1.4
-      addons-moz-compare: 1.4.0
-      addons-scanner-utils: 16.0.0(express@5.2.1)
-      ajv: 8.20.0
-      cheerio: 1.2.0
-      columnify: 1.6.0
-      common-tags: 1.8.2
-      css-tree: 3.2.1
-      deepmerge: 4.3.1
-      eslint: 9.39.4(jiti@2.7.0)(supports-color@8.1.1)
-      eslint-plugin-no-unsanitized: 4.1.5(eslint@9.39.4)
-      eslint-visitor-keys: 5.0.1
-      espree: 11.2.0
-      esprima: 4.0.1
-      fast-json-patch: 3.1.1
-      image-size: 2.0.4
-      json-merge-patch: 1.0.2
-      pino: 10.3.1
-      semver: 7.8.5
-      source-map-support: 0.5.21
-      upath: 3.0.8
-      yargs: 17.7.3
-      yauzl: 3.4.0
-    transitivePeerDependencies:
-      - express
-      - jiti
-      - safe-compare
-      - supports-color
-    optional: true
-
-  addons-moz-compare@1.4.0:
-    optional: true
-
-  addons-scanner-utils@16.0.0(express@5.2.1):
-    dependencies:
-      common-tags: 1.8.2
-      first-chunk-stream: 3.0.0
-      jsonwebtoken: 9.0.3
-      strip-bom-stream: 4.0.0
-      upath: 3.0.8
-      yauzl: 3.4.0
-    optionalDependencies:
-      express: 5.2.1(supports-color@8.1.1)
-
-  adm-zip@0.6.1:
-    optional: true
-
   agent-base@6.0.2(supports-color@8.1.1):
     dependencies:
       debug: 4.4.3(supports-color@8.1.1)
@@ -12313,7 +12262,6 @@ snapshots:
     optionalDependencies:
       eslint: 10.14.0(jiti@2.7.0)(supports-color@8.1.1)
       typescript: 6.0.3
-      web-ext: 10.8.0(express@5.2.1)(jiti@2.7.0)(supports-color@8.1.1)
     transitivePeerDependencies:
       - '@farmfe/core'
       - '@rspack/core'

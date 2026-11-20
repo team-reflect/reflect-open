@@ -89,17 +89,11 @@ loads under the ID the host allowlists; there is no `key` dance.
     --source-dir .output/firefox-mv3-dev \
     --no-reload
   ```
+
 - **Side-load a build:** `pnpm build:firefox`, then navigate to `about:debugging` in
   your browser → This Firefox → **Load Temporary Add-on…** → pick
   `.output/firefox-mv3/manifest.json`. Temporary add-ons are removed when
   Firefox quits.
-- **Keep it installed:** release Firefox only installs signed add-ons. Either
-  sign the `pnpm zip:firefox` artifact as an unlisted add-on on
-  addons.mozilla.org `web-ext sign --channel=unlisted`, which also requires
-  installing `web-ext`, or use Developer
-  Edition / Nightly with `xpinstall.signatures.required` set to `false` in
-  `about:config` and install the zip (renamed to `.xpi`) from `about:addons` →
-  gear → **Install Add-on From File…**.
 
 The desktop app writes the Firefox host manifest to
 `~/Library/Application Support/Mozilla/NativeMessagingHosts/app.reflect.capture.json`
