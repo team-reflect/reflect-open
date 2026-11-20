@@ -20,7 +20,7 @@
       "outputs": ["dist/**", ".output/**"],
     },
     "dev": {
-      "dependsOn": ["^build", "transit"],
+      "dependsOn": ["^build"],
       "env": ["TAURI_ENV_PLATFORM"],
       "cache": false,
       "persistent": true,
@@ -30,36 +30,12 @@
     "//#lint": {
       "dependsOn": ["@reflect/index-wasm#build"],
       "outputs": [".eslintcache"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "!.github/**",
-        "!docs/**",
-        "!apple/**",
-        "!apps/ios/**",
-        "!crates/**",
-      ],
     },
     "//#typecheck": {
       "outputs": ["**/*.tsbuildinfo"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "!.github/**",
-        "!docs/**",
-        "!apple/**",
-        "!apps/ios/**",
-        "!crates/**",
-      ],
     },
     "//#test:node": {
       "dependsOn": ["@reflect/index-wasm#build"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "!.github/**",
-        "!docs/**",
-        "!apple/**",
-        "!apps/ios/**",
-        "!crates/**",
-      ],
     },
     "//#test:browser": {
       "dependsOn": ["@reflect/index-wasm#build"],
@@ -70,6 +46,7 @@
         "!apple/**",
         "!apps/ios/**",
         "!crates/**",
+        "!scripts/**",
       ],
       "env": ["REFLECT_TEST_BROWSER"],
       "passThroughEnv": ["VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB", "__XPC_JSC_useJIT"],
