@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.19.0-beta.6...v0.19.0-beta.7) (2026-11-20)
+
+
+### Bug Fixes
+
+* pass the sccache S3 key in publish jobs ([#2267](https://github.com/team-reflect/reflect-open/issues/2267)) ([2e86463](https://github.com/team-reflect/reflect-open/commit/2e864634ecb99c6bff11f9015bc2413a1c526b8b))
+
 ## [0.19.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.19.0-beta.5...v0.19.0-beta.6) (2026-11-20)
 
 
