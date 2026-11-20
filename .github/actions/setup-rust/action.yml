@@ -62,7 +62,7 @@ runs:
         # and a rate-limited probe makes it skip the write.
         echo "SCCACHE_SKIP_CACHE_CHECK=true" >> "$GITHUB_ENV"
 
-        # Do not upload to GitHub Actions cache on pull requests.
+        # Upload to the GitHub Actions cache only on master.
         if [ "$GITHUB_REF" != "refs/heads/master" ]; then
           echo "SCCACHE_GHA_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
         fi

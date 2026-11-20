@@ -40,7 +40,7 @@ jobs:
           fetch-depth: 2
           filter: blob:none
 
-      - name: Warn the pnpm store cache
+      - name: Warm up the pnpm store cache
         uses: ./.github/actions/setup-node
         if: github.ref == 'refs/heads/master'
 
