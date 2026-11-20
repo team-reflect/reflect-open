@@ -162,16 +162,20 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
 
-      - uses: ./.github/actions/setup-turbo
-
       - name: Verify the generated iOS CSP is current
         run: |
           pnpm gen:ios-csp
           git diff --exit-code apple/Sources/WebHostKit/ContentSecurityPolicy.gen.swift \
             || (echo "::error::ContentSecurityPolicy.gen.swift is stale. Run 'pnpm gen:ios-csp' and commit the result." && exit 1)
 
-      - name: Lint, typecheck and build
-        run: pnpm turbo run lint typecheck build --filter=// --filter='@reflect/*'
+      - name: Lint
+        run: pnpm turbo run lint --filter=//
+
+      - name: Typecheck
+        run: pnpm turbo run typecheck --filter=//
+
+      - name: Build
+        run: pnpm run build
 
   test-node:
     needs: [classify]
@@ -185,8 +189,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-
-      - uses: ./.github/actions/setup-turbo
 
       - name: Test
         run: pnpm turbo run test:node
@@ -220,8 +222,6 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
 
-      - uses: ./.github/actions/setup-turbo
-
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:chromium
 
@@ -254,8 +254,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-
-      - uses: ./.github/actions/setup-turbo
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:webkit
@@ -294,8 +292,6 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      - uses: ./.github/actions/setup-turbo
-
       - name: Test apple/
         run: pnpm turbo run test:swift --filter=@reflect/apple
 
@@ -322,8 +318,6 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-targets: 'true'
-
-      - uses: ./.github/actions/setup-turbo
 
       - uses: ./.github/actions/setup-mise
 
@@ -405,8 +399,6 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      - uses: ./.github/actions/setup-turbo
-
       # Fails if Cargo.lock is out of date.
       - name: Check Cargo.lock
         run: cargo metadata --locked --format-version 1 > /dev/null
@@ -462,8 +454,6 @@ jobs:
       - uses: ./.github/actions/setup-rust
 
       - uses: ./.github/actions/setup-node
-
-      - uses: ./.github/actions/setup-turbo
 
       - name: Test
         run: pnpm turbo run test --filter=reflect-workspace
