@@ -1,12 +1,11 @@
 // Must stay the first import: see `boot.ts`.
+import { registerAppCommands, installNativeMenu } from '@reflect/app'
 import { appServices, coreServices } from '@/boot.ts'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from '@/lib/query-client.ts'
-import { registerAppCommands } from '@/lib/commands/app-commands.ts'
-import { installNativeMenu } from '@/lib/native-menu/menu.ts'
 import { registerAppKeymaps } from '@/lib/shortcuts.ts'
 import { startPerfHud } from '@/perf-hud/flag.ts'
 import { PlatformRoot, warmPlatformRoot } from '@platform-root'

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { getIsComposing } from '@meowdown/core'
+import { noteEditorHandleFor } from '@/editor/editor-handle-registry.ts'
 import { usePalette } from '@/components/command-palette/palette-provider.tsx'
-import type { AppCommandId, CommandContext } from '@/lib/commands/types.ts'
 import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
 import { useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { useGraphActions, useGraphInfo, useGraphRecents } from '@/providers/graph-provider.tsx'
@@ -15,7 +15,7 @@ import {
   useCoreServices,
   useMaybeGraphServices,
 } from '@/services/services-provider.tsx'
-import { focusedNotePathForRoute } from '@reflect/app'
+import { type AppCommandId, type CommandContext, focusedNotePathForRoute } from '@reflect/app'
 import { useRouterActions, useRouterState, useRouterHandlers } from './router.tsx'
 
 /**
@@ -117,6 +117,7 @@ export function useAppShortcuts(): CommandContext {
       // Resolve through the focused stream day so a note-scoped command targets
       // the same day the context sidebar shows (see `effectiveDailyDate`); off
       // the daily views it falls back to the routed note.
+      noteEditor: noteEditorHandleFor,
       notePath: () => {
         return focusedNotePathForRoute(
           routeRef.current,

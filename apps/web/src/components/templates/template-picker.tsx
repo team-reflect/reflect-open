@@ -1,3 +1,4 @@
+import type { CommandContext } from '@reflect/app'
 import type { TemplateEntry } from '@reflect/types'
 import { useState, type ReactElement } from 'react'
 import { Autocomplete } from '@base-ui/react/autocomplete'
@@ -13,7 +14,6 @@ import {
 } from '@/components/ui/dialog.tsx'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group.tsx'
 import { noteEditorHandleFor } from '@/editor/editor-handle-registry.ts'
-import type { CommandContext } from '@/lib/commands/types.ts'
 import { createTemplatesQueryOptions } from '@/lib/query-options.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useNoteTemplates } from '@/providers/note-templates-provider.tsx'

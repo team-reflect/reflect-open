@@ -1,7 +1,7 @@
+import { keybindingFor } from '@reflect/app'
 import type { ReactElement } from 'react'
 import { SearchIcon } from '@/components/icons/search-icon.tsx'
 import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
-import { keybindingFor } from '@/lib/commands/app-commands.ts'
 
 const PALETTE_BINDING = keybindingFor('palette.open')
 

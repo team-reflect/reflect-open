@@ -8,8 +8,12 @@ import { createSwiftIpcTransport } from '@/services/swift-ipc.ts'
 import { createSwiftLogger } from '@/services/swift-logger.ts'
 import { createTauriIpcTransport } from '@/services/tauri-ipc.ts'
 import { createTauriLogger } from '@/services/tauri-logger.ts'
-import { createAppGraphServices, createAppServices } from '@reflect/app'
-import type { AppCommandId, CommandContext } from '@/lib/commands/types.ts'
+import {
+  type AppCommandId,
+  type CommandContext,
+  createAppGraphServices,
+  createAppServices,
+} from '@reflect/app'
 import {
   createConsoleLogger,
   createCoreServices,

@@ -1,3 +1,4 @@
+import type { CommandContext } from '@reflect/app'
 import {
   Dialog,
   DialogContent,
@@ -5,7 +6,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog.tsx'
-import type { CommandContext } from '@/lib/commands/types.ts'
 import { useNoteTemplates } from '@/providers/note-templates-provider.tsx'
 import { lazy, Suspense, useState, type ReactElement } from 'react'
 

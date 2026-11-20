@@ -1,8 +1,8 @@
 import { isNotNullish } from '@ocavue/utils'
 import { describe, expect, it } from 'vitest'
-import { APP_COMMANDS, keybindingFor } from '@/lib/commands/app-commands.ts'
-import type { AppCommandId } from '@/lib/commands/types.ts'
-import { appMenuLayout } from './menu.ts'
+import type { AppCommandId } from './app-command.ts'
+import { APP_COMMANDS, keybindingFor } from './app-commands.ts'
+import { appMenuLayout } from './app-menu.ts'
 
 function referencedCommandIds(): AppCommandId[] {
   return appMenuLayout().flatMap((submenu) => {

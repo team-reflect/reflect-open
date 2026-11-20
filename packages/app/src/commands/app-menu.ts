@@ -1,10 +1,10 @@
-import type { AppCommandId } from '@/lib/commands/types.ts'
+import type { AppCommandId } from './app-command.ts'
 import type {
   AppMenuEntry,
   AppSubmenuLayout,
   NativeMenuPredefinedItem,
   NativeMenuService,
-} from '@reflect/app'
+} from './native-menu-service.ts'
 
 /**
  * The native macOS application menu (the V1 Electron menu, ported). Command

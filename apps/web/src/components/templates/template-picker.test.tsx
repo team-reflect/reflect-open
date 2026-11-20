@@ -1,9 +1,9 @@
+import type { CommandContext } from '@reflect/app'
 import { createTestAppServices } from '@reflect/app/testing'
 import type { ReactElement } from 'react'
 import { page, userEvent } from 'vitest/browser'
 import { expect, it, vi } from 'vitest'
 import { createTestDatabaseService, createTestCoreServices, seedNotes } from '@reflect/core/testing'
-import type { CommandContext } from '@/lib/commands/types.ts'
 import { NoteTemplatesProvider, useNoteTemplates } from '@/providers/note-templates-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { TemplateCreateDialog } from './template-create-dialog.tsx'
@@ -30,6 +30,7 @@ async function renderPicker(): Promise<void> {
     app: createTestAppServices(core),
     navigate: vi.fn(),
     route: () => ({ kind: 'today' }),
+    noteEditor: returnNull,
     notePath: returnNull,
     back: vi.fn(),
     forward: vi.fn(),

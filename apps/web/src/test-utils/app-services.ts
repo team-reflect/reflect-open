@@ -1,5 +1,5 @@
+import type { AppCommandId, CommandContext } from '@reflect/app'
 import { createTestAppServices, type TestAppServices } from '@reflect/app/testing'
-import type { AppCommandId, CommandContext } from '@/lib/commands/types.ts'
 
 /**
  * The test app services, typed with the app's commands.

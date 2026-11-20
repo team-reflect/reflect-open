@@ -12,6 +12,7 @@ import {
   type SettingsService,
 } from '@reflect/core'
 import {
+  type CommandContext,
   type GraphBootService,
   type NativeContextMenuOptions,
   deepLinkForRoute,
@@ -28,7 +29,6 @@ import {
   createTestCoreServices,
   createTestGitSyncService,
 } from '@reflect/core/testing'
-import type { CommandContext } from '@/lib/commands/types.ts'
 import { AudioMemoProvider } from '@/providers/audio-memo-provider.tsx'
 import { SidebarProvider } from '@/providers/sidebar-provider.tsx'
 import { UpdateProvider } from '@/providers/update-provider.tsx'
@@ -112,6 +112,7 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
     app: appLayer,
     navigate,
     route: () => ({ kind: 'today' }),
+    noteEditor: returnNull,
     notePath: returnNull,
     selectSection: (section, options) => appLayer.navigation.selectSection(section, options),
     back: vi.fn(),

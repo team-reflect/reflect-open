@@ -4,27 +4,26 @@ import {
   createTestCoreServices,
   type TestCoreServices,
 } from '@reflect/core/testing'
-import {
-  registerNoteEditorHandle,
-  unregisterNoteEditorHandle,
-} from '@/editor/editor-handle-registry.ts'
-import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
-import type { CommandContext } from '@/lib/commands/types.ts'
+import type { AttachmentInsertTarget } from '@reflect/core'
+import { createTestAppServices, type TestAppServices } from '../testing/services.ts'
+import type { AppCommandId, CommandContext } from './app-command.ts'
 import { attachFilesToNote } from './attach-files.ts'
-import { noop, returnFalse } from '@ocavue/utils'
-import { createWebTestAppServices, type WebTestAppServices } from '@/test-utils/app-services.ts'
+import { noop } from '@ocavue/utils'
 
 let core: TestCoreServices
-let appLayer: WebTestAppServices
+let appLayer: TestAppServices<AppCommandId, CommandContext>
+// The mounted note editors, by note path.
+const editors = new Map<string, AttachmentInsertTarget>()
 
 beforeEach(() => {
   core = createTestCoreServices({ database: createTestDatabaseService() })
-  appLayer = createWebTestAppServices(core)
+  appLayer = createTestAppServices<AppCommandId, CommandContext>(core)
   core.graphSession.setGraph({ generation: 4 })
 })
 
 afterEach(() => {
   core.database.close()
+  editors.clear()
 })
 
 function contextFor(notePath: string | null): CommandContext {
@@ -33,6 +32,7 @@ function contextFor(notePath: string | null): CommandContext {
     app: appLayer,
     navigate: vi.fn(),
     route: () => ({ kind: 'today' }),
+    noteEditor: (path) => editors.get(path) ?? null,
     notePath: () => notePath,
     back: vi.fn(),
     forward: vi.fn(),
@@ -56,28 +56,14 @@ function contextFor(notePath: string | null): CommandContext {
   }
 }
 
-function editorHandle(): NoteEditorHandle {
-  return {
-    getMarkdown: () => '',
-    setMarkdown: noop,
-    insertMarkdown: noop,
-    focus: noop,
-    setSelection: noop,
-    getSelectedText: () => '',
-    openSelectionMenu: noop,
-    startPendingReplacement: returnFalse,
-    appendPendingReplacementText: noop,
-    acceptPendingReplacement: noop,
-    discardPendingReplacement: noop,
-    findNext: noop,
-    findPrevious: noop,
-  }
+function editorHandle(): AttachmentInsertTarget {
+  return { insertMarkdown: noop, focus: noop }
 }
 
 describe('attachFilesToNote', () => {
   it("attaches the picked files into the routed note's editor, looked up on every call", async () => {
     const handle = editorHandle()
-    registerNoteEditorHandle('notes/plan.md', handle)
+    editors.set('notes/plan.md', handle)
     appLayer.dialog.setFiles(['/tmp/a.pdf'])
 
     await attachFilesToNote(contextFor('notes/plan.md'))
@@ -88,7 +74,7 @@ describe('attachFilesToNote', () => {
     const [request] = core.attachments.attachRequests()
     expect(request?.sources).toEqual(['/tmp/a.pdf'])
     expect(request?.findEditor()).toBe(handle)
-    unregisterNoteEditorHandle('notes/plan.md', handle)
+    editors.delete('notes/plan.md')
     expect(request?.findEditor()).toBeNull()
   })
 
@@ -97,13 +83,13 @@ describe('attachFilesToNote', () => {
     await attachFilesToNote(contextFor(null))
     await attachFilesToNote(contextFor('notes/plan.md'))
     const handle = editorHandle()
-    registerNoteEditorHandle('notes/plan.md', handle)
+    editors.set('notes/plan.md', handle)
     core.graphSession.setGraph(null)
     await attachFilesToNote(contextFor('notes/plan.md'))
     core.graphSession.setGraph({ generation: 4 })
     appLayer.dialog.setFiles(null)
     await attachFilesToNote(contextFor('notes/plan.md'))
-    unregisterNoteEditorHandle('notes/plan.md', handle)
+    editors.delete('notes/plan.md')
 
     expect(core.attachments.attachRequests()).toEqual([])
     expect(appLayer.dialog.calls()).toHaveLength(1)

@@ -1,3 +1,4 @@
+import { keybindingFor } from '@reflect/app'
 import type { TemplateEntry } from '@reflect/types'
 import { useCallback, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -23,7 +24,6 @@ import { InlineAlert } from '@/components/inline-alert.tsx'
 import { SettingsField } from './field.tsx'
 import { SettingsSection } from './section.tsx'
 import { isModEvent } from '@meowdown/core'
-import { keybindingFor } from '@/lib/commands/app-commands.ts'
 
 const PALETTE_BINDING = keybindingFor('palette.open')
 

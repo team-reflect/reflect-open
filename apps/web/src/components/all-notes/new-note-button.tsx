@@ -1,5 +1,5 @@
+import { keybindingFor, newNoteRoute } from '@reflect/app'
 import type { ReactElement } from 'react'
-import { keybindingFor, newNoteRoute } from '@/lib/commands/app-commands.ts'
 import { useRouterActions } from '@/routing/router.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 

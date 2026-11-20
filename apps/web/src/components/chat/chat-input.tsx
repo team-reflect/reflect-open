@@ -1,3 +1,4 @@
+import { keybindingFor } from '@reflect/app'
 import { useMemo, type ReactElement } from 'react'
 import { ArrowUp, Plus, Square, X } from 'lucide-react'
 import { getIsComposing } from '@meowdown/core'
@@ -22,7 +23,6 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { imageFilesFrom } from '@/lib/chat-attachments.ts'
 import { groupModelOptions } from '@/lib/chat-model-groups.ts'
-import { keybindingFor } from '@/lib/commands/app-commands.ts'
 import {
   useChatActions,
   useChatAttachments,

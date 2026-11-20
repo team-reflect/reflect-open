@@ -1,6 +1,9 @@
 import type { MaybePromise } from '@reflect/utils'
-import type { AppServices, Command, Route, NavigateOptions, Section } from '@reflect/app'
-import type { CoreServices } from '@reflect/core'
+import type { AttachmentInsertTarget, CoreServices } from '@reflect/core'
+import type { AppServices } from '../create-app-services.ts'
+import type { NavigateOptions } from '../navigation/navigation-service.ts'
+import type { Route, Section } from '../navigation/route.ts'
+import type { Command } from './command-service.ts'
 
 /**
  * The typed command contract (Plan 08): one registry powers the ⌘K palette,
@@ -14,7 +17,7 @@ export interface CommandContext {
    * The core services, for the commands that call one directly.
    */
   services: CoreServices
-  app: WebAppServices
+  app: AppServices<AppCommandId, CommandContext>
   navigate: (route: Route, options?: NavigateOptions) => void
   /**
    * Go to a section: where it was left from elsewhere, its root from within.
@@ -29,6 +32,10 @@ export interface CommandContext {
    * describes — so a command and the sidebar never target different days.
    */
   notePath: () => string | null
+  /**
+   * The mounted editor of the note at `path`, or null when none is on screen.
+   */
+  noteEditor: (path: string) => AttachmentInsertTarget | null
   /** Toggle the focused note pin with immediate shared feedback. */
   togglePin: () => MaybePromise<void>
   /** Toggle the focused note privacy with immediate shared feedback. */
@@ -114,8 +121,3 @@ export type AppCommandId =
  * A command of this app: it runs with a {@link CommandContext}.
  */
 export type AppCommand = Command<AppCommandId, CommandContext>
-
-/**
- * The app services of this app, typed with its commands.
- */
-export type WebAppServices = AppServices<AppCommandId, CommandContext>

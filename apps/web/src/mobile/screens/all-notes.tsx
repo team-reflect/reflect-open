@@ -11,6 +11,7 @@ import {
   formatDayLabel,
 } from '@reflect/core'
 import {
+  newNoteRoute,
   buildAllNotesSearch,
   pendingTagToken,
   searchPlanFor,
@@ -18,7 +19,6 @@ import {
   routeForPath,
 } from '@reflect/app'
 import { queryKeys } from '@/lib/query-client.ts'
-import { newNoteRoute } from '@/lib/commands/app-commands.ts'
 import { MobileAskRow } from '@/mobile/ask-row.tsx'
 import { useChatButton } from '@/mobile/chat-button.tsx'
 import { FilterBar } from '@/mobile/search-filters/filter-bar.tsx'

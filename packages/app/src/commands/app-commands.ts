@@ -1,8 +1,14 @@
 import type { NoteCreationService } from '@reflect/core'
-import { type Commands, type CommandService, routeForPath, type Route } from '@reflect/app'
-import { attachFilesToNote } from '@/lib/attach-files.ts'
-import { copyNoteDeepLink, copyNotePath, publishGistAndCopyLink } from '@/lib/clipboard-actions.ts'
-import type { AppCommand, AppCommandId, CommandContext, GraphSwitchPosition } from './types.ts'
+import { routeForPath, type Route } from '../navigation/route.ts'
+import type {
+  AppCommand,
+  AppCommandId,
+  CommandContext,
+  GraphSwitchPosition,
+} from './app-command.ts'
+import { attachFilesToNote } from './attach-files.ts'
+import { copyNoteDeepLink, copyNotePath, publishGistAndCopyLink } from './clipboard-actions.ts'
+import type { Commands, CommandService } from './command-service.ts'
 
 /**
  * The app commands. Each command defines its keybinding and its behavior

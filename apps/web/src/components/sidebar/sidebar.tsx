@@ -8,11 +8,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { ListIcon } from '@/components/icons/list-icon.tsx'
 import { PencilIcon } from '@/components/icons/pencil-icon.tsx'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
-import { keybindingFor } from '@/lib/commands/app-commands.ts'
 import { useToday } from '@/lib/use-today.ts'
-import type { CommandContext } from '@/lib/commands/types.ts'
 import { cn } from '@/lib/utils.ts'
-import { notePathForRoute, rootSectionForRoute } from '@reflect/app'
+import {
+  keybindingFor,
+  type CommandContext,
+  notePathForRoute,
+  rootSectionForRoute,
+} from '@reflect/app'
 import { useRouterState } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { GraphFooter } from './graph-footer.tsx'

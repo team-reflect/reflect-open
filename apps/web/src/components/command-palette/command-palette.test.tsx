@@ -1,5 +1,5 @@
 import type { MaybePromise } from '@reflect/utils'
-import { deepLinkForRoute, formatBinding } from '@reflect/app'
+import { type CommandContext, deepLinkForRoute, formatBinding } from '@reflect/app'
 import { createTestWindowService } from '@reflect/app/testing'
 import { userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,7 +17,6 @@ import {
   createTestNoteFileService,
   createTestRetrievalService,
 } from '@reflect/core/testing'
-import type { CommandContext } from '@/lib/commands/types.ts'
 import { useRouterState } from '@/routing/router.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -116,6 +115,7 @@ async function renderPalette(query: string, context?: Partial<CommandContext>) {
     app: appLayer,
     navigate,
     route: () => ({ kind: 'today' }),
+    noteEditor: returnNull,
     notePath: returnNull,
     back: vi.fn(),
     forward: vi.fn(),

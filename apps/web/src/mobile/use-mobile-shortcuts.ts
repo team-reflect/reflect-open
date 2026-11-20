@@ -1,7 +1,6 @@
+import { newNoteRoute, type AppCommandId } from '@reflect/app'
 import { useEffect } from 'react'
 import { getIsComposing } from '@meowdown/core'
-import { newNoteRoute } from '@/lib/commands/app-commands.ts'
-import type { AppCommandId } from '@/lib/commands/types.ts'
 import { quickOpenVisible } from '@/mobile/quick-open.tsx'
 import { openChat } from '@/mobile/sidebar.ts'
 import { useRouterActions } from '@/routing/router.tsx'

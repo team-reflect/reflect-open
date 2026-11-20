@@ -1,7 +1,6 @@
 import { EDITOR_BINDING_DESCRIPTIONS } from '@/editor/keymap.ts'
-import { APP_COMMANDS } from '@/lib/commands/app-commands.ts'
 import { isNotNullish } from '@ocavue/utils'
-import type { KeymapService } from '@reflect/app'
+import { APP_COMMANDS, type KeymapService } from '@reflect/app'
 
 /** One row of a shortcuts listing: a binding and what it does. */
 export interface Shortcut {

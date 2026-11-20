@@ -1,10 +1,10 @@
+import type { CommandContext } from '@reflect/app'
 import { useState, type ReactElement } from 'react'
 import { useForm } from 'react-hook-form'
 import { errorMessage } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { InlineAlert } from '@/components/inline-alert.tsx'
-import type { CommandContext } from '@/lib/commands/types.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 interface TemplateCreateFormProps {

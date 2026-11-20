@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createTestWindowService, type TestWindowService } from '@reflect/app/testing'
 import { buildIndexedNote, parseNote } from '@reflect/core'
 import {
   createTestDatabaseService,
@@ -10,11 +9,14 @@ import {
   type TestEmbeddingIndexService,
   type TestEmbeddingRuntimeService,
 } from '@reflect/core/testing'
-import { deepLinkForRoute, notePathForRoute, type Route, type NavigateOptions } from '@reflect/app'
+import { deepLinkForRoute } from '../navigation/deep-link-format.ts'
+import type { NavigateOptions } from '../navigation/navigation-service.ts'
+import { notePathForRoute, type Route } from '../navigation/route.ts'
+import { createTestAppServices } from '../testing/services.ts'
+import { createTestWindowService, type TestWindowService } from '../testing/window.ts'
+import type { AppCommandId, CommandContext } from './app-command.ts'
 import { APP_COMMANDS, keybindingFor } from './app-commands.ts'
-import type { CommandContext } from './types.ts'
-import { noop } from '@ocavue/utils'
-import { createWebTestAppServices } from '@/test-utils/app-services.ts'
+import { noop, returnNull } from '@ocavue/utils'
 
 const TODAY = '2026-06-09'
 
@@ -56,7 +58,7 @@ function fakeContext(overrides?: Partial<CommandContext>) {
   const navigated: Route[] = []
   const navigateOptions: (NavigateOptions | undefined)[] = []
   const route: () => Route = overrides?.route ?? (() => ({ kind: 'today' }))
-  const appLayer = createWebTestAppServices(core, { window: windows })
+  const appLayer = createTestAppServices<AppCommandId, CommandContext>(core, { window: windows })
   const context: CommandContext = {
     services: core,
     app: appLayer,
@@ -65,6 +67,7 @@ function fakeContext(overrides?: Partial<CommandContext>) {
       navigateOptions.push(options)
     },
     route,
+    noteEditor: returnNull,
     // Mirror the real context: note-scoped commands resolve their target from
     // the route (the focused-day branch is exercised in app-shortcuts).
     notePath: () => notePathForRoute(route(), TODAY),

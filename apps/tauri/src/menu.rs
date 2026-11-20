@@ -38,7 +38,7 @@
 //! # Why the webview triggers this, and only after the menu is installed
 //!
 //! The frontend replaces the whole app menu at startup: `installNativeMenu`
-//! (`apps/web/src/lib/native-menu/menu.ts`) builds its own menu and
+//! (`packages/app/src/commands/app-menu.ts`) builds its own menu and
 //! calls `Menu.setAsAppMenu` from `@tauri-apps/api/menu`
 //! (https://github.com/tauri-apps/tauri/blob/@tauri-apps/api-v2.11.1/packages/api/src/menu/menu.ts#L237),
 //! which installs it as the new `NSApp.mainMenu` on the Rust side

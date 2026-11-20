@@ -1,5 +1,4 @@
-import { noteEditorHandleFor } from '@/editor/editor-handle-registry.ts'
-import type { CommandContext } from '@/lib/commands/types.ts'
+import type { CommandContext } from './app-command.ts'
 
 /**
  * The Attach file… command for the routed note: the native file picker, then
@@ -13,7 +12,7 @@ export async function attachFilesToNote(context: CommandContext): Promise<void> 
   }
   const { attachments, graphSession } = context.services
   const { dialog } = context.app
-  const findEditor = () => noteEditorHandleFor(notePath)
+  const findEditor = () => context.noteEditor(notePath)
   const { session } = graphSession.get()
   if (session === null || findEditor() === null) {
     return

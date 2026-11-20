@@ -1,7 +1,7 @@
+import type { WebAppServices } from '@/services/services-provider.tsx'
 import { Profiler, type ReactElement, type ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
 import { describe, expect, it, vi } from 'vitest'
-import type { WebAppServices } from '@/lib/commands/types.ts'
 import { createTestDialogService } from '@reflect/app/testing'
 import type {
   AppPlatform,

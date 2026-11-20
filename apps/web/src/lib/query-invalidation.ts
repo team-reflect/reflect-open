@@ -1,4 +1,4 @@
-import type { WebAppServices } from '@/lib/commands/types.ts'
+import type { WebAppServices } from '@/services/services-provider.tsx'
 import type { CoreServices, Unlisten } from '@reflect/core'
 import {
   dropIcloudStatusQuery,

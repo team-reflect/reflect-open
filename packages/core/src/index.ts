@@ -91,6 +91,7 @@ export { normalizeWikiTarget } from './markdown/resolve.ts'
 export {
   createAttachmentService,
   type AssetSaveError,
+  type AttachmentInsertTarget,
   type AttachmentService,
 } from './documents/attachment-service.ts'
 export {

@@ -1,8 +1,8 @@
+import { keybindingFor } from '@reflect/app'
 import type { ReactElement } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
-import { keybindingFor } from '@/lib/commands/app-commands.ts'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
 const BACK_BINDING = keybindingFor('history.back')

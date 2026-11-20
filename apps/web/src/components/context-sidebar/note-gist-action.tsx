@@ -1,3 +1,4 @@
+import { publishGistAndCopyLink } from '@reflect/app'
 import { useCallback, useState, useTransition, type ReactElement } from 'react'
 import { CloudOff, CloudUpload } from 'lucide-react'
 import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
@@ -5,7 +6,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useNoteRowOverlay } from '@/hooks/note-row-overlay.ts'
 import { useGithubConnected } from '@/hooks/use-github-connected.ts'
 import { useNoteRow } from '@/hooks/use-note-row.ts'
-import { publishGistAndCopyLink } from '@/lib/clipboard-actions.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 type GistKind = 'publish' | 'unpublish'

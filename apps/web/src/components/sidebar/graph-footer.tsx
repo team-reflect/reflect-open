@@ -1,3 +1,4 @@
+import { isGraphSwitchPosition, keybindingFor, type CommandContext } from '@reflect/app'
 import { useRef, useState, type ReactElement } from 'react'
 import type { GraphInfo, GitSyncState } from '@reflect/core'
 import { FolderOpen, GraduationCap, LocateFixed, PanelsTopLeft, Settings } from 'lucide-react'
@@ -16,8 +17,6 @@ import {
 } from '@/components/ui/dropdown-menu.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { useGraphColors } from '@/hooks/use-graph-colors.ts'
-import { isGraphSwitchPosition, keybindingFor } from '@/lib/commands/app-commands.ts'
-import type { CommandContext } from '@/lib/commands/types.ts'
 import { useSelector } from '@/lib/use-store.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraphActions, useGraphIndexing, useGraphRecents } from '@/providers/graph-provider.tsx'

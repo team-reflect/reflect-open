@@ -122,6 +122,21 @@ export {
   weekOf,
   type WeekWindow,
 } from './daily/week-window.ts'
+export {
+  type AppCommand,
+  type AppCommandId,
+  type CommandContext,
+  type GraphSwitchPosition,
+} from './commands/app-command.ts'
+export {
+  APP_COMMANDS,
+  isGraphSwitchPosition,
+  keybindingFor,
+  newNoteRoute,
+  registerAppCommands,
+} from './commands/app-commands.ts'
+export { installNativeMenu } from './commands/app-menu.ts'
+export { publishGistAndCopyLink } from './commands/clipboard-actions.ts'
 export { type Command, type Commands, type CommandService } from './commands/command-service.ts'
 export { formatBinding } from './commands/keybindings.ts'
 export { type KeymapService } from './commands/keymap-service.ts'

@@ -1,9 +1,9 @@
+import type { WebAppServices } from '@/services/services-provider.tsx'
 import type { ReactElement, ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { onTestFinished } from 'vitest'
 import { render, renderHook, type RenderHookResult, type RenderResult } from 'vitest-browser-react'
-import type { MobileOnboardingState, Route } from '@reflect/app'
-import type { WebAppServices } from '@/lib/commands/types.ts'
+import { registerAppCommands, type MobileOnboardingState, type Route } from '@reflect/app'
 import { createTestOperationsService } from '@reflect/app/testing'
 import type {
   CoreServices,
@@ -29,7 +29,6 @@ import {
   type TestPlatformOptions,
 } from '@reflect/core/testing'
 import { TooltipProvider } from '@/components/ui/tooltip.tsx'
-import { registerAppCommands } from '@/lib/commands/app-commands.ts'
 import { ChromeRendererProvider } from '@/mobile/chrome/chrome-renderer-provider.tsx'
 import { GraphProvider } from '@/providers/graph-provider.tsx'
 import { RouterProvider } from '@/routing/router.tsx'

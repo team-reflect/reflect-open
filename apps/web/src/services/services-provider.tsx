@@ -1,6 +1,11 @@
 import { createContext, use, type ReactElement, type ReactNode } from 'react'
-import type { WebAppServices } from '@/lib/commands/types.ts'
+import type { AppCommandId, AppServices, CommandContext } from '@reflect/app'
 import type { CoreServices, GraphServices } from '@reflect/core'
+
+/**
+ * The app services of this app, typed with its commands.
+ */
+export type WebAppServices = AppServices<AppCommandId, CommandContext>
 
 const CoreServicesContext = createContext<CoreServices | null>(null)
 const AppServicesContext = createContext<WebAppServices | null>(null)

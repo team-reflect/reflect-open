@@ -1,3 +1,4 @@
+import type { CommandContext } from '@reflect/app'
 import { createTestAppServices } from '@reflect/app/testing'
 import type { ReactElement } from 'react'
 import { page } from 'vitest/browser'
@@ -7,7 +8,6 @@ import {
   createTestCoreServices,
   type TestCoreServices,
 } from '@reflect/core/testing'
-import type { CommandContext } from '@/lib/commands/types.ts'
 import { NoteTemplatesProvider, useNoteTemplates } from '@/providers/note-templates-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { TemplateCreateDialog } from './template-create-dialog.tsx'
@@ -30,6 +30,7 @@ async function renderDialog(): Promise<{ context: CommandContext; core: TestCore
     app: createTestAppServices(core),
     navigate: vi.fn(),
     route: () => ({ kind: 'today' }),
+    noteEditor: returnNull,
     notePath: returnNull,
     back: vi.fn(),
     forward: vi.fn(),
