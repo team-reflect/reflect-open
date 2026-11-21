@@ -35,6 +35,22 @@ export function useCommands(handlers: CommandHandlers): void {
   }, [commands, ids])
 }
 
+export function useCommandHandler_WIP(
+  id: AppCommandId,
+  handler: CommandHandler | undefined | null,
+): void {
+  const { commands } = useAppServices()
+
+  useEffect(() => {
+    const controller = new AbortController()
+    if (!handler) {
+      return
+    }
+    commands.handle(id, handler, controller.signal)
+    return () => controller.abort()
+  }, [id, handler, commands])
+}
+
 /**
  * Stop keys and menu items from running any command except `allow` while
  * `active` is true. A modal screen blocks while it is open.

@@ -9,7 +9,8 @@ import {
 import type { CoreServices } from '@reflect/core'
 import { noteEditorHandleFor } from '@/editor/editor-handle-registry.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
-import { useCommands, type CommandHandlers } from './use-commands.ts'
+import { useCommandHandler_WIP, useCommands, type CommandHandlers } from './use-commands.ts'
+import { useMemo } from 'react'
 
 function noteCommandHandlers(
   services: CoreServices,
@@ -17,11 +18,11 @@ function noteCommandHandlers(
   path: string,
 ): CommandHandlers {
   return {
-    // Converting the path back to a route also canonicalizes Today to a dated
-    // daily link, so every way of opening the day dedupes to the same window.
-    'note.openInNewWindow': async () => {
-      await app.linkNavigation.openRouteInNewWindow(routeForPath(path))
-    },
+    // // Converting the path back to a route also canonicalizes Today to a dated
+    // // daily link, so every way of opening the day dedupes to the same window.
+    // 'note.openInNewWindow': async () => {
+    //   await app.linkNavigation.openRouteInNewWindow(routeForPath(path))
+    // },
     // `togglePinned` updates the shared note rows before the file write, so
     // every pin surface reacts at once.
     'note.togglePin': async () => {
@@ -30,9 +31,9 @@ function noteCommandHandlers(
     'note.togglePrivate': async () => {
       await services.noteActions.togglePrivate(path)
     },
-    // `GistPublishService.publish` owns the progress line and the failure
-    // surface; `publishGistAndCopyLink` owns the "link copied" confirmation.
-    'note.publishGist': () => publishGistAndCopyLink(services, app, path),
+    // // `GistPublishService.publish` owns the progress line and the failure
+    // // surface; `publishGistAndCopyLink` owns the "link copied" confirmation.
+    // 'note.publishGist': () => publishGistAndCopyLink(services, app, path),
     // Native file picker, then a markdown link per file at the caret: the
     // keyboard-native twin of dropping a file on the note.
     'note.attachFile': () => {
@@ -53,5 +54,31 @@ function noteCommandHandlers(
 export function useNoteCommands(path: string | null): void {
   const services = useCoreServices()
   const app = useAppServices()
-  useCommands(path === null ? {} : noteCommandHandlers(services, app, path))
+
+  useCommandHandler_WIP(
+    'note.openInNewWindow',
+    useMemo(() => {
+      if (path === null) return
+      return async () => {
+        await app.linkNavigation.openRouteInNewWindow(routeForPath(path))
+      }
+    }, [app, path]),
+  )
+
+  useCommandHandler_WIP(
+    'note.publishGist',
+    useMemo(() => {
+      if (path === null) return
+
+      return async () => {
+        await app.linkNavigation.openRouteInNewWindow(routeForPath(path))
+      }
+    }, [app, path]),
+  )
+
+  const commands: CommandHandlers = useMemo(
+    () => (path === null ? {} : noteCommandHandlers(services, app, path)),
+    [services, app, path],
+  )
+  useCommands(commands)
 }
