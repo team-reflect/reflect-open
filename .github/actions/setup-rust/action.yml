@@ -9,7 +9,7 @@ inputs:
   cache-targets:
     description: Whether to cache the target directory.
     required: false
-    default: 'false'
+    default: 'true'
   s3-endpoint:
     description: S3 endpoint of the sccache bucket.
     required: false
@@ -43,8 +43,7 @@ runs:
       shell: bash
       run: rustc --version --verbose
 
-    # ort-sys downloads prebuilt ONNX Runtime binaries into ORT_CACHE_DIR.
-    # Caching it skips the download.
+    # `ort-sys` downloads prebuilt ONNX Runtime binaries into ORT_CACHE_DIR.
     # ORT_CACHE_DIR is documented in the v2.0.0-rc.11 release notes:
     # https://github.com/pykeio/ort/releases/tag/v2.0.0-rc.11
     - name: Set the ONNX Runtime cache dir
@@ -65,16 +64,16 @@ runs:
         S3_ACCESS_KEY_ID: ${{ inputs.s3-access-key-id }}
         S3_SECRET_ACCESS_KEY: ${{ inputs.s3-secret-access-key }}
       run: |
-        echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
         echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
         echo "SCCACHE_IDLE_TIMEOUT=0" >> "$GITHUB_ENV"
 
-        # Look up the local disk first, then the GitHub Actions cache, then S3.
+        # Look up the local disk first, then S3.
         # https://github.com/mozilla/sccache/blob/v0.19.0/docs/MultiLevel.md
         # https://github.com/mozilla/sccache/blob/v0.19.0/docs/S3.md
         echo "SCCACHE_DIR=$RUNNER_TEMP/sccache" >> "$GITHUB_ENV"
         if [ -n "$S3_ENDPOINT" ] && [ -n "$S3_BUCKET" ] && [ -n "$S3_ACCESS_KEY_ID" ] && [ -n "$S3_SECRET_ACCESS_KEY" ]; then
-          echo "SCCACHE_MULTILEVEL_CHAIN=disk,gha,s3" >> "$GITHUB_ENV"
+          echo "Found S3 secrets: sccache uses the local disk first, then S3."
+          echo "SCCACHE_MULTILEVEL_CHAIN=disk,s3" >> "$GITHUB_ENV"
           echo "SCCACHE_ENDPOINT=$S3_ENDPOINT" >> "$GITHUB_ENV"
           echo "SCCACHE_BUCKET=$S3_BUCKET" >> "$GITHUB_ENV"
           echo "SCCACHE_REGION=auto" >> "$GITHUB_ENV"
@@ -82,24 +81,28 @@ runs:
           echo "AWS_ACCESS_KEY_ID=$S3_ACCESS_KEY_ID" >> "$GITHUB_ENV"
           echo "AWS_SECRET_ACCESS_KEY=$S3_SECRET_ACCESS_KEY" >> "$GITHUB_ENV"
         else
-          echo "No S3 secrets: sccache uses the disk and the GitHub Actions cache only."
-          echo "SCCACHE_MULTILEVEL_CHAIN=disk,gha" >> "$GITHUB_ENV"
+          echo "No S3 secrets: sccache uses the local disk only."
         fi
 
         # Without this, sccache writes a probe file before every write, and a
         # rate-limited probe makes it skip the write.
         echo "SCCACHE_SKIP_CACHE_CHECK=true" >> "$GITHUB_ENV"
 
-        # Upload to the remote caches only on master.
+        # Upload only on master.
         if [ "$GITHUB_REF" != "refs/heads/master" ]; then
-          echo "SCCACHE_GHA_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
           echo "SCCACHE_S3_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
         fi
+
+    - name: Cache ONNX Runtime
+      if: inputs.cache == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ env.ORT_CACHE_DIR }}
+        key: ort-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
 
     - name: Cache cargo registry
       if: inputs.cache == 'true'
       uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       with:
         cache-targets: ${{ inputs.cache-targets }}
-        cache-directories: ${{ env.ORT_CACHE_DIR }}
         save-if: ${{ github.ref == 'refs/heads/master' }}
