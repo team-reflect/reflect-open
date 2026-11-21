@@ -32,9 +32,8 @@ pub const LATEST_SCHEMA_VERSION: usize = 23;
 ///
 /// Keep it for an additive migration: new tables, indexes, or columns that an
 /// older app's inserts can omit. Set it to the new version for anything else.
-/// Data the indexer fills needs a `PROJECTION_VERSION` bump, and a new derived
-/// table needs `REFERENCES notes(path) ON DELETE CASCADE`, so rows an older
-/// app writes get rebuilt or wiped.
+/// Data the indexer fills needs a `PROJECTION_VERSION` bump; a new derived
+/// table needs `ON DELETE CASCADE` to `notes(path)`.
 pub const MIN_COMPATIBLE_SCHEMA_VERSION: usize = 23;
 
 /// The `index_meta` key holding [`MIN_COMPATIBLE_SCHEMA_VERSION`].
@@ -98,7 +97,7 @@ mod schema {
 
     use rusqlite::ffi::{sqlite3, sqlite3_api_routines};
     use rusqlite::{Connection, Transaction};
-    use rusqlite_migration::{HookResult, M, Migrations};
+    use rusqlite_migration::{HookResult, M, MigrationDefinitionError, Migrations};
 
     const UPSERT_STAMP: &str = "INSERT INTO index_meta(key, value) VALUES (?1, ?2) \
          ON CONFLICT(key) DO UPDATE SET value = excluded.value";
@@ -238,18 +237,26 @@ mod schema {
         Ok(conn)
     }
 
-    /// Migrates to the latest schema and stamps
-    /// [`MIN_COMPATIBLE_SCHEMA_VERSION`] in the same transaction. A newer index
-    /// is never written: it is used unchanged when its stamp allows this app,
-    /// else [`SchemaError::TooNew`].
+    /// Migrates to the latest schema; each migration stamps
+    /// [`MIN_COMPATIBLE_SCHEMA_VERSION`]. A newer index is never written: it is
+    /// used unchanged when its stamp allows this app, else [`SchemaError::TooNew`].
     ///
     /// [`MIN_COMPATIBLE_SCHEMA_VERSION`]: crate::MIN_COMPATIBLE_SCHEMA_VERSION
     pub fn migrate(conn: &mut Connection) -> Result<(), SchemaError> {
-        if let Err(err) = MIGRATIONS.to_latest(conn) {
-            if crate::read_user_version(conn)? > crate::LATEST_SCHEMA_VERSION {
-                return accept_newer(conn);
+        match MIGRATIONS.to_latest(conn) {
+            Ok(()) => {}
+            Err(rusqlite_migration::Error::MigrationDefinition(
+                MigrationDefinitionError::DatabaseTooFarAhead,
+            )) => {
+                if crate::is_compatible_schema(conn)? {
+                    return Ok(());
+                }
+                return Err(SchemaError::TooNew {
+                    found: crate::read_user_version(conn)?,
+                    supported: crate::LATEST_SCHEMA_VERSION,
+                });
             }
-            return Err(SchemaError::Migration(err.to_string()));
+            Err(err) => return Err(SchemaError::Migration(err.to_string())),
         }
         // An index that was already current may predate the stamp. The guard
         // skips it when a newer app migrated it since `to_latest`.
@@ -267,16 +274,6 @@ mod schema {
             )?;
         }
         Ok(())
-    }
-
-    fn accept_newer(conn: &Connection) -> Result<(), SchemaError> {
-        if crate::is_compatible_schema(conn)? {
-            return Ok(());
-        }
-        Err(SchemaError::TooNew {
-            found: crate::read_user_version(conn)?,
-            supported: crate::LATEST_SCHEMA_VERSION,
-        })
     }
 
     /// Stop at schema `version`, so schema-evolution tests can stage data in an
@@ -380,8 +377,8 @@ mod schema {
 
         fn set_min_compatible(conn: &Connection, version: usize) {
             conn.execute(
-                "UPDATE index_meta SET value = ?1 WHERE key = ?2",
-                (version.to_string(), crate::MIN_COMPATIBLE_SCHEMA_KEY),
+                UPSERT_STAMP,
+                (crate::MIN_COMPATIBLE_SCHEMA_KEY, version.to_string()),
             )
             .unwrap();
         }
@@ -395,19 +392,13 @@ mod schema {
         }
 
         #[test]
-        fn migrate_stamps_the_min_compatible_schema() {
+        fn a_current_index_without_a_stamp_gets_one() {
             let mut conn = open_in_memory().unwrap();
             migrate(&mut conn).unwrap();
             assert_eq!(
                 crate::read_min_compatible_schema(&conn).unwrap(),
                 Some(crate::MIN_COMPATIBLE_SCHEMA_VERSION)
             );
-        }
-
-        #[test]
-        fn a_current_index_without_a_stamp_gets_one() {
-            let mut conn = open_in_memory().unwrap();
-            migrate(&mut conn).unwrap();
             delete_min_compatible(&conn);
 
             migrate(&mut conn).unwrap();

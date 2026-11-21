@@ -23,8 +23,7 @@ use crate::note_file::{read_note_text, walk_notes};
 /// A successfully-opened read-only index.
 pub struct OpenIndex {
     pub conn: Connection,
-    /// The index is from a newer, incompatible schema — queries
-    /// against the stable subset are attempted, but callers should warn.
+    /// The index schema is newer and incompatible; callers should warn.
     pub newer_schema: bool,
 }
 
