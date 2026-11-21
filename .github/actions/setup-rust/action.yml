@@ -44,7 +44,7 @@ runs:
       run: rustc --version --verbose
 
     # ort-sys downloads prebuilt ONNX Runtime binaries into ORT_CACHE_DIR.
-    # Caching it skips the download.
+    # The "Cache ONNX Runtime" step below caches it.
     # ORT_CACHE_DIR is documented in the v2.0.0-rc.11 release notes:
     # https://github.com/pykeio/ort/releases/tag/v2.0.0-rc.11
     - name: Set the ONNX Runtime cache dir
@@ -94,10 +94,18 @@ runs:
           echo "SCCACHE_S3_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
         fi
 
+    # ONNX Runtime depends only on the runner and the ort-sys version, so all
+    # jobs on the same runner share one entry. The post step saves it on a miss.
+    - name: Cache ONNX Runtime
+      if: inputs.cache == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ env.ORT_CACHE_DIR }}
+        key: v1-ort-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
+
     - name: Cache cargo registry
       if: inputs.cache == 'true'
       uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       with:
         cache-targets: ${{ inputs.cache-targets }}
-        cache-directories: ${{ env.ORT_CACHE_DIR }}
         save-if: ${{ github.ref == 'refs/heads/master' }}
