@@ -33,6 +33,8 @@ pub enum AppError {
     Auth { message: String },
     /// The remote is unreachable (offline, DNS, timeout) — retryable.
     Network { message: String },
+    /// The graph's index comes from a newer app whose schema this app cannot use.
+    IndexTooNew { message: String },
     /// Anything not covered above.
     Unknown { message: String },
 }
@@ -88,6 +90,7 @@ impl AppError {
             | Self::Parse { message }
             | Self::Auth { message }
             | Self::Network { message }
+            | Self::IndexTooNew { message }
             | Self::Unknown { message } => message,
         }
     }
