@@ -217,7 +217,10 @@ export const APP_COMMANDS = {
     // Finder's Copy-as-Pathname chord.
     keybinding: 'Alt-Mod-c',
   },
-  'note.random': { title: 'Open random note', keywords: ['shuffle', 'serendipity'] },
+  'note.random': {
+    title: 'Open random note',
+    keywords: ['shuffle', 'serendipity'],
+  },
   'template.insert': {
     title: 'Insert template…',
     keywords: ['snippet', 'boilerplate', 'stamp'],
