@@ -254,8 +254,9 @@ describe('createIndexLifecycleService', () => {
   it('open() shows a lasting notice when a newer app owns the index', async () => {
     let tooNew = true
     const { index, operations } = setup({
-      failStore: (call) =>
-        call.method === 'open' && tooNew ? new AppError('indexTooNew', 'too new') : undefined,
+      failStore: (call) => {
+        return call.method === 'open' && tooNew ? new AppError('indexTooNew', 'too new') : undefined
+      },
     })
     expect(await index.open()).toBeNull()
     expect(operations.snapshot()).toEqual([
