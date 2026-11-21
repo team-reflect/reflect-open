@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { setBottomScrollInset } from './bottom-scroll-inset.ts'
 import { useFormattingToolbar, type FormattingToolbar } from './formatting-toolbar-store.ts'
 import { NoteEditor, type NoteEditorHandle } from './note-editor.tsx'
 
@@ -63,6 +64,7 @@ async function setupEditor(
 
 afterEach(() => {
   captured.toolbar = null
+  setBottomScrollInset(0)
 })
 
 describe('FormattingToolbarBridge', () => {
@@ -208,5 +210,36 @@ describe('FormattingToolbarBridge', () => {
 
     await setup.rerender(false)
     await expect.element(toolbarState).toMatchTextContent('no-toolbar')
+  })
+
+  it('reveals the caret above the bottom scroll inset', async () => {
+    const lines = Array.from({ length: 30 }, (_, index) => `line ${index + 1}`)
+    await renderInApp(
+      <div data-testid="scroller" style={{ height: 300, overflowY: 'auto' }}>
+        <NoteEditor initialContent={lines.join('\n\n')} onWikilinkSearch={() => []} />
+        <ToolbarProbe />
+      </div>,
+      { platform: { surface: { touchEditor: true } } },
+    )
+    const scroller = page.getByTestId('scroller').element()
+    const bottom = scroller.getBoundingClientRect().bottom
+    const target = [...pmRoot.element().querySelectorAll('p')].find((paragraph) => {
+      const rect = paragraph.getBoundingClientRect()
+      return rect.top > bottom - 120 && rect.bottom < bottom
+    })
+    if (target === undefined) {
+      throw new Error('no paragraph near the bottom of the scroller')
+    }
+    await page.elementLocator(target).click()
+    await expect.element(toolbarState).toMatchTextContent('has-toolbar')
+
+    captured.toolbar?.commands.scrollCaretIntoView()
+    expect(scroller.scrollTop).toBe(0)
+
+    setBottomScrollInset(200)
+    captured.toolbar?.commands.scrollCaretIntoView()
+    await vi.waitFor(() => {
+      expect(target.getBoundingClientRect().bottom).toBeLessThanOrEqual(bottom - 200)
+    })
   })
 })

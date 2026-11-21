@@ -214,7 +214,7 @@ export function useBackPager({
       })
     }
 
-    // A finger on the pager owns its position, even when the keyboard or the
+    // A finger on the pager owns its position, even when rotation or the
     // safe area resizes it mid-swipe.
     const resize = new ResizeObserver(() => {
       if (!watch.isTouching() && scroller.scrollLeft > REVEALED_PX) {

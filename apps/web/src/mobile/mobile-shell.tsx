@@ -70,16 +70,13 @@ export function MobileShell(): ReactElement {
 
   return (
     <SafeAreaBoundary>
-      {/* The shell yields to the software keyboard by height (Plan 19,
-          decision 8): the root ends at the keyboard's top, so every screen's
-          layout sees the true visible viewport. Only `position: fixed`
-          elements need `--keyboard-height` themselves. */}
+      {/* The software keyboard covers the bottom of the shell (Plan 19,
+          decision 8, refined): the root keeps the full height, and each
+          scroller or bottom element clears `--keyboard-height` itself, so the
+          page shows through the keyboard. */}
       <div
-        className="mobile-shell flex w-screen flex-col"
-        style={{
-          ...chromeRenderer.shellStyle(form),
-          height: 'calc(100dvh - var(--keyboard-height, 0px))',
-        }}
+        className="mobile-shell flex h-dvh w-screen flex-col"
+        style={chromeRenderer.shellStyle(form)}
       >
         <div className="min-h-0 flex-1">
           {/* A stable boundary lets route transitions retain the current screen while lazy code loads. */}

@@ -191,11 +191,14 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
         // Loading only gates what would otherwise be a false empty state: with
         // archived flipping on, the open groups keep showing while the
         // completed history loads (desktop likewise gates only the message).
-        <div className="flex flex-1 items-center justify-center px-safe" aria-label="Loading tasks">
+        <div
+          className="flex flex-1 items-center justify-center px-safe pb-keyboard"
+          aria-label="Loading tasks"
+        >
           <Spinner className="size-5 text-text-muted" />
         </div>
       ) : groups.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-safe text-text-muted">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-safe pb-keyboard text-text-muted">
           <CircleCheck className="size-6" />
           <p className="text-sm">{needle ? 'No matching tasks' : 'No tasks to show'}</p>
           {needle === '' ? (
@@ -208,7 +211,7 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
         <div
           // A stacking context, so WebKit composites the sticky headers and row
           // surfaces inside this scroller, below the iOS scroll indicator.
-          className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-chrome-safe-offset-24"
+          className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-chrome-safe-or-keyboard-offset-24"
           ref={listRef}
           onScroll={(event) => {
             revealedRow.set(null)

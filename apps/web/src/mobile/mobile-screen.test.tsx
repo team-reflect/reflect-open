@@ -12,10 +12,6 @@ import {
   createTestSecretStoreService,
   type TestCoreServices,
 } from '@reflect/core/testing'
-import {
-  clearFormattingToolbar,
-  publishFormattingToolbar,
-} from '@/editor/formatting-toolbar-store.ts'
 import { useRouterActions } from '@/routing/router.tsx'
 import { addDaysToIsoDate, getYearMonth, getIsoToday } from '@reflect/utils'
 import {
@@ -647,49 +643,6 @@ describe('MobileShell', () => {
     expect(view.getByRole('navigation', { name: 'Sections' }).query()).toBeNull()
 
     await act(() => appServices.keyboard.publish(0))
-    await expect.element(view.getByRole('navigation', { name: 'Sections' })).toBeVisible()
-  })
-
-  it('gives the tab bar slot to the formatting toolbar only while an editor is focused', async () => {
-    const view = await mount({ kind: 'today' })
-    const owner = Symbol('shell-test')
-
-    // Keyboard up with no focused editor (the All-tab search field): neither
-    // the tab bar nor a dead-button toolbar.
-    await act(() => appServices.keyboard.publish(316))
-    expect(view.getByRole('toolbar', { name: 'Formatting' }).query()).toBeNull()
-
-    await act(() => {
-      publishFormattingToolbar(owner, {
-        capabilities: {
-          canIndent: true,
-          canDedent: false,
-          canMoveUp: true,
-          canMoveDown: true,
-          canAttachFiles: false,
-        },
-        commands: {
-          cycleBulletOrderedList: vi.fn(),
-          cycleCheckableList: vi.fn(),
-          indent: vi.fn(),
-          dedent: vi.fn(),
-          moveUp: vi.fn(),
-          moveDown: vi.fn(),
-          insertTrigger: vi.fn(),
-          dismissKeyboard: vi.fn(),
-          attachFiles: vi.fn(),
-          scrollCaretIntoView: vi.fn(),
-        },
-      })
-    })
-    await expect.element(view.getByRole('toolbar', { name: 'Formatting' })).toBeVisible()
-    expect(view.getByRole('navigation', { name: 'Sections' }).query()).toBeNull()
-
-    await act(() => {
-      clearFormattingToolbar(owner)
-      appServices.keyboard.publish(0)
-    })
-    expect(view.getByRole('toolbar', { name: 'Formatting' }).query()).toBeNull()
     await expect.element(view.getByRole('navigation', { name: 'Sections' })).toBeVisible()
   })
 

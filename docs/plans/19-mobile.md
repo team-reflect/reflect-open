@@ -278,6 +278,19 @@ later on the height events.
 > The tab bar hides while the keyboard is up — V1 let the keyboard cover it,
 > and above the keyboard it would just eat typing space.
 
+> **Refined 2026-11-17: the keyboard covers the shell.** The root keeps
+> `100dvh`; the iOS 26 keyboard is translucent, so the page now shows
+> through it. Scrollers pad past `--keyboard-height`
+> (`pb-safe-plus-keyboard`), bottom elements use
+> `pb-chrome-safe-or-keyboard-offset-*`, centered empty states use
+> `pb-keyboard`, and the editor's caret reveal keeps above the keyboard with
+> a bottom `scrollThreshold` / `scrollMargin` (`editor/bottom-scroll-inset.ts`).
+> PR #477's popup problem no longer applies: floating-ui (1.8) and Base UI
+> clip to `visualViewport`, which already excludes the keyboard and the
+> native formatting capsule in its frame. The webview-drawn toolbar is
+> removed: it was a DOM element inside the visual viewport, so popups would
+> overlap it, and the iOS shell draws its own toolbar.
+
 ### 9. App identity & store
 
 The iOS template now carries the product identity (`app.reflect.ios`, product

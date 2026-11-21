@@ -25,9 +25,8 @@ import { useRouterState } from '@/routing/router.tsx'
  * session's draft — provider state, so a half-typed message survives tab
  * switches — with a photo-picker attach button, the model trigger (a bottom
  * sheet, not desktop's dropdown), and send/stop. Enter inserts a newline;
- * sending is the button, the mobile convention. The textarea never registers
- * with the formatting-toolbar store, so the shell's keyboard slot stays
- * empty and the composer lands on the keyboard's top edge (contract 6).
+ * sending is the button, the mobile convention. While the keyboard is up, the
+ * bottom padding lifts the composer to the keyboard's top edge (contract 6).
  */
 export function MobileChatComposer(): ReactElement {
   const { arrivalSeq, arrivalFocusEditor } = useRouterState()
@@ -52,7 +51,7 @@ export function MobileChatComposer(): ReactElement {
   }
 
   return (
-    <div className="shrink-0 border-t border-border px-safe-offset-3 pt-2 pb-chrome-safe-unless-keyboard-offset-2">
+    <div className="shrink-0 border-t border-border px-safe-offset-3 pt-2 pb-chrome-safe-or-keyboard-offset-2">
       {attachments.length > 0 ? (
         <AttachmentGroup className="flex-wrap gap-2 overflow-visible pb-1">
           {attachments.map((attachment) => (
