@@ -18,7 +18,6 @@ import {
   routeForPath,
 } from '@reflect/app'
 import { queryKeys } from '@/lib/query-client.ts'
-import { newNoteRoute } from '@/lib/commands/app-commands.ts'
 import { MobileAskRow } from '@/mobile/ask-row.tsx'
 import { useChatButton } from '@/mobile/chat-button.tsx'
 import { FilterBar } from '@/mobile/search-filters/filter-bar.tsx'
@@ -157,7 +156,7 @@ export function MobileAllNotes({
         plus={{
           kind: 'action',
           label: 'New note',
-          onTap: () => navigate(newNoteRoute(noteCreation)),
+          onTap: () => navigate({ kind: 'note', path: noteCreation.untitledNotePath() }),
         }}
         search={{
           value: query,

@@ -1,3 +1,4 @@
+import { createTestAppServices } from '@reflect/app/testing'
 import { page } from 'vitest/browser'
 import { describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { MobileOnboardingService } from '@reflect/app'
@@ -11,7 +12,6 @@ import {
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { MobileOnboardingScreen } from './onboarding-screen.tsx'
-import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
 const STORAGE: MobileStorageInfo = {
   localRoot: '/Documents',
@@ -34,7 +34,7 @@ async function mount(options?: {
     platform: createTestPlatformService(MOBILE_PLATFORM),
     mobileStorage: createTestMobileStorageService({ storage }),
   })
-  const appServices = createWebTestAppServices(core)
+  const appServices = createTestAppServices(core)
   completeOnboarding = vi
     .spyOn(appServices.mobileOnboarding, 'completeOnboarding')
     .mockImplementation(async () => {})

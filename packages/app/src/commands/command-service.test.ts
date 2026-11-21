@@ -5,7 +5,7 @@ import { noop } from '@ocavue/utils'
 
 function setup(options?: { isApplePlatform?: boolean }) {
   const logger = createTestLoggerService()
-  const commands = createCommandService<string, string[]>({
+  const commands = createCommandService({
     platform: createTestPlatformService({ isApplePlatform: options?.isApplePlatform ?? true }),
     logger,
   })
@@ -26,71 +26,125 @@ function keyDown(overrides: Partial<CommandKeyEvent>): CommandKeyEvent {
 }
 
 describe('createCommandService', () => {
-  it('registers, lists in order, and runs by id', async () => {
+  it('runs the handler of a command', async () => {
     const { commands } = setup()
-    commands.register([
-      { id: 'a', title: 'A', run: (ran) => void ran.push('a') },
-      { id: 'b', title: 'B', run: (ran) => void ran.push('b') },
-    ])
-    expect(commands.list().map((command) => command.id)).toEqual(['a', 'b'])
     const ran: string[] = []
-    await commands.run('b', ran)
-    expect(ran).toEqual(['b'])
+    commands.handle('nav.today', () => void ran.push('today'), new AbortController().signal)
+    expect(commands.isHandled('nav.today')).toBe(true)
+    await commands.run('nav.today')
+    expect(ran).toEqual(['today'])
   })
 
-  it('throws on a duplicate id (a programmer error, not a runtime state)', () => {
+  it('does nothing for a command without a handler', async () => {
     const { commands } = setup()
-    commands.register([{ id: 'a', title: 'A', run: noop }])
-    expect(() => commands.register([{ id: 'a', title: 'again', run: noop }])).toThrow(
-      /already registered/,
-    )
+    expect(commands.isHandled('nav.today')).toBe(false)
+    await expect(commands.run('nav.today')).resolves.toBeUndefined()
+    expect(commands.trigger('nav.today')).toBe(false)
   })
 
-  it('throws on a blank id or title', () => {
+  it('removes a handler when its signal aborts', () => {
     const { commands } = setup()
-    expect(() => commands.register([{ id: ' ', title: 'A', run: noop }])).toThrow(
-      'command id cannot be empty',
-    )
-    expect(() => commands.register([{ id: 'a', title: '', run: noop }])).toThrow(
-      'command title cannot be empty: a',
-    )
+    const controller = new AbortController()
+    commands.handle('nav.today', noop, controller.signal)
+    controller.abort()
+    expect(commands.isHandled('nav.today')).toBe(false)
   })
 
-  it('an unknown id is a loud no-op (deep links may dangle)', async () => {
+  it('keeps a newer registration of the same handler when an older one aborts', () => {
+    const { commands } = setup()
+    const older = new AbortController()
+    commands.handle('nav.today', noop, older.signal)
+    commands.handle('nav.today', noop, new AbortController().signal)
+    older.abort()
+    expect(commands.isHandled('nav.today')).toBe(true)
+  })
+
+  it('ignores a handler whose signal already aborted', () => {
+    const { commands } = setup()
+    commands.handle('nav.today', noop, AbortSignal.abort())
+    expect(commands.isHandled('nav.today')).toBe(false)
+  })
+
+  it('stops triggers outside the allow list while a block is active', () => {
+    const { commands } = setup()
+    const ran: string[] = []
+    const handlers = new AbortController()
+    commands.handle('nav.today', () => void ran.push('today'), handlers.signal)
+    commands.handle('shortcuts.show', () => void ran.push('shortcuts'), handlers.signal)
+    const block = new AbortController()
+    commands.block(['shortcuts.show'], block.signal)
+    expect(commands.trigger('nav.today')).toBe(false)
+    expect(commands.trigger('shortcuts.show')).toBe(true)
+    // A direct run is the caller's decision, so blocks do not apply to it.
+    void commands.run('nav.today')
+    block.abort()
+    expect(commands.trigger('nav.today')).toBe(true)
+    expect(ran).toEqual(['shortcuts', 'today', 'today'])
+  })
+
+  it('applies only the latest active block', () => {
+    const { commands } = setup()
+    const handlers = new AbortController()
+    commands.handle('nav.today', noop, handlers.signal)
+    commands.handle('shortcuts.show', noop, handlers.signal)
+    const palette = new AbortController()
+    const sheet = new AbortController()
+    commands.block([], palette.signal)
+    commands.block(['shortcuts.show'], sheet.signal)
+    expect(commands.trigger('shortcuts.show')).toBe(true)
+    expect(commands.trigger('nav.today')).toBe(false)
+    palette.abort()
+    expect(commands.trigger('nav.today')).toBe(false)
+    sheet.abort()
+    expect(commands.trigger('nav.today')).toBe(true)
+  })
+
+  it('logs a handler that throws synchronously', async () => {
     const { commands, logger } = setup()
-    await commands.run('missing', [])
-    expect(logger.getErrors()).toEqual([{ message: 'unknown command: missing', cause: undefined }])
+    const failure = new Error('boom')
+    commands.handle(
+      'note.random',
+      () => {
+        throw failure
+      },
+      new AbortController().signal,
+    )
+    expect(commands.trigger('note.random')).toBe(true)
+    await expect
+      .poll(() => logger.getErrors())
+      .toEqual([{ message: 'command failed: note.random', cause: failure }])
+  })
+
+  it('logs the failure of a triggered handler', async () => {
+    const { commands, logger } = setup()
+    const failure = new Error('boom')
+    commands.handle('note.random', () => Promise.reject(failure), new AbortController().signal)
+    expect(commands.trigger('note.random')).toBe(true)
+    await expect
+      .poll(() => logger.getErrors())
+      .toEqual([{ message: 'command failed: note.random', cause: failure }])
   })
 
   it('keeps each registry separate', () => {
     const { commands } = setup()
-    commands.register([{ id: 'a', title: 'A', run: noop }])
-    expect(setup().commands.list()).toEqual([])
+    commands.handle('nav.today', noop, new AbortController().signal)
+    expect(setup().commands.isHandled('nav.today')).toBe(false)
   })
 })
 
 describe('commandForKeyDown', () => {
   function bound(options?: { isApplePlatform?: boolean }) {
-    const { commands } = setup(options)
-    commands.register([
-      { id: 'today', title: 'Today', keybinding: 'Mod-d', run: noop },
-      { id: 'all', title: 'All notes', keybinding: 'Mod-Shift-a', run: noop },
-      { id: 'back', title: 'Back', keybinding: 'Mod-[', run: noop },
-      { id: 'link', title: 'Copy link', keybinding: 'Alt-Mod-l', run: noop },
-      { id: 'graph2', title: 'Graph 2', keybinding: 'Mod-2', run: noop },
-      { id: 'unbound', title: 'Unbound', run: noop },
-    ])
-    return commands
+    return setup(options).commands
   }
 
   it('matches ⌘ on Apple and Ctrl elsewhere', () => {
     expect(bound().commandForKeyDown(keyDown({ key: 'd', code: 'KeyD', metaKey: true }))).toBe(
-      'today',
+      'nav.today',
     )
     expect(bound().commandForKeyDown(keyDown({ key: 'd', code: 'KeyD', ctrlKey: true }))).toBeNull()
     const other = bound({ isApplePlatform: false })
     expect(other.commandForKeyDown(keyDown({ key: 'd', code: 'KeyD', ctrlKey: true }))).toBe(
-      'today',
+      'nav.today',
     )
     expect(other.commandForKeyDown(keyDown({ key: 'd', code: 'KeyD', metaKey: true }))).toBeNull()
   })
@@ -109,7 +163,7 @@ describe('commandForKeyDown', () => {
       commands.commandForKeyDown(
         keyDown({ key: 'A', code: 'KeyA', metaKey: true, shiftKey: true }),
       ),
-    ).toBe('all')
+    ).toBe('nav.allNotes')
     expect(
       commands.commandForKeyDown(
         keyDown({ key: 'D', code: 'KeyD', metaKey: true, shiftKey: true }),
@@ -123,13 +177,13 @@ describe('commandForKeyDown', () => {
   it('matches alt chords by physical code', () => {
     expect(
       bound().commandForKeyDown(keyDown({ key: '¬', code: 'KeyL', metaKey: true, altKey: true })),
-    ).toBe('link')
+    ).toBe('note.copyDeepLink')
   })
 
   it('matches brackets by physical code', () => {
     expect(
       bound().commandForKeyDown(keyDown({ key: 'Dead', code: 'BracketLeft', metaKey: true })),
-    ).toBe('back')
+    ).toBe('history.back')
   })
 
   it('matches a number-row digit that the layout types with Shift', () => {
@@ -138,7 +192,7 @@ describe('commandForKeyDown', () => {
       commands.commandForKeyDown(
         keyDown({ key: '2', code: 'Digit2', metaKey: true, shiftKey: true }),
       ),
-    ).toBe('graph2')
+    ).toBe('graph.switch2')
     // US-style ⌘⇧2 types "@": that is not the ⌘2 shortcut.
     expect(
       commands.commandForKeyDown(

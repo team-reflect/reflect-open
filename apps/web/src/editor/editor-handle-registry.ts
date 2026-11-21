@@ -3,7 +3,7 @@ import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
 /**
  * The mounted note editors, keyed by graph-relative note path. Commands that
  * act on "the current note's editor" (Attach file…) resolve the handle for
- * `CommandContext.notePath()` here — the same path the context sidebar and
+ * the focused note path here — the same path the context sidebar and
  * note-scoped commands target, so an insertion can never land in a different
  * note than the one those commands describe.
  *

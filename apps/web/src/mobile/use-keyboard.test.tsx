@@ -1,9 +1,9 @@
+import { createTestAppServices } from '@reflect/app/testing'
 import { act } from '@/test-utils/act.ts'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createTestDatabaseService, createTestCoreServices } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { useKeyboardHeightVar, useKeyboardVisible } from './use-keyboard.ts'
-import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
 /**
  * The `KeyboardService` behind `--keyboard-height`, as the app reads it:
@@ -14,7 +14,7 @@ import { createWebTestAppServices } from '@/test-utils/app-services.ts'
  */
 describe('keyboard height', () => {
   it('starts closed and reflects the last published height', () => {
-    const { keyboard } = createWebTestAppServices(
+    const { keyboard } = createTestAppServices(
       createTestCoreServices({ database: createTestDatabaseService() }),
     )
     expect(keyboard.get()).toBe(0)
@@ -39,7 +39,7 @@ describe('keyboard height', () => {
 
   it('keeps notifying after an unrelated subscriber unmounts', async () => {
     const core = createTestCoreServices({ database: createTestDatabaseService() })
-    const appServices = createWebTestAppServices(core)
+    const appServices = createTestAppServices(core)
     const { keyboard } = appServices
     const first = await renderHookInApp(() => useKeyboardVisible(), { core, appServices })
     const second = await renderHookInApp(() => useKeyboardVisible(), { core, appServices })

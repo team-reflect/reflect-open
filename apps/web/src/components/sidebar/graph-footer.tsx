@@ -1,3 +1,4 @@
+import { APP_COMMANDS } from '@reflect/app'
 import { useRef, useState, type ReactElement } from 'react'
 import type { GraphInfo, GitSyncState } from '@reflect/core'
 import { FolderOpen, GraduationCap, LocateFixed, PanelsTopLeft, Settings } from 'lucide-react'
@@ -16,8 +17,6 @@ import {
 } from '@/components/ui/dropdown-menu.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { useGraphColors } from '@/hooks/use-graph-colors.ts'
-import { isGraphSwitchPosition, keybindingFor } from '@/lib/commands/app-commands.ts'
-import type { CommandContext } from '@/lib/commands/types.ts'
 import { useSelector } from '@/lib/use-store.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraphActions, useGraphIndexing, useGraphRecents } from '@/providers/graph-provider.tsx'
@@ -26,12 +25,23 @@ import { useRouterState } from '@/routing/router.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 const MENU_ITEM_CLASS = 'h-8 gap-2 px-2 py-0 text-[13px] text-text-secondary'
-const SETTINGS_BINDING = keybindingFor('settings.open')
+const SETTINGS_BINDING = APP_COMMANDS['settings.open'].keybinding
+
+const GRAPH_SWITCH_COMMAND_IDS = [
+  'graph.switch1',
+  'graph.switch2',
+  'graph.switch3',
+  'graph.switch4',
+  'graph.switch5',
+  'graph.switch6',
+  'graph.switch7',
+  'graph.switch8',
+  'graph.switch9',
+] as const
 
 function graphSwitchBindingFor(index: number): string | null {
-  // Recent rows are zero-based; `graph.switchN` commands and keycaps are one-based.
-  const position = index + 1
-  return isGraphSwitchPosition(position) ? keybindingFor(`graph.switch${position}`) : null
+  const id = GRAPH_SWITCH_COMMAND_IDS[index]
+  return id === undefined ? null : APP_COMMANDS[id].keybinding
 }
 
 type SyncStatus = Extract<GitSyncState, { phase: 'connected' }>['status']
@@ -69,8 +79,6 @@ function GitSyncDot(): ReactElement | null {
 
 interface GraphFooterProps {
   graph: GraphInfo
-  /** Commands run with this — the same context the palette/shortcuts use. */
-  context: CommandContext
 }
 
 /**
@@ -79,11 +87,11 @@ interface GraphFooterProps {
  * The swatch pulses while the graph indexes; a small dot reports backup state.
  * Menu content matches the trigger width to stay inset from the sidebar edges.
  */
-export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement {
+export function GraphFooter({ graph }: GraphFooterProps): ReactElement {
   const [appsOpen, setAppsOpen] = useState(false)
   const graphTriggerRef = useRef<HTMLButtonElement>(null)
   const { logger } = useCoreServices()
-  const { opener, window: appWindow } = useAppServices()
+  const { opener, window: appWindow, commands } = useAppServices()
   const recents = useGraphRecents()
   const indexing = useGraphIndexing()
   const { openRecent, chooseGraph } = useGraphActions()
@@ -161,14 +169,12 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
           ) : null}
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            onClick={() => void context.app.commands.run('settings.open', context)}
+            onClick={() => commands.run('settings.open')}
             className={MENU_ITEM_CLASS}
           >
             <Settings aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
             <span className="min-w-0 flex-1 truncate">Preferences</span>
-            {SETTINGS_BINDING && (
-              <ShortcutKeys binding={SETTINGS_BINDING} className="text-[10px]" />
-            )}
+            <ShortcutKeys binding={SETTINGS_BINDING} className="text-[10px]" />
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setAppsOpen(true)} className={MENU_ITEM_CLASS}>
@@ -193,7 +199,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
               size="icon-sm"
               aria-label="Open settings"
               aria-current={settingsActive ? 'page' : undefined}
-              onClick={() => void context.app.commands.run('settings.open', context)}
+              onClick={() => commands.run('settings.open')}
               className={cn(
                 'size-7 shrink-0 text-text-muted transition-colors duration-100 hover:bg-surface-hover hover:text-text-secondary',
                 settingsActive
@@ -206,7 +212,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
           }
         />
         <TooltipContent>
-          Settings {SETTINGS_BINDING && <ShortcutKeys binding={SETTINGS_BINDING} />}
+          Settings <ShortcutKeys binding={SETTINGS_BINDING} />
         </TooltipContent>
       </Tooltip>
       <ReflectAppsDialog open={appsOpen} onOpenChange={setAppsOpen} finalFocus={graphTriggerRef} />

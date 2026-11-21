@@ -1,3 +1,4 @@
+import { publishGistAndCopyLink } from '@reflect/app'
 import {
   useCallback,
   useEffect,
@@ -11,7 +12,6 @@ import { errorMessage } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { useNoteRow } from '@/hooks/use-note-row.ts'
-import { publishGistAndCopyLink } from '@/lib/clipboard-actions.ts'
 import { cn } from '@/lib/utils.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { SidebarSection } from './sidebar-section.tsx'

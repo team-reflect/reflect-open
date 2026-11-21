@@ -1,7 +1,7 @@
+import type { AppServices } from '@reflect/app'
 import { Profiler, type ReactElement, type ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
 import { describe, expect, it, vi } from 'vitest'
-import type { WebAppServices } from '@/lib/commands/types.ts'
 import { createTestDialogService } from '@reflect/app/testing'
 import type {
   AppPlatform,
@@ -74,7 +74,7 @@ function tree(children: ReactNode, platform?: AppPlatform): ReactElement {
 async function renderGraph<Core extends CoreServices>(
   core: Core,
   platform?: AppPlatform,
-  appServices?: Partial<WebAppServices>,
+  appServices?: Partial<AppServices>,
 ) {
   const result = {} as { current: GraphProbe }
   function Probe(): null {

@@ -1,9 +1,9 @@
+import { APP_COMMANDS } from '@reflect/app'
 import type { ReactElement } from 'react'
 import { SearchIcon } from '@/components/icons/search-icon.tsx'
 import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
-import { keybindingFor } from '@/lib/commands/app-commands.ts'
 
-const PALETTE_BINDING = keybindingFor('palette.open')
+const PALETTE_BINDING = APP_COMMANDS['palette.open'].keybinding
 
 /**
  * The sidebar's search affordance, styled as the original app's search field —
@@ -21,7 +21,7 @@ export function SidebarSearch({ onOpen }: { onOpen: () => void }): ReactElement 
         <SearchIcon />
       </span>
       <span className="w-0 flex-1 truncate text-left">Search anything...</span>
-      {PALETTE_BINDING !== null ? <ShortcutKeys binding={PALETTE_BINDING} ghost /> : null}
+      <ShortcutKeys binding={PALETTE_BINDING} ghost />
     </button>
   )
 }

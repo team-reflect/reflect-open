@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { Command } from '../commands/command-service.ts'
+import type { Command } from '../commands/app-commands.ts'
 import type { WikiSuggestion } from '@reflect/core'
 import { buildPaletteSections, type PaletteHit } from './palette-entries.ts'
-import { noop } from '@ocavue/utils'
 
 function suggestion(path: string, title: string, date: string | null = null): WikiSuggestion {
   return { target: title, path, title, alias: null, date }
@@ -15,18 +14,18 @@ function hit(
 ): PaletteHit {
   return { path, title, snippet, dailyDate }
 }
-const COMMANDS: Command<string>[] = [
-  { id: 'nav.today', title: 'Go to today', keywords: ['daily'], run: noop },
-  { id: 'theme.toggle', title: 'Toggle theme', keywords: ['dark'], run: noop },
+const COMMANDS: Command[] = [
+  { id: 'nav.today', title: 'Go to today', keywords: ['daily'] },
+  { id: 'theme.toggle', title: 'Toggle theme', keywords: ['dark'] },
 ]
 
 /** Defaults for the common case; tests override what they exercise. */
 function sections(
-  overrides: Partial<Parameters<typeof buildPaletteSections<Command<string>>>[0]> & {
+  overrides: Partial<Parameters<typeof buildPaletteSections<Command>>[0]> & {
     query: string
   },
 ) {
-  return buildPaletteSections<Command<string>>({
+  return buildPaletteSections<Command>({
     dataQuery: overrides.query,
     suggestions: [],
     hits: [],

@@ -1,4 +1,4 @@
-import type { AppCommandId } from '@/lib/commands/types.ts'
+import type { AppCommandId } from '@reflect/app'
 import {
   ArrowLeft,
   ArrowRight,

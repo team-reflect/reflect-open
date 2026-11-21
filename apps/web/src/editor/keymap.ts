@@ -23,7 +23,7 @@ import { EDITOR_KEY_BINDINGS } from '@meowdown/core'
  * selected (to open its menu). Otherwise the keydown falls through to the app,
  * which claims `Mod-k` (command palette) and `Mod-/` (keyboard shortcuts)
  * app-scope. The editor wins at run time by preventDefault-ing the keydown it
- * handles, which `useAppShortcuts` checks before acting.
+ * handles, which `useCommandKeys` checks before acting.
  */
 const SHARED_WITH_APP: ReadonlySet<string> = new Set(['Mod-k', 'Mod-/'])
 

@@ -128,10 +128,8 @@ export interface AppHost {
 
 /**
  * The app-layer services of one webview, built over the core services.
- * `CommandId` and `Context` are the id and context types of the app's
- * commands.
  */
-export interface AppServices<CommandId extends string, Context> {
+export interface AppServices {
   /**
    * Facts about this webview's window and the actions that span windows.
    */
@@ -166,17 +164,17 @@ export interface AppServices<CommandId extends string, Context> {
    */
   readonly keymap: KeymapService
   /**
-   * The command registry. The app decides the context type that its commands run with.
+   * The command registry.
    */
-  readonly commands: CommandService<CommandId, Context>
+  readonly commands: CommandService
   /**
    * The native macOS application menu and native context menus.
    */
-  readonly nativeMenu: NativeMenuService<CommandId>
+  readonly nativeMenu: NativeMenuService
   /**
    * The command palette's data layer.
    */
-  readonly paletteSearch: PaletteSearchService<CommandId, Context>
+  readonly paletteSearch: PaletteSearchService
   /**
    * Exception-only crash reporting.
    */
@@ -246,12 +244,9 @@ export interface AppServices<CommandId extends string, Context> {
 /**
  * Build the app layer once per webview.
  */
-export function createAppServices<CommandId extends string, Context>(
-  core: CoreServices,
-  host: AppHost,
-): AppServices<CommandId, Context> {
+export function createAppServices(core: CoreServices, host: AppHost): AppServices {
   const systemPreferences = createSystemPreferencesService({ media: host.media })
-  const commands = createCommandService<CommandId, Context>({
+  const commands = createCommandService({
     platform: core.platform,
     logger: core.logger,
   })

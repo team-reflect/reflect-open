@@ -1,11 +1,11 @@
+import { APP_COMMANDS } from '@reflect/app'
 import type { ReactElement } from 'react'
 import { Keyboard } from 'lucide-react'
 import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
 import { Button } from '@/components/ui/button.tsx'
-import { keybindingFor } from '@/lib/commands/app-commands.ts'
 import { useShortcuts } from '@/providers/shortcuts-provider.tsx'
 
-const SHORTCUTS_BINDING = keybindingFor('shortcuts.show')
+const SHORTCUTS_BINDING = APP_COMMANDS['shortcuts.show'].keybinding
 
 export function KeyboardShortcutsField(): ReactElement {
   const { openShortcuts } = useShortcuts()
@@ -17,9 +17,7 @@ export function KeyboardShortcutsField(): ReactElement {
         <p className="mt-0.5 text-xs text-text-muted">Show every app and editor shortcut.</p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        {SHORTCUTS_BINDING !== null ? (
-          <ShortcutKeys binding={SHORTCUTS_BINDING} className="hidden sm:flex" />
-        ) : null}
+        <ShortcutKeys binding={SHORTCUTS_BINDING} className="hidden sm:flex" />
         <Button type="button" variant="outline" size="sm" onClick={openShortcuts}>
           <Keyboard aria-hidden data-icon="inline-start" strokeWidth={1.75} />
           Show all

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Command } from '../commands/command-service.ts'
+import { APP_COMMANDS } from '../commands/app-commands.ts'
 import {
   createSearchService,
   createSuggestionService,
@@ -57,7 +57,7 @@ function setup() {
       },
     ],
   })
-  const commands = createCommandService<string>({
+  const commands = createCommandService({
     platform: createTestPlatformService(),
     logger: createTestLoggerService(),
   })
@@ -147,15 +147,12 @@ describe('PaletteSearchService', () => {
     expect(retrieval.retrieveCalls()).toEqual([])
   })
 
-  it('merges the data with the registered commands', () => {
+  it('merges the data with the commands that have a handler', () => {
     const { service, commands } = setup()
-    const toggleTheme: Command<string> = {
-      id: 'theme.toggle',
-      title: 'Toggle theme',
-      keywords: ['dark'],
-      run: noop,
-    }
-    commands.register([{ id: 'nav.today', title: 'Go to today', run: noop }, toggleTheme])
+    const toggleTheme = { id: 'theme.toggle', ...APP_COMMANDS['theme.toggle'] }
+    const handlers = new AbortController()
+    commands.handle('nav.today', noop, handlers.signal)
+    commands.handle('theme.toggle', noop, handlers.signal)
 
     const sections = service.sections({
       query: 'dark',
