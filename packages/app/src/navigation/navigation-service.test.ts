@@ -563,7 +563,6 @@ describe('NavigationService', () => {
         entryId: 0,
         arrivalSeq: 0,
         arrivalFocusEditor: false,
-        revision: navigation.navigationRevision(),
         canBack: false,
         canForward: false,
         backRoute: null,

@@ -23,6 +23,7 @@ pub(crate) fn visited_notes(conn: &Connection, limit: u32) -> AppResult<Vec<Visi
             )
             .and_where(Expr::col((Notes::Table, Notes::Kind)).eq(lit("note")))
             .order_by((NoteVisits::Table, NoteVisits::VisitedMs), Order::Desc)
+            .order_by((NoteVisits::Table, NoteVisits::Path), Order::Asc)
             .limit(u64::from(limit)),
         |row| {
             Ok(VisitedNote {

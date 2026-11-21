@@ -40,14 +40,3 @@ pub(super) fn record(conn: &Connection, path: &str, visited_ms: i64) -> AppResul
     )?;
     Ok(())
 }
-
-/// Deletes the visit of `path`, so a later note at that path starts without one.
-pub(super) fn remove(conn: &Connection, path: &str) -> AppResult<()> {
-    sql::execute(
-        conn,
-        Query::delete()
-            .from_table(NoteVisits::Table)
-            .and_where(Expr::col(NoteVisits::Path).eq(path)),
-    )?;
-    Ok(())
-}

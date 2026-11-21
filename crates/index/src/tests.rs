@@ -3561,22 +3561,3 @@ fn moving_a_note_moves_its_visit() {
         }]
     );
 }
-
-#[test]
-fn removing_a_note_removes_its_visit() {
-    let graph_dir = tempfile::tempdir().expect("tempdir");
-    let (session, generation) = file_session(graph_dir.path());
-    session
-        .apply(generation, &[note("notes/a.md", "A", vec![])])
-        .unwrap();
-    session.record_visit(generation, "notes/a.md", 1).unwrap();
-    session.remove(generation, "notes/a.md").unwrap();
-    // A new note at the same path starts without the old visit.
-    session
-        .apply(generation, &[note("notes/a.md", "A", vec![])])
-        .unwrap();
-    let visited = session
-        .read(generation, |conn| visited_notes(conn, 10))
-        .unwrap();
-    assert_eq!(visited, []);
-}
