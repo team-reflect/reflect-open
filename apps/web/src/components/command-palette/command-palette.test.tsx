@@ -22,7 +22,7 @@ import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { CommandPalette } from './command-palette.tsx'
 import { PaletteProvider, usePalette } from './palette-provider.tsx'
-import { noop } from '@ocavue/utils'
+import { noop, objectEntries } from '@ocavue/utils'
 
 // The palette runs on the real `PaletteSearchService` of the test app
 // services; each test scripts the index reads below it.
@@ -113,7 +113,7 @@ async function renderPalette(query: string, handlers?: Partial<Record<AppCommand
     window: createTestWindowService({ openNoteWindow }),
   })
   const commandHandlers = new AbortController()
-  for (const id of Object.keys(APP_COMMANDS) as AppCommandId[]) {
+  for (const [id] of objectEntries(APP_COMMANDS)) {
     appLayer.commands.handle(id, handlers?.[id] ?? noop, commandHandlers.signal)
   }
   const view = await renderInApp(
