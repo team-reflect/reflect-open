@@ -2,6 +2,7 @@ import {
   dateFromDailyPath,
   parseSearchQuery,
   updatedPresetFilter,
+  wikiLinkTargetForTitle,
   type ClockService,
   type DateSuggestionContext,
   type RetrievalService,
@@ -13,7 +14,6 @@ import {
 } from '@reflect/core'
 import type { Command } from '../commands/app-commands.ts'
 import type { CommandService } from '../commands/command-service.ts'
-import type { NavigationService } from '../navigation/navigation-service.ts'
 import type { NoteVisitService } from '../navigation/note-visit-service.ts'
 import { buildPaletteSections, type PaletteHit, type PaletteSections } from './palette-entries.ts'
 
@@ -51,10 +51,14 @@ export interface PaletteSectionsInput {
 export interface PaletteSearchService {
   /**
    * Title suggestions for `text` (at most 8), generated date phrases merged in.
-   * An empty `text` lists the recently opened notes first, without the note
-   * on screen.
+   * An empty `text` lists the recently opened notes first, without
+   * `currentNote` (the note on screen).
    */
-  suggestTitles(text: string, dateContext: DateSuggestionContext): Promise<WikiSuggestion[]>
+  suggestTitles(
+    text: string,
+    dateContext: DateSuggestionContext,
+    currentNote: string | null,
+  ): Promise<WikiSuggestion[]>
   /**
    * The search hits for `text`. Filter tokens (#tag, is:daily, is:pinned,
    * links:, linked-from:, updated:) switch the search into constrained mode
@@ -79,7 +83,6 @@ export interface PaletteSearchServiceDeps {
   readonly retrieval: RetrievalService
   readonly commands: CommandService
   readonly clock: ClockService
-  readonly navigation: NavigationService
   readonly noteVisits: Pick<NoteVisitService, 'listRecent'>
 }
 
@@ -90,8 +93,12 @@ class PaletteSearchServiceImpl implements PaletteSearchService {
     this.#deps = deps
   }
 
-  async suggestTitles(text: string, dateContext: DateSuggestionContext): Promise<WikiSuggestion[]> {
-    const { suggestions, navigation, noteVisits } = this.#deps
+  async suggestTitles(
+    text: string,
+    dateContext: DateSuggestionContext,
+    currentNote: string | null,
+  ): Promise<WikiSuggestion[]> {
+    const { suggestions, noteVisits } = this.#deps
     if (text !== '') {
       return await suggestions.suggestWikiTargets(text, 8, dateContext)
     }
@@ -100,14 +107,13 @@ class PaletteSearchServiceImpl implements PaletteSearchService {
       suggestions.suggestWikiTargets(text, 9, dateContext),
     ])
     const recent = visited.map(({ path, title }): WikiSuggestion => ({
-      target: title,
+      target: wikiLinkTargetForTitle(title),
       path,
       title,
       alias: null,
       date: null,
     }))
-    const route = navigation.get().route
-    const seen = new Set(route.kind === 'note' ? [route.path] : [])
+    const seen = new Set(currentNote === null ? [] : [currentNote])
     const merged: WikiSuggestion[] = []
     for (const suggestion of [...recent, ...linked]) {
       const { path } = suggestion

@@ -279,7 +279,6 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
     retrieval: core.retrieval,
     commands,
     clock: core.clock,
-    navigation,
     noteVisits,
   })
   const opener = createOpenerService({ transport: host.opener, logger: core.logger })

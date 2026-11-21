@@ -17,7 +17,6 @@ import {
   seedNotes,
 } from '@reflect/core/testing'
 import { createCommandService } from '../commands/command-service.ts'
-import { createTestNavigationService } from '../testing/navigation.ts'
 import { createPaletteSearchService } from './palette-search-service.ts'
 import { noop } from '@ocavue/utils'
 
@@ -73,7 +72,6 @@ function setup() {
     retrieval,
     commands,
     clock: createTestClockService({ now: NOON_JUNE_9 }),
-    navigation: createTestNavigationService(),
     noteVisits: { listRecent: () => Promise.resolve([]) },
   })
   return { service, searches, retrieval, commands }
@@ -101,15 +99,14 @@ describe('PaletteSearchService', () => {
         logger: createTestLoggerService(),
       }),
       clock: createTestClockService(),
-      navigation: createTestNavigationService(),
       noteVisits: { listRecent: () => Promise.resolve([]) },
     })
 
-    const suggestions = await service.suggestTitles('tomorrow', {
-      today: '2026-06-09',
-      dateFormat: 'mdy',
-      weekStartDay: 'monday',
-    })
+    const suggestions = await service.suggestTitles(
+      'tomorrow',
+      { today: '2026-06-09', dateFormat: 'mdy', weekStartDay: 'monday' },
+      null,
+    )
     expect(suggestions).toHaveLength(8)
     expect(suggestions.find((suggestion) => suggestion.generated !== undefined)).toMatchObject({
       date: '2026-06-10',
@@ -125,8 +122,6 @@ describe('PaletteSearchService', () => {
       { path: 'notes/b.md', markdown: '# B\n' },
       { path: 'notes/c.md', markdown: '# C\n' },
     ])
-    const navigation = createTestNavigationService()
-    navigation.navigate({ kind: 'note', path: 'notes/a.md' })
     const service = createPaletteSearchService({
       suggestions: createSuggestionService({ database }),
       search: createSearchService({
@@ -139,7 +134,6 @@ describe('PaletteSearchService', () => {
         logger: createTestLoggerService(),
       }),
       clock: createTestClockService(),
-      navigation,
       noteVisits: {
         listRecent: () => {
           return Promise.resolve([
@@ -150,11 +144,11 @@ describe('PaletteSearchService', () => {
       },
     })
 
-    const suggestions = await service.suggestTitles('', {
-      today: '2026-06-09',
-      dateFormat: 'mdy',
-      weekStartDay: 'monday',
-    })
+    const suggestions = await service.suggestTitles(
+      '',
+      { today: '2026-06-09', dateFormat: 'mdy', weekStartDay: 'monday' },
+      'notes/a.md',
+    )
     expect(suggestions.map((suggestion) => suggestion.path)).toEqual(['notes/b.md', 'notes/c.md'])
     database.close()
   })

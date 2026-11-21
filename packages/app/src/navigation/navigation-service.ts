@@ -84,6 +84,11 @@ export interface NavigationState {
    * moves clear it, so it can never leak onto a later, unrelated arrival.
    */
   readonly arrivalFocusEditor: boolean
+  /**
+   * {@link NavigationService.navigationRevision} when this snapshot was taken.
+   * It only goes up, even across `reset`.
+   */
+  readonly revision: number
   readonly canBack: boolean
   readonly canForward: boolean
   /**
@@ -455,6 +460,7 @@ class NavigationServiceImpl implements NavigationService {
       entryId: entry.id,
       arrivalSeq: this.#arrivalSeq,
       arrivalFocusEditor: this.#arrivalFocusEditor,
+      revision: this.#revision,
       canBack: this.#index > 0,
       canForward: this.#index < this.#stack.length - 1,
       backRoute: this.#index > 0 ? this.#stack[this.#index - 1]!.route : null,

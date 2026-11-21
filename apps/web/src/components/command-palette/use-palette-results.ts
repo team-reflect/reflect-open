@@ -59,7 +59,9 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
   // would serve a stale "Tomorrow" afterwards. Computed once so the key and the
   // query agree on the same day.
   const today = useToday()
-  const { entryId, arrivalSeq } = useRouterState()
+  const { route, revision } = useRouterState()
+  const recent = trimmed === ''
+  const currentNote = route.kind === 'note' ? route.path : null
 
   const {
     data: suggestions,
@@ -71,18 +73,21 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
       dateFormat,
       weekStartDay,
       today,
-      // An arrival changes the empty query's recent notes without an index
-      // write, so each arrival gets its own answer.
-      arrival: trimmed === '' ? `${entryId}:${arrivalSeq}` : null,
+      // A visit changes the empty query's answer without an index write. The
+      // revision only goes up, so each navigation gets a fresh answer.
+      currentNote: recent ? currentNote : null,
+      revision: recent ? revision : null,
     }),
     queryFn: () => {
-      return paletteSearch.suggestTitles(trimmed, {
-        today,
-        dateFormat,
-        weekStartDay,
-      })
+      return paletteSearch.suggestTitles(
+        trimmed,
+        { today, dateFormat, weekStartDay },
+        recent ? currentNote : null,
+      )
     },
     enabled: searching && !parsed.filtered,
+    // Another window's visits refresh the list each time the palette opens.
+    staleTime: recent ? 0 : Infinity,
   })
   const useHybrid = hybrid && !parsed.filtered
   const {

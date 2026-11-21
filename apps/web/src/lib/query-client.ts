@@ -28,7 +28,8 @@ export const queryKeys = {
         dateFormat: string
         weekStartDay: string
         today: string
-        arrival: string | null
+        currentNote: string | null
+        revision: number | null
       },
     ) {
       return [
@@ -38,7 +39,8 @@ export const queryKeys = {
         options.dateFormat,
         options.weekStartDay,
         options.today,
-        options.arrival,
+        options.currentNote,
+        options.revision,
       ] as const
     },
     paletteSearch(root: GraphRoot, mode: PaletteSearchMode, text: string) {

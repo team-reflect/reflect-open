@@ -129,7 +129,7 @@ async function renderPalette(query: string, handlers?: Partial<Record<AppCommand
       settings: { semanticSearchEnabled: semanticEnabled, dateFormat: 'mdy' },
     },
   )
-  return { view, core }
+  return { view, core, appLayer }
 }
 
 describe('CommandPalette', () => {
@@ -170,6 +170,34 @@ describe('CommandPalette', () => {
     await expect.element(view.getByText('Recent One')).toBeInTheDocument()
     await expect.element(view.getByText('Recent', { exact: true })).toBeInTheDocument()
     expect(view.getByText('Commands').query()).toBeNull() // recall feed only (decided)
+  })
+
+  it('answers the recent notes again after a back and forward', async () => {
+    suggestWikiTargets.mockResolvedValue([])
+    const { view, appLayer } = await renderPalette('')
+    const { navigation, noteVisits } = appLayer
+    const listRecent = vi.spyOn(noteVisits, 'listRecent')
+    listRecent.mockResolvedValue([
+      { path: 'notes/c.md', title: 'Note C' },
+      { path: 'notes/a.md', title: 'Note A' },
+    ])
+    navigation.navigate({ kind: 'note', path: 'notes/a.md' })
+    navigation.navigate({ kind: 'note', path: 'notes/b.md' })
+    navigation.navigate({ kind: 'note', path: 'notes/c.md' })
+    navigation.back()
+    await expect.element(view.getByText('Note C')).toBeInTheDocument()
+
+    // Back to A records A, so the list at B changes.
+    const pending = Promise.withResolvers<{ path: string; title: string }[]>()
+    listRecent.mockReturnValue(pending.promise)
+    navigation.back()
+    navigation.forward()
+    await vi.waitFor(() => expect(view.getByText('Note C').query()).toBeNull())
+    pending.resolve([
+      { path: 'notes/a.md', title: 'Note A' },
+      { path: 'notes/c.md', title: 'Note C' },
+    ])
+    await expect.element(view.getByText('Note A')).toBeInTheDocument()
   })
 
   it('ends a typed query with an Ask row that leads to Settings with no AI provider', async () => {

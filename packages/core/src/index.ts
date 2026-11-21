@@ -433,6 +433,7 @@ export {
   splitFrontmatter,
   upsertFrontmatter,
   displayNoteTitle,
+  wikiLinkTargetForTitle,
   foldKey,
   foldTag,
   foldFallbackTitleKey,
