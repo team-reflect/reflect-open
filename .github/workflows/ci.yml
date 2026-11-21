@@ -24,7 +24,6 @@ jobs:
     timeout-minutes: 30
     outputs:
       lint-node: ${{ steps.classify.outputs.lint-node }}
-      test-node: ${{ steps.classify.outputs.test-node }}
       test-chromium: ${{ steps.classify.outputs.test-chromium }}
       test-webkit: ${{ steps.classify.outputs.test-webkit }}
       test-swift: ${{ steps.classify.outputs.test-swift }}
@@ -142,7 +141,6 @@ jobs:
 
           {
             echo "lint-node=$js"
-            echo "test-node=$js"
             echo "test-chromium=$js"
             echo "test-webkit=$webkit"
             echo "test-swift=$swift"
@@ -178,29 +176,14 @@ jobs:
           git diff --exit-code apple/Sources/WebHostKit/ContentSecurityPolicy.gen.swift \
             || (echo "::error::ContentSecurityPolicy.gen.swift is stale. Run 'pnpm gen:ios-csp' and commit the result." && exit 1)
 
-      - name: Lint
-        run: pnpm turbo run lint --filter=//
-
       - name: Typecheck
         run: pnpm turbo run typecheck --filter=//
 
+      - name: Lint
+        run: pnpm turbo run lint --filter=//
+
       - name: Build
         run: pnpm run build
-
-  test-node:
-    needs: [classify]
-    if: needs.classify.outputs.test-node == 'true'
-    runs-on: ubuntu-24.04
-    environment: *sccache-environment
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-node
-
-      - uses: ./.github/actions/setup-rust
-        with: *setup-rust-s3
 
       - name: Test
         run: pnpm turbo run test:node
@@ -470,7 +453,6 @@ jobs:
     needs:
       - classify
       - lint-node
-      - test-node
       - test-chromium
       - test-swift
       - test-rust
