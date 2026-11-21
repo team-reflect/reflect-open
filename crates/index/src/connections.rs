@@ -17,10 +17,10 @@ use crate::session::IndexConnections;
 
 fn map_err(err: reflect_index_schema::SchemaError) -> AppError {
     match err {
-        reflect_index_schema::SchemaError::TooNew { .. } => AppError::IndexTooNew {
+        err @ reflect_index_schema::SchemaError::TooNew { .. } => AppError::IndexTooNew {
             message: err.to_string(),
         },
-        _ => AppError::io(err.to_string()),
+        err => AppError::io(err.to_string()),
     }
 }
 

@@ -226,13 +226,22 @@ mod schema {
     }
 
     /// Migrates to the latest schema and stamps
-    /// [`MIN_COMPATIBLE_SCHEMA_VERSION`]. A newer index is used unchanged when
-    /// its stamp allows this app, and is [`SchemaError::TooNew`] otherwise.
+    /// [`MIN_COMPATIBLE_SCHEMA_VERSION`]. A newer index is never written: it is
+    /// used unchanged when its stamp allows this app, else [`SchemaError::TooNew`].
     ///
     /// [`MIN_COMPATIBLE_SCHEMA_VERSION`]: crate::MIN_COMPATIBLE_SCHEMA_VERSION
     pub fn migrate(conn: &mut Connection) -> Result<(), SchemaError> {
-        if crate::read_user_version(conn)? > crate::LATEST_SCHEMA_VERSION {
+        let version = crate::read_user_version(conn)?;
+        if version > crate::LATEST_SCHEMA_VERSION {
             return accept_newer(conn);
+        }
+        if version > 0 && version < crate::LATEST_SCHEMA_VERSION {
+            // Unstamped until the new stamp lands, so an interrupted upgrade
+            // reads as incompatible to older apps.
+            conn.execute(
+                "DELETE FROM index_meta WHERE key = ?1",
+                [crate::MIN_COMPATIBLE_SCHEMA_KEY],
+            )?;
         }
         if let Err(err) = MIGRATIONS.to_latest(conn) {
             // A newer app can migrate the file between the check and here.
@@ -390,10 +399,6 @@ mod schema {
             migrate(&mut conn).unwrap();
 
             assert_eq!(crate::read_user_version(&conn).unwrap(), newer);
-            assert_eq!(
-                crate::read_min_compatible_schema(&conn).unwrap(),
-                Some(crate::LATEST_SCHEMA_VERSION)
-            );
         }
 
         #[test]

@@ -244,11 +244,12 @@ describe('createIndexLifecycleService', () => {
   })
 
   it('open() returns null and logs the failure (editing is never blocked)', async () => {
-    const { index, logger } = setup({
+    const { index, logger, operations } = setup({
       failStore: (call) => (call.method === 'open' ? new Error('boom') : undefined),
     })
     expect(await index.open()).toBeNull()
     expect(logger.getErrors()).toEqual([{ message: 'index open failed:', cause: 'boom' }])
+    expect(operations.snapshot()).toEqual([])
   })
 
   it('open() shows a lasting notice when a newer app owns the index', async () => {
@@ -273,14 +274,6 @@ describe('createIndexLifecycleService', () => {
     ])
 
     tooNew = false
-    await index.open()
-    expect(operations.snapshot()).toEqual([])
-  })
-
-  it('open() shows no notice for other failures', async () => {
-    const { index, operations } = setup({
-      failStore: (call) => (call.method === 'open' ? new Error('boom') : undefined),
-    })
     await index.open()
     expect(operations.snapshot()).toEqual([])
   })
