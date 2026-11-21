@@ -30,7 +30,6 @@ jobs:
       test-swift: ${{ steps.classify.outputs.test-swift }}
       test-ios: ${{ steps.classify.outputs.test-ios }}
       lint-rust: ${{ steps.classify.outputs.lint-rust }}
-      test-rust: ${{ steps.classify.outputs.test-rust }}
     steps:
       # The merge commit's first parent is the base branch, so the diff
       # against it is the change that the PR brings in.
@@ -149,7 +148,6 @@ jobs:
             echo "test-swift=$swift"
             echo "test-ios=$ios"
             echo "lint-rust=$rust"
-            echo "test-rust=$rust"
           } | tee -a "$GITHUB_OUTPUT"
 
   lint-node:
@@ -428,6 +426,9 @@ jobs:
       - name: Check Cargo.lock
         run: cargo metadata --locked --format-version 1 > /dev/null
 
+      - name: Test
+        run: pnpm turbo run test --filter=reflect-workspace
+
       - name: Clippy
         run: pnpm turbo run lint --filter=reflect-workspace
 
@@ -459,32 +460,6 @@ jobs:
           git diff --exit-code crates/ffi/include/reflect_core.h \
             || (echo "::error::reflect_core.h is stale. Run 'pnpm build:ffi' and commit the result." && exit 1)
 
-  test-rust:
-    needs: classify
-    if: needs.classify.outputs.test-rust == 'true'
-    runs-on: ubuntu-24.04
-    environment: *sccache-environment
-    # Clippy and the tests never run the desktop sidecars, so drop them from the
-    # Tauri config instead of building them (tauri-build and tauri-codegen merge
-    # this JSON into the config). `pnpm sidecar` still stages them for dev and
-    # release builds.
-    env:
-      TAURI_CONFIG: '{"bundle":{"externalBin":null}}'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-apt
-
-      - uses: ./.github/actions/setup-rust
-        with: *setup-rust-s3
-
-      - uses: ./.github/actions/setup-node
-
-      - name: Test
-        run: pnpm turbo run test --filter=reflect-workspace
-
   # A single job for branch protection to require, instead of listing every
   # job as a required status check.
   all-green:
@@ -499,7 +474,6 @@ jobs:
       - test-chromium
       - test-swift
       - lint-rust
-      - test-rust
       # Not part of `all-green`
       # - test-webkit
       # - test-ios
