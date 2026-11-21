@@ -7,7 +7,7 @@
 //! consumers build with `default-features = false` and get just the constants.
 //!
 //! `rusqlite_migration` tracks the applied version in SQLite's `user_version`
-//! pragma. Append a new `M::up(include_str!(...))` (never edit a shipped one)
+//! pragma. Append a new `up(include_str!(...))` (never edit a shipped one)
 //! as later plans add tables — and bump [`LATEST_SCHEMA_VERSION`] with it.
 //! Then decide [`MIN_COMPATIBLE_SCHEMA_VERSION`].
 //!
@@ -150,11 +150,7 @@ mod schema {
         Migration(String),
         Io(std::io::Error),
         VecRegistration(String),
-        /// The index comes from a newer app whose schema this app cannot use.
-        TooNew {
-            found: usize,
-            supported: usize,
-        },
+        TooNew { found: usize, supported: usize },
     }
 
     impl fmt::Display for SchemaError {
@@ -244,36 +240,21 @@ mod schema {
     /// [`MIN_COMPATIBLE_SCHEMA_VERSION`]: crate::MIN_COMPATIBLE_SCHEMA_VERSION
     pub fn migrate(conn: &mut Connection) -> Result<(), SchemaError> {
         match MIGRATIONS.to_latest(conn) {
-            Ok(()) => {}
+            Ok(()) => Ok(()),
             Err(rusqlite_migration::Error::MigrationDefinition(
                 MigrationDefinitionError::DatabaseTooFarAhead,
             )) => {
                 if crate::is_compatible_schema(conn)? {
-                    return Ok(());
+                    Ok(())
+                } else {
+                    Err(SchemaError::TooNew {
+                        found: crate::read_user_version(conn)?,
+                        supported: crate::LATEST_SCHEMA_VERSION,
+                    })
                 }
-                return Err(SchemaError::TooNew {
-                    found: crate::read_user_version(conn)?,
-                    supported: crate::LATEST_SCHEMA_VERSION,
-                });
             }
-            Err(err) => return Err(SchemaError::Migration(err.to_string())),
+            Err(err) => Err(SchemaError::Migration(err.to_string())),
         }
-        // An index that was already current may predate the stamp. The guard
-        // skips it when a newer app migrated it since `to_latest`.
-        let stamp = crate::MIN_COMPATIBLE_SCHEMA_VERSION;
-        if crate::read_min_compatible_schema(conn)? != Some(stamp) {
-            conn.execute(
-                "INSERT INTO index_meta(key, value) \
-                 SELECT ?1, ?2 FROM pragma_user_version WHERE user_version = ?3 \
-                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-                (
-                    crate::MIN_COMPATIBLE_SCHEMA_KEY,
-                    stamp.to_string(),
-                    crate::LATEST_SCHEMA_VERSION as i64,
-                ),
-            )?;
-        }
-        Ok(())
     }
 
     /// Stop at schema `version`, so schema-evolution tests can stage data in an
@@ -389,24 +370,6 @@ mod schema {
                 [crate::MIN_COMPATIBLE_SCHEMA_KEY],
             )
             .unwrap();
-        }
-
-        #[test]
-        fn a_current_index_without_a_stamp_gets_one() {
-            let mut conn = open_in_memory().unwrap();
-            migrate(&mut conn).unwrap();
-            assert_eq!(
-                crate::read_min_compatible_schema(&conn).unwrap(),
-                Some(crate::MIN_COMPATIBLE_SCHEMA_VERSION)
-            );
-            delete_min_compatible(&conn);
-
-            migrate(&mut conn).unwrap();
-
-            assert_eq!(
-                crate::read_min_compatible_schema(&conn).unwrap(),
-                Some(crate::MIN_COMPATIBLE_SCHEMA_VERSION)
-            );
         }
 
         #[test]

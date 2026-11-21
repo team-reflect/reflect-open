@@ -23,8 +23,8 @@ use crate::note_file::{read_note_text, walk_notes};
 /// A successfully-opened read-only index.
 pub struct OpenIndex {
     pub conn: Connection,
-    /// The index schema is newer and incompatible; callers should warn.
-    pub newer_schema: bool,
+    /// The index schema is too new for this CLI; callers should warn.
+    pub index_too_new: bool,
 }
 
 /// The three ways opening can go; callers decide how each degrades per command
@@ -70,7 +70,7 @@ pub fn open_read_only(root: &Path) -> IndexOpen {
     };
     IndexOpen::Opened(OpenIndex {
         conn,
-        newer_schema: !compatible,
+        index_too_new: !compatible,
     })
 }
 
