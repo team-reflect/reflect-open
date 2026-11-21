@@ -2,6 +2,7 @@ import type { MaybePromise } from '@reflect/utils'
 import type { LoggerService, PlatformFacts } from '@reflect/core'
 import { APP_COMMANDS, type AppCommandId, type Command } from './app-commands.ts'
 import { normalizeBinding } from './keybindings.ts'
+import { objectEntries } from '@ocavue/utils'
 
 /**
  * The fields of a `keydown` event that {@link CommandService.commandForKeyDown} reads.
@@ -146,7 +147,8 @@ class CommandServiceImpl implements CommandService {
 
   constructor(deps: CommandServiceDeps) {
     this.#deps = deps
-    this.#commands = Object.entries(APP_COMMANDS).map(([id, declaration]) => ({
+    // FIXME: 1. if you use objectEntries here, you do not need `as AppCommandId` anymore; 2. find the whole codebase, do the refactors like this and remove unnecessary `as` casts for `Object.entries`;
+    this.#commands = objectEntries(APP_COMMANDS).map(([id, declaration]) => ({
       id: id as AppCommandId,
       ...declaration,
     }))
