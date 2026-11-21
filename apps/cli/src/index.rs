@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use rusqlite::{Connection, OpenFlags};
 
-use reflect_index_schema::{INDEX_FILE, LATEST_SCHEMA_VERSION, REFLECT_DIR};
+use reflect_index_schema::{INDEX_FILE, REFLECT_DIR, is_compatible_schema, read_user_version};
 
 use crate::error::CliError;
 use crate::hash::hash_content;
@@ -23,9 +23,8 @@ use crate::note_file::{read_note_text, walk_notes};
 /// A successfully-opened read-only index.
 pub struct OpenIndex {
     pub conn: Connection,
-    /// The index was written by a newer schema than this CLI knows — queries
-    /// against the stable subset are attempted, but callers should warn.
-    pub newer_schema: bool,
+    /// The index schema is too new for this CLI; callers should warn.
+    pub index_too_new: bool,
 }
 
 /// The three ways opening can go; callers decide how each degrades per command
@@ -58,16 +57,20 @@ pub fn open_read_only(root: &Path) -> IndexOpen {
         return IndexOpen::Unusable(format!("could not configure the index connection: {err}"));
     }
     // First actual read — a WAL that needs recovery surfaces here, not at open.
-    let version: i64 = match conn.query_row("PRAGMA user_version", [], |row| row.get(0)) {
+    let version = match read_user_version(&conn) {
         Ok(version) => version,
         Err(err) => return IndexOpen::Unusable(format!("could not read the index: {err}")),
     };
     if version == 0 {
         return IndexOpen::Unusable("the index exists but has no schema yet".to_string());
     }
+    let compatible = match is_compatible_schema(&conn) {
+        Ok(compatible) => compatible,
+        Err(err) => return IndexOpen::Unusable(format!("could not read the index: {err}")),
+    };
     IndexOpen::Opened(OpenIndex {
         conn,
-        newer_schema: version > LATEST_SCHEMA_VERSION as i64,
+        index_too_new: !compatible,
     })
 }
 

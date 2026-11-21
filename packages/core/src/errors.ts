@@ -13,6 +13,7 @@ const appErrorKinds = [
   'parse',
   'auth',
   'network',
+  'indexTooNew',
   'unknown',
 ] as const
 

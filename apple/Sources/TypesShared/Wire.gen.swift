@@ -58,6 +58,7 @@ public enum AppError: Sendable, Equatable {
     case parse(AppErrorParseData)
     case auth(AppErrorAuthData)
     case network(AppErrorNetworkData)
+    case indexTooNew(AppErrorIndextoonewData)
     case unknown(AppErrorUnknownData)
 }
 public struct AppErrorIoData: Codable, Sendable, Equatable {
@@ -116,6 +117,14 @@ public struct AppErrorNetworkData: Codable, Sendable, Equatable {
     }
 }
 
+public struct AppErrorIndextoonewData: Codable, Sendable, Equatable {
+    public let message: String
+
+    public init(message: String) {
+        self.message = message
+    }
+}
+
 public struct AppErrorUnknownData: Codable, Sendable, Equatable {
     public let message: String
 
@@ -159,6 +168,9 @@ extension AppError: Codable {
         case "network":
             let messageValue = try container.decode(String.self, forKey: CodingKeys("message"))
             self = .network(AppErrorNetworkData(message: messageValue))
+        case "indexTooNew":
+            let messageValue = try container.decode(String.self, forKey: CodingKeys("message"))
+            self = .indexTooNew(AppErrorIndextoonewData(message: messageValue))
         case "unknown":
             let messageValue = try container.decode(String.self, forKey: CodingKeys("message"))
             self = .unknown(AppErrorUnknownData(message: messageValue))
@@ -190,6 +202,9 @@ extension AppError: Codable {
             try container.encode(data.message, forKey: CodingKeys("message"))
         case .network(let data):
             try container.encode("network", forKey: CodingKeys("kind"))
+            try container.encode(data.message, forKey: CodingKeys("message"))
+        case .indexTooNew(let data):
+            try container.encode("indexTooNew", forKey: CodingKeys("kind"))
             try container.encode(data.message, forKey: CodingKeys("message"))
         case .unknown(let data):
             try container.encode("unknown", forKey: CodingKeys("kind"))

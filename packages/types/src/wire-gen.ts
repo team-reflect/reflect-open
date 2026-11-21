@@ -46,6 +46,8 @@ export type AppError =
   | { kind: 'auth'; message: string }
   /**  The remote is unreachable (offline, DNS, timeout) — retryable. */
   | { kind: 'network'; message: string }
+  /**  The graph's index comes from a newer app whose schema this app cannot use. */
+  | { kind: 'indexTooNew'; message: string }
   /**  Anything not covered above. */
   | { kind: 'unknown'; message: string }
 

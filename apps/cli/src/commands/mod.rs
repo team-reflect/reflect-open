@@ -25,7 +25,7 @@ fn warn(message: impl Display) {
 fn open_index_for_resolution(root: &Path) -> Option<OpenIndex> {
     match open_read_only(root) {
         IndexOpen::Opened(open) => {
-            if open.newer_schema {
+            if open.index_too_new {
                 warn("the index schema is newer than this CLI — update Reflect");
             }
             Some(open)

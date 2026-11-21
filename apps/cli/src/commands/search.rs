@@ -33,7 +33,7 @@ pub fn run(graph: &Graph, json: bool, query: &str, limit: usize) -> Result<(), C
         }
         IndexOpen::Unusable(message) => return Err(CliError::NoIndex(message)),
     };
-    if opened.newer_schema {
+    if opened.index_too_new {
         warn("the index schema is newer than this CLI — update Reflect");
     }
 

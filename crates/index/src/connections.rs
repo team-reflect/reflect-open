@@ -16,7 +16,12 @@ use reflect_types::{AppError, AppResult};
 use crate::session::IndexConnections;
 
 fn map_err(err: reflect_index_schema::SchemaError) -> AppError {
-    AppError::io(err.to_string())
+    match err {
+        err @ reflect_index_schema::SchemaError::TooNew { .. } => AppError::IndexTooNew {
+            message: err.to_string(),
+        },
+        err => AppError::io(err.to_string()),
+    }
 }
 
 /// The file-backed connections: a migrated writer under WAL plus a second,

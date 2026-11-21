@@ -32,6 +32,7 @@ describe('toAppError', () => {
       'parse',
       'auth',
       'network',
+      'indexTooNew',
       'unknown',
     ] as const) {
       expect(toAppError({ kind, message: 'm' })).toEqual(new AppError(kind, 'm'))

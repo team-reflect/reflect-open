@@ -244,11 +244,38 @@ describe('createIndexLifecycleService', () => {
   })
 
   it('open() returns null and logs the failure (editing is never blocked)', async () => {
-    const { index, logger } = setup({
+    const { index, logger, operations } = setup({
       failStore: (call) => (call.method === 'open' ? new Error('boom') : undefined),
     })
     expect(await index.open()).toBeNull()
     expect(logger.getErrors()).toEqual([{ message: 'index open failed:', cause: 'boom' }])
+    expect(operations.snapshot()).toEqual([])
+  })
+
+  it('open() shows a lasting notice when a newer app owns the index', async () => {
+    let tooNew = true
+    const { index, operations } = setup({
+      failStore: (call) => {
+        return call.method === 'open' && tooNew ? new AppError('indexTooNew', 'too new') : undefined
+      },
+    })
+    expect(await index.open()).toBeNull()
+    expect(operations.snapshot()).toEqual([
+      {
+        label: 'Search index unavailable',
+        description: null,
+        progress: null,
+        status: 'failed',
+        persistent: true,
+        action: 'Dismiss',
+        message:
+          'A newer version of Reflect updated this graph. Update Reflect to use search, backlinks, and tasks.',
+      },
+    ])
+
+    tooNew = false
+    await index.open()
+    expect(operations.snapshot()).toEqual([])
   })
 
   it('close() stops the watcher and does not reconcile', async () => {

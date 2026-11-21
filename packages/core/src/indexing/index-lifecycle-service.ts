@@ -3,8 +3,8 @@ import type { GraphRole, GraphSession } from '../graph/graph-session.ts'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { isMobilePlatform } from '../ports/platform-facts.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
-import type { ProgressPort } from '../ports/progress-port.ts'
-import { errorMessage } from '../errors.ts'
+import type { OperationHandle, ProgressPort } from '../ports/progress-port.ts'
+import { errorMessage, toAppError } from '../errors.ts'
 import { isNotePath } from '../graph/paths.ts'
 import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
@@ -306,6 +306,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
   #refreshRunning = false
   #refreshQueued = false
   #rebuildInFlight: { generation: number; promise: Promise<void> } | null = null
+  #tooNewNotice: OperationHandle | null = null
 
   constructor(deps: IndexLifecycleDeps) {
     this.#deps = deps
@@ -317,10 +318,15 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
   }
 
   async open(): Promise<number | null> {
+    this.#tooNewNotice?.dismiss()
+    this.#tooNewNotice = null
     try {
       return await this.#deps.indexStore.open()
     } catch (error) {
       this.#reportError('open', error)
+      if (toAppError(error).kind === 'indexTooNew') {
+        this.#showTooNewNotice()
+      }
       return null
     }
   }
@@ -641,6 +647,17 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     for (const listener of this.#movedListeners) {
       listener(from, to)
     }
+  }
+
+  #showTooNewNotice(): void {
+    const notice = this.#deps.progress.start('Search index unavailable', {
+      persistent: true,
+      action: { label: 'Dismiss', run: () => notice.dismiss() },
+    })
+    notice.fail(
+      'A newer version of Reflect updated this graph. Update Reflect to use search, backlinks, and tasks.',
+    )
+    this.#tooNewNotice = notice
   }
 
   #reportError(stage: IndexLifecycleStage, error: unknown): void {
