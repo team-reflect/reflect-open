@@ -132,7 +132,11 @@ export const APP_COMMANDS: Readonly<Record<AppCommandId, CommandDeclaration>> = 
     keywords: ['graph', 'workspace', 'switch', 'recent'],
     keybinding: 'Mod-9',
   },
-  'nav.today': { title: 'Go to today', keywords: ['daily', 'now'], keybinding: 'Mod-d' },
+  'nav.today': {
+    title: 'Go to today',
+    keywords: ['daily', 'now'],
+    keybinding: 'Mod-d',
+  },
   'nav.allNotes': {
     title: 'All notes',
     keywords: ['notes', 'list', 'browse', 'library'],
@@ -143,7 +147,11 @@ export const APP_COMMANDS: Readonly<Record<AppCommandId, CommandDeclaration>> = 
     keywords: ['todo', 'todos', 'checklist', 'checkbox', 'open'],
     keybinding: 'Mod-t',
   },
-  'note.new': { title: 'New note', keywords: ['create'], keybinding: 'Mod-n' },
+  'note.new': {
+    title: 'New note',
+    keywords: ['create'],
+    keybinding: 'Mod-n',
+  },
   'note.openInNewWindow': {
     title: 'Open note in new window',
     keywords: ['window', 'duplicate', 'pop out'],
@@ -174,9 +182,19 @@ export const APP_COMMANDS: Readonly<Record<AppCommandId, CommandDeclaration>> = 
     keywords: ['ai', 'assistant', 'copilot', 'conversation'],
     keybinding: 'Mod-Shift-n',
   },
-  'history.back': { title: 'Back', keybinding: 'Mod-[' },
-  'history.forward': { title: 'Forward', keybinding: 'Mod-]' },
-  'palette.open': { title: 'Search…', keywords: ['find', 'open'], keybinding: 'Mod-k' },
+  'history.back': {
+    title: 'Back',
+    keybinding: 'Mod-[',
+  },
+  'history.forward': {
+    title: 'Forward',
+    keybinding: 'Mod-]',
+  },
+  'palette.open': {
+    title: 'Search…',
+    keywords: ['find', 'open'],
+    keybinding: 'Mod-k',
+  },
   'note.togglePin': {
     title: 'Pin or unpin note',
     keywords: ['pinned', 'favorite', 'bookmark', 'sidebar'],
@@ -247,7 +265,10 @@ export const APP_COMMANDS: Readonly<Record<AppCommandId, CommandDeclaration>> = 
     title: 'Enable semantic search',
     keywords: ['embeddings', 'ai', 'similar', 'model'],
   },
-  'index.rebuild': { title: 'Rebuild search index', keywords: ['reindex', 'refresh'] },
+  'index.rebuild': {
+    title: 'Rebuild search index',
+    keywords: ['reindex', 'refresh'],
+  },
   'dev.toggleDevtools': {
     title: 'Developer tools',
     keywords: ['devtools', 'inspector', 'debug', 'console', 'inspect', 'web inspector'],
