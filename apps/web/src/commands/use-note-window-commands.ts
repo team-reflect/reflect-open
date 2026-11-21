@@ -1,7 +1,7 @@
 import { useNoteFindActions } from '@/providers/note-find-provider.tsx'
 import { useRouterActions } from '@/routing/router.tsx'
 import { useFocusedNotePath } from '@/routing/use-focused-note-path.ts'
-import { useCommandHandler_WIP, useCommands } from './use-commands.ts'
+import { useCommandHandler } from './use-commands.ts'
 import { useCommandKeys } from './use-command-keys.ts'
 import { useNoteCommands } from './use-note-commands.ts'
 
@@ -16,17 +16,13 @@ export function useNoteWindowCommands(): void {
   const notePath = useFocusedNotePath()
   const noteFind = useNoteFindActions()
 
-  useCommandHandler_WIP('history.back', back)
-
-  useCommands({
-    // 'history.back': back,
-    'history.forward': forward,
-    'note.find': () => {
-      noteFind.openForPath(notePath)
-    },
-    'note.findNext': noteFind.next,
-    'note.findPrevious': noteFind.previous,
+  useCommandHandler('history.back', back)
+  useCommandHandler('history.forward', forward)
+  useCommandHandler('note.find', () => {
+    noteFind.openForPath(notePath)
   })
+  useCommandHandler('note.findNext', noteFind.next)
+  useCommandHandler('note.findPrevious', noteFind.previous)
 
   useNoteCommands(notePath)
   useCommandKeys()

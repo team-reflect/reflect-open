@@ -1,5 +1,5 @@
 import type { AppCommandId } from '@reflect/app'
-import { useCommandBlock, useCommands } from '@/commands/use-commands.ts'
+import { useCommandBlock, useCommandHandler } from '@/commands/use-commands.ts'
 import { useCommandKeys } from '@/commands/use-command-keys.ts'
 import { useStore } from '@/lib/use-store.ts'
 import { quickOpenVisible } from '@/mobile/quick-open.tsx'
@@ -19,17 +19,17 @@ export function useMobileShortcuts(): void {
   const { navigate, selectSection, back, forward } = useRouterActions()
   const quickOpen = useStore(quickOpenVisible)
 
-  useCommands({
-    'nav.today': () => navigate({ kind: 'today' }, { focusEditor: true }),
-    'nav.allNotes': () => selectSection('all'),
-    'nav.tasks': () => selectSection('tasks'),
-    'note.new': () => navigate({ kind: 'note', path: noteCreation.untitledNotePath() }),
-    'chat.open': () => openChat(navigate, selectSection),
-    'palette.open': () => quickOpenVisible.set(true),
-    'settings.open': () => navigate({ kind: 'settings', page: 'main' }),
-    'history.back': back,
-    'history.forward': forward,
+  useCommandHandler('nav.today', () => navigate({ kind: 'today' }, { focusEditor: true }))
+  useCommandHandler('nav.allNotes', () => selectSection('all'))
+  useCommandHandler('nav.tasks', () => selectSection('tasks'))
+  useCommandHandler('note.new', () => {
+    navigate({ kind: 'note', path: noteCreation.untitledNotePath() })
   })
+  useCommandHandler('chat.open', () => openChat(navigate, selectSection))
+  useCommandHandler('palette.open', () => quickOpenVisible.set(true))
+  useCommandHandler('settings.open', () => navigate({ kind: 'settings', page: 'main' }))
+  useCommandHandler('history.back', back)
+  useCommandHandler('history.forward', forward)
   // Quick open is modal: nothing may run behind it.
   useCommandBlock(quickOpen, NO_COMMANDS)
   useCommandKeys()

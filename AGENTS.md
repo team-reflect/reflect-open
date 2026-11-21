@@ -169,7 +169,7 @@ The short version:
   built in `apps/web/src/boot.ts`. Never import from `boot.ts` outside `main.tsx`
   and the platform roots.
 - React reads `useCoreServices()` and `useAppServices()`. Command handlers are
-  registered by the UI that implements them (`useCommands` in
+  registered by the UI that implements them (`useCommandHandler` in
   `apps/web/src/commands/`) and close over what they need.
 - Service state is a `Store`. Read the module comment of
   [packages/core/src/store.ts](packages/core/src/store.ts) before you add or change

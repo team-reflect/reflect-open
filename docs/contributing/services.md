@@ -280,7 +280,7 @@ more. A module that needs both layers takes two
 (`installQueryInvalidation(core, app)` in `lib/query-invalidation.ts`).
 
 **Command handlers** are registered by the UI that implements them
-(`useCommands` in `apps/web/src/commands/use-commands.ts`) and read services
+(`useCommandHandler` in `apps/web/src/commands/use-commands.ts`) and read services
 through the React hooks. Never import `coreServices` or `appServices` from
 `boot.ts`: only `main.tsx` and the platform roots do.
 

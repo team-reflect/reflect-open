@@ -103,7 +103,7 @@ implements. Mobile-only services live in `CoreServices.mobile` (`null` elsewhere
   mobile). Do not add per-service hooks.
 - **Non-React desktop modules:** leading parameters are the services used (or the
   containers when three or more).
-- **Command handlers:** registered by the UI with `useCommands`; they read services through the React hooks, never from an import.
+- **Command handlers:** registered by the UI with `useCommandHandler`; they read services through the React hooks, never from an import.
 
 Providers are thin shells over service state; the state machines are in core.
 (`RouterProvider` uses `subscribe` + `useState` because a `useSyncExternalStore` update

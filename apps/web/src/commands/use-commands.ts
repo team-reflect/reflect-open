@@ -1,54 +1,25 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent } from 'react'
 import type { AppCommandId, CommandHandler } from '@reflect/app'
 import { useAppServices } from '@/services/services-provider.tsx'
 
 /**
- * Command handlers by id. An `undefined` handler registers nothing, so a
- * caller can offer a command only in some states (a note on screen, the chat
- * route).
+ * Register `handler` for `id` while the calling component is mounted. An
+ * `undefined` handler registers nothing, so a caller can offer a command only
+ * in some states (a note on screen, the chat route). The latest render's
+ * handler runs, so it may close over render values.
  */
-export type CommandHandlers = Partial<Record<AppCommandId, CommandHandler | undefined>>
-
-/**
- * Register `handlers` while the calling component is mounted. The latest
- * render's handlers run, so they may close over render values.
- */
-export function useCommands(handlers: CommandHandlers): void {
+export function useCommandHandler(id: AppCommandId, handler: CommandHandler | undefined): void {
   const { commands } = useAppServices()
-  const handlersRef = useRef(handlers)
+  const run = useEffectEvent(() => handler?.())
+  const enabled = handler !== undefined
   useEffect(() => {
-    handlersRef.current = handlers
-  })
-  // Re-register only when the set of handled ids changes.
-  const ids = Object.keys(handlers)
-    .filter((id) => handlers[id as AppCommandId] !== undefined)
-    .join(' ')
-  useEffect(() => {
-    if (ids === '') {
+    if (!enabled) {
       return
     }
     const controller = new AbortController()
-    for (const id of ids.split(' ') as AppCommandId[]) {
-      commands.handle(id, () => handlersRef.current[id]?.(), controller.signal)
-    }
+    commands.handle(id, run, controller.signal)
     return () => controller.abort()
-  }, [commands, ids])
-}
-
-export function useCommandHandler_WIP(
-  id: AppCommandId,
-  handler: CommandHandler | undefined | null,
-): void {
-  const { commands } = useAppServices()
-
-  useEffect(() => {
-    const controller = new AbortController()
-    if (!handler) {
-      return
-    }
-    commands.handle(id, handler, controller.signal)
-    return () => controller.abort()
-  }, [id, handler, commands])
+  }, [commands, id, enabled])
 }
 
 /**
