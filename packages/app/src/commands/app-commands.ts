@@ -231,7 +231,10 @@ export const APP_COMMANDS = {
     keywords: ['voice', 'mic', 'dictate', 'transcribe', 'speech', 'capture'],
     keybinding: 'Mod-Shift-r',
   },
-  'theme.toggle': { title: 'Toggle theme', keywords: ['dark', 'light', 'appearance'] },
+  'theme.toggle': {
+    title: 'Toggle theme',
+    keywords: ['dark', 'light', 'appearance'],
+  },
   'sidebar.toggle': {
     title: 'Toggle sidebar',
     keywords: ['collapse', 'expand', 'navigation', 'focus'],
