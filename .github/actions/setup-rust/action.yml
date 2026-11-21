@@ -33,7 +33,14 @@ runs:
     - name: Configure cargo
       shell: bash
       run: |
-        echo "CARGO_PROFILE_DEV_DEBUG=line-tables-only" >> "$GITHUB_ENV"
+        # No debug info keeps the cached target directory about 25% smaller.
+        echo "CARGO_PROFILE_DEV_DEBUG=false" >> "$GITHUB_ENV"
+
+        # actions/cache runs zstd without a level, so zstd reads ZSTD_CLEVEL.
+        # Level 10 makes the caches that this job saves about 12% smaller
+        # than the default level 3, and compresses almost as fast.
+        # https://github.com/actions/toolkit/blob/0c3a9c332b678ff1e776f93d728a4ad279803abe/packages/cache/src/internal/tar.ts#L239
+        echo "ZSTD_CLEVEL=10" >> "$GITHUB_ENV"
 
     - name: Install Rust toolchain
       shell: bash
