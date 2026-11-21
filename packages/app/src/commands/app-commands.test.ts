@@ -7,6 +7,7 @@ describe('APP_COMMANDS', () => {
   })
 })
 
+// FIXME: 下面这个测试就完全没有任何作用，请你删除。下面这个测试代码块本质上测试的是我们的代码定义，并不是测试的行为。这个测试用例对用户来说没有任何帮助，它本质上就是把我们 production 代码当中的东西，使用一种新的写法重新写了一遍而已。请你看看这个 pull request 还有没有类似这种没有任何用处的测试用例，把它们删除。
 describe('keybindingFor', () => {
   it('returns the binding UI hints derive from', () => {
     expect(keybindingFor('nav.today')).toBe('Mod-d')
