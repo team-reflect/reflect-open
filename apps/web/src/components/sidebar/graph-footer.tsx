@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { useGraphColors } from '@/hooks/use-graph-colors.ts'
+import { sortGraphsByName } from '@/lib/graph-order.ts'
 import { useSelector } from '@/lib/use-store.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraphActions, useGraphIndexing, useGraphRecents } from '@/providers/graph-provider.tsx'
@@ -135,7 +136,7 @@ export function GraphFooter({ graph }: GraphFooterProps): ReactElement {
           <TooltipContent>{graph.root}</TooltipContent>
         </Tooltip>
         <DropdownMenuContent aria-label="Switch graph" side="top" sideOffset={6}>
-          {recents.map((recent, index) => (
+          {sortGraphsByName(recents).map((recent, index) => (
             <GraphMenuItem
               key={recent.root}
               graph={recent}

@@ -2,6 +2,7 @@ import type { AppCommandId } from '@reflect/app'
 import { usePalette } from '@/components/command-palette/palette-provider.tsx'
 import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
 import { useNoteFindActions } from '@/providers/note-find-provider.tsx'
+import { sortGraphsByName } from '@/lib/graph-order.ts'
 import { useNoteTemplates } from '@/providers/note-templates-provider.tsx'
 import { useShortcuts } from '@/providers/shortcuts-provider.tsx'
 import { useSidebar } from '@/providers/sidebar-provider.tsx'
@@ -47,10 +48,11 @@ export function useWorkspaceCommands(): void {
   // The workspace can outlive the open graph, and its chat session with it.
   const chat = useMaybeGraphServices()?.chat
 
-  // `index` is zero-based: `graph.switch1` opens `recents[0]`.
+  // `index` is zero-based: `graph.switch1` opens the first graph by name, the
+  // same order the graph menu lists them in.
   const switchGraph = (index: number) => async () => {
     const { recents, graph } = graphSession.get()
-    const recent = recents[index]
+    const recent = sortGraphsByName(recents)[index]
     if (recent !== undefined && recent.root !== graph?.root) {
       await app.graphBoot.openRecent(recent.root)
     }
