@@ -1,9 +1,10 @@
 import type { ToolbarState } from '@reflect/types'
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { useEditor } from '@meowdown/react'
+import { useEditor, useExtension } from '@meowdown/react'
 import { buildFileMarkdown, type EditorExtension } from '@meowdown/core'
 import { toPortableImageFile } from '@/lib/image-file.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
+import { bottomScrollInsetExtension } from './bottom-scroll-inset.ts'
 import { whenEditorMounted } from './when-editor-mounted.ts'
 import {
   clearFormattingToolbar,
@@ -52,6 +53,7 @@ export function FormattingToolbarBridge({
     saveFileRef.current = saveFile
   }, [saveFile])
   const canAttachFiles = saveFile !== undefined
+  useExtension(touchEditor ? bottomScrollInsetExtension : null)
 
   useEffect(() => {
     if (!touchEditor) {

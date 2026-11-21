@@ -11,6 +11,7 @@ import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import { MobileStatusLayer } from '@/mobile/status-layer.tsx'
 import { RecordingDrawer } from '@/mobile/recording-drawer.tsx'
 import { WhatsNewDrawer } from '@/mobile/whats-new-drawer.tsx'
+import { useKeyboardAccessoryVar } from '@/mobile/keyboard-accessory.ts'
 import {
   useKeyboardCaretReveal,
   useKeyboardFieldReveal,
@@ -74,6 +75,7 @@ function MobileRouter({
  */
 function KeyboardEffects(): null {
   useKeyboardHeightVar()
+  useKeyboardAccessoryVar()
   useKeyboardFieldReveal()
   useKeyboardCaretReveal()
   return null

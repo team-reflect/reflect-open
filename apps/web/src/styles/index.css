@@ -28,6 +28,12 @@ Cascade layer order, low to high priority.
 @utility pb-above-keyboard {
   padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--keyboard-height, 0px));
 }
+/* The mobile shell root extends under the keyboard's accessory view
+   (`--keyboard-accessory-overlap`, mobile/keyboard-accessory.ts). This clears
+   it and the home indicator. */
+@utility pb-safe-above-keyboard-accessory {
+  padding-bottom: calc(var(--twsa-safe-area-inset-bottom) + var(--keyboard-accessory-overlap, 0px));
+}
 /* The chrome renderer of the shell (mobile/chrome/) sets the bottom safe
    area the page must clear itself (`--chrome-safe-bottom`). Edge-to-edge
    content clears it, and, with `-unless-keyboard`, only while the keyboard is

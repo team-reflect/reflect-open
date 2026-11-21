@@ -39,9 +39,20 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
   /// The presented photo picker; a new document closes it.
   private weak var picker: PHPickerViewController?
 
+  /// Declares the strip to the page at document start. The page extends its
+  /// content under the strip by the same rule as ``wantsStrip``.
+  private static let metricsScript = WKUserScript(
+    source: """
+      window.__reflectKeyboardAccessory = \
+      { height: \(FormattingStrip.height), shortcutBarHeight: \(shortcutBarHeight) }
+      """,
+    injectionTime: .atDocumentStart,
+    forMainFrameOnly: true)
+
   init(webView: WKWebView) {
     self.webView = webView
     super.init()
+    webView.configuration.userContentController.addUserScript(Self.metricsScript)
     strip.onCommand = { [weak self] id in self?.send(.command(.init(id: id))) }
     strip.onInsertImage = { [weak self] in self?.pickImages() }
     KeyboardTuning.accessoryProvider = { [weak self] view in self?.accessory(for: view) }
