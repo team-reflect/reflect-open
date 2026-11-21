@@ -317,7 +317,6 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
         with:
-          cache-targets: 'true'
           s3-endpoint: ${{ secrets.S3_SCCACHE_ENDPOINT }}
           s3-bucket: ${{ secrets.S3_SCCACHE_BUCKET }}
           s3-access-key-id: ${{ secrets.S3_SCCACHE_ACCESS_KEY_ID }}
