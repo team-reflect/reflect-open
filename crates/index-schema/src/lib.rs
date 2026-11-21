@@ -27,8 +27,8 @@ pub const INDEX_FILE: &str = "index.sqlite";
 pub const LATEST_SCHEMA_VERSION: usize = 23;
 
 /// The oldest schema version whose app can still use an index at
-/// [`LATEST_SCHEMA_VERSION`]. Reflect and Reflect Beta share one index, so an
-/// older app opens a newer index without migrating when this stamp allows it.
+/// [`LATEST_SCHEMA_VERSION`]. Reflect and Reflect Beta share one index; an older
+/// app uses a newer one unchanged when this allows it.
 ///
 /// Keep it for an additive migration: new tables, indexes, or columns that an
 /// older app's inserts can omit. Set it to the new version for anything else.
@@ -96,38 +96,51 @@ mod schema {
     use std::path::Path;
     use std::sync::{LazyLock, OnceLock};
 
-    use rusqlite::Connection;
     use rusqlite::ffi::{sqlite3, sqlite3_api_routines};
-    use rusqlite_migration::{M, Migrations};
+    use rusqlite::{Connection, Transaction};
+    use rusqlite_migration::{HookResult, M, Migrations};
+
+    const UPSERT_STAMP: &str = "INSERT INTO index_meta(key, value) VALUES (?1, ?2) \
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value";
+
+    /// A migration that also writes the stamp, so it commits with the new
+    /// `user_version`.
+    fn up(sql: &'static str) -> M<'static> {
+        M::up_with_hook(sql, |tx: &Transaction| -> HookResult {
+            let stamp = crate::MIN_COMPATIBLE_SCHEMA_VERSION.to_string();
+            tx.execute(UPSERT_STAMP, (crate::MIN_COMPATIBLE_SCHEMA_KEY, stamp))?;
+            Ok(())
+        })
+    }
 
     /// Ordered schema migrations, loaded from `migrations/*.sql`.
     static MIGRATIONS: LazyLock<Migrations<'static>> = LazyLock::new(|| {
         Migrations::new(vec![
-            M::up(include_str!("../migrations/0001_initial.sql")),
-            M::up(include_str!("../migrations/0002_embeddings.sql")),
-            M::up(include_str!("../migrations/0003_cosine_vectors.sql")),
-            M::up(include_str!("../migrations/0004_pinned.sql")),
-            M::up(include_str!("../migrations/0005_note_list_projection.sql")),
-            M::up(include_str!("../migrations/0006_conflicts.sql")),
-            M::up(include_str!("../migrations/0007_note_id_index.sql")),
-            M::up(include_str!("../migrations/0008_chat.sql")),
-            M::up(include_str!("../migrations/0009_gist.sql")),
-            M::up(include_str!("../migrations/0010_tag_search_indexes.sql")),
-            M::up(include_str!("../migrations/0011_tasks.sql")),
-            M::up(include_str!("../migrations/0012_task_due_date.sql")),
-            M::up(include_str!("../migrations/0013_perf_indexes.sql")),
-            M::up(include_str!("../migrations/0014_note_kind.sql")),
-            M::up(include_str!("../migrations/0015_note_kind_invariant.sql")),
-            M::up(include_str!("../migrations/0016_note_emails.sql")),
-            M::up(include_str!("../migrations/0017_task_breadcrumbs.sql")),
-            M::up(include_str!("../migrations/0018_note_key_precedence.sql")),
-            M::up(include_str!("../migrations/0019_note_claims.sql")),
-            M::up(include_str!(
+            up(include_str!("../migrations/0001_initial.sql")),
+            up(include_str!("../migrations/0002_embeddings.sql")),
+            up(include_str!("../migrations/0003_cosine_vectors.sql")),
+            up(include_str!("../migrations/0004_pinned.sql")),
+            up(include_str!("../migrations/0005_note_list_projection.sql")),
+            up(include_str!("../migrations/0006_conflicts.sql")),
+            up(include_str!("../migrations/0007_note_id_index.sql")),
+            up(include_str!("../migrations/0008_chat.sql")),
+            up(include_str!("../migrations/0009_gist.sql")),
+            up(include_str!("../migrations/0010_tag_search_indexes.sql")),
+            up(include_str!("../migrations/0011_tasks.sql")),
+            up(include_str!("../migrations/0012_task_due_date.sql")),
+            up(include_str!("../migrations/0013_perf_indexes.sql")),
+            up(include_str!("../migrations/0014_note_kind.sql")),
+            up(include_str!("../migrations/0015_note_kind_invariant.sql")),
+            up(include_str!("../migrations/0016_note_emails.sql")),
+            up(include_str!("../migrations/0017_task_breadcrumbs.sql")),
+            up(include_str!("../migrations/0018_note_key_precedence.sql")),
+            up(include_str!("../migrations/0019_note_claims.sql")),
+            up(include_str!(
                 "../migrations/0020_backlink_name_fallback.sql"
             )),
-            M::up(include_str!("../migrations/0021_note_has_content.sql")),
-            M::up(include_str!("../migrations/0022_drop_note_text.sql")),
-            M::up(include_str!("../migrations/0023_task_ast_path.sql")),
+            up(include_str!("../migrations/0021_note_has_content.sql")),
+            up(include_str!("../migrations/0022_drop_note_text.sql")),
+            up(include_str!("../migrations/0023_task_ast_path.sql")),
         ])
     });
 
@@ -226,36 +239,31 @@ mod schema {
     }
 
     /// Migrates to the latest schema and stamps
-    /// [`MIN_COMPATIBLE_SCHEMA_VERSION`]. A newer index is never written: it is
-    /// used unchanged when its stamp allows this app, else [`SchemaError::TooNew`].
+    /// [`MIN_COMPATIBLE_SCHEMA_VERSION`] in the same transaction. A newer index
+    /// is never written: it is used unchanged when its stamp allows this app,
+    /// else [`SchemaError::TooNew`].
     ///
     /// [`MIN_COMPATIBLE_SCHEMA_VERSION`]: crate::MIN_COMPATIBLE_SCHEMA_VERSION
     pub fn migrate(conn: &mut Connection) -> Result<(), SchemaError> {
-        let version = crate::read_user_version(conn)?;
-        if version > crate::LATEST_SCHEMA_VERSION {
-            return accept_newer(conn);
-        }
-        if version > 0 && version < crate::LATEST_SCHEMA_VERSION {
-            // Unstamped until the new stamp lands, so an interrupted upgrade
-            // reads as incompatible to older apps.
-            conn.execute(
-                "DELETE FROM index_meta WHERE key = ?1",
-                [crate::MIN_COMPATIBLE_SCHEMA_KEY],
-            )?;
-        }
         if let Err(err) = MIGRATIONS.to_latest(conn) {
-            // A newer app can migrate the file between the check and here.
             if crate::read_user_version(conn)? > crate::LATEST_SCHEMA_VERSION {
                 return accept_newer(conn);
             }
             return Err(SchemaError::Migration(err.to_string()));
         }
+        // An index that was already current may predate the stamp. The guard
+        // skips it when a newer app migrated it since `to_latest`.
         let stamp = crate::MIN_COMPATIBLE_SCHEMA_VERSION;
         if crate::read_min_compatible_schema(conn)? != Some(stamp) {
             conn.execute(
-                "INSERT INTO index_meta(key, value) VALUES (?1, ?2) \
+                "INSERT INTO index_meta(key, value) \
+                 SELECT ?1, ?2 FROM pragma_user_version WHERE user_version = ?3 \
                  ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-                (crate::MIN_COMPATIBLE_SCHEMA_KEY, stamp.to_string()),
+                (
+                    crate::MIN_COMPATIBLE_SCHEMA_KEY,
+                    stamp.to_string(),
+                    crate::LATEST_SCHEMA_VERSION as i64,
+                ),
             )?;
         }
         Ok(())
@@ -378,10 +386,46 @@ mod schema {
             .unwrap();
         }
 
+        fn delete_min_compatible(conn: &Connection) {
+            conn.execute(
+                "DELETE FROM index_meta WHERE key = ?1",
+                [crate::MIN_COMPATIBLE_SCHEMA_KEY],
+            )
+            .unwrap();
+        }
+
         #[test]
         fn migrate_stamps_the_min_compatible_schema() {
             let mut conn = open_in_memory().unwrap();
             migrate(&mut conn).unwrap();
+            assert_eq!(
+                crate::read_min_compatible_schema(&conn).unwrap(),
+                Some(crate::MIN_COMPATIBLE_SCHEMA_VERSION)
+            );
+        }
+
+        #[test]
+        fn a_current_index_without_a_stamp_gets_one() {
+            let mut conn = open_in_memory().unwrap();
+            migrate(&mut conn).unwrap();
+            delete_min_compatible(&conn);
+
+            migrate(&mut conn).unwrap();
+
+            assert_eq!(
+                crate::read_min_compatible_schema(&conn).unwrap(),
+                Some(crate::MIN_COMPATIBLE_SCHEMA_VERSION)
+            );
+        }
+
+        #[test]
+        fn an_upgrade_replaces_an_older_stamp() {
+            let mut conn = open_in_memory().unwrap();
+            migrate_to(&mut conn, crate::LATEST_SCHEMA_VERSION - 1).unwrap();
+            set_min_compatible(&conn, 1);
+
+            migrate(&mut conn).unwrap();
+
             assert_eq!(
                 crate::read_min_compatible_schema(&conn).unwrap(),
                 Some(crate::MIN_COMPATIBLE_SCHEMA_VERSION)
@@ -422,11 +466,7 @@ mod schema {
         fn a_newer_index_without_a_stamp_is_too_new() {
             let mut conn = open_in_memory().unwrap();
             migrate(&mut conn).unwrap();
-            conn.execute(
-                "DELETE FROM index_meta WHERE key = ?1",
-                [crate::MIN_COMPATIBLE_SCHEMA_KEY],
-            )
-            .unwrap();
+            delete_min_compatible(&conn);
             set_user_version(&conn, crate::LATEST_SCHEMA_VERSION + 1);
 
             let error = migrate(&mut conn).unwrap_err();
