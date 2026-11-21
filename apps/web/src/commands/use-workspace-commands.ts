@@ -12,9 +12,10 @@ import {
   useCoreServices,
   useMaybeGraphServices,
 } from '@/services/services-provider.tsx'
-import { useCommandBlock, useCommands } from './use-commands.ts'
+import { useCommandBlock, useCommandHandler_WIP, useCommands } from './use-commands.ts'
 import { useCommandKeys } from './use-command-keys.ts'
 import { useNoteCommands } from './use-note-commands.ts'
+import { useCallback, useMemo } from 'react'
 
 const NO_COMMANDS: readonly AppCommandId[] = []
 const SHORTCUTS_SHOW: readonly AppCommandId[] = ['shortcuts.show']
@@ -24,7 +25,8 @@ const SHORTCUTS_SHOW: readonly AppCommandId[] = ['shortcuts.show']
  * keyboard. Mount once inside the router and the workspace providers.
  */
 export function useWorkspaceCommands(): void {
-  const services = useCoreServices()
+  const services = useCoreServices() // FIXME: split services into items;
+  const { graphSession } = services
   const app = useAppServices()
   const { route } = useRouterState()
   const { clearScrollState } = useRouterHandlers()
@@ -40,17 +42,48 @@ export function useWorkspaceCommands(): void {
   const chat = useMaybeGraphServices()?.chat
 
   // `index` is zero-based: `graph.switch1` opens `recents[0]`.
-  const switchGraph = (index: number) => async () => {
-    const { recents, graph } = services.graphSession.get()
-    const recent = recents[index]
-    if (recent !== undefined && recent.root !== graph?.root) {
-      await app.graphBoot.openRecent(recent.root)
-    }
-  }
+  const switchGraph = useCallback(
+    (index: number) => async () => {
+      const { recents, graph } = graphSession.get()
+      const recent = recents[index]
+      if (recent !== undefined && recent.root !== graph?.root) {
+        await app.graphBoot.openRecent(recent.root)
+      }
+    },
+    [app, graphSession],
+  )
+
+  useCommandHandler_WIP(
+    'graph.switch1',
+    useMemo(() => switchGraph(0), [switchGraph]),
+  )
+  useCommandHandler_WIP(
+    'graph.switch2',
+    useMemo(() => switchGraph(1), [switchGraph]),
+  )
+
+  // 'note.find':
+  //   notePath === null
+  //     ? undefined
+  //     : () => {
+  //         noteFind.openForPath(notePath)
+  //       },
+  //
+  //
+  //
+  useCommandHandler_WIP(
+    'note.find',
+    useMemo(() => {
+      if (notePath === null) return
+      return () => {
+        noteFind.openForPath(notePath)
+      }
+    }, [noteFind, notePath]),
+  )
 
   useCommands({
-    'graph.switch1': switchGraph(0),
-    'graph.switch2': switchGraph(1),
+    // 'graph.switch1': switchGraph(0),
+    // 'graph.switch2': switchGraph(1),
     'graph.switch3': switchGraph(2),
     'graph.switch4': switchGraph(3),
     'graph.switch5': switchGraph(4),
@@ -80,12 +113,12 @@ export function useWorkspaceCommands(): void {
         navigate({ kind: 'note', path })
       }
     },
-    'note.find':
-      notePath === null
-        ? undefined
-        : () => {
-            noteFind.openForPath(notePath)
-          },
+    // 'note.find':
+    //   notePath === null
+    //     ? undefined
+    //     : () => {
+    //         noteFind.openForPath(notePath)
+    //       },
     'note.findNext': noteFind.next,
     'note.findPrevious': noteFind.previous,
     'chat.open': () => navigate({ kind: 'chat', conversationId: null }),
