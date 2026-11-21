@@ -43,8 +43,7 @@ runs:
       shell: bash
       run: rustc --version --verbose
 
-    # ort-sys downloads prebuilt ONNX Runtime binaries into ORT_CACHE_DIR.
-    # The "Cache ONNX Runtime" step below caches it.
+    # `ort-sys` downloads prebuilt ONNX Runtime binaries into ORT_CACHE_DIR.
     # ORT_CACHE_DIR is documented in the v2.0.0-rc.11 release notes:
     # https://github.com/pykeio/ort/releases/tag/v2.0.0-rc.11
     - name: Set the ONNX Runtime cache dir
@@ -85,11 +84,7 @@ runs:
           echo "No S3 secrets: sccache uses the local disk only."
         fi
 
-        # Without this, sccache writes a probe file before every write, and a
-        # rate-limited probe makes it skip the write.
-        echo "SCCACHE_SKIP_CACHE_CHECK=true" >> "$GITHUB_ENV"
-
-        # Upload to S3 only on master.
+        # Upload only on master.
         if [ "$GITHUB_REF" != "refs/heads/master" ]; then
           echo "SCCACHE_S3_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
         fi
