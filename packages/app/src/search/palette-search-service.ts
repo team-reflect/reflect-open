@@ -5,6 +5,7 @@ import {
   wikiLinkTargetForTitle,
   type ClockService,
   type DateSuggestionContext,
+  type NoteListService,
   type RetrievalService,
   type SearchService,
   type SuggestionService,
@@ -14,7 +15,6 @@ import {
 } from '@reflect/core'
 import type { Command } from '../commands/app-commands.ts'
 import type { CommandService } from '../commands/command-service.ts'
-import type { NoteVisitService } from '../navigation/note-visit-service.ts'
 import { buildPaletteSections, type PaletteHit, type PaletteSections } from './palette-entries.ts'
 
 /**
@@ -83,7 +83,7 @@ export interface PaletteSearchServiceDeps {
   readonly retrieval: RetrievalService
   readonly commands: CommandService
   readonly clock: ClockService
-  readonly noteVisits: Pick<NoteVisitService, 'listRecent'>
+  readonly noteList: Pick<NoteListService, 'listVisitedNotes'>
 }
 
 class PaletteSearchServiceImpl implements PaletteSearchService {
@@ -98,12 +98,12 @@ class PaletteSearchServiceImpl implements PaletteSearchService {
     dateContext: DateSuggestionContext,
     currentNote: string | null,
   ): Promise<WikiSuggestion[]> {
-    const { suggestions, noteVisits } = this.#deps
+    const { suggestions, noteList } = this.#deps
     if (text !== '') {
       return await suggestions.suggestWikiTargets(text, 8, dateContext)
     }
     const [visited, linked] = await Promise.all([
-      noteVisits.listRecent(9),
+      noteList.listVisitedNotes(9),
       suggestions.suggestWikiTargets(text, 9, dateContext),
     ])
     const recent = visited.map(({ path, title }): WikiSuggestion => ({

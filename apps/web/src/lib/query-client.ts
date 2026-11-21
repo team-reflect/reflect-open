@@ -29,7 +29,6 @@ export const queryKeys = {
         weekStartDay: string
         today: string
         currentNote: string | null
-        revision: number | null
       },
     ) {
       return [
@@ -40,7 +39,6 @@ export const queryKeys = {
         options.weekStartDay,
         options.today,
         options.currentNote,
-        options.revision,
       ] as const
     },
     paletteSearch(root: GraphRoot, mode: PaletteSearchMode, text: string) {

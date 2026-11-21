@@ -88,8 +88,9 @@ export function RouterProvider({
     return appNavigation
   })
 
-  // `reset` notifies no subscriber, so each fresh history starts its own
-  // tracking. StrictMode runs this twice in dev; the second visit is an upsert.
+  // `reset` notifies no subscriber, so tracking starts here, from the route on
+  // screen when this effect runs. StrictMode runs this twice in dev; the
+  // second visit is an upsert.
   useEffect(() => noteVisits.track(), [noteVisits])
 
   return (

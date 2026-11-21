@@ -3,14 +3,12 @@ import type {
   GraphSessionService,
   IpcBridgeService,
   LoggerService,
-  NoteListService,
   Unlisten,
-  VisitedNote,
 } from '@reflect/core'
 import type { NavigationService } from './navigation-service.ts'
 
 /**
- * The notes this device opened (the index's `note_visits` table).
+ * Records the notes this device opens in the index's `note_visits` table.
  */
 export interface NoteVisitService {
   /**
@@ -19,18 +17,12 @@ export interface NoteVisitService {
    * history, because `NavigationService.reset` notifies no subscriber.
    */
   track(): Unlisten
-  /**
-   * The notes opened most recently first, at most `limit`. Daily notes and
-   * templates are left out.
-   */
-  listRecent(limit: number): Promise<VisitedNote[]>
 }
 
 export interface NoteVisitServiceDeps {
   readonly navigation: NavigationService
   readonly graphSession: GraphSessionService
   readonly ipc: IpcBridgeService
-  readonly noteList: Pick<NoteListService, 'listVisitedNotes'>
   readonly clock: ClockService
   readonly logger: LoggerService
 }
@@ -68,10 +60,6 @@ class NoteVisitServiceImpl implements NoteVisitService {
       unlistenNavigation()
       unlistenGraph()
     }
-  }
-
-  async listRecent(limit: number): Promise<VisitedNote[]> {
-    return await this.#deps.noteList.listVisitedNotes(limit)
   }
 
   async #record(path: string, generation: number): Promise<void> {

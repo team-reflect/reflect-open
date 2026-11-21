@@ -390,7 +390,6 @@ export {
   type ChatTurn,
 } from './ai/chat/transcript.ts'
 export { type ChatConversation } from './ai/chat/chat-history-service.ts'
-export type { VisitedNote } from '@reflect/types'
 export { audioMemoIdentity, audioMemoPartPath } from './audio/audio-memo.ts'
 export {
   type AudioMemoPhase,

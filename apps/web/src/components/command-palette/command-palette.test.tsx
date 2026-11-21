@@ -172,32 +172,21 @@ describe('CommandPalette', () => {
     expect(view.getByText('Commands').query()).toBeNull() // recall feed only (decided)
   })
 
-  it('answers the recent notes again after a back and forward', async () => {
+  it('leaves the note on screen out of the recent notes', async () => {
     suggestWikiTargets.mockResolvedValue([])
-    const { view, appLayer } = await renderPalette('')
-    const { navigation, noteVisits } = appLayer
-    const listRecent = vi.spyOn(noteVisits, 'listRecent')
-    listRecent.mockResolvedValue([
-      { path: 'notes/c.md', title: 'Note C' },
+    const { view, core, appLayer } = await renderPalette('')
+    const listVisitedNotes = vi.spyOn(core.noteList, 'listVisitedNotes')
+    listVisitedNotes.mockResolvedValue([
       { path: 'notes/a.md', title: 'Note A' },
+      { path: 'notes/b.md', title: 'Note B' },
     ])
-    navigation.navigate({ kind: 'note', path: 'notes/a.md' })
-    navigation.navigate({ kind: 'note', path: 'notes/b.md' })
-    navigation.navigate({ kind: 'note', path: 'notes/c.md' })
-    navigation.back()
-    await expect.element(view.getByText('Note C')).toBeInTheDocument()
+    appLayer.navigation.navigate({ kind: 'note', path: 'notes/a.md' })
+    await expect.element(view.getByText('Note B')).toBeInTheDocument()
+    expect(view.getByText('Note A').query()).toBeNull()
 
-    // Back to A records A, so the list at B changes.
-    const pending = Promise.withResolvers<{ path: string; title: string }[]>()
-    listRecent.mockReturnValue(pending.promise)
-    navigation.back()
-    navigation.forward()
-    await vi.waitFor(() => expect(view.getByText('Note C').query()).toBeNull())
-    pending.resolve([
-      { path: 'notes/a.md', title: 'Note A' },
-      { path: 'notes/c.md', title: 'Note C' },
-    ])
+    appLayer.navigation.navigate({ kind: 'note', path: 'notes/b.md' })
     await expect.element(view.getByText('Note A')).toBeInTheDocument()
+    expect(view.getByText('Note B').query()).toBeNull()
   })
 
   it('ends a typed query with an Ask row that leads to Settings with no AI provider', async () => {

@@ -41,9 +41,6 @@ function setup(indexOpen = true) {
     navigation,
     graphSession,
     ipc,
-    noteList: {
-      listVisitedNotes: (limit) => database.read('index_visited_notes', { limit }),
-    },
     clock,
     logger: createTestLoggerService(),
   })
@@ -94,14 +91,14 @@ describe('NoteVisitService', () => {
     expect(recorded()).toEqual(['notes/a.md'])
   })
 
-  it('lists the recorded notes, most recent first', async () => {
+  it('writes the visits to the index, most recent first', async () => {
     const { navigation, clock, service } = setup()
     service.track()
     navigation.navigate({ kind: 'note', path: 'notes/a.md' })
     clock.setNow(2000)
     navigation.navigate({ kind: 'note', path: 'notes/b.md' })
     await Promise.resolve()
-    await expect(service.listRecent(8)).resolves.toEqual([
+    await expect(database.read('index_visited_notes', { limit: 8 })).resolves.toEqual([
       { path: 'notes/b.md', title: 'B' },
       { path: 'notes/a.md', title: 'A' },
     ])

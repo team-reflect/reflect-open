@@ -269,7 +269,6 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
     navigation,
     graphSession: core.graphSession,
     ipc: core.ipc,
-    noteList: core.noteList,
     clock: core.clock,
     logger: core.logger,
   })
@@ -279,7 +278,7 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
     retrieval: core.retrieval,
     commands,
     clock: core.clock,
-    noteVisits,
+    noteList: core.noteList,
   })
   const opener = createOpenerService({ transport: host.opener, logger: core.logger })
   const deepLinkRouter = createDeepLinkRouter({

@@ -72,7 +72,7 @@ function setup() {
     retrieval,
     commands,
     clock: createTestClockService({ now: NOON_JUNE_9 }),
-    noteVisits: { listRecent: () => Promise.resolve([]) },
+    noteList: { listVisitedNotes: () => Promise.resolve([]) },
   })
   return { service, searches, retrieval, commands }
 }
@@ -99,7 +99,7 @@ describe('PaletteSearchService', () => {
         logger: createTestLoggerService(),
       }),
       clock: createTestClockService(),
-      noteVisits: { listRecent: () => Promise.resolve([]) },
+      noteList: { listVisitedNotes: () => Promise.resolve([]) },
     })
 
     const suggestions = await service.suggestTitles(
@@ -134,8 +134,8 @@ describe('PaletteSearchService', () => {
         logger: createTestLoggerService(),
       }),
       clock: createTestClockService(),
-      noteVisits: {
-        listRecent: () => {
+      noteList: {
+        listVisitedNotes: () => {
           return Promise.resolve([
             { path: 'notes/a.md', title: 'A' },
             { path: 'notes/b.md', title: 'B' },
