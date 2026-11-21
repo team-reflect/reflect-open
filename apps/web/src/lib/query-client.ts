@@ -23,7 +23,13 @@ export const queryKeys = {
     },
     paletteSuggestions(
       root: GraphRoot,
-      options: { text: string; dateFormat: string; weekStartDay: string; today: string },
+      options: {
+        text: string
+        dateFormat: string
+        weekStartDay: string
+        today: string
+        arrival: string | null
+      },
     ) {
       return [
         ...this.graph(root),
@@ -32,6 +38,7 @@ export const queryKeys = {
         options.dateFormat,
         options.weekStartDay,
         options.today,
+        options.arrival,
       ] as const
     },
     paletteSearch(root: GraphRoot, mode: PaletteSearchMode, text: string) {

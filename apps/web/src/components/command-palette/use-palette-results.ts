@@ -10,6 +10,7 @@ import {
   useSemanticSearchEnabled,
   useWeekStartDay,
 } from '@/providers/settings-provider.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 import type { PaletteSections } from './entries.ts'
 
@@ -58,6 +59,7 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
   // would serve a stale "Tomorrow" afterwards. Computed once so the key and the
   // query agree on the same day.
   const today = useToday()
+  const { entryId, arrivalSeq } = useRouterState()
 
   const {
     data: suggestions,
@@ -69,6 +71,9 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
       dateFormat,
       weekStartDay,
       today,
+      // An arrival changes the empty query's recent notes without an index
+      // write, so each arrival gets its own answer.
+      arrival: trimmed === '' ? `${entryId}:${arrivalSeq}` : null,
     }),
     queryFn: () => {
       return paletteSearch.suggestTitles(trimmed, {
@@ -78,9 +83,6 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
       })
     },
     enabled: searching && !parsed.filtered,
-    // Opening a note changes the empty query's recent notes without an index
-    // write, so that answer refetches on every open.
-    staleTime: trimmed === '' ? 0 : Infinity,
   })
   const useHybrid = hybrid && !parsed.filtered
   const {
