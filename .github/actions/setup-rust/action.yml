@@ -9,7 +9,7 @@ inputs:
   cache-targets:
     description: Whether to cache the target directory.
     required: false
-    default: 'false'
+    default: 'true'
   s3-endpoint:
     description: S3 endpoint of the sccache bucket.
     required: false
