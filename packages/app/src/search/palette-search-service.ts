@@ -13,6 +13,7 @@ import {
 } from '@reflect/core'
 import type { Command } from '../commands/app-commands.ts'
 import type { CommandService } from '../commands/command-service.ts'
+import type { NoteVisitService } from '../navigation/note-visit-service.ts'
 import { buildPaletteSections, type PaletteHit, type PaletteSections } from './palette-entries.ts'
 
 /**
@@ -49,6 +50,7 @@ export interface PaletteSectionsInput {
 export interface PaletteSearchService {
   /**
    * Title suggestions for `text` (at most 8), generated date phrases merged in.
+   * An empty `text` lists the recently opened notes first.
    */
   suggestTitles(text: string, dateContext: DateSuggestionContext): Promise<WikiSuggestion[]>
   /**
@@ -75,6 +77,7 @@ export interface PaletteSearchServiceDeps {
   readonly retrieval: RetrievalService
   readonly commands: CommandService
   readonly clock: ClockService
+  readonly noteVisits: NoteVisitService
 }
 
 class PaletteSearchServiceImpl implements PaletteSearchService {
@@ -85,7 +88,24 @@ class PaletteSearchServiceImpl implements PaletteSearchService {
   }
 
   async suggestTitles(text: string, dateContext: DateSuggestionContext): Promise<WikiSuggestion[]> {
-    return await this.#deps.suggestions.suggestWikiTargets(text, 8, dateContext)
+    const { suggestions, noteVisits } = this.#deps
+    if (text !== '') {
+      return await suggestions.suggestWikiTargets(text, 8, dateContext)
+    }
+    const [visited, linked] = await Promise.all([
+      noteVisits.listRecent(8),
+      suggestions.suggestWikiTargets(text, 8, dateContext),
+    ])
+    const recent = visited.map(({ path, title }): WikiSuggestion => ({
+      target: title,
+      path,
+      title,
+      alias: null,
+      date: null,
+    }))
+    const paths = new Set(visited.map((note) => note.path))
+    const rest = linked.filter((suggestion) => !paths.has(suggestion.path ?? ''))
+    return [...recent, ...rest].slice(0, 8)
   }
 
   async search(text: string, options: { hybrid: boolean }): Promise<PaletteHit[]> {

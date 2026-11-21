@@ -72,6 +72,7 @@ function setup() {
     retrieval,
     commands,
     clock: createTestClockService({ now: NOON_JUNE_9 }),
+    noteVisits: { listRecent: () => Promise.resolve([]) },
   })
   return { service, searches, retrieval, commands }
 }
@@ -98,6 +99,7 @@ describe('PaletteSearchService', () => {
         logger: createTestLoggerService(),
       }),
       clock: createTestClockService(),
+      noteVisits: { listRecent: () => Promise.resolve([]) },
     })
 
     const suggestions = await service.suggestTitles('tomorrow', {
@@ -110,6 +112,36 @@ describe('PaletteSearchService', () => {
       date: '2026-06-10',
       generated: { phrase: 'Tomorrow' },
     })
+    database.close()
+  })
+
+  it('lists the recently opened notes first for an empty query', async () => {
+    const database = createTestDatabaseService()
+    seedNotes(database, [
+      { path: 'notes/a.md', markdown: '# A\n' },
+      { path: 'notes/b.md', markdown: '# B\n' },
+    ])
+    const service = createPaletteSearchService({
+      suggestions: createSuggestionService({ database }),
+      search: createSearchService({
+        database,
+        wikiResolver: createWikiResolverService({ database }),
+      }),
+      retrieval: createTestRetrievalService(),
+      commands: createCommandService({
+        platform: createTestPlatformService(),
+        logger: createTestLoggerService(),
+      }),
+      clock: createTestClockService(),
+      noteVisits: { listRecent: () => Promise.resolve([{ path: 'notes/b.md', title: 'B' }]) },
+    })
+
+    const suggestions = await service.suggestTitles('', {
+      today: '2026-06-09',
+      dateFormat: 'mdy',
+      weekStartDay: 'monday',
+    })
+    expect(suggestions.map((suggestion) => suggestion.path)).toEqual(['notes/b.md', 'notes/a.md'])
     database.close()
   })
 

@@ -55,6 +55,7 @@ import {
   type LinkNavigationService,
 } from './navigation/link-navigation-service.ts'
 import { createNavigationService, type NavigationService } from './navigation/navigation-service.ts'
+import { createNoteVisitService } from './navigation/note-visit-service.ts'
 import type { AppLifecycleService } from './app/lifecycle-service.ts'
 import { createQuitPolicyService, type QuitPolicyService } from './app/quit-policy-service.ts'
 import type { WindowService } from './app/window-service.ts'
@@ -259,15 +260,23 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
     logger: core.logger,
     host: host.nativeMenu ?? createUnsupportedNativeMenuHost(),
   })
+  const navigation = createNavigationService()
   const paletteSearch = createPaletteSearchService({
     suggestions: core.suggestions,
     search: core.search,
     retrieval: core.retrieval,
     commands,
     clock: core.clock,
+    noteVisits: createNoteVisitService({
+      navigation,
+      graphSession: core.graphSession,
+      ipc: core.ipc,
+      noteList: core.noteList,
+      clock: core.clock,
+      logger: core.logger,
+    }),
   })
   const opener = createOpenerService({ transport: host.opener, logger: core.logger })
-  const navigation = createNavigationService()
   const deepLinkRouter = createDeepLinkRouter({
     intake: core.deepLinkIntake,
     logger: core.logger,

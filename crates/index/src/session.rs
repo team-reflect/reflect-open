@@ -17,6 +17,7 @@ use crate::embed_write;
 use crate::scan;
 use crate::schema::IndexMeta;
 use crate::sql;
+use crate::visit_write;
 use crate::write;
 
 /// Where a session gets its connections when it opens a root.
@@ -329,8 +330,8 @@ impl IndexSession {
     }
 
     /// Wipe all derived tables (the TS layer then re-applies every note). The
-    /// `chat_*` tables are deliberately untouched: chat history is durable,
-    /// not a rebuildable projection.
+    /// `chat_*` and `note_visits` tables are deliberately untouched: they are
+    /// durable, not a rebuildable projection.
     pub fn clear(&self, generation: u64) -> AppResult<Applied> {
         Self::applied(self.write(generation, |conn| write::clear_index(conn)))
     }
@@ -355,6 +356,16 @@ impl IndexSession {
     /// Delete a conversation and (via cascade) its messages.
     pub fn delete_chat_conversation(&self, generation: u64, id: &str) -> AppResult<Applied> {
         Self::applied(self.write(generation, |conn| chat_write::delete_conversation(conn, id)))
+    }
+
+    /// Record that this device opened the note at `path` at `visited_ms`.
+    pub fn record_visit(&self, generation: u64, path: &str, visited_ms: i64) -> AppResult<Applied> {
+        Self::applied(self.write(generation, |conn| {
+            let tx = conn.transaction()?;
+            visit_write::record(&tx, path, visited_ms)?;
+            tx.commit()?;
+            Ok(())
+        }))
     }
 
     /// Replace a note's embedding chunk set (diff applied in one transaction).
