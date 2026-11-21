@@ -4,18 +4,24 @@ import type {
   IpcBridgeService,
   LoggerService,
   NoteListService,
+  Unlisten,
   VisitedNote,
 } from '@reflect/core'
 import type { NavigationService } from './navigation-service.ts'
 
 /**
- * The notes this device opened (the index's `note_visits` table). Every
- * arrival on a note route records a visit.
+ * The notes this device opened (the index's `note_visits` table).
  */
 export interface NoteVisitService {
   /**
-   * The notes opened most recently first, at most `limit`, without the note
-   * on screen.
+   * Record the note on screen, then every later arrival on a note route,
+   * until the returned function runs. A router calls it once for each fresh
+   * history, because `NavigationService.reset` notifies no subscriber.
+   */
+  track(): Unlisten
+  /**
+   * The notes opened most recently first, at most `limit`. Daily notes and
+   * templates are left out.
    */
   listRecent(limit: number): Promise<VisitedNote[]>
 }
@@ -31,37 +37,41 @@ export interface NoteVisitServiceDeps {
 
 class NoteVisitServiceImpl implements NoteVisitService {
   readonly #deps: NoteVisitServiceDeps
-  #entryId: number
-  #arrivalSeq: number
 
   constructor(deps: NoteVisitServiceDeps) {
     this.#deps = deps
-    const { entryId, arrivalSeq } = deps.navigation.get()
-    this.#entryId = entryId
-    this.#arrivalSeq = arrivalSeq
-    deps.navigation.subscribe(() => this.#onNavigation())
+  }
+
+  track(): Unlisten {
+    const { navigation, graphSession } = this.#deps
+    let seen: { entryId: number; arrivalSeq: number } | null = null
+    const check = (): void => {
+      const { route, entryId, arrivalSeq } = navigation.get()
+      // A rename rewrites the route in place; only an arrival is a visit.
+      if (seen?.entryId === entryId && seen.arrivalSeq === arrivalSeq) {
+        return
+      }
+      // Without an index, the arrival stays unseen until the index opens.
+      const generation = graphSession.get().indexGeneration
+      if (generation === null) {
+        return
+      }
+      seen = { entryId, arrivalSeq }
+      if (route.kind === 'note') {
+        void this.#record(route.path, generation)
+      }
+    }
+    check()
+    const unlistenNavigation = navigation.subscribe(check)
+    const unlistenGraph = graphSession.subscribe(check)
+    return () => {
+      unlistenNavigation()
+      unlistenGraph()
+    }
   }
 
   async listRecent(limit: number): Promise<VisitedNote[]> {
-    const { navigation, noteList } = this.#deps
-    const notes = await noteList.listVisitedNotes(limit + 1)
-    const route = navigation.get().route
-    const current = route.kind === 'note' ? route.path : null
-    return notes.filter((note) => note.path !== current).slice(0, limit)
-  }
-
-  #onNavigation(): void {
-    const { route, entryId, arrivalSeq } = this.#deps.navigation.get()
-    // A rename rewrites the route in place; only an arrival is a visit.
-    if (entryId === this.#entryId && arrivalSeq === this.#arrivalSeq) {
-      return
-    }
-    this.#entryId = entryId
-    this.#arrivalSeq = arrivalSeq
-    const generation = this.#deps.graphSession.get().indexGeneration
-    if (route.kind === 'note' && generation !== null) {
-      void this.#record(route.path, generation)
-    }
+    return await this.#deps.noteList.listVisitedNotes(limit)
   }
 
   async #record(path: string, generation: number): Promise<void> {

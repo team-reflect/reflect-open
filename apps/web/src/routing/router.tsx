@@ -82,11 +82,14 @@ export function RouterProvider({
   initialSection,
   children,
 }: RouterProviderProps): ReactElement {
-  const { navigation: appNavigation } = useAppServices()
+  const { navigation: appNavigation, noteVisits } = useAppServices()
   const [navigation] = useState(() => {
     appNavigation.reset(initialRoute, initialSection)
     return appNavigation
   })
+
+  // `reset` notifies no subscriber, so each fresh history starts its own tracking.
+  useEffect(() => noteVisits.track(), [noteVisits])
 
   return (
     <RouterActionsProvider navigation={navigation}>
