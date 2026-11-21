@@ -144,6 +144,15 @@ pub struct RecentNoteRow {
     pub is_private: bool,
 }
 
+/// One note this device opened, for the palette's Recent list.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct VisitedNote {
+    pub path: String,
+    pub title: String,
+}
+
 /// One task row with the fields of its note that the task list shows.
 #[derive(Debug, PartialEq, Serialize)]
 #[cfg_attr(feature = "codegen", derive(specta::Type))]

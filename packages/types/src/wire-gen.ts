@@ -1049,6 +1049,14 @@ export type Commands = {
     }
     result: null
   }
+  note_visit_record: {
+    args: {
+      path: string
+      visitedMs: number
+      generation: number
+    }
+    result: null
+  }
   embed_apply: {
     args: {
       path: string
@@ -1294,6 +1302,12 @@ export type Commands = {
       conversationId: string
     }
     result: ChatMessageRow[]
+  }
+  index_visited_notes: {
+    args: {
+      limit: number
+    }
+    result: VisitedNote[]
   }
   skill_status: {
     args: Record<string, never>
@@ -2618,6 +2632,12 @@ export type VaultScanStats = {
   skipped: number
 }
 
+/**  One note this device opened, for the palette's Recent list. */
+export type VisitedNote = {
+  path: string
+  title: string
+}
+
 /**  `plugin:web-auth|start` result. */
 export type WebAuthCallback = {
   /**  The callback URL; none when the user cancels. */
@@ -2728,6 +2748,7 @@ export type IndexWriteCommand =
   | 'index_meta_set'
   | 'chat_message_save'
   | 'chat_conversation_delete'
+  | 'note_visit_record'
   | 'embed_apply'
   | 'embed_remove'
 
@@ -2773,3 +2794,4 @@ export type IndexReadCommand =
   | 'index_daily_notes'
   | 'chat_conversations'
   | 'chat_messages'
+  | 'index_visited_notes'

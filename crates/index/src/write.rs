@@ -10,8 +10,8 @@ use sea_query::{Expr, ExprTrait, Query};
 use reflect_types::{AppError, AppResult, IndexedNote, MovedNoteAddress};
 
 use crate::schema::{
-    Aliases, Assets, EmbeddingChunks, EmbeddingVectors, Links, NoteClaims, NoteEmails, Notes,
-    SearchFts, Tags, Tasks,
+    Aliases, Assets, EmbeddingChunks, EmbeddingVectors, Links, NoteClaims, NoteEmails, NoteVisits,
+    Notes, SearchFts, Tags, Tasks,
 };
 use crate::sql::{self, lit};
 
@@ -291,6 +291,14 @@ pub(super) fn move_note(
         to,
     )?;
     move_rows(conn, SearchFts::Table, SearchFts::Path, from, to)?;
+    // A visit of a note deleted at `to` would collide with the moved visit.
+    sql::execute(
+        conn,
+        Query::delete()
+            .from_table(NoteVisits::Table)
+            .and_where(Expr::col(NoteVisits::Path).eq(to)),
+    )?;
+    move_rows(conn, NoteVisits::Table, NoteVisits::Path, from, to)?;
     Ok(())
 }
 

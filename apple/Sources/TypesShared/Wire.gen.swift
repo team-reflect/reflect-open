@@ -5217,6 +5217,34 @@ public struct VaultScanStats: Codable, Sendable, Equatable {
     }
 }
 
+/// One note this device opened, for the palette's Recent list.
+public struct VisitedNote: Codable, Sendable, Equatable {
+    public let path: String
+    public let title: String
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case title = "title"
+    }
+
+    public init(path: String, title: String) {
+        self.path = path
+        self.title = title
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.title = try container.decode(String.self, forKey: .title)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(title, forKey: .title)
+    }
+}
+
 /// `plugin:web-auth|start` result.
 public struct WebAuthCallback: Codable, Sendable, Equatable {
     public let url: String?

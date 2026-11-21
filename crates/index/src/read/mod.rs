@@ -19,4 +19,5 @@ pub mod search;
 pub(crate) mod stats;
 pub(crate) mod suggest;
 pub(crate) mod tasks;
+pub(crate) mod visits;
 pub mod wiki;

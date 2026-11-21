@@ -44,6 +44,7 @@ tables! {
     NoteEmails { NotePath, Email, EmailKey }
     /// A view: the note that wins each wiki key.
     NoteKeys { NotePath, Key, ClaimCount }
+    NoteVisits { Path, VisitedMs }
     Notes {
         Path, Id, Title, TitleKey, DailyDate, IsPrivate, FileHash, Mtime, UpdatedAt, IsPinned,
         PinnedOrder, Preview, HasConflict, GistUrl, GistStale, Kind, PathKey, HasContent,
