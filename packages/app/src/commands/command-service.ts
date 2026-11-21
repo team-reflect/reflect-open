@@ -149,7 +149,7 @@ class CommandServiceImpl implements CommandService {
     this.#deps = deps
     // FIXME: 1. if you use objectEntries here, you do not need `as AppCommandId` anymore; 2. find the whole codebase, do the refactors like this and remove unnecessary `as` casts for `Object.entries`;
     this.#commands = objectEntries(APP_COMMANDS).map(([id, declaration]) => ({
-      id: id as AppCommandId,
+      id: id,
       ...declaration,
     }))
     for (const command of this.#commands) {
