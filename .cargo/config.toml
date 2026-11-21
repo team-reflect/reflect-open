@@ -7,3 +7,12 @@ warnings = "deny"
 # already in `Cargo.lock`.
 [registry]
 global-min-publish-age = "24 hours"
+
+# The wasm build of SQLite archives its C objects with the `llvm-ar` of the
+# Rust toolchain: the macOS `ar` writes no symbol index for wasm objects.
+[env]
+AR_wasm32_unknown_unknown = { value = "scripts/llvm-ar", relative = true }
+
+# `cargo xtask <command>` runs the repository automation in `xtask/`.
+[alias]
+xtask = "run --package xtask --locked --"

@@ -1,25 +1,43 @@
 //! The candidates of the tag and wiki link suggestions.
 
-use rusqlite::{Connection, Row, params};
+use rusqlite::Connection;
+use sea_query::extension::sqlite::SqliteBinOper;
+use sea_query::{Asterisk, Cond, Expr, ExprTrait, Func, LikeExpr, Order, Query, SelectStatement};
 
 use reflect_types::{
     AppResult, TagFacet, WikiAliasCandidate, WikiCandidates, WikiKeyWinner, WikiTitleCandidate,
     WikiWinningAlias,
 };
 
-use super::notes::json_list;
+use super::lists::{tag_facet, tag_facets};
+use crate::schema::{Aliases, Links, NoteClaims, NoteKeys, Notes, SearchFts, Tags};
+use crate::sql::{self, lit};
 use crate::text::fts::build_fts_title_prefix_match;
 
 /// The size of each candidate pool. Ranking happens in the frontend.
-const WIKI_CANDIDATE_LIMIT: u32 = 200;
+const WIKI_CANDIDATE_LIMIT: u64 = 200;
+
+const LINK_COUNT: &str = "link_count";
 
 /// The number of links that point at a key the note claims.
-const LINK_COUNT: &str = "(SELECT count(*) FROM note_claims
-       JOIN links ON links.target_key = note_claims.key
-       WHERE note_claims.note_path = notes.path)";
+fn link_count() -> SelectStatement {
+    Query::select()
+        .expr(Func::count(Expr::col(Asterisk)))
+        .from(NoteClaims::Table)
+        .inner_join(
+            Links::Table,
+            Expr::col((Links::Table, Links::TargetKey))
+                .equals((NoteClaims::Table, NoteClaims::Key)),
+        )
+        .and_where(
+            Expr::col((NoteClaims::Table, NoteClaims::NotePath))
+                .equals((Notes::Table, Notes::Path)),
+        )
+        .take()
+}
 
-/// A `LIKE` pattern that matches `key` anywhere, for `ESCAPE '\'`.
-fn like_contains(key: &str) -> String {
+/// A `LIKE` pattern that matches `key` anywhere, with `\` as the escape.
+fn like_contains(key: &str) -> LikeExpr {
     let mut pattern = String::with_capacity(key.len() + 2);
     pattern.push('%');
     for character in key.chars() {
@@ -29,53 +47,78 @@ fn like_contains(key: &str) -> String {
         pattern.push(character);
     }
     pattern.push('%');
-    pattern
+    LikeExpr::new(pattern).escape('\\')
 }
 
 /// The most used tags whose key contains `tag_key` (every tag when it is
 /// empty), most used first, at most `limit`. Templates do not count.
-pub(crate) fn tags(conn: &Connection, tag_key: &str, limit: u32) -> AppResult<Vec<TagFacet>> {
-    let facet = |row: &Row<'_>| {
-        Ok(TagFacet {
-            tag: row.get(0)?,
-            count: row.get(1)?,
-        })
-    };
-    let facets = if tag_key.is_empty() {
-        conn.prepare_cached(
-            "SELECT min(tags.tag), count(*) FROM tags
-             JOIN notes ON notes.path = tags.note_path
-             WHERE notes.kind != 'template'
-             GROUP BY tags.tag_key
-             ORDER BY count(*) DESC, min(tags.tag)
-             LIMIT ?1",
-        )?
-        .query_map([limit], facet)?
-        .collect::<Result<_, _>>()?
-    } else {
-        conn.prepare_cached(
-            "SELECT min(tags.tag), count(*) FROM tags
-             JOIN notes ON notes.path = tags.note_path
-             WHERE notes.kind != 'template' AND tags.tag_key LIKE ?1 ESCAPE '\\'
-             GROUP BY tags.tag_key
-             ORDER BY count(*) DESC, min(tags.tag)
-             LIMIT ?2",
-        )?
-        .query_map(params![like_contains(tag_key), limit], facet)?
-        .collect::<Result<_, _>>()?
-    };
-    Ok(facets)
+pub(crate) fn tags_query(tag_key: &str, limit: u32) -> SelectStatement {
+    let mut query = tag_facets();
+    query.and_where(Expr::col((Notes::Table, Notes::Kind)).ne(lit("template")));
+    if !tag_key.is_empty() {
+        query.and_where(Expr::col((Tags::Table, Tags::TagKey)).like(like_contains(tag_key)));
+    }
+    query
+        .order_by_expr(Func::count(Expr::col(Asterisk)).into(), Order::Desc)
+        .order_by_expr(
+            Func::min(Expr::col((Tags::Table, Tags::Tag))).into(),
+            Order::Asc,
+        )
+        .limit(u64::from(limit));
+    query
 }
 
-fn title_candidate(row: &Row<'_>) -> rusqlite::Result<WikiTitleCandidate> {
-    Ok(WikiTitleCandidate {
-        path: row.get(0)?,
-        title: row.get(1)?,
-        title_key: row.get(2)?,
-        daily_date: row.get(3)?,
-        mtime: row.get(4)?,
-        link_count: row.get(5)?,
-    })
+/// The rows of [`tags_query`].
+pub(crate) fn tags(conn: &Connection, tag_key: &str, limit: u32) -> AppResult<Vec<TagFacet>> {
+    sql::query(conn, &tags_query(tag_key, limit), tag_facet)
+}
+
+/// The notes whose title matches the folded wiki key `key`, with the number
+/// of links to each, at most [`WIKI_CANDIDATE_LIMIT`]: an exact title first,
+/// then a title that contains the key, then by link count and recency. The
+/// search index also admits titles that differ only in accents. An empty key
+/// lists the notes that are not daily notes.
+pub(crate) fn title_candidates_query(key: &str) -> SelectStatement {
+    let title_contains = || Expr::col((Notes::Table, Notes::TitleKey)).like(like_contains(key));
+
+    let mut query = Query::select();
+    query
+        .columns([
+            (Notes::Table, Notes::Path),
+            (Notes::Table, Notes::Title),
+            (Notes::Table, Notes::TitleKey),
+            (Notes::Table, Notes::DailyDate),
+            (Notes::Table, Notes::Mtime),
+        ])
+        .expr_as(link_count(), LINK_COUNT)
+        .from(Notes::Table)
+        .and_where(Expr::col((Notes::Table, Notes::Kind)).ne(lit("template")));
+    if key.is_empty() {
+        query.and_where(Expr::col((Notes::Table, Notes::DailyDate)).is_null());
+    } else if let Some(fts_match) = build_fts_title_prefix_match(key) {
+        let fts_paths = Query::select()
+            .column(SearchFts::Path)
+            .from(SearchFts::Table)
+            .and_where(Expr::col(SearchFts::Fts).binary(SqliteBinOper::Match, fts_match))
+            .take();
+        query.cond_where(
+            Cond::any()
+                .add(title_contains())
+                .add(Expr::col((Notes::Table, Notes::Path)).in_subquery(fts_paths)),
+        );
+    } else {
+        query.and_where(title_contains());
+    }
+    query
+        .order_by_expr(
+            Expr::col((Notes::Table, Notes::TitleKey)).eq(key),
+            Order::Desc,
+        )
+        .order_by_expr(title_contains(), Order::Desc)
+        .order_by(LINK_COUNT, Order::Desc)
+        .order_by((Notes::Table, Notes::Mtime), Order::Desc)
+        .limit(WIKI_CANDIDATE_LIMIT);
+    query
 }
 
 /// The notes whose title or alias matches the folded wiki key `key`.
@@ -86,68 +129,63 @@ fn title_candidate(row: &Row<'_>) -> rusqlite::Result<WikiTitleCandidate> {
 /// below spelled hits. An empty key lists notes only: days come from the date
 /// generator of the frontend.
 pub(crate) fn wiki_candidates(conn: &Connection, key: &str) -> AppResult<WikiCandidates> {
-    let contains = like_contains(key);
-    let select = format!(
-        "SELECT path, title, title_key, daily_date, mtime, {LINK_COUNT} AS link_count FROM notes
-         WHERE kind != 'template'"
-    );
-    let order = "ORDER BY title_key = ?1 DESC, (title_key LIKE ?2 ESCAPE '\\') DESC,
-                 link_count DESC, mtime DESC
-                 LIMIT ?3";
-    let titles = if key.is_empty() {
-        conn.prepare_cached(&format!("{select} AND daily_date IS NULL {order}"))?
-            .query_map(
-                params![key, contains, WIKI_CANDIDATE_LIMIT],
-                title_candidate,
-            )?
-            .collect::<Result<_, _>>()?
-    } else if let Some(fts_match) = build_fts_title_prefix_match(key) {
-        conn.prepare_cached(&format!(
-            "{select} AND (title_key LIKE ?2 ESCAPE '\\'
-               OR path IN (SELECT path FROM search_fts WHERE search_fts MATCH ?4))
-             {order}"
-        ))?
-        .query_map(
-            params![key, contains, WIKI_CANDIDATE_LIMIT, fts_match],
-            title_candidate,
-        )?
-        .collect::<Result<_, _>>()?
-    } else {
-        conn.prepare_cached(&format!(
-            "{select} AND title_key LIKE ?2 ESCAPE '\\' {order}"
-        ))?
-        .query_map(
-            params![key, contains, WIKI_CANDIDATE_LIMIT],
-            title_candidate,
-        )?
-        .collect::<Result<_, _>>()?
-    };
+    let titles = sql::query(conn, &title_candidates_query(key), |row| {
+        Ok(WikiTitleCandidate {
+            path: row.get(0)?,
+            title: row.get(1)?,
+            title_key: row.get(2)?,
+            daily_date: row.get(3)?,
+            mtime: row.get(4)?,
+            link_count: row.get(5)?,
+        })
+    })?;
 
     let aliases = if key.is_empty() {
         Vec::new()
     } else {
-        conn.prepare_cached(&format!(
-            "SELECT notes.path, notes.title, notes.title_key, notes.daily_date, notes.mtime,
-                    aliases.alias, aliases.alias_key, {LINK_COUNT} AS link_count
-             FROM aliases
-             JOIN notes ON notes.path = aliases.note_path
-             WHERE notes.kind != 'template' AND aliases.alias_key LIKE ?2 ESCAPE '\\'
-             ORDER BY aliases.alias_key = ?1 DESC, link_count DESC, notes.mtime DESC
-             LIMIT ?3"
-        ))?
-        .query_map(params![key, contains, WIKI_CANDIDATE_LIMIT], |row| {
-            Ok(WikiAliasCandidate {
-                path: row.get(0)?,
-                title: row.get(1)?,
-                title_key: row.get(2)?,
-                daily_date: row.get(3)?,
-                mtime: row.get(4)?,
-                alias: row.get(5)?,
-                alias_key: row.get(6)?,
-                link_count: row.get(7)?,
-            })
-        })?
-        .collect::<Result<_, _>>()?
+        sql::query(
+            conn,
+            Query::select()
+                .columns([
+                    (Notes::Table, Notes::Path),
+                    (Notes::Table, Notes::Title),
+                    (Notes::Table, Notes::TitleKey),
+                    (Notes::Table, Notes::DailyDate),
+                    (Notes::Table, Notes::Mtime),
+                ])
+                .columns([
+                    (Aliases::Table, Aliases::Alias),
+                    (Aliases::Table, Aliases::AliasKey),
+                ])
+                .expr_as(link_count(), LINK_COUNT)
+                .from(Aliases::Table)
+                .inner_join(
+                    Notes::Table,
+                    Expr::col((Notes::Table, Notes::Path))
+                        .equals((Aliases::Table, Aliases::NotePath)),
+                )
+                .and_where(Expr::col((Notes::Table, Notes::Kind)).ne(lit("template")))
+                .and_where(Expr::col((Aliases::Table, Aliases::AliasKey)).like(like_contains(key)))
+                .order_by_expr(
+                    Expr::col((Aliases::Table, Aliases::AliasKey)).eq(key),
+                    Order::Desc,
+                )
+                .order_by(LINK_COUNT, Order::Desc)
+                .order_by((Notes::Table, Notes::Mtime), Order::Desc)
+                .limit(WIKI_CANDIDATE_LIMIT),
+            |row| {
+                Ok(WikiAliasCandidate {
+                    path: row.get(0)?,
+                    title: row.get(1)?,
+                    title_key: row.get(2)?,
+                    daily_date: row.get(3)?,
+                    mtime: row.get(4)?,
+                    alias: row.get(5)?,
+                    alias_key: row.get(6)?,
+                    link_count: row.get(7)?,
+                })
+            },
+        )?
     };
     Ok(WikiCandidates { titles, aliases })
 }
@@ -155,23 +193,33 @@ pub(crate) fn wiki_candidates(conn: &Connection, key: &str) -> AppResult<WikiCan
 /// The winner of each wiki key in `keys` that a note claims: `note_keys`
 /// holds one winner per key.
 pub(crate) fn key_winners(conn: &Connection, keys: &[String]) -> AppResult<Vec<WikiKeyWinner>> {
-    let winners = conn
-        .prepare_cached(
-            "SELECT note_keys.key, note_keys.note_path, notes.daily_date, note_keys.claim_count
-             FROM note_keys
-             JOIN notes ON notes.path = note_keys.note_path
-             WHERE note_keys.key IN (SELECT value FROM json_each(?1))",
-        )?
-        .query_map([json_list(keys)?], |row| {
+    sql::query(
+        conn,
+        Query::select()
+            .columns([
+                (NoteKeys::Table, NoteKeys::Key),
+                (NoteKeys::Table, NoteKeys::NotePath),
+            ])
+            .column((Notes::Table, Notes::DailyDate))
+            .column((NoteKeys::Table, NoteKeys::ClaimCount))
+            .from(NoteKeys::Table)
+            .inner_join(
+                Notes::Table,
+                Expr::col((Notes::Table, Notes::Path))
+                    .equals((NoteKeys::Table, NoteKeys::NotePath)),
+            )
+            .and_where(
+                Expr::col((NoteKeys::Table, NoteKeys::Key)).in_subquery(sql::json_values(keys)?),
+            ),
+        |row| {
             Ok(WikiKeyWinner {
                 key: row.get(0)?,
                 path: row.get(1)?,
                 daily_date: row.get(2)?,
                 claim_count: row.get(3)?,
             })
-        })?
-        .collect::<Result<_, _>>()?;
-    Ok(winners)
+        },
+    )
 }
 
 /// The aliases of the notes in `paths` that win their key with no other
@@ -180,21 +228,34 @@ pub(crate) fn winning_aliases(
     conn: &Connection,
     paths: &[String],
 ) -> AppResult<Vec<WikiWinningAlias>> {
-    let aliases = conn
-        .prepare_cached(
-            "SELECT aliases.note_path, aliases.alias FROM aliases
-             JOIN note_keys ON note_keys.key = aliases.alias_key
-               AND note_keys.note_path = aliases.note_path
-             WHERE aliases.note_path IN (SELECT value FROM json_each(?1))
-               AND note_keys.claim_count = 1
-             ORDER BY aliases.rowid",
-        )?
-        .query_map([json_list(paths)?], |row| {
+    sql::query(
+        conn,
+        Query::select()
+            .columns([
+                (Aliases::Table, Aliases::NotePath),
+                (Aliases::Table, Aliases::Alias),
+            ])
+            .from(Aliases::Table)
+            .inner_join(
+                NoteKeys::Table,
+                Expr::col((NoteKeys::Table, NoteKeys::Key))
+                    .equals((Aliases::Table, Aliases::AliasKey))
+                    .and(
+                        Expr::col((NoteKeys::Table, NoteKeys::NotePath))
+                            .equals((Aliases::Table, Aliases::NotePath)),
+                    ),
+            )
+            .and_where(
+                Expr::col((Aliases::Table, Aliases::NotePath))
+                    .in_subquery(sql::json_values(paths)?),
+            )
+            .and_where(Expr::col((NoteKeys::Table, NoteKeys::ClaimCount)).eq(lit(1)))
+            .order_by((Aliases::Table, sql::ROWID), Order::Asc),
+        |row| {
             Ok(WikiWinningAlias {
                 note_path: row.get(0)?,
                 alias: row.get(1)?,
             })
-        })?
-        .collect::<Result<_, _>>()?;
-    Ok(aliases)
+        },
+    )
 }

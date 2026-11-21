@@ -13,10 +13,11 @@ import {
 } from '@/components/ui/dialog.tsx'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group.tsx'
 import { noteEditorHandleFor } from '@/editor/editor-handle-registry.ts'
-import type { CommandContext } from '@/lib/commands/types.ts'
 import { createTemplatesQueryOptions } from '@/lib/query-options.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useNoteTemplates } from '@/providers/note-templates-provider.tsx'
+import { useFocusedNotePath } from '@/routing/use-focused-note-path.ts'
+import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
  * The "Insert template…" picker (docs/porting/note-templates.md): the graph's
@@ -26,28 +27,24 @@ import { useNoteTemplates } from '@/providers/note-templates-provider.tsx'
  * graph has no templates yet.
  */
 
-interface TemplatePickerProps {
-  /** The command capabilities (the same context the palette runs with). */
-  context: CommandContext
-}
-
-export function TemplatePicker({ context }: TemplatePickerProps): ReactElement {
+export function TemplatePicker(): ReactElement {
+  const { indexQuery, templates: templateService } = useCoreServices()
+  const notePath = useFocusedNotePath()
   const { pickerOpen, closeTemplatePicker, openTemplateCreate } = useNoteTemplates()
   const graph = useGraphInfo()
   const { data: templates } = useQuery({
-    ...createTemplatesQueryOptions(context.services.indexQuery, graph?.root),
+    ...createTemplatesQueryOptions(indexQuery, graph?.root),
     enabled: graph !== null && pickerOpen,
   })
 
   const insert = (path: string): void => {
     closeTemplatePicker()
-    const target = context.notePath()
-    if (target === null) {
+    if (notePath === null) {
       return // the command opens the picker only where a note is being edited
     }
     // `TemplateService.insertTemplate` owns all feedback — a missing editor (protected or
     // still-loading note) and a failed read both surface as failed operations.
-    void context.services.templates.insertTemplate(path, noteEditorHandleFor(target))
+    void templateService.insertTemplate(path, noteEditorHandleFor(notePath))
   }
 
   return (

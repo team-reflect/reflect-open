@@ -6,9 +6,13 @@
 //! rows alone. Mutations are plain functions over a [`Connection`]; the
 //! command layer ([`super`]) owns transactions and generation gating.
 
-use rusqlite::{Connection, params};
+use rusqlite::Connection;
+use sea_query::{Expr, ExprTrait, Func, OnConflict, Query};
 
 use reflect_types::{AppResult, ChatConversation, ChatMessageRow};
+
+use crate::schema::{ChatConversations, ChatMessages};
+use crate::sql::{self, lit};
 
 /// Upsert the conversation row and the message row. The conversation keeps its
 /// original `title`/`created_ms` (set once, on insert) and bumps `updated_ms`;
@@ -26,46 +30,82 @@ pub(super) fn save_message(
     conversation: &ChatConversation,
     message: &ChatMessageRow,
 ) -> AppResult<()> {
-    conn.prepare_cached(
-        "INSERT INTO chat_conversations(id, title, created_ms, updated_ms)
-         VALUES (?1, ?2, ?3, ?4)
-         ON CONFLICT(id) DO UPDATE SET updated_ms = excluded.updated_ms",
-    )?
-    .execute(params![
-        conversation.id,
-        conversation.title,
-        conversation.created_ms,
-        conversation.updated_ms,
-    ])?;
-    conn.prepare_cached(
-        "INSERT INTO chat_messages(
-            id, conversation_id, seq, user_text, attachments, parts,
-            response_messages, created_ms)
-         VALUES (
-            ?1, ?2,
-            (SELECT COALESCE(MAX(seq) + 1, 0) FROM chat_messages WHERE conversation_id = ?2),
-            ?3, ?4, ?5, ?6, ?7)
-         ON CONFLICT(id) DO UPDATE SET
-            user_text = excluded.user_text,
-            attachments = excluded.attachments,
-            parts = excluded.parts,
-            response_messages = excluded.response_messages",
-    )?
-    .execute(params![
-        message.id,
-        message.conversation_id,
-        message.user_text,
-        message.attachments,
-        message.parts,
-        message.response_messages,
-        message.created_ms,
-    ])?;
+    sql::execute(
+        conn,
+        Query::insert()
+            .into_table(ChatConversations::Table)
+            .columns([
+                ChatConversations::Id,
+                ChatConversations::Title,
+                ChatConversations::CreatedMs,
+                ChatConversations::UpdatedMs,
+            ])
+            .values_panic([
+                conversation.id.as_str().into(),
+                conversation.title.as_str().into(),
+                conversation.created_ms.into(),
+                conversation.updated_ms.into(),
+            ])
+            .on_conflict(
+                OnConflict::column(ChatConversations::Id)
+                    .update_column(ChatConversations::UpdatedMs)
+                    .to_owned(),
+            ),
+    )?;
+    let conversation_id = message.conversation_id.as_str();
+    let next_seq = Query::select()
+        .expr(Func::coalesce([
+            Expr::col(ChatMessages::Seq).max().add(lit(1)),
+            lit(0),
+        ]))
+        .from(ChatMessages::Table)
+        .and_where(Expr::col(ChatMessages::ConversationId).eq(conversation_id))
+        .take();
+    sql::execute(
+        conn,
+        Query::insert()
+            .into_table(ChatMessages::Table)
+            .columns([
+                ChatMessages::Id,
+                ChatMessages::ConversationId,
+                ChatMessages::Seq,
+                ChatMessages::UserText,
+                ChatMessages::Attachments,
+                ChatMessages::Parts,
+                ChatMessages::ResponseMessages,
+                ChatMessages::CreatedMs,
+            ])
+            .values_panic([
+                message.id.as_str().into(),
+                conversation_id.into(),
+                next_seq.into(),
+                message.user_text.as_str().into(),
+                message.attachments.as_str().into(),
+                message.parts.as_str().into(),
+                message.response_messages.as_str().into(),
+                message.created_ms.into(),
+            ])
+            .on_conflict(
+                OnConflict::column(ChatMessages::Id)
+                    .update_columns([
+                        ChatMessages::UserText,
+                        ChatMessages::Attachments,
+                        ChatMessages::Parts,
+                        ChatMessages::ResponseMessages,
+                    ])
+                    .to_owned(),
+            ),
+    )?;
     Ok(())
 }
 
 /// Delete a conversation; its messages cascade.
 pub(super) fn delete_conversation(conn: &Connection, id: &str) -> AppResult<()> {
-    conn.prepare_cached("DELETE FROM chat_conversations WHERE id = ?1")?
-        .execute(params![id])?;
+    sql::execute(
+        conn,
+        Query::delete()
+            .from_table(ChatConversations::Table)
+            .and_where(Expr::col(ChatConversations::Id).eq(id)),
+    )?;
     Ok(())
 }

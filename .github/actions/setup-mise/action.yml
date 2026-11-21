@@ -1,3 +1,5 @@
+# Put setup-mise after setup-rust
+
 name: Set up mise
 description: Installs mise and the tools in `mise.toml`.
 

@@ -1,9 +1,9 @@
+import { APP_COMMANDS } from '@reflect/app'
 import type { ReactElement, ReactNode } from 'react'
 import { Sparkles } from 'lucide-react'
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import { useEmbedStatus } from '@/lib/use-embed-status.ts'
 import { useSemanticSearchEnabled, useSettingsService } from '@/providers/settings-provider.tsx'
-import { keybindingFor } from '@/lib/commands/app-commands.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { DescribeAssetsField } from './describe-assets-field.tsx'
 import { SettingsField } from './field.tsx'
@@ -11,7 +11,7 @@ import { ModelDownloadProgress } from './model-download-progress.tsx'
 import { RebuildIndexField } from './rebuild-index-field.tsx'
 import { SettingsSection } from './section.tsx'
 
-const PALETTE_BINDING = keybindingFor('palette.open')
+const PALETTE_BINDING = APP_COMMANDS['palette.open'].keybinding
 
 /**
  * The search settings: the semantic-search opt-in (Plan 09) and the index
@@ -99,7 +99,7 @@ export function SearchSection(): ReactElement {
     <SettingsSection id="search">
       <SettingsField
         legend="Semantic search"
-        description={`Find notes by meaning, not just keywords — smarter ${PALETTE_BINDING === null ? 'search' : keymap.formatLabel(PALETTE_BINDING)} results and related notes. Runs entirely on this device; enabling downloads a small model (~90 MB) once.`}
+        description={`Find notes by meaning, not just keywords — smarter ${keymap.formatLabel(PALETTE_BINDING)} results and related notes. Runs entirely on this device; enabling downloads a small model (~90 MB) once.`}
       >
         <div className="mt-3">{control}</div>
       </SettingsField>

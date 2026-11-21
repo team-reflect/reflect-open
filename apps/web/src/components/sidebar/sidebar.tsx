@@ -8,13 +8,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { ListIcon } from '@/components/icons/list-icon.tsx'
 import { PencilIcon } from '@/components/icons/pencil-icon.tsx'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
-import { keybindingFor } from '@/lib/commands/app-commands.ts'
 import { useToday } from '@/lib/use-today.ts'
-import type { CommandContext } from '@/lib/commands/types.ts'
 import { cn } from '@/lib/utils.ts'
-import { notePathForRoute, rootSectionForRoute } from '@reflect/app'
-import { useRouterState } from '@/routing/router.tsx'
-import { useCoreServices } from '@/services/services-provider.tsx'
+import { APP_COMMANDS, notePathForRoute, rootSectionForRoute } from '@reflect/app'
+import { useRouterActions, useRouterState } from '@/routing/router.tsx'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { GraphFooter } from './graph-footer.tsx'
 import { NavigateArrows } from './navigate-arrows.tsx'
 import { SidebarItem } from './sidebar-item.tsx'
@@ -23,9 +21,13 @@ import { SidebarSearch } from './sidebar-search.tsx'
 
 interface SidebarProps {
   graph: GraphInfo
-  /** Commands run with this — the same context the palette/shortcuts use. */
-  context: CommandContext
 }
+
+const NEW_NOTE_BINDING = APP_COMMANDS['note.new'].keybinding
+const TODAY_BINDING = APP_COMMANDS['nav.today'].keybinding
+const ALL_NOTES_BINDING = APP_COMMANDS['nav.allNotes'].keybinding
+const TASKS_BINDING = APP_COMMANDS['nav.tasks'].keybinding
+const CHAT_BINDING = APP_COMMANDS['chat.open'].keybinding
 
 /**
  * The workspace sidebar, in the original app's shape: history arrows top
@@ -37,8 +39,10 @@ interface SidebarProps {
  * capture gesture (today, caret at the end). (Sidebar collapse stays on
  * `Mod-\` via the command registry.)
  */
-export function Sidebar({ graph, context }: SidebarProps): ReactElement {
+export function Sidebar({ graph }: SidebarProps): ReactElement {
   const { platform } = useCoreServices()
+  const { commands } = useAppServices()
+  const { selectSection } = useRouterActions()
   const { route, section } = useRouterState()
   const onDailySurface = route.kind === 'today' || route.kind === 'daily'
   const today = useToday()
@@ -50,7 +54,6 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
   // pinned note lights its own row instead; the settings screens light none.
   const sectionRowsLit =
     (rootSectionForRoute(route) !== null || route.kind === 'note') && !hasActivePinnedNote
-  const newNoteBinding = keybindingFor('note.new')
 
   // Wrap the 16px Lucide glyphs in the custom icons' 24px box so nav rows
   // share one icon footprint.
@@ -72,7 +75,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
       <div className="flex flex-none flex-col">
         <div className="mt-1 flex items-center gap-1.5 px-4">
           <div className="min-w-0 flex-1">
-            <SidebarSearch onOpen={() => context.openPalette()} />
+            <SidebarSearch onOpen={() => commands.run('palette.open')} />
           </div>
           <Tooltip>
             <TooltipTrigger
@@ -81,7 +84,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
                   variant="ghost"
                   size="icon-sm"
                   aria-label="New note"
-                  onClick={() => void context.app.commands.run('note.new', context)}
+                  onClick={() => commands.run('note.new')}
                   className="text-text-muted hover:text-text-secondary dark:hover:text-text"
                 >
                   <SquarePen aria-hidden strokeWidth={1.75} className="size-4" />
@@ -89,7 +92,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
               }
             />
             <TooltipContent side="bottom">
-              New note {newNoteBinding && <ShortcutKeys binding={newNoteBinding} />}
+              New note <ShortcutKeys binding={NEW_NOTE_BINDING} />
             </TooltipContent>
           </Tooltip>
           <AudioMemoButton />
@@ -99,22 +102,22 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
           <SidebarItem
             icon={<PencilIcon className="shrink-0" />}
             label="Daily notes"
-            binding={keybindingFor('nav.today') ?? undefined}
+            binding={TODAY_BINDING}
             active={sectionRowsLit && section === 'daily'}
             onClick={() => {
               if (onDailySurface) {
-                void context.app.commands.run('nav.today', context)
+                void commands.run('nav.today')
               } else {
-                context.selectSection('daily')
+                selectSection('daily')
               }
             }}
           />
           <SidebarItem
             icon={<ListIcon className="shrink-0" />}
             label="All notes"
-            binding={keybindingFor('nav.allNotes') ?? undefined}
+            binding={ALL_NOTES_BINDING}
             active={sectionRowsLit && section === 'all'}
-            onClick={() => void context.app.commands.run('nav.allNotes', context)}
+            onClick={() => commands.run('nav.allNotes')}
           />
           <SidebarItem
             icon={
@@ -123,9 +126,9 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
               </span>
             }
             label="Tasks"
-            binding={keybindingFor('nav.tasks') ?? undefined}
+            binding={TASKS_BINDING}
             active={sectionRowsLit && section === 'tasks'}
-            onClick={() => void context.app.commands.run('nav.tasks', context)}
+            onClick={() => commands.run('nav.tasks')}
           />
           <SidebarItem
             icon={
@@ -134,9 +137,9 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
               </span>
             }
             label="Chat"
-            binding={keybindingFor('chat.open') ?? undefined}
+            binding={CHAT_BINDING}
             active={sectionRowsLit && section === 'chat'}
-            onClick={() => void context.app.commands.run('chat.open', context)}
+            onClick={() => commands.run('chat.open')}
           />
         </nav>
       </div>
@@ -145,7 +148,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
         <SidebarPinned />
       </div>
 
-      <GraphFooter graph={graph} context={context} />
+      <GraphFooter graph={graph} />
     </div>
   )
 }

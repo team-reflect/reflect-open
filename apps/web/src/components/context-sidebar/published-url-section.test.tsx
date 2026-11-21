@@ -8,12 +8,12 @@ import {
   type TestClipboardService,
   type TestOpenerService,
   type TestOperationsService,
+  createTestAppServices,
 } from '@reflect/app/testing'
 import { createTestDatabaseService, createTestCoreServices } from '@reflect/core/testing'
 import { queryKeys } from '@/lib/query-client.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { PublishedUrlSection } from './published-url-section.tsx'
-import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
 // What the index answers for the note; each test sets it before `renderSection`.
 let row: NoteRow | null
@@ -48,7 +48,7 @@ async function renderSection(path = 'notes/a.md') {
   publish = vi
     .spyOn(core.gistPublish, 'publish')
     .mockResolvedValue({ url: 'https://gist.github.com/alex/g1', stale: false })
-  const appLayer = createWebTestAppServices(core)
+  const appLayer = createTestAppServices(core)
   ;({ clipboard, opener } = appLayer)
   if (clipboardFailure !== null) {
     clipboard.failWith(clipboardFailure)

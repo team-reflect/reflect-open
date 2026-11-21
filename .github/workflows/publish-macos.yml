@@ -12,6 +12,14 @@ on:
         type: string
         required: true
     secrets:
+      S3_SCCACHE_ENDPOINT:
+        required: false
+      S3_SCCACHE_BUCKET:
+        required: false
+      S3_SCCACHE_ACCESS_KEY_ID:
+        required: false
+      S3_SCCACHE_SECRET_ACCESS_KEY:
+        required: false
       APPLE_SIGNING_IDENTITY:
         required: true
       APPLE_CERTIFICATE:
@@ -93,14 +101,14 @@ jobs:
 
       - uses: ./.github/actions/setup-xcode
 
-      # Any master job can write the caches, so a release build starts cold.
       - uses: ./.github/actions/setup-node
-        with:
-          cache: false
 
       - uses: ./.github/actions/setup-rust
         with:
-          cache: false
+          s3-endpoint: ${{ secrets.S3_SCCACHE_ENDPOINT }}
+          s3-bucket: ${{ secrets.S3_SCCACHE_BUCKET }}
+          s3-access-key-id: ${{ secrets.S3_SCCACHE_ACCESS_KEY_ID }}
+          s3-secret-access-key: ${{ secrets.S3_SCCACHE_SECRET_ACCESS_KEY }}
 
       # The universal build also compiles the x86_64 slice on this arm64 runner.
       - name: Add the x86_64 macOS target

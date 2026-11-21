@@ -1,0 +1,32 @@
+name: Cache cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+concurrency:
+  group: ci-refs/pull/${{ github.event.pull_request.number }}/merge
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  cleanup:
+    name: Delete PR caches
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      actions: write
+    steps:
+      - run: |
+          gh cache list --ref "refs/pull/$PR_NUMBER/merge" --sort size_in_bytes --limit 100 --json key,id,sizeInBytes --jq '.[] | "\(.id) \(.sizeInBytes / 1024 | floor) \(.key)"' |
+            while read -r id size key; do
+              echo "Deleting $key ($size KiB)"
+              gh cache delete "$id" || true
+              sleep 1
+            done
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}

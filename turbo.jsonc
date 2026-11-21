@@ -1,0 +1,107 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "futureFlags": {
+    "githubActionsRemoteBaseRefFallback": true,
+    "experimentalCargoWorkspaces": true,
+    "experimentalTaskCommand": true,
+  },
+  // sccache reads its config and the GitHub Actions cache token from these.
+  // turbo starts cargo, and the first rustc call starts the sccache server.
+  "globalPassThroughEnv": ["CI", "GITHUB_ACTIONS", "SCCACHE_*", "ACTIONS_*"],
+  "cacheMaxAge": "7d",
+  "cacheMaxSize": "4GB",
+  "tasks": {
+    "transit": {
+      "outputLogs": "new-only",
+      "dependsOn": ["^transit"],
+    },
+    "build": {
+      "outputLogs": "new-only",
+      "dependsOn": ["^build", "transit"],
+      "env": ["TAURI_ENV_PLATFORM"],
+      "outputs": ["dist/**", ".output/**"],
+    },
+    "dev": {
+      "outputLogs": "new-only",
+      "dependsOn": ["^build"],
+      "env": ["TAURI_ENV_PLATFORM"],
+      "cache": false,
+      "persistent": true,
+    },
+
+    // TypeScript checks and tests (root scripts, whole repo).
+    "//#lint": {
+      "outputLogs": "new-only",
+      "dependsOn": ["@reflect/index-wasm#build"],
+      "outputs": [".eslintcache"],
+    },
+    "//#typecheck": {
+      "outputLogs": "new-only",
+      "outputs": ["**/*.tsbuildinfo"],
+    },
+    "//#test:node": {
+      "outputLogs": "new-only",
+      "dependsOn": ["@reflect/index-wasm#build"],
+    },
+    "//#test:browser": {
+      "outputLogs": "new-only",
+      "dependsOn": ["@reflect/index-wasm#build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!.github/**",
+        "!docs/**",
+        "!apple/**",
+        "!apps/ios/**",
+        "!crates/**",
+        "!scripts/**",
+      ],
+      "env": ["REFLECT_TEST_BROWSER"],
+      "passThroughEnv": ["VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB", "__XPC_JSC_useJIT"],
+    },
+
+    // Rust checks and tests (the whole Cargo workspace).
+    "reflect-workspace#lint": {
+      "outputLogs": "new-only",
+      "command": ["cargo", "clippy", "--workspace", "--all-targets", "--locked"],
+      "env": ["TAURI_CONFIG"],
+      "passThroughEnv": ["ORT_CACHE_DIR"],
+    },
+    "reflect-workspace#lint:ios": {
+      "outputLogs": "new-only",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--exclude",
+        "reflect-open",
+        "--all-targets",
+        "--locked",
+        "--target",
+        "aarch64-apple-ios-sim",
+      ],
+      "env": ["TAURI_CONFIG"],
+      "passThroughEnv": ["ORT_CACHE_DIR"],
+    },
+    "reflect-workspace#lint:wasm": {
+      "outputLogs": "new-only",
+      "command": [
+        "cargo",
+        "clippy",
+        "--package",
+        "reflect-index-wasm",
+        "--target",
+        "wasm32-unknown-unknown",
+        "--locked",
+      ],
+    },
+    "reflect-workspace#format:check": {
+      "outputLogs": "new-only",
+      "command": ["cargo", "fmt", "--all", "--", "--check"],
+    },
+    "reflect-workspace#test": {
+      "outputLogs": "new-only",
+      "env": ["TAURI_CONFIG"],
+      "passThroughEnv": ["ORT_CACHE_DIR"],
+    },
+  },
+}

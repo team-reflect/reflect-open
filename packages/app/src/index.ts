@@ -122,13 +122,25 @@ export {
   weekOf,
   type WeekWindow,
 } from './daily/week-window.ts'
-export { type Command, type Commands, type CommandService } from './commands/command-service.ts'
+export {
+  APP_COMMANDS,
+  type AppCommandId,
+  type Command,
+  type CommandDeclaration,
+} from './commands/app-commands.ts'
+export { installNativeMenu } from './commands/app-menu.ts'
+export { attachFilesToNote } from './commands/attach-files.ts'
+export {
+  copyNoteDeepLink,
+  copyNotePath,
+  publishGistAndCopyLink,
+} from './commands/clipboard-actions.ts'
+export { type CommandHandler, type CommandService } from './commands/command-service.ts'
 export { formatBinding } from './commands/keybindings.ts'
 export { type KeymapService } from './commands/keymap-service.ts'
 export {
   type AppMenuEntry,
   type AppSubmenuLayout,
-  type FocusedNoteMenuCommand,
   type NativeContextMenuOptions,
   type NativeMenuHost,
   type NativeMenuItem,

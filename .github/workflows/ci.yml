@@ -7,18 +7,22 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
+  id-token: write
+
+env:
+  # On master, run every task instead of skipping it on a turbo cache hit.
+  TURBO_CACHE: ${{ github.event_name == 'push' && 'local:rw' || 'local:rw,remote:rw' }}
 
 jobs:
   classify:
-    runs-on: ubuntu-slim
-    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     outputs:
-      build-index-wasm: ${{ steps.classify.outputs.build-index-wasm }}
       lint-node: ${{ steps.classify.outputs.lint-node }}
       test-node: ${{ steps.classify.outputs.test-node }}
       test-chromium: ${{ steps.classify.outputs.test-chromium }}
@@ -30,12 +34,15 @@ jobs:
     steps:
       # The merge commit's first parent is the base branch, so the diff
       # against it is the change that the PR brings in.
-      - if: github.event_name == 'pull_request'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 2
           filter: blob:none
+
+      - name: Warm up the pnpm store cache
+        uses: ./.github/actions/setup-node
+        if: github.ref == 'refs/heads/master'
 
       - id: classify
         env:
@@ -82,7 +89,8 @@ jobs:
             'Cargo.lock'
             'Cargo.toml'
             'rust-toolchain.toml'
-            'mise.toml'
+            'xtask/*'
+            '.cargo/config.toml'
           )
           swift_files=(
             '.github/*'
@@ -91,7 +99,9 @@ jobs:
             'apple/*'
             'apps/ios/*'
             'apps/safari-extension/*'
+            'package.json'
             'scripts/build-ffi.ts'
+            'scripts/ios-simulator.ts'
             'scripts/test-ios.ts'
           )
 
@@ -132,7 +142,6 @@ jobs:
           fi
 
           {
-            echo "build-index-wasm=$js"
             echo "lint-node=$js"
             echo "test-node=$js"
             echo "test-chromium=$js"
@@ -143,11 +152,14 @@ jobs:
             echo "test-rust=$rust"
           } | tee -a "$GITHUB_OUTPUT"
 
-  # Builds the Rust index to wasm once; the TypeScript jobs download it.
-  build-index-wasm:
-    needs: classify
-    if: needs.classify.outputs.build-index-wasm == 'true'
+  lint-node:
+    needs: [classify]
+    if: needs.classify.outputs.lint-node == 'true'
     runs-on: ubuntu-24.04
+    environment:
+      &sccache-environment # Only master can use `sccache_write`, which holds the read-write S3 key.
+      name: ${{ github.ref == 'refs/heads/master' && 'sccache_write' || 'sccache_read' }}
+      deployment: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -156,42 +168,11 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-        with:
-          cache-key: index-wasm
-
-      - uses: ./.github/actions/setup-mise
-
-      - name: Build
-        run: pnpm build:index-wasm
-
-      - name: Upload the index wasm build
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: index-wasm
-          path: |
-            packages/index-wasm/pkg
-            !packages/index-wasm/pkg/*.d.ts
-          retention-days: 1
-
-  lint-node:
-    needs: [classify, build-index-wasm]
-    if: needs.classify.outputs.lint-node == 'true'
-    runs-on: ubuntu-24.04
-    env:
-      # The job downloads the wasm build of the index; it has no Rust toolchain.
-      REFLECT_INDEX_WASM_PREBUILT: '1'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-node
-
-      - name: Download the index wasm build
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: index-wasm
-          path: packages/index-wasm/pkg
+        with: &setup-rust-s3
+          s3-endpoint: ${{ secrets.S3_SCCACHE_ENDPOINT }}
+          s3-bucket: ${{ secrets.S3_SCCACHE_BUCKET }}
+          s3-access-key-id: ${{ secrets.S3_SCCACHE_ACCESS_KEY_ID }}
+          s3-secret-access-key: ${{ secrets.S3_SCCACHE_SECRET_ACCESS_KEY }}
 
       - name: Verify the generated iOS CSP is current
         run: |
@@ -200,21 +181,19 @@ jobs:
             || (echo "::error::ContentSecurityPolicy.gen.swift is stale. Run 'pnpm gen:ios-csp' and commit the result." && exit 1)
 
       - name: Lint
-        run: pnpm lint
+        run: pnpm turbo run lint --filter=//
 
       - name: Typecheck
-        run: pnpm typecheck
+        run: pnpm turbo run typecheck --filter=//
 
       - name: Build
-        run: pnpm build
+        run: pnpm run build
 
   test-node:
-    needs: [classify, build-index-wasm]
+    needs: [classify]
     if: needs.classify.outputs.test-node == 'true'
     runs-on: ubuntu-24.04
-    env:
-      # The job downloads the wasm build of the index; it has no Rust toolchain.
-      REFLECT_INDEX_WASM_PREBUILT: '1'
+    environment: *sccache-environment
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -222,27 +201,23 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      - name: Download the index wasm build
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: index-wasm
-          path: packages/index-wasm/pkg
+      - uses: ./.github/actions/setup-rust
+        with: *setup-rust-s3
 
       - name: Test
-        run: pnpm run test:node
+        run: pnpm turbo run test:node
 
   test-chromium:
-    needs: [classify, build-index-wasm]
+    needs: [classify]
     if: needs.classify.outputs.test-chromium == 'true'
     runs-on: ubuntu-24.04
+    environment: *sccache-environment
     strategy:
       fail-fast: false
       matrix:
         shard: [1, 2, 3]
     name: test-chromium (${{ matrix.shard }}/3)
     env:
-      # The job downloads the wasm build of the index; it has no Rust toolchain.
-      REFLECT_INDEX_WASM_PREBUILT: '1'
       REFLECT_TEST_BROWSER: chromium
       # Chromium on Linux does not promptly free the iframe of a finished
       # test file (https://issues.chromium.org/issues/530892387), so one
@@ -260,26 +235,25 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      - name: Download the index wasm build
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: index-wasm
-          path: packages/index-wasm/pkg
+      - uses: ./.github/actions/setup-rust
+        with: *setup-rust-s3
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:chromium
 
-      - name: Test
-        run: pnpm run test:browser --shard=${{ matrix.shard }}/3
+      - name: Build the index wasm
+        run: pnpm build:index-wasm
 
-  # Not part of `all-green`: a WebKit failure does not block merging.
+      # `--only` passes `--shard` to the test task alone, not to the wasm build.
+      - name: Test
+        run: pnpm turbo run test:browser --only -- --shard=${{ matrix.shard }}/3
+
   test-webkit:
-    needs: [classify, build-index-wasm, test-chromium]
+    needs: [classify, test-chromium]
     if: needs.classify.outputs.test-webkit == 'true'
     runs-on: xcode-27
+    environment: *sccache-environment
     env:
-      # The job downloads the wasm build of the index; it has no Rust toolchain.
-      REFLECT_INDEX_WASM_PREBUILT: '1'
       REFLECT_TEST_BROWSER: webkit
       # Suspected workaround, root cause unknown: WebContent sometimes
       # segfaults in JavaScriptCore JIT code ("The webkit page crashed") in
@@ -296,25 +270,26 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      - name: Download the index wasm build
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: index-wasm
-          path: packages/index-wasm/pkg
+      - uses: ./.github/actions/setup-rust
+        with: *setup-rust-s3
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:webkit
 
+      - name: Build the index wasm
+        run: pnpm build:index-wasm
+
       # WebKit keeps the memory of every finished test file, so each shard
-      # runs in its own Vitest process to restart the browser.
+      # runs in its own Vitest process to restart the browser. `--only` passes
+      # `--shard` to the test task alone, not to the wasm build.
       - name: Test browser (shard 1/3)
-        run: pnpm run test:browser --shard=1/3
+        run: pnpm turbo run test:browser --only -- --shard=1/3
 
       - name: Test browser (shard 2/3)
-        run: pnpm run test:browser --shard=2/3
+        run: pnpm turbo run test:browser --only -- --shard=2/3
 
       - name: Test browser (shard 3/3)
-        run: pnpm run test:browser --shard=3/3
+        run: pnpm turbo run test:browser --only -- --shard=3/3
 
   test-swift:
     needs: classify
@@ -333,22 +308,22 @@ jobs:
       - run: git ls-files -z '*.swift' | xargs -0 swift format lint --strict --parallel
       - run: git diff --exit-code '*.swift'
 
+      - uses: ./.github/actions/setup-node
+
       - name: Test apple/
-        run: swift test --package-path apple
+        run: pnpm turbo run test:swift --filter=@reflect/apple
 
       - name: Build apple/ for the iOS Simulator
-        working-directory: apple
-        run: xcodebuild build -scheme ReflectApple-Package -destination 'generic/platform=iOS Simulator' -quiet
+        run: pnpm turbo run build:ios-simulator --filter=@reflect/apple
 
       - name: Build apple/ for iOS devices
-        working-directory: apple
-        run: xcodebuild build -scheme ReflectApple-Package -destination 'generic/platform=iOS' -quiet
+        run: pnpm turbo run build:ios-device --filter=@reflect/apple
 
-  # Builds the Swift shell in apps/ios and runs its unit and UI tests in a simulator.
   test-ios:
     needs: [classify, test-swift]
     if: needs.classify.outputs.test-ios == 'true'
     runs-on: xcode-27
+    environment: *sccache-environment
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -361,12 +336,47 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
         with:
-          cache-key: test-ios
+          cache-targets: 'true'
+          s3-endpoint: ${{ secrets.S3_SCCACHE_ENDPOINT }}
+          s3-bucket: ${{ secrets.S3_SCCACHE_BUCKET }}
+          s3-access-key-id: ${{ secrets.S3_SCCACHE_ACCESS_KEY_ID }}
+          s3-secret-access-key: ${{ secrets.S3_SCCACHE_SECRET_ACCESS_KEY }}
 
       - uses: ./.github/actions/setup-mise
 
-      # The script prints the time of each of its steps.
+      - name: Pick the simulator cache key
+        id: simulator
+        env:
+          HASH: ${{ hashFiles('.github/actions/setup-xcode/action.yml', 'mise.toml', 'scripts/ios-simulator.ts') }}
+        run: echo "key=ios-simulator-$ImageOS-$ImageVersion-$HASH" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the prepared simulator
+        id: restore
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/ios-simulator
+          key: ${{ steps.simulator.outputs.key }}
+
+      - name: Prepare the simulator
+        if: steps.restore.outputs.cache-hit != 'true'
+        run: node scripts/ios-simulator.ts prepare "$RUNNER_TEMP/ios-simulator"
+
+      - name: Save the prepared simulator
+        if: steps.restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/ios-simulator
+          key: ${{ steps.simulator.outputs.key }}
+
+      - name: Build web
+        run: pnpm build:web:ios
+
+      - name: Build ffi
+        run: pnpm build:ffi:iphonesimulator
+
       - name: Build and run the tests
+        env:
+          IOS_SIMULATOR_SNAPSHOT: ${{ runner.temp }}/ios-simulator
         run: pnpm test:ios
 
       # The result bundle has the screenshots and the steps of each failed test.
@@ -383,6 +393,7 @@ jobs:
     if: needs.classify.outputs.lint-rust == 'true'
     name: lint-rust (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
+    environment: *sccache-environment
     # Clippy and the tests never run the desktop sidecars, so drop them from the
     # Tauri config instead of building them (tauri-build and tauri-codegen merge
     # this JSON into the config). `pnpm sidecar` still stages them for dev and
@@ -397,7 +408,6 @@ jobs:
             os: ubuntu-24.04
           - name: macOS
             os: xcode-27
-            args: --target aarch64-apple-darwin
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -410,24 +420,28 @@ jobs:
         uses: ./.github/actions/setup-xcode
 
       - uses: ./.github/actions/setup-rust
+        with: *setup-rust-s3
+
+      - uses: ./.github/actions/setup-node
+
+      # Fails if Cargo.lock is out of date.
+      - name: Check Cargo.lock
+        run: cargo metadata --locked --format-version 1 > /dev/null
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets ${{ matrix.args }}
+        run: pnpm turbo run lint --filter=reflect-workspace
 
-      # The iOS app links the core crates through `reflect-ffi`. The Tauri
-      # shell (`reflect-open`) builds for desktop only.
+      # The iOS app links the core crates through `reflect-ffi`.
       - name: Clippy (iOS simulator)
         if: matrix.name == 'macOS'
-        run: cargo clippy --workspace --exclude reflect-open --all-targets --target aarch64-apple-ios-sim
+        run: pnpm turbo run lint:ios --filter=reflect-workspace
 
       - name: Clippy (wasm)
         if: matrix.name == 'Linux'
-        run: |
-          export AR_wasm32_unknown_unknown="$(rustc --print sysroot)/lib/rustlib/$(rustc -vV | sed -n 's/host: //p')/bin/llvm-ar"
-          cargo clippy --package reflect-index-wasm --target wasm32-unknown-unknown
+        run: pnpm turbo run lint:wasm --filter=reflect-workspace
 
       - name: Format check
-        run: cargo fmt --all -- --check
+        run: pnpm turbo run format:check --filter=reflect-workspace
 
       - if: matrix.name == 'Linux'
         uses: ./.github/actions/setup-mise
@@ -441,7 +455,7 @@ jobs:
       - name: Verify the generated C header is current
         if: matrix.name == 'Linux'
         run: |
-          cbindgen --config crates/ffi/cbindgen.toml --output crates/ffi/include/reflect_core.h crates/ffi
+          cargo xtask ffi-header
           git diff --exit-code crates/ffi/include/reflect_core.h \
             || (echo "::error::reflect_core.h is stale. Run 'pnpm build:ffi' and commit the result." && exit 1)
 
@@ -449,6 +463,7 @@ jobs:
     needs: classify
     if: needs.classify.outputs.test-rust == 'true'
     runs-on: ubuntu-24.04
+    environment: *sccache-environment
     # Clippy and the tests never run the desktop sidecars, so drop them from the
     # Tauri config instead of building them (tauri-build and tauri-codegen merge
     # this JSON into the config). `pnpm sidecar` still stages them for dev and
@@ -463,9 +478,12 @@ jobs:
       - uses: ./.github/actions/setup-apt
 
       - uses: ./.github/actions/setup-rust
+        with: *setup-rust-s3
+
+      - uses: ./.github/actions/setup-node
 
       - name: Test
-        run: cargo test --workspace
+        run: pnpm turbo run test --filter=reflect-workspace
 
   # A single job for branch protection to require, instead of listing every
   # job as a required status check.
@@ -476,13 +494,15 @@ jobs:
     if: always()
     needs:
       - classify
-      - build-index-wasm
       - lint-node
       - test-node
       - test-chromium
       - test-swift
       - lint-rust
       - test-rust
+      # Not part of `all-green`
+      # - test-webkit
+      # - test-ios
 
     steps:
       # A skipped job counts as passed: classify skips jobs on purpose.

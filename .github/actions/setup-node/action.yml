@@ -3,9 +3,13 @@ description: Installs Node.js, pnpm, and dependencies.
 
 inputs:
   cache:
-    description: Whether to restore and save the cache.
+    description: Whether to use the pnpm store cache and the turbo remote cache.
     required: false
     default: 'true'
+  save-pnpm-cache:
+    description: Whether to save the pnpm store cache at the end of the job. Defaults to true only on master.
+    required: false
+    default: ${{ github.ref == 'refs/heads/master' }}
 
 runs:
   using: composite
@@ -16,15 +20,39 @@ runs:
       shell: bash
       run: git config --system core.longpaths true
 
-    - name: Install pnpm
-      uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+    - name: Set up environment variables
+      shell: bash
+      run: |
+        echo "DO_NOT_TRACK=1" >> $GITHUB_ENV
+        echo "NO_UPDATE_NOTIFIER=1" >> $GITHUB_ENV
+        echo "TURBO_CONCURRENCY=1" >> $GITHUB_ENV
+        echo "TURBO_LOG_ORDER=stream" >> $GITHUB_ENV
 
-    - name: Install Node
-      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+    - name: Install pnpm
+      uses: pnpm/setup@731dfb6463bbd11c11fd0ee11fe00ed0e36d48a1 # v3.2.0
       with:
-        node-version: 24
-        cache: ${{ inputs.cache == 'true' && 'pnpm' || '' }}
+        cache: ${{ inputs.cache }}
+        save-cache: ${{ inputs.save-pnpm-cache }}
+        install: false
 
     - name: Install dependencies
       shell: bash
       run: pnpm install --frozen-lockfile
+
+    - name: Check OIDC
+      id: oidc
+      shell: bash
+      run: |
+        if [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] && [ -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+          echo "available=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Set up turborepo remote cache
+      uses: vercel/setup-turborepo-remote-cache-action@49d7b1b46ba4c9251e1977986bfe18336feabc8f # v1.1.0
+      if: >-
+        inputs.cache == 'true'
+        && steps.oidc.outputs.available == 'true'
+        && github.repository == 'team-reflect/reflect-open'
+        && github.event.pull_request.head.repo.fork != true
+      with:
+        team: team-reflect

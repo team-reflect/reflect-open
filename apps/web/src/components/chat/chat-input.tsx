@@ -1,3 +1,4 @@
+import { APP_COMMANDS } from '@reflect/app'
 import { useMemo, type ReactElement } from 'react'
 import { ArrowUp, Plus, Square, X } from 'lucide-react'
 import { getIsComposing } from '@meowdown/core'
@@ -22,7 +23,6 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { imageFilesFrom } from '@/lib/chat-attachments.ts'
 import { groupModelOptions } from '@/lib/chat-model-groups.ts'
-import { keybindingFor } from '@/lib/commands/app-commands.ts'
 import {
   useChatActions,
   useChatAttachments,
@@ -33,7 +33,7 @@ import {
 } from '@/providers/chat-provider.tsx'
 import { ChatHistoryMenu } from './chat-history-menu.tsx'
 
-const NEW_CHAT_BINDING = keybindingFor('chat.new')
+const NEW_CHAT_BINDING = APP_COMMANDS['chat.new'].keybinding
 
 /**
  * The composer: a textarea (Enter sends, Shift-Enter breaks, Esc stops a
@@ -185,7 +185,7 @@ export function ChatInput(): ReactElement {
                 }
               />
               <TooltipContent side="top">
-                New chat {NEW_CHAT_BINDING ? <ShortcutKeys binding={NEW_CHAT_BINDING} /> : null}
+                New chat <ShortcutKeys binding={NEW_CHAT_BINDING} />
               </TooltipContent>
             </Tooltip>
           ) : null}

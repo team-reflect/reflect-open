@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.19.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.19.0-beta.6...v0.19.0-beta.7) (2026-11-20)
+
+
+### Bug Fixes
+
+* pass the sccache S3 key in publish jobs ([#2267](https://github.com/team-reflect/reflect-open/issues/2267)) ([2e86463](https://github.com/team-reflect/reflect-open/commit/2e864634ecb99c6bff11f9015bc2413a1c526b8b))
+
+## [0.19.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.19.0-beta.5...v0.19.0-beta.6) (2026-11-20)
+
+
+### Features
+
+* emit index events in the dev bridge ([#2239](https://github.com/team-reflect/reflect-open/issues/2239)) ([089373f](https://github.com/team-reflect/reflect-open/commit/089373fa5a749efc807cc3aadf09f05965d66835))
+
+
+### Bug Fixes
+
+* **mobile:** commit the back swipe pop as the card leaves the screen ([#2211](https://github.com/team-reflect/reflect-open/issues/2211)) ([d0bfcb9](https://github.com/team-reflect/reflect-open/commit/d0bfcb951d7b14f45133c9883f2bcabe5cee4061))
+* split search terms on JavaScript whitespace ([#2232](https://github.com/team-reflect/reflect-open/issues/2232)) ([8148f69](https://github.com/team-reflect/reflect-open/commit/8148f6923ae3f6fc0de341b75f83aca5cd2c8847))
+
 ## [0.19.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.19.0-beta.4...v0.19.0-beta.5) (2026-11-16)
 
 

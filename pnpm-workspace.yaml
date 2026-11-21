@@ -1,13 +1,14 @@
 packages:
+  - apple
   - apps/*
   - packages/*
   - design-system
   - scripts
 
 allowBuilds:
-  '@sentry/cli': true
+  '@sentry/cli': false
   appium-ios-tuntap: false
-  esbuild: true
+  esbuild: false
   simple-git-hooks: false
 
 dedupePeers: true

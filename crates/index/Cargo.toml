@@ -13,6 +13,7 @@ native = ["dep:reflect-index-schema"]
 
 [dependencies]
 rusqlite = { workspace = true }
+sea-query = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
@@ -23,5 +24,6 @@ reflect-types = { workspace = true, features = ["rusqlite"] }
 reflect-index-schema = { workspace = true, features = ["default"], optional = true }
 
 [dev-dependencies]
+expect-test = { workspace = true }
 tempfile = { workspace = true }
 reflect-index-schema = { workspace = true, features = ["default"] }

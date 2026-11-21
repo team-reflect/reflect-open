@@ -24,7 +24,8 @@ use std::time::Duration;
 use notify_debouncer_full::file_id::{FileId, get_file_id};
 use notify_debouncer_full::notify::{self, EventKindMask, RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{
-    DebounceEventHandler, DebounceEventResult, Debouncer, FileIdCache, FileIdMap, new_debouncer_opt,
+    Config, DebounceEventHandler, DebounceEventResult, Debouncer, FileIdCache, FileIdMap,
+    new_debouncer_opt,
 };
 use reflect_graph_paths::{
     GraphPathKind, classify, evicted_logical_path, eviction_placeholder, has_pruned_component,
@@ -269,13 +270,11 @@ fn lock_watcher(
 /// Only changes are subscribed. On Linux the default also reports opens, and
 /// the reconcile pass opens every directory: each pass would trigger the next.
 fn watch_graph(root: &Path, handler: impl DebounceEventHandler) -> notify::Result<GraphDebouncer> {
-    let mut debouncer = new_debouncer_opt(
-        Duration::from_millis(400),
-        None,
-        handler,
-        PrunedFileIdMap::new(root.to_path_buf()),
-        notify::Config::default().with_event_kinds(EventKindMask::CORE),
-    )?;
+    let config = Config::default()
+        .with_timeout(Duration::from_millis(400))
+        .with_notify_config(notify::Config::default().with_event_kinds(EventKindMask::CORE));
+    let mut debouncer =
+        new_debouncer_opt(config, handler, PrunedFileIdMap::new(root.to_path_buf()))?;
     debouncer.watch(root, RecursiveMode::Recursive)?;
     Ok(debouncer)
 }

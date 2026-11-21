@@ -18,8 +18,11 @@ jobs:
     with:
       commit: ${{ github.sha }}
       flavor: beta
-      cache: true
     secrets:
+      S3_SCCACHE_ENDPOINT: ${{ secrets.S3_SCCACHE_ENDPOINT }}
+      S3_SCCACHE_BUCKET: ${{ secrets.S3_SCCACHE_BUCKET }}
+      S3_SCCACHE_ACCESS_KEY_ID: ${{ secrets.S3_SCCACHE_ACCESS_KEY_ID }}
+      S3_SCCACHE_SECRET_ACCESS_KEY: ${{ secrets.S3_SCCACHE_SECRET_ACCESS_KEY }}
       APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
       APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
       APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}

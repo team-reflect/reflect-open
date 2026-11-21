@@ -134,8 +134,8 @@ failing with `database is locked`.
 - The same note in two windows converges through external-change
   reconciliation, the same path an iCloud edit takes.
 - Only main installs the native macOS menu. Menu action channels belong to the
-  webview that creates them, so a note window's menu would have no
-  `useAppShortcuts` dispatcher.
+  webview that creates them. Main sends an activation to the focused window,
+  which runs it, or hands it back to main when it has no handler for it.
 - A note window's settings screen shows sync as loading (it creates no backup
   service, on purpose).
 - **Settings are main-window-owned.** Note windows mount no settings-writing

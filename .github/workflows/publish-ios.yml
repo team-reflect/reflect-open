@@ -13,12 +13,15 @@ on:
         description: beta or stable
         required: true
         type: string
-      cache:
-        description: Whether to restore and save the pnpm, cargo and mise caches.
-        required: false
-        default: false
-        type: boolean
     secrets:
+      S3_SCCACHE_ENDPOINT:
+        required: false
+      S3_SCCACHE_BUCKET:
+        required: false
+      S3_SCCACHE_ACCESS_KEY_ID:
+        required: false
+      S3_SCCACHE_SECRET_ACCESS_KEY:
+        required: false
       APPLE_API_KEY:
         required: true
       APPLE_API_ISSUER:
@@ -75,19 +78,14 @@ jobs:
 
       - uses: ./.github/actions/setup-xcode
 
-      # Any master job can write the caches, so a release build starts cold.
       - uses: ./.github/actions/setup-node
-        with:
-          cache: ${{ inputs.cache }}
 
       - uses: ./.github/actions/setup-rust
         with:
-          cache: ${{ inputs.cache }}
-          cache-key: publish-ios
-
-      - uses: ./.github/actions/setup-mise
-        with:
-          cache: ${{ inputs.cache }}
+          s3-endpoint: ${{ secrets.S3_SCCACHE_ENDPOINT }}
+          s3-bucket: ${{ secrets.S3_SCCACHE_BUCKET }}
+          s3-access-key-id: ${{ secrets.S3_SCCACHE_ACCESS_KEY_ID }}
+          s3-secret-access-key: ${{ secrets.S3_SCCACHE_SECRET_ACCESS_KEY }}
 
       - name: Resolve build number
         id: build_number

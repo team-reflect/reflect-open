@@ -1,0 +1,12 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // `reflect-index-wasm#build` writes `pkg`. This task only orders it.
+    "build": {
+      "dependsOn": ["reflect-index-wasm#build", "transit"],
+      "env": [],
+      "outputs": [],
+    },
+  },
+}

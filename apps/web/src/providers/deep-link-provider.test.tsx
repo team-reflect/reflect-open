@@ -1,3 +1,4 @@
+import { createTestAppServices } from '@reflect/app/testing'
 import { StrictMode, type ReactElement, type ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -12,7 +13,6 @@ import { act } from '@/test-utils/act.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { DeepLinkProvider } from './deep-link-provider.tsx'
 import { noop, sleep } from '@ocavue/utils'
-import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
 // The handler itself is covered in `@reflect/app`; these cover how the
 // provider ties it to the router and to the graph session.
@@ -38,7 +38,7 @@ function setup() {
     graphSession,
     deepLinkIntake,
   })
-  const appServices = createWebTestAppServices(core)
+  const appServices = createTestAppServices(core)
 
   function tree(): ReactElement {
     return <DeepLinkProvider search={noop}>{null}</DeepLinkProvider>

@@ -19,7 +19,9 @@ mod embed_write;
 mod query;
 pub mod read;
 mod scan;
+mod schema;
 mod session;
+mod sql;
 #[cfg(test)]
 mod tests;
 pub mod text;

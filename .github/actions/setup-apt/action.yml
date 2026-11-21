@@ -10,26 +10,9 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Compute the apt cache key and directory
+    - name: Compute the apt cache key and directories
       id: apt
       shell: bash
-      # `ImageOS` and `ImageVersion` are runner environment variables.
-      run: |
-        echo "key=apt-$ImageOS-$ImageVersion-$RUNNER_ARCH" >> "$GITHUB_OUTPUT"
-        echo "dir=$RUNNER_TEMP/apt-archives" >> "$GITHUB_OUTPUT"
-
-    - name: Restore the apt package cache
-      id: apt-cache
-      if: inputs.cache == 'true'
-      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: ${{ steps.apt.outputs.dir }}/*.deb
-        key: ${{ steps.apt.outputs.key }}
-
-    - name: Install apt packages
-      shell: bash
-      env:
-        archives: ${{ steps.apt.outputs.dir }}
       run: |
         # Tauri v2 build dependencies (the crate links the WebView + GTK stack):
         # the Tauri docs list, minus `patchelf`, which the runner image already
@@ -37,28 +20,58 @@ runs:
         # `libappindicator3-dev`, as in the Tauri prerequisites page.
         # https://github.com/tauri-apps/tauri-docs/blob/5e49cc6e48597060f1618e0b62cb91b071b1b4a9/src/content/docs/distribute/Pipelines/github.mdx?plain=1#L105
         packages="libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils"
-        opts="--yes --no-install-recommends -o Dir::Cache::Archives=$archives"
-        mkdir -p "$archives"
+        hash=$(echo "$packages" | sha256sum | cut -d ' ' -f 1)
+        archives=$RUNNER_TEMP/apt-archives
+        lists=$RUNNER_TEMP/apt-lists
+        mkdir -p "$archives" "$lists"
+        # apt keeps the package files and lists in directories that the runner
+        # user can restore and save.
+        printf 'Dir::Cache::Archives "%s";\nDir::State::Lists "%s";\n' "$archives" "$lists" \
+          | sudo tee /etc/apt/apt.conf.d/99ci-cache > /dev/null
+        echo "packages=$packages" >> "$GITHUB_OUTPUT"
+        # The cache holds the package lists and the package files of one runner
+        # image version, so a cache hit installs without the network. A new
+        # image version (about once a week) downloads everything again.
+        echo "key=apt-$ImageOS-${ImageVersion:?}-$RUNNER_ARCH-$hash" >> "$GITHUB_OUTPUT"
+        echo "archives=$archives" >> "$GITHUB_OUTPUT"
+        echo "lists=$lists" >> "$GITHUB_OUTPUT"
 
-        # Update first: the image's package index can name versions the archive
-        # has since removed. Only the download runs under `timeout`, since
-        # killing `dpkg` mid-install would break the retry.
-        download() {
-          sudo timeout 120 apt-get update &&
-            sudo timeout 180 apt-get install $opts --download-only $packages
-        }
-        if ! download; then
-          # The Azure mirror can trickle at ~50 kB/s without tripping apt's failover: https://github.com/actions/runner-images/issues/14823
-          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
-          download
-        fi
-        sudo apt-get install $opts $packages
+    - name: Restore the apt package cache
+      id: apt-cache
+      if: inputs.cache == 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        # The globs skip the `lock` file and `partial/` directory that apt
+        # keeps next to the files, which only root and `_apt` can read. Every
+        # package list file name has an underscore.
+        path: |
+          ${{ steps.apt.outputs.archives }}/*.deb
+          ${{ steps.apt.outputs.lists }}/*_*
+        key: ${{ steps.apt.outputs.key }}
+
+    # The cache matches this runner image, so it needs no network.
+    - name: Install apt packages from the cache
+      if: steps.apt-cache.outputs.cache-hit == 'true'
+      shell: bash
+      env:
+        packages: ${{ steps.apt.outputs.packages }}
+      run: sudo DEBIAN_FRONTEND=noninteractive apt-get --quiet install --no-download --yes --no-install-recommends $packages
+
+    - name: Download and install apt packages
+      if: steps.apt-cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        packages: ${{ steps.apt.outputs.packages }}
+      run: '"$GITHUB_WORKSPACE/scripts/ci-apt.sh" $packages'
 
     - name: Save the apt package cache
       if: inputs.cache == 'true' && steps.apt-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        # The glob skips the `lock` file and `partial/` directory that apt
-        # keeps next to the packages, which only root and `_apt` can read.
-        path: ${{ steps.apt.outputs.dir }}/*.deb
+        # The globs skip the `lock` file and `partial/` directory that apt
+        # keeps next to the files, which only root and `_apt` can read. Every
+        # package list file name has an underscore.
+        path: |
+          ${{ steps.apt.outputs.archives }}/*.deb
+          ${{ steps.apt.outputs.lists }}/*_*
         key: ${{ steps.apt.outputs.key }}

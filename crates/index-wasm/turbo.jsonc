@@ -1,0 +1,18 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // `cargo xtask index-wasm` builds the .wasm and writes its bindings to
+    // `packages/index-wasm/pkg`. Overriding the crate's `build` keeps the Cargo
+    // inputs, which include the sources of the local crates it depends on.
+    "build": {
+      "command": ["cargo", "xtask", "index-wasm"],
+      "dependsOn": ["xtask#build", "transit"],
+      "env": [],
+      "outputs": [
+        "$TURBO_ROOT$/packages/index-wasm/pkg/*.js",
+        "$TURBO_ROOT$/packages/index-wasm/pkg/*.wasm",
+      ],
+    },
+  },
+}

@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "build:ipa": "node scripts/build-ipa.ts",
-    "build:web": "TAURI_ENV_PLATFORM=ios pnpm --filter @reflect/web build",
-    "dev:web": "pnpm --filter @reflect/web dev",
+    "build:web": "pnpm -w build:web:ios",
+    "dev:web": "pnpm -w dev:web:ios",
     "upload:testflight": "node scripts/upload-testflight.ts"
   },
   "devDependencies": {

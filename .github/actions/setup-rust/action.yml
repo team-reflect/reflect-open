@@ -6,19 +6,34 @@ inputs:
     description: Whether to restore and save the cache.
     required: false
     default: 'true'
-  cache-key:
-    description: An extra key for the cargo build cache, for jobs that must not share one.
+  cache-targets:
+    description: Whether to cache the target directory.
+    required: false
+    default: 'false'
+  s3-endpoint:
+    description: S3 endpoint of the sccache bucket.
+    required: false
+    default: ''
+  s3-bucket:
+    description: Name of the sccache bucket.
+    required: false
+    default: ''
+  s3-access-key-id:
+    description: Access key ID for the sccache bucket.
+    required: false
+    default: ''
+  s3-secret-access-key:
+    description: Secret access key for the sccache bucket.
     required: false
     default: ''
 
 runs:
   using: composite
   steps:
-    # Cargo registry fetches can intermittently fail on GitHub runners with
-    # curl HTTP/2 framing errors. HTTP/1.1 is slower but steadier.
-    - name: Disable HTTP/2 multiplexing in cargo
+    - name: Configure cargo
       shell: bash
-      run: echo "CARGO_HTTP_MULTIPLEXING=false" >> "$GITHUB_ENV"
+      run: |
+        echo "CARGO_PROFILE_DEV_DEBUG=line-tables-only" >> "$GITHUB_ENV"
 
     - name: Install Rust toolchain
       shell: bash
@@ -28,39 +43,63 @@ runs:
       shell: bash
       run: rustc --version --verbose
 
-    # Build scripts (ort-sys, swift-rs) write the path of Xcode's clang runtime
-    # into their cached output, and cargo does not rerun them when Xcode
-    # changes. rust-cache hashes RUST_* variables into its key, so a new Xcode
-    # starts from a cold cache instead of failing at link time.
-    - name: Scope the cargo cache to Xcode
-      if: runner.os == 'macOS'
-      shell: bash
-      # Ensures the setup-xcode action has run before setup-rust, so that xcrun clang points to the selected Xcode version.
-      run: echo "RUST_CACHE_CLANG_DIR=$(xcrun clang --print-resource-dir)" >> "$GITHUB_ENV"
-
-    # ort-sys (fastembed → ort) downloads prebuilt ONNX Runtime binaries at
-    # build time into $ORT_CACHE_DIR/dfbin/<target>/<hash> and writes that
-    # absolute path into its build script output in target/. Cargo does not
-    # rerun the build script when the directory is missing, so the binaries
-    # must live in the same cache entry as target/, or a restored target/ fails
-    # to link with "could not find native static library onnxruntime".
+    # ort-sys downloads prebuilt ONNX Runtime binaries into ORT_CACHE_DIR.
+    # Caching it skips the download.
     # ORT_CACHE_DIR is documented in the v2.0.0-rc.11 release notes:
     # https://github.com/pykeio/ort/releases/tag/v2.0.0-rc.11
     - name: Set the ONNX Runtime cache dir
       shell: bash
       run: echo "ORT_CACHE_DIR=$RUNNER_TEMP/ort_cache" >> "$GITHUB_ENV"
 
-    # `env-vars` puts ORT_CACHE_DIR into the cache key, so changing the path
-    # starts from a cold cache instead of a target/ that points to the old one.
-    - name: Cache cargo build
+    # Skip sccache on Windows because of error "The filename or extension is too long" (os error 206). See https://github.com/mozilla/sccache/issues/2397
+    - name: Install sccache
+      if: inputs.cache == 'true' && runner.os != 'Windows'
+      uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+
+    - name: Enable sccache
+      if: inputs.cache == 'true' && runner.os != 'Windows'
+      shell: bash
+      env:
+        S3_ENDPOINT: ${{ inputs.s3-endpoint }}
+        S3_BUCKET: ${{ inputs.s3-bucket }}
+        S3_ACCESS_KEY_ID: ${{ inputs.s3-access-key-id }}
+        S3_SECRET_ACCESS_KEY: ${{ inputs.s3-secret-access-key }}
+      run: |
+        echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+        echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
+        echo "SCCACHE_IDLE_TIMEOUT=0" >> "$GITHUB_ENV"
+
+        # Look up the local disk first, then the GitHub Actions cache, then S3.
+        # https://github.com/mozilla/sccache/blob/v0.19.0/docs/MultiLevel.md
+        # https://github.com/mozilla/sccache/blob/v0.19.0/docs/S3.md
+        echo "SCCACHE_DIR=$RUNNER_TEMP/sccache" >> "$GITHUB_ENV"
+        if [ -n "$S3_ENDPOINT" ] && [ -n "$S3_BUCKET" ] && [ -n "$S3_ACCESS_KEY_ID" ] && [ -n "$S3_SECRET_ACCESS_KEY" ]; then
+          echo "SCCACHE_MULTILEVEL_CHAIN=disk,gha,s3" >> "$GITHUB_ENV"
+          echo "SCCACHE_ENDPOINT=$S3_ENDPOINT" >> "$GITHUB_ENV"
+          echo "SCCACHE_BUCKET=$S3_BUCKET" >> "$GITHUB_ENV"
+          echo "SCCACHE_REGION=auto" >> "$GITHUB_ENV"
+          echo "SCCACHE_S3_KEY_PREFIX=sccache/" >> "$GITHUB_ENV"
+          echo "AWS_ACCESS_KEY_ID=$S3_ACCESS_KEY_ID" >> "$GITHUB_ENV"
+          echo "AWS_SECRET_ACCESS_KEY=$S3_SECRET_ACCESS_KEY" >> "$GITHUB_ENV"
+        else
+          echo "No S3 secrets: sccache uses the disk and the GitHub Actions cache only."
+          echo "SCCACHE_MULTILEVEL_CHAIN=disk,gha" >> "$GITHUB_ENV"
+        fi
+
+        # Without this, sccache writes a probe file before every write, and a
+        # rate-limited probe makes it skip the write.
+        echo "SCCACHE_SKIP_CACHE_CHECK=true" >> "$GITHUB_ENV"
+
+        # Upload to the remote caches only on master.
+        if [ "$GITHUB_REF" != "refs/heads/master" ]; then
+          echo "SCCACHE_GHA_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
+          echo "SCCACHE_S3_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
+        fi
+
+    - name: Cache cargo registry
       if: inputs.cache == 'true'
       uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       with:
-        key: ${{ inputs.cache-key }}
-        env-vars: ORT_CACHE_DIR
+        cache-targets: ${{ inputs.cache-targets }}
         cache-directories: ${{ env.ORT_CACHE_DIR }}
-
-    # Fails if Cargo.lock is out of date.
-    - name: Check Cargo.lock
-      shell: bash
-      run: cargo update --workspace --locked
+        save-if: ${{ github.ref == 'refs/heads/master' }}

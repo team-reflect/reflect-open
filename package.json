@@ -4,23 +4,27 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "turbo run dev",
-    "dev:web": "pnpm --filter @reflect/web dev",
+    "dev": "turbo run dev --filter='@reflect/*'",
+    "dev:web": "turbo run dev --filter=@reflect/web",
+    "dev:web:ios": "TAURI_ENV_PLATFORM=ios pnpm dev:web",
     "dev:ios": "node scripts/dev-ios.ts",
-    "build": "turbo run build",
+    "build": "turbo run build --filter='@reflect/*'",
+    "build:web": "turbo run build --filter='@reflect/web'",
+    "build:web:ios": "TAURI_ENV_PLATFORM=ios pnpm build:web",
     "build:ipa": "pnpm --filter @reflect/ios build:ipa",
     "build:ffi": "node scripts/build-ffi.ts",
-    "build:index-wasm": "node scripts/build-index-wasm.ts",
+    "build:ffi:iphonesimulator": "pnpm build:ffi --debug --sdk iphonesimulator",
+    "build:index-wasm": "turbo run build --filter=@reflect/index-wasm",
     "build:linux": "pnpm --filter @reflect/tauri build:linux",
     "build:macos": "pnpm --filter @reflect/tauri build:macos",
     "build:windows": "pnpm --filter @reflect/tauri build:windows",
     "web-inspector": "node scripts/web-inspector.ts",
     "typecheck": "tsc -b",
-    "test": "node scripts/build-index-wasm.ts && vitest",
-    "test:browser": "node scripts/build-index-wasm.ts && vitest run --project '*browser*'",
-    "test:node": "node scripts/build-index-wasm.ts && vitest run --project '!*browser*'",
+    "test": "pnpm build:index-wasm --output-logs=errors-only && vitest",
+    "test:browser": "vitest run --project '*browser*'",
+    "test:node": "vitest run --project '!*browser*'",
     "test:ios": "node scripts/test-ios.ts",
-    "test:swift": "swift test --package-path apple",
+    "test:swift": "turbo run test:swift --filter=@reflect/apple",
     "lint": "pnpm run lint:oxfmt && pnpm run lint:oxlint && pnpm run lint:eslint && pnpm run lint:knip",
     "lint:oxfmt": "oxfmt --check",
     "lint:oxlint": "oxlint --max-warnings 0 apps packages",
@@ -43,16 +47,16 @@
     "postinstall": "simple-git-hooks"
   },
   "devDependencies": {
-    "@ocavue/eslint-config": "^4.24.0",
+    "@ocavue/eslint-config": "^4.26.0",
     "@ocavue/tsconfig": "^0.7.1",
     "@types/node": "^24.0.0",
-    "eslint": "^10.14.0",
-    "knip": "^6.44.1",
+    "eslint": "^10.15.0",
+    "knip": "^6.46.0",
     "nano-staged": "^1.0.2",
     "oxfmt": "^0.76.0",
     "oxlint": "^1.91.0",
     "simple-git-hooks": "^2.14.0",
-    "turbo": "^2.11.11",
+    "turbo": "^2.11.13",
     "typescript": "~6.0.3",
     "vitest": "^5.1.0"
   },
@@ -62,5 +66,5 @@
   "nano-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern"
   },
-  "packageManager": "pnpm@11.28.8"
+  "packageManager": "pnpm@11.28.13"
 }

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // The Swift package, the Xcode of the runner image and the Xcode that
+    // setup-xcode selects decide the results.
+    "test:swift": {
+      "outputLogs": "new-only",
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.github/actions/setup-xcode/action.yml"],
+      "env": ["ImageVersion"],
+      "outputs": [],
+    },
+    "build:ios-simulator": {
+      "outputLogs": "new-only",
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.github/actions/setup-xcode/action.yml"],
+      "env": ["ImageVersion"],
+      "outputs": [],
+    },
+    "build:ios-device": {
+      "outputLogs": "new-only",
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.github/actions/setup-xcode/action.yml"],
+      "env": ["ImageVersion"],
+      "outputs": [],
+    },
+  },
+}

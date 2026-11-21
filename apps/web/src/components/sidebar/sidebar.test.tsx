@@ -13,6 +13,7 @@ import {
 } from '@reflect/core'
 import {
   type GraphBootService,
+  type AppCommandId,
   type NativeContextMenuOptions,
   deepLinkForRoute,
   type Route,
@@ -22,21 +23,19 @@ import {
   createTestWindowService,
   type TestOpenerService,
   type TestOperationsService,
+  createTestAppServices,
 } from '@reflect/app/testing'
 import {
   createTestDatabaseService,
   createTestCoreServices,
   createTestGitSyncService,
 } from '@reflect/core/testing'
-import type { CommandContext } from '@/lib/commands/types.ts'
 import { AudioMemoProvider } from '@/providers/audio-memo-provider.tsx'
 import { SidebarProvider } from '@/providers/sidebar-provider.tsx'
 import { UpdateProvider } from '@/providers/update-provider.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { Sidebar } from './sidebar.tsx'
-import { noop, returnNull } from '@ocavue/utils'
-import { createWebTestAppServices } from '@/test-utils/app-services.ts'
 
 const openNativeContextMenu = vi.fn((options: NativeContextMenuOptions) => {
   return Promise.try(() => {
@@ -87,9 +86,17 @@ beforeEach(() => {
   openNativeContextMenu.mockClear()
 })
 
-async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?: Route) {
-  const navigate = vi.fn()
-  const openPalette = vi.fn()
+const SIDEBAR_COMMANDS: readonly AppCommandId[] = [
+  'nav.today',
+  'nav.allNotes',
+  'nav.tasks',
+  'note.new',
+  'chat.open',
+  'settings.open',
+  'palette.open',
+]
+
+async function renderSidebar(initialRoute?: Route) {
   const readSource = (): Promise<string> => Promise.resolve('# Rust\n')
   operations = createTestOperationsService()
   const core = createTestCoreServices({
@@ -104,35 +111,15 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
     },
     gitSync: createTestGitSyncService({ state: { phase: 'disconnected' } }),
   })
-  const appLayer = createWebTestAppServices(core, {
+  const appLayer = createTestAppServices(core, {
     window: createTestWindowService({ openNoteWindow }),
   })
-  const context: CommandContext = {
-    services: core,
-    app: appLayer,
-    navigate,
-    route: () => ({ kind: 'today' }),
-    notePath: returnNull,
-    selectSection: (section, options) => appLayer.navigation.selectSection(section, options),
-    back: vi.fn(),
-    forward: vi.fn(),
-    clearScrollState: vi.fn(),
-    togglePin: vi.fn(noop),
-    togglePrivate: vi.fn(noop),
-    toggleTheme: vi.fn(),
-    toggleSidebar: vi.fn(),
-    newChat: vi.fn(),
-    openNoteFind: vi.fn(),
-    findNextInNote: vi.fn(),
-    findPreviousInNote: vi.fn(),
-    switchGraph: vi.fn(),
-    toggleAudioMemo: vi.fn(),
-    openPalette,
-    openShortcuts: vi.fn(),
-    openTemplatePicker: vi.fn(),
-    openTemplateCreate: vi.fn(),
-    enableSemanticSearch: vi.fn(),
-    ...overrides,
+  // The commands the sidebar ran, in order. The main window's own handlers
+  // are tested with `useWorkspaceCommands`.
+  const ran: string[] = []
+  const handlers = new AbortController()
+  for (const id of SIDEBAR_COMMANDS) {
+    appLayer.commands.handle(id, () => void ran.push(id), handlers.signal)
   }
   vi.spyOn(core.indexQuery, 'getPinnedNotes').mockImplementation(getPinnedNotes)
   vi.spyOn(appLayer.nativeMenu, 'openContextMenu').mockImplementation(openNativeContextMenu)
@@ -143,14 +130,14 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
   opener = appLayer.opener
   // The app constrains the sidebar to its rail width; without it the graph
   // menu's anchor spans the viewport and popper pushes the submenu off-screen.
-  const view = await renderInApp(<Sidebar graph={GRAPH} context={context} />, {
+  const view = await renderInApp(<Sidebar graph={GRAPH} />, {
     core,
     appServices: appLayer,
     graph: GRAPH,
     graphState: {
       recents: [
-        { root: '/work', name: 'Work', openedMs: 2 },
-        { root: '/notes', name: 'Notes', openedMs: 1 },
+        { root: '/notes', name: 'Notes', openedMs: 2 },
+        { root: '/work', name: 'Work', openedMs: 1 },
       ],
     },
     settings: {
@@ -170,12 +157,12 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
       </div>
     ),
   })
-  return { view, navigate, openPalette, context, core, navigation: appLayer.navigation }
+  return { view, ran, core, navigation: appLayer.navigation }
 }
 
 describe('Sidebar', () => {
   it('section rows return to where their section was left, and light for it', async () => {
-    const { view, navigate, navigation } = await renderSidebar(undefined, { kind: 'tasks' })
+    const { view, ran, navigation } = await renderSidebar({ kind: 'tasks' })
     const tasks = view.getByRole('button', { name: /tasks/i })
 
     navigation.navigate({ kind: 'note', path: 'notes/meeting.md' })
@@ -184,55 +171,33 @@ describe('Sidebar', () => {
     // Off the stream, Daily notes returns to its last day without focus.
     await view.getByRole('button', { name: /daily notes/i }).click()
     await vi.waitFor(() => expect(navigation.get().route).toEqual({ kind: 'today' }))
-    expect(navigate).not.toHaveBeenCalled()
+    expect(ran).toEqual([])
 
     await tasks.click()
-    await vi.waitFor(() => {
-      expect(navigation.get().route).toEqual({ kind: 'note', path: 'notes/meeting.md' })
-    })
-    await expect.element(tasks).toHaveAttribute('aria-current', 'page')
-
     await view.getByRole('button', { name: /all notes/i }).click()
-    await vi.waitFor(() => {
-      expect(navigation.get().route).toEqual({ kind: 'allNotes', tag: null })
-    })
-
     await view.getByRole('button', { name: /settings/i }).click()
-    await vi.waitFor(() => {
-      return expect(navigate).toHaveBeenCalledWith({ kind: 'settings', page: 'main' })
-    })
-
     await view.getByRole('button', { name: /chat/i }).click()
     await vi.waitFor(() => {
-      return expect(navigate).toHaveBeenCalledWith({ kind: 'chat', conversationId: null })
+      expect(ran).toEqual(['nav.tasks', 'nav.allNotes', 'settings.open', 'chat.open'])
     })
   })
 
   it('Daily notes on the stream re-anchors to today with focus', async () => {
-    const { view, navigate } = await renderSidebar(undefined, { kind: 'daily', date: '2026-01-02' })
+    const { view, ran } = await renderSidebar({ kind: 'daily', date: '2026-01-02' })
 
     await view.getByRole('button', { name: /daily notes/i }).click()
-    await vi.waitFor(() => {
-      expect(navigate).toHaveBeenCalledWith({ kind: 'today' }, { focusEditor: true })
-    })
+    await vi.waitFor(() => expect(ran).toEqual(['nav.today']))
   })
 
   it('the compose button runs the new-note command', async () => {
-    const { view, navigate } = await renderSidebar()
+    const { view, ran } = await renderSidebar()
 
     await view.getByRole('button', { name: 'New note' }).click()
-    await vi.waitFor(() => {
-      expect(navigate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          kind: 'note',
-          path: expect.stringMatching(/^notes\/.+\.md$/) as string,
-        }),
-      )
-    })
+    await vi.waitFor(() => expect(ran).toEqual(['note.new']))
   })
 
   it('All notes stays active while editing a note opened from it', async () => {
-    const { view, navigation } = await renderSidebar(undefined, { kind: 'allNotes', tag: null })
+    const { view, navigation } = await renderSidebar({ kind: 'allNotes', tag: null })
     navigation.navigate({ kind: 'note', path: 'notes/meeting.md' })
     await expect
       .element(view.getByRole('button', { name: /all notes/i }))
@@ -240,7 +205,7 @@ describe('Sidebar', () => {
   })
 
   it('a fresh untitled note lights the section it was created from', async () => {
-    const { view, navigation } = await renderSidebar(undefined, { kind: 'today' })
+    const { view, navigation } = await renderSidebar({ kind: 'today' })
     navigation.navigate({ kind: 'note', path: untitledNotePath() })
     await expect
       .element(view.getByRole('button', { name: /daily notes/i }))
@@ -248,9 +213,9 @@ describe('Sidebar', () => {
   })
 
   it('the search affordance opens the palette', async () => {
-    const { view, openPalette } = await renderSidebar()
+    const { view, ran } = await renderSidebar()
     await view.getByRole('button', { name: /search anything/i }).click()
-    expect(openPalette).toHaveBeenCalled()
+    expect(ran).toEqual(['palette.open'])
   })
 
   it('the mic button starts an audio memo', async () => {
@@ -334,7 +299,7 @@ describe('Sidebar', () => {
     getPinnedNotes.mockResolvedValue([
       { path: 'notes/roadmap.md', title: 'Roadmap', dailyDate: null, pinnedOrder: null },
     ])
-    const { view } = await renderSidebar(undefined, { kind: 'note', path: 'notes/roadmap.md' })
+    const { view } = await renderSidebar({ kind: 'note', path: 'notes/roadmap.md' })
 
     const roadmap = view.getByRole('button', { name: 'Roadmap' })
     await expect.element(roadmap).toHaveAttribute('aria-current', 'page')
@@ -433,14 +398,12 @@ describe('Sidebar', () => {
   })
 
   it('the graph footer opens preferences from the graph menu', async () => {
-    const { view, navigate } = await renderSidebar()
+    const { view, ran } = await renderSidebar()
 
     await view.getByRole('button', { name: /Notes/ }).click()
     await page.getByRole('menuitem', { name: 'Preferences' }).click()
 
-    await vi.waitFor(() => {
-      return expect(navigate).toHaveBeenCalledWith({ kind: 'settings', page: 'main' })
-    })
+    await vi.waitFor(() => expect(ran).toEqual(['settings.open']))
   })
 
   it('the graph menu offers the iOS app and browser extension in their stores', async () => {

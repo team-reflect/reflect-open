@@ -1,4 +1,3 @@
-# Run before setup-rust, which keys its cache on `xcrun clang`.
 name: Set up Xcode
 description: Select a fixed Xcode version
 inputs:
@@ -9,6 +8,11 @@ inputs:
 runs:
   using: composite
   steps:
+    # Spotlight indexes every file that the build writes.
+    - name: Turn off Spotlight
+      shell: bash
+      run: sudo mdutil -a -i off
+
     - name: List installed Xcode versions
       shell: bash
       run: |

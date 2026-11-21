@@ -10,7 +10,7 @@ import {
 
 /**
  * Open state for the ⌘/ shortcuts cheat-sheet (Plan 15), provided once per
- * workspace so the `shortcuts.show` command (via CommandContext) and the
+ * workspace so the `shortcuts.show` command and the
  * dialog itself share one definition of "open" — the same shape as the
  * palette's provider.
  */

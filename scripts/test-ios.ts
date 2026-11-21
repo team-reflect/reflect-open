@@ -1,8 +1,11 @@
-// Runs the tests of the iOS app in apps/ios the same way on a developer's Mac
-// and in CI: in a new simulator for each run, so each run starts from an empty
-// device. It prints the time of each step when the step ends.
+// Runs the tests of the iOS app in apps/ios in a new, slim simulator, so each
+// run starts from an empty device. It prints the time of each step when the
+// step ends.
 //
 //   pnpm test:ios
+//
+// In CI, IOS_SIMULATOR_SNAPSHOT is the folder of a simulator from
+// `scripts/ios-simulator.ts prepare`, used instead of a new one.
 //
 // The result bundle and, after a failed test run, the log archive of the
 // simulator go to apps/ios/build/test-ios.
@@ -10,9 +13,9 @@
 import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
-import { setTimeout as sleep } from 'node:timers/promises'
 import { exec } from 'tinyexec'
 import ms from 'pretty-ms'
+import { createSimulator, restoreSimulator, slimSimulator } from './ios-simulator.ts'
 
 const ROOT_DIR = join(import.meta.dirname, '..')
 const BUILD_DIR = join(ROOT_DIR, 'apps', 'ios', 'build')
@@ -22,6 +25,7 @@ const RESULT_BUNDLE = join(OUTPUT_DIR, 'Reflect.xcresult')
 const LOG_ARCHIVE = join(OUTPUT_DIR, 'simulator.logarchive')
 
 const IN_GITHUB_ACTIONS = process.env.GITHUB_ACTIONS === 'true'
+const SNAPSHOT_DIR = process.env.IOS_SIMULATOR_SNAPSHOT
 
 async function run(command: string, args: string[]): Promise<void> {
   await exec(command, args, {
@@ -44,29 +48,17 @@ async function step<T>(name: string, body: () => Promise<T>): Promise<T> {
   }
 }
 
-async function xcodebuild(args: string[]): Promise<void> {
-  const renderer = IN_GITHUB_ACTIONS ? '--renderer github-actions' : ''
-  const script = `
-    set -o pipefail
-    if command -v xcbeautify >/dev/null; then
-      xcodebuild "$@" 2>&1 | xcbeautify ${renderer}
-    else
-      xcodebuild "$@"
-    fi`
-  await run('bash', ['-c', script, 'bash', ...args])
-}
-
 async function main(): Promise<void> {
   // xcodebuild and `log collect` refuse to write over an existing bundle.
   rmSync(OUTPUT_DIR, { recursive: true, force: true })
   mkdirSync(OUTPUT_DIR, { recursive: true })
 
   await step('Build the web app', async () => {
-    await run('pnpm', ['--filter', '@reflect/ios', 'build:web'])
+    await run('pnpm', ['build:web:ios'])
   })
 
   await step('Build the Rust core', async () => {
-    await run('pnpm', ['build:ffi', '--debug', '--sdk', 'iphonesimulator'])
+    await run('pnpm', ['build:ffi:iphonesimulator'])
   })
 
   const projectArgs = [
@@ -79,16 +71,18 @@ async function main(): Promise<void> {
   ]
 
   await step('Resolve the Swift packages', async () => {
-    await xcodebuild(['-resolvePackageDependencies', ...projectArgs])
+    await run('xcodebuild', [
+      '-resolvePackageDependencies',
+      '-onlyUsePackageVersionsFromResolvedFile',
+      ...projectArgs,
+    ])
   })
 
   const simulator = await step('Create the simulator', async () => {
-    const name = `reflect-test-${Date.now()}`
-    const created = await exec('xcrun', ['simctl', 'create', name, 'iPhone 17'], {
-      throwOnError: true,
-    })
-    const udid = created.stdout.trim()
-    console.log(`[test-ios] created ${name} (${udid})`)
+    const udid = SNAPSHOT_DIR
+      ? await restoreSimulator(SNAPSHOT_DIR)
+      : await createSimulator(`reflect-test-${Date.now()}`)
+    console.log(`[test-ios] simulator ${udid}`)
     return udid
   })
 
@@ -104,16 +98,13 @@ async function main(): Promise<void> {
     // The build comes before the boot: a booted simulator takes CPU time
     // from the compiler.
     await step('Build the app and the tests', async () => {
-      await xcodebuild(['build-for-testing', ...xcodebuildArgs])
+      await run('xcodebuild', ['build-for-testing', '-showBuildTimingSummary', ...xcodebuildArgs])
     })
 
-    await step('Boot the simulator', async () => {
-      await run('xcrun', ['simctl', 'bootstatus', simulator, '-b'])
-    })
-
-    // A new simulator still starts system services after `bootstatus` returns.
-    await step('Wait for the system services', async () => {
-      await sleep(10_000)
+    // simslim keeps its settings on the host, not in the device folder, so a
+    // restored simulator needs it too.
+    await step('Slim and boot the simulator', async () => {
+      await slimSimulator(simulator)
     })
 
     await step('Launch Safari', async () => {
@@ -126,7 +117,7 @@ async function main(): Promise<void> {
 
     try {
       await step('Run the tests', async () => {
-        await xcodebuild([
+        await run('xcodebuild', [
           'test-without-building',
           ...xcodebuildArgs,
           '-resultBundlePath',

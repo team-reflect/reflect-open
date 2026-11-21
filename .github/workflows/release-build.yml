@@ -1,7 +1,7 @@
 name: Release build
 
 # Checks that the release build of each platform compiles and bundles. It uses
-# no secrets and uploads nothing.
+# only the sccache secrets and uploads no build.
 #
 # Only Release PRs change the desktop release-please manifests, so the paths
 # filter keeps this workflow off every other pull request.
@@ -47,6 +47,10 @@ jobs:
 
     name: release-build-${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    environment:
+      # Only master can use `sccache_write`, which holds the read-write S3 key.
+      name: ${{ github.ref == 'refs/heads/master' && 'sccache_write' || 'sccache_read' }}
+      deployment: false
     timeout-minutes: 120
 
     steps:
@@ -64,11 +68,10 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
         with:
-          cache-key: build-${{ matrix.name }}
-
-      # The Rust build of the Swift shell runs cbindgen.
-      - uses: ./.github/actions/setup-mise
-        if: matrix.name == 'ios'
+          s3-endpoint: ${{ secrets.S3_SCCACHE_ENDPOINT }}
+          s3-bucket: ${{ secrets.S3_SCCACHE_BUCKET }}
+          s3-access-key-id: ${{ secrets.S3_SCCACHE_ACCESS_KEY_ID }}
+          s3-secret-access-key: ${{ secrets.S3_SCCACHE_SECRET_ACCESS_KEY }}
 
       # The universal build also compiles the x86_64 slice on this arm64 runner.
       - name: Add the x86_64 macOS target

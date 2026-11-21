@@ -1,40 +1,8 @@
 import type { MaybePromise } from '@reflect/utils'
 import type { LoggerService, PlatformFacts } from '@reflect/core'
+import { APP_COMMANDS, type AppCommandId, type Command } from './app-commands.ts'
 import { normalizeBinding } from './keybindings.ts'
-
-/**
- * The typed command contract: one registry powers the ⌘K palette, the
- * app-scope keybindings, and the native menu. A command receives its
- * capabilities through `Context`, an object the app assembles, so the
- * registry stays testable and host-agnostic.
- */
-export interface Command<CommandId extends string, Context = unknown> {
-  /**
-   * Stable id — the deep-link/CLI name (e.g. `nav.today`).
-   */
-  id: CommandId
-  /**
-   * Palette display title.
-   */
-  title: string
-  /**
-   * Extra match terms for palette filtering.
-   */
-  keywords?: string[]
-  /**
-   * Keymap-registry binding (app scope), e.g. `Mod-d`.
-   */
-  keybinding?: string
-  run: (context: Context) => MaybePromise<void>
-}
-
-/**
- * A list of commands, in registration order.
- */
-export type Commands<CommandId extends string, Context = unknown> = readonly Command<
-  CommandId,
-  Context
->[]
+import { objectEntries } from '@ocavue/utils'
 
 /**
  * The fields of a `keydown` event that {@link CommandService.commandForKeyDown} reads.
@@ -50,26 +18,50 @@ export interface CommandKeyEvent {
 }
 
 /**
- * A flat, collision-checked id → command map.
+ * What a command does in the current window.
  */
-export interface CommandService<CommandId extends string, Context = unknown> {
+export type CommandHandler = () => MaybePromise<void>
+
+/**
+ * The app command registry of one window. The declarations are static
+ * ({@link APP_COMMANDS}); the handlers are registered at run time by the UI
+ * that implements them, and removed when it goes away.
+ */
+export interface CommandService {
   /**
-   * Register commands; duplicate or blank ids/titles are programmer errors.
+   * Every declared command, in declaration order.
    */
-  register(definitions: Commands<CommandId, Context>): void
+  list(): readonly Command[]
   /**
-   * Every registered command, in registration order.
+   * Make `handler` the handler of `id` until `signal` aborts.
    */
-  list(): Command<CommandId, Context>[]
+  handle(id: AppCommandId, handler: CommandHandler, signal: AbortSignal): void
   /**
-   * Run a command by id; unknown ids are a loud no-op (deep links may dangle).
+   * Whether `id` has a handler.
    */
-  run(id: CommandId, context: Context): Promise<void>
+  isHandled(id: AppCommandId): boolean
+  /**
+   * Run the handler of `id`, if any. Blocks do not apply: a caller that runs
+   * a command directly (a button, the palette) owns that decision.
+   */
+  run(id: AppCommandId): Promise<void>
+  /**
+   * Run `id` for a key or a menu item. Returns whether a handler ran: false
+   * when `id` has no handler or a block stops it. The handler's failure is
+   * logged, not thrown.
+   */
+  trigger(id: AppCommandId): boolean
+  /**
+   * Stop {@link trigger} for every command except `allow` until `signal`
+   * aborts. A modal screen blocks while it is open. Only the latest active
+   * block applies, so a modal opened on top of another decides alone.
+   */
+  block(allow: readonly AppCommandId[], signal: AbortSignal): void
   /**
    * The id of the command whose keybinding `event` types, or `null`. Only
    * chords with ⌘ or Ctrl match, and a held key (`repeat`) never does.
    */
-  commandForKeyDown(event: CommandKeyEvent): CommandId | null
+  commandForKeyDown(event: CommandKeyEvent): AppCommandId | null
 }
 
 export interface CommandServiceDeps {
@@ -142,34 +134,24 @@ function bindingLookupsFor(event: CommandKeyEvent): BindingKeyLookup[] {
   return lookups
 }
 
-class CommandServiceImpl<CommandId extends string, Context> implements CommandService<
-  CommandId,
-  Context
-> {
+class CommandServiceImpl implements CommandService {
   readonly #deps: CommandServiceDeps
-  readonly #commands = new Map<CommandId, Command<CommandId, Context>>()
+  readonly #handlers = new Map<AppCommandId, CommandHandler>()
+  readonly #blocks: (readonly AppCommandId[])[] = []
+  readonly #commands: readonly Command[]
   /**
    * Normalized binding → command id, for Apple platforms and for the others.
    */
-  readonly #appleBindingToId = new Map<string, CommandId>()
-  readonly #otherBindingToId = new Map<string, CommandId>()
+  readonly #appleBindingToId = new Map<string, AppCommandId>()
+  readonly #otherBindingToId = new Map<string, AppCommandId>()
 
   constructor(deps: CommandServiceDeps) {
     this.#deps = deps
-  }
-
-  register(definitions: Commands<CommandId, Context>): void {
-    for (const command of definitions) {
-      if (command.id.trim() === '') {
-        throw new Error('command id cannot be empty')
-      }
-      if (command.title.trim() === '') {
-        throw new Error(`command title cannot be empty: ${command.id}`)
-      }
-      if (this.#commands.has(command.id)) {
-        throw new Error(`command id already registered: ${command.id}`)
-      }
-      this.#commands.set(command.id, command)
+    this.#commands = objectEntries(APP_COMMANDS).map(([id, declaration]) => ({
+      id,
+      ...declaration,
+    }))
+    for (const command of this.#commands) {
       if (command.keybinding) {
         this.#appleBindingToId.set(normalizeBinding(command.keybinding, true), command.id)
         this.#otherBindingToId.set(normalizeBinding(command.keybinding, false), command.id)
@@ -177,20 +159,64 @@ class CommandServiceImpl<CommandId extends string, Context> implements CommandSe
     }
   }
 
-  list(): Command<CommandId, Context>[] {
-    return [...this.#commands.values()]
+  list(): readonly Command[] {
+    return this.#commands
   }
 
-  async run(id: CommandId, context: Context): Promise<void> {
-    const command = this.#commands.get(id)
-    if (!command) {
-      this.#deps.logger.error(`unknown command: ${id}`)
+  handle(id: AppCommandId, handler: CommandHandler, signal: AbortSignal): void {
+    if (signal.aborted) {
       return
     }
-    await command.run(context)
+    // A fresh function per registration, so an abort removes only its own
+    // registration, even when two registrations share one handler.
+    const registered: CommandHandler = () => handler()
+    this.#handlers.set(id, registered)
+    signal.addEventListener(
+      'abort',
+      () => {
+        if (this.#handlers.get(id) === registered) {
+          this.#handlers.delete(id)
+        }
+      },
+      { once: true },
+    )
   }
 
-  commandForKeyDown(event: CommandKeyEvent): CommandId | null {
+  isHandled(id: AppCommandId): boolean {
+    return this.#handlers.has(id)
+  }
+
+  async run(id: AppCommandId): Promise<void> {
+    await this.#handlers.get(id)?.()
+  }
+
+  trigger(id: AppCommandId): boolean {
+    const block = this.#blocks.at(-1)
+    if (block !== undefined && !block.includes(id)) {
+      return false
+    }
+    if (!this.#handlers.has(id)) {
+      return false
+    }
+    void this.#runLogged(id)
+    return true
+  }
+
+  block(allow: readonly AppCommandId[], signal: AbortSignal): void {
+    if (signal.aborted) {
+      return
+    }
+    this.#blocks.push(allow)
+    signal.addEventListener(
+      'abort',
+      () => this.#blocks.splice(this.#blocks.lastIndexOf(allow), 1),
+      {
+        once: true,
+      },
+    )
+  }
+
+  commandForKeyDown(event: CommandKeyEvent): AppCommandId | null {
     if ((!event.metaKey && !event.ctrlKey) || event.repeat) {
       return null // held keys must not spam navigations (e.g. a stack of new notes)
     }
@@ -212,10 +238,16 @@ class CommandServiceImpl<CommandId extends string, Context> implements CommandSe
     }
     return null
   }
+
+  async #runLogged(id: AppCommandId): Promise<void> {
+    try {
+      await this.run(id)
+    } catch (cause) {
+      this.#deps.logger.error(`command failed: ${id}`, cause)
+    }
+  }
 }
 
-export function createCommandService<CommandId extends string, Context = unknown>(
-  deps: CommandServiceDeps,
-): CommandService<CommandId, Context> {
-  return new CommandServiceImpl<CommandId, Context>(deps)
+export function createCommandService(deps: CommandServiceDeps): CommandService {
+  return new CommandServiceImpl(deps)
 }

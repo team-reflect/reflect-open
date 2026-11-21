@@ -7,9 +7,6 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "scripts": {
-    "test": "node ../../scripts/build-index-wasm.ts && vitest run"
-  },
   "dependencies": {
     "@reflect/types": "workspace:*"
   },

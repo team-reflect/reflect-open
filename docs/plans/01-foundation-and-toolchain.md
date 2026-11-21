@@ -25,7 +25,7 @@ skeleton, a Tauri shell sanity check.
    `apps/desktop/` (its `src/` + `src-tauri/` + `dist/`). Create `packages/core`
    (`@reflect/core` — the TS actions/business-logic home) and `packages/db` (`@reflect/db`
    — Kysely schema/types + the IPC dialect, wired in Plan 04). Add `pnpm-workspace.yaml`
-   (`apps/*`, `packages/*`), `turbo.json` (dev/build/lint/test/typecheck), root `tsconfig`
+   (`apps/*`, `packages/*`), `turbo.jsonc` (dev/build/lint/test/typecheck), root `tsconfig`
    with project references, and `@reflect/*` names. Do **not** pre-create empty `apps/cli`
    or `apps/extension` — they arrive at Plans 14 and 11. Confirm `pnpm tauri dev` works
    from `apps/desktop`.

@@ -12,6 +12,14 @@ on:
         type: string
         required: true
     secrets:
+      S3_SCCACHE_ENDPOINT:
+        required: false
+      S3_SCCACHE_BUCKET:
+        required: false
+      S3_SCCACHE_ACCESS_KEY_ID:
+        required: false
+      S3_SCCACHE_SECRET_ACCESS_KEY:
+        required: false
       APPLE_SIGNING_IDENTITY:
         required: true
       APPLE_CERTIFICATE:
@@ -42,6 +50,10 @@ jobs:
       tag: ${{ inputs.tag }}
       commit: ${{ inputs.commit }}
     secrets:
+      S3_SCCACHE_ENDPOINT: ${{ secrets.S3_SCCACHE_ENDPOINT }}
+      S3_SCCACHE_BUCKET: ${{ secrets.S3_SCCACHE_BUCKET }}
+      S3_SCCACHE_ACCESS_KEY_ID: ${{ secrets.S3_SCCACHE_ACCESS_KEY_ID }}
+      S3_SCCACHE_SECRET_ACCESS_KEY: ${{ secrets.S3_SCCACHE_SECRET_ACCESS_KEY }}
       APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -68,6 +80,10 @@ jobs:
       tag: ${{ inputs.tag }}
       commit: ${{ inputs.commit }}
     secrets:
+      S3_SCCACHE_ENDPOINT: ${{ secrets.S3_SCCACHE_ENDPOINT }}
+      S3_SCCACHE_BUCKET: ${{ secrets.S3_SCCACHE_BUCKET }}
+      S3_SCCACHE_ACCESS_KEY_ID: ${{ secrets.S3_SCCACHE_ACCESS_KEY_ID }}
+      S3_SCCACHE_SECRET_ACCESS_KEY: ${{ secrets.S3_SCCACHE_SECRET_ACCESS_KEY }}
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
   ios:
@@ -77,6 +93,10 @@ jobs:
       commit: ${{ inputs.commit }}
       flavor: stable
     secrets:
+      S3_SCCACHE_ENDPOINT: ${{ secrets.S3_SCCACHE_ENDPOINT }}
+      S3_SCCACHE_BUCKET: ${{ secrets.S3_SCCACHE_BUCKET }}
+      S3_SCCACHE_ACCESS_KEY_ID: ${{ secrets.S3_SCCACHE_ACCESS_KEY_ID }}
+      S3_SCCACHE_SECRET_ACCESS_KEY: ${{ secrets.S3_SCCACHE_SECRET_ACCESS_KEY }}
       APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
       APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
       APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
@@ -101,10 +121,7 @@ jobs:
           ref: ${{ inputs.commit }}
           persist-credentials: false
 
-      # Any master job can write the caches, so a release build starts cold.
       - uses: ./.github/actions/setup-node
-        with:
-          cache: false
 
       # A prerelease version is the beta flavor. Asset names use the flavor's
       # product name with spaces as dots, which is how GitHub stores them.

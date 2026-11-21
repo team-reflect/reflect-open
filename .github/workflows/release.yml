@@ -96,6 +96,10 @@ jobs:
       tag: ${{ needs.release-please.outputs.stable_tag }}
       commit: ${{ needs.release-please.outputs.stable_commit }}
     secrets:
+      S3_SCCACHE_ENDPOINT: ${{ secrets.S3_SCCACHE_ENDPOINT }}
+      S3_SCCACHE_BUCKET: ${{ secrets.S3_SCCACHE_BUCKET }}
+      S3_SCCACHE_ACCESS_KEY_ID: ${{ secrets.S3_SCCACHE_ACCESS_KEY_ID }}
+      S3_SCCACHE_SECRET_ACCESS_KEY: ${{ secrets.S3_SCCACHE_SECRET_ACCESS_KEY }}
       APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -117,6 +121,10 @@ jobs:
       tag: ${{ needs.release-please.outputs.beta_tag }}
       commit: ${{ needs.release-please.outputs.beta_commit }}
     secrets:
+      S3_SCCACHE_ENDPOINT: ${{ secrets.S3_SCCACHE_ENDPOINT }}
+      S3_SCCACHE_BUCKET: ${{ secrets.S3_SCCACHE_BUCKET }}
+      S3_SCCACHE_ACCESS_KEY_ID: ${{ secrets.S3_SCCACHE_ACCESS_KEY_ID }}
+      S3_SCCACHE_SECRET_ACCESS_KEY: ${{ secrets.S3_SCCACHE_SECRET_ACCESS_KEY }}
       APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}

@@ -10,7 +10,7 @@ import {
 
 /**
  * Palette open/query state (Plan 08), provided once per workspace so both the
- * ⌘K command (via CommandContext.openPalette) and the `search/:query` route
+ * ⌘K command and the `search/:query` route
  * can open the same surface.
  */
 

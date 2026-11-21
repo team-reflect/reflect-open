@@ -1,7 +1,3 @@
-# Workspace for all Rust crates: the Tauri desktop shell, the `reflect` CLI,
-# the shared core crates, and the FFI library of the iOS app. One lockfile
-# pins one SQLite everywhere — the desktop writer and the CLI reader can
-# never skew.
 [workspace]
 resolver = "3"
 members = [
@@ -17,7 +13,11 @@ members = [
   "crates/index-schema",
   "crates/index-wasm",
   "crates/types",
+  "xtask",
 ]
+
+[workspace.metadata]
+name = "reflect-workspace"
 
 [workspace.package]
 authors = ["Reflect App, LLC"]
@@ -44,12 +44,15 @@ reflect-types = { path = "crates/types" }
 apple-native-keyring-store = "1.0.2"
 base64 = "0.23.1"
 block2 = "0.6.2"
-clap = "4.6.7"
+# The library only: the default `clap` feature builds the CLI.
+cbindgen = { version = "0.29.4", default-features = false }
+clap = "4.6.8"
 console_error_panic_hook = "0.1.7"
 core-foundation = "0.10.1"
 dbus-secret-service-keyring-store = "1.0.1"
 dirs = "7.0.0"
 dispatch2 = "0.3.1"
+expect-test = "1.5.1"
 # Text embeddings only. The default `image-models` feature turns on every
 # `image` format (AVIF encoder, EXR, TIFF, ...) through feature unification.
 fastembed = { version = "7.5.0", default-features = false, features = [
@@ -73,10 +76,10 @@ ignore = "0.4.34"
 image = { version = "0.25.10", default-features = false }
 infer = "0.22.0"
 js-sys = "0.3.103"
-jiff = { version = "0.2.45", default-features = false, features = ["std"] }
+jiff = { version = "1.0.0", default-features = false, features = ["std"] }
 keyring-core = "1.0.1"
 log = "0.4.35"
-notify-debouncer-full = "0.8.0-rc.3"
+notify-debouncer-full = "0.8.0-rc.4"
 objc2 = "0.6.5"
 objc2-app-kit = { version = "0.3.2", default-features = false }
 objc2-contacts = "0.3.2"
@@ -87,18 +90,17 @@ objc2-ui-kit = { version = "0.3.2", default-features = false }
 percent-encoding = "2.3.2"
 proptest = "1.12.0"
 pulldown-cmark = "0.13.6"
-reconcile-text = "0.14.1"
+reconcile-text = "0.14.3"
 regex = "1.13.1"
 # reqwest 0.12 rides the exact version tauri-plugin-http already compiles.
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
 rusqlite = { version = "0.41.0", features = ["bundled"] }
 rusqlite_migration = "2.6.0"
 saphyr = "0.3.0"
+sea-query = { version = "1.0.2", default-features = false, features = ["backend-sqlite", "derive"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
-# `reflect-types` codegen. Pinned exactly: specta is a release candidate and
-# its exporters are 0.0.x, so any bump can change the generated files.
 specta = { version = "=2.0.0-rc.28", features = ["derive"] }
 specta-serde = "=0.0.15"
 specta-swift = "=0.0.6"
@@ -124,7 +126,8 @@ trash = "5.3.0"
 unicode-normalization = "0.1.26"
 urlpattern = "0.6.0"
 walkdir = "2.5.0"
-wasm-bindgen = "0.2.126"
+wasm-bindgen = "0.2.130"
+wasm-bindgen-cli-support = "0.2.130"
 windows-native-keyring-store = "1.1.0"
 xattr = "1.7.0"
 zip = { version = "9.0.5", default-features = false }

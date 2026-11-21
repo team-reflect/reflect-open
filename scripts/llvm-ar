@@ -1,0 +1,3 @@
+#!/bin/sh
+# The `llvm-ar` of the Rust toolchain (the `llvm-tools` component).
+exec "$(rustc --print target-libdir)/../bin/llvm-ar" "$@"

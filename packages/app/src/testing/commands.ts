@@ -11,8 +11,6 @@ import { type CommandService, createCommandService } from '../commands/command-s
 import {
   createNativeMenuService,
   type AppSubmenuLayout,
-  type FocusedNoteMenuCommand,
-  type MenuCommandDispatch,
   type NativeAppMenu,
   type NativeContextMenuItem,
   type NativeContextMenuOptions,
@@ -79,9 +77,9 @@ export function createTestNativeMenuHost(): TestNativeMenuHost {
 
 export interface TestNativeMenuServiceOptions {
   /**
-   * Defaults to an empty registry.
+   * Defaults to a registry with no handlers.
    */
-  commands?: CommandService<string>
+  commands?: CommandService
   /**
    * Defaults to a focused main window.
    */
@@ -97,7 +95,7 @@ export interface TestNativeMenuServiceOptions {
   logger?: LoggerService
 }
 
-export interface TestNativeMenuService extends NativeMenuService<string> {
+export interface TestNativeMenuService extends NativeMenuService {
   /**
    * The host the service builds its menus on.
    */
@@ -107,15 +105,15 @@ export interface TestNativeMenuService extends NativeMenuService<string> {
 class TestNativeMenuServiceImpl implements TestNativeMenuService {
   readonly host: TestNativeMenuHost
   readonly dispatchCommand: (commandId: string) => void
-  readonly #inner: NativeMenuService<string>
+  readonly #inner: NativeMenuService
 
-  constructor(host: TestNativeMenuHost, inner: NativeMenuService<string>) {
+  constructor(host: TestNativeMenuHost, inner: NativeMenuService) {
     this.host = host
     this.#inner = inner
     this.dispatchCommand = inner.dispatchCommand
   }
 
-  install(layout: readonly AppSubmenuLayout<string>[]): Promise<void> {
+  install(layout: readonly AppSubmenuLayout[]): Promise<void> {
     return this.#inner.install(layout)
   }
 
@@ -123,12 +121,8 @@ class TestNativeMenuServiceImpl implements TestNativeMenuService {
     return this.#inner.isInstalled()
   }
 
-  setCommandDispatch(dispatch: MenuCommandDispatch<string> | null): void {
-    this.#inner.setCommandDispatch(dispatch)
-  }
-
-  subscribeFocusedNoteCommands(listener: (commandId: FocusedNoteMenuCommand) => void): Unlisten {
-    return this.#inner.subscribeFocusedNoteCommands(listener)
+  connect(): Unlisten {
+    return this.#inner.connect()
   }
 
   openContextMenu(options: NativeContextMenuOptions): Promise<void> {

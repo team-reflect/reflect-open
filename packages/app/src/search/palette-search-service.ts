@@ -11,7 +11,8 @@ import {
   type UpdatedPreset,
   type WikiSuggestion,
 } from '@reflect/core'
-import type { Command, CommandService } from '../commands/command-service.ts'
+import type { Command } from '../commands/app-commands.ts'
+import type { CommandService } from '../commands/command-service.ts'
 import { buildPaletteSections, type PaletteHit, type PaletteSections } from './palette-entries.ts'
 
 /**
@@ -45,7 +46,7 @@ export interface PaletteSectionsInput {
  * `palette-entries.ts`; the mobile All tab's query model in
  * `all-notes-filters.ts`.
  */
-export interface PaletteSearchService<CommandId extends string, Context = unknown> {
+export interface PaletteSearchService {
   /**
    * Title suggestions for `text` (at most 8), generated date phrases merged in.
    */
@@ -61,28 +62,25 @@ export interface PaletteSearchService<CommandId extends string, Context = unknow
   /**
    * Merge the data with every registered command into the palette's sections.
    */
-  sections(input: PaletteSectionsInput): PaletteSections<Command<CommandId, Context>>
+  sections(input: PaletteSectionsInput): PaletteSections<Command>
   /**
    * Resolve a relative updated-at preset of the mobile All tab against the clock.
    */
   updatedPresetFilter(preset: UpdatedPreset): UpdatedFilter
 }
 
-export interface PaletteSearchServiceDeps<CommandId extends string, Context = unknown> {
+export interface PaletteSearchServiceDeps {
   readonly suggestions: SuggestionService
   readonly search: SearchService
   readonly retrieval: RetrievalService
-  readonly commands: CommandService<CommandId, Context>
+  readonly commands: CommandService
   readonly clock: ClockService
 }
 
-class PaletteSearchServiceImpl<CommandId extends string, Context> implements PaletteSearchService<
-  CommandId,
-  Context
-> {
-  readonly #deps: PaletteSearchServiceDeps<CommandId, Context>
+class PaletteSearchServiceImpl implements PaletteSearchService {
+  readonly #deps: PaletteSearchServiceDeps
 
-  constructor(deps: PaletteSearchServiceDeps<CommandId, Context>) {
+  constructor(deps: PaletteSearchServiceDeps) {
     this.#deps = deps
   }
 
@@ -108,8 +106,12 @@ class PaletteSearchServiceImpl<CommandId extends string, Context> implements Pal
     }))
   }
 
-  sections(input: PaletteSectionsInput): PaletteSections<Command<CommandId, Context>> {
-    return buildPaletteSections({ ...input, commands: this.#deps.commands.list() })
+  sections(input: PaletteSectionsInput): PaletteSections<Command> {
+    const { commands } = this.#deps
+    // A command without a handler in this window does nothing, so the
+    // palette leaves it out.
+    const handled = commands.list().filter((command) => commands.isHandled(command.id))
+    return buildPaletteSections({ ...input, commands: handled })
   }
 
   updatedPresetFilter(preset: UpdatedPreset): UpdatedFilter {
@@ -117,8 +119,6 @@ class PaletteSearchServiceImpl<CommandId extends string, Context> implements Pal
   }
 }
 
-export function createPaletteSearchService<CommandId extends string, Context = unknown>(
-  deps: PaletteSearchServiceDeps<CommandId, Context>,
-): PaletteSearchService<CommandId, Context> {
-  return new PaletteSearchServiceImpl<CommandId, Context>(deps)
+export function createPaletteSearchService(deps: PaletteSearchServiceDeps): PaletteSearchService {
+  return new PaletteSearchServiceImpl(deps)
 }
