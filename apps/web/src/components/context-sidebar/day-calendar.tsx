@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import { addMonthsToYearMonth, getYearMonth } from '@reflect/utils'
 import { formatDayLabel } from '@reflect/core'
-import { keybindingFor, buildMonthGrid, formatMonthLabel, getWeekdayLabels } from '@reflect/app'
+import { APP_COMMANDS, buildMonthGrid, formatMonthLabel, getWeekdayLabels } from '@reflect/app'
 import { createDailyDatesQueryOptions } from '@/lib/query-options.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
@@ -24,7 +24,7 @@ interface DayCalendarProps {
   today: string
 }
 
-const TODAY_BINDING = keybindingFor('nav.today')
+const TODAY_BINDING = APP_COMMANDS['nav.today'].keybinding
 
 const HEADER_BUTTON_CLASS =
   'cursor-default rounded-md transition-colors duration-100 hover:bg-surface-hover hover:text-text'
@@ -97,7 +97,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
               }
             />
             <TooltipContent>
-              Jump to Today {TODAY_BINDING && <ShortcutKeys binding={TODAY_BINDING} />}
+              Jump to Today <ShortcutKeys binding={TODAY_BINDING} />
             </TooltipContent>
           </Tooltip>
           <button

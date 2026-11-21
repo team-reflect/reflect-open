@@ -1,7 +1,6 @@
 import { publishGistAndCopyLink } from '@reflect/app'
 import { useCallback, useState, useTransition, type ReactElement } from 'react'
 import { CloudOff, CloudUpload } from 'lucide-react'
-import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { useNoteRowOverlay } from '@/hooks/note-row-overlay.ts'
 import { useGithubConnected } from '@/hooks/use-github-connected.ts'
@@ -13,8 +12,6 @@ type GistKind = 'publish' | 'unpublish'
 interface NoteGistActionProps {
   /** Graph-relative path of the note the action operates on. */
   path: string
-  /** Keybinding hint, from the matching command definition. */
-  keybinding?: string | null
 }
 
 /**
@@ -25,10 +22,7 @@ interface NoteGistActionProps {
  * URL section owns the update action, including the stale-body nudge from the
  * index. Failures and success state surface through the operations status line.
  */
-export function NoteGistAction({
-  path,
-  keybinding = null,
-}: NoteGistActionProps): ReactElement | null {
+export function NoteGistAction({ path }: NoteGistActionProps): ReactElement | null {
   const services = useCoreServices()
   const { gistPublish } = services
   const app = useAppServices()
@@ -90,9 +84,6 @@ export function NoteGistAction({
               <Icon size={14} aria-hidden />
             </span>
             <span className="min-w-0 flex-1 truncate text-xs font-medium">{label}</span>
-            {keybinding !== null ? (
-              <ShortcutKeys binding={keybinding} className="invisible group-hover:visible" />
-            ) : null}
           </button>
         }
       />

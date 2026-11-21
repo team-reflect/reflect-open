@@ -124,9 +124,9 @@ export {
 } from './daily/week-window.ts'
 export {
   APP_COMMANDS,
-  keybindingFor,
   type AppCommandId,
   type Command,
+  type CommandDeclaration,
 } from './commands/app-commands.ts'
 export { installNativeMenu } from './commands/app-menu.ts'
 export { attachFilesToNote } from './commands/attach-files.ts'

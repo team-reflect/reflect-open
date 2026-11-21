@@ -1,4 +1,4 @@
-import { keybindingFor } from '@reflect/app'
+import { APP_COMMANDS } from '@reflect/app'
 import type { ReactElement } from 'react'
 import { Lock } from 'lucide-react'
 import { PinIcon } from '@/components/icons/pin-icon.tsx'
@@ -19,9 +19,7 @@ interface NoteActionsSectionProps {
 
 // Derived from the command definitions so the hints can never drift from the
 // real bindings (the same contract as the Today hint).
-const PIN_KEYBINDING = keybindingFor('note.togglePin')
-const PRIVATE_KEYBINDING = keybindingFor('note.togglePrivate')
-const GIST_KEYBINDING = keybindingFor('note.publishGist')
+const PIN_KEYBINDING = APP_COMMANDS['note.togglePin'].keybinding
 
 /**
  * "Note actions" as a context-sidebar section: mouse-reachable counterparts
@@ -63,10 +61,9 @@ export function NoteActionsSection({
           active: 'Unlock note',
           inactive: 'Lock note',
         }}
-        keybinding={PRIVATE_KEYBINDING}
         tooltip="Locks this note out of AI. Backup and sync still include it."
       />
-      <NoteGistAction path={path} keybinding={GIST_KEYBINDING} />
+      <NoteGistAction path={path} />
       {showTrash ? <NoteTrashAction path={path} /> : null}
     </SidebarSection>
   )

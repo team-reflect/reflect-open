@@ -1,4 +1,4 @@
-import { keybindingFor, type AppCommandId } from '@reflect/app'
+import { APP_COMMANDS } from '@reflect/app'
 import { useRef, useState, type ReactElement } from 'react'
 import type { GraphInfo, GitSyncState } from '@reflect/core'
 import { FolderOpen, GraduationCap, LocateFixed, PanelsTopLeft, Settings } from 'lucide-react'
@@ -25,9 +25,9 @@ import { useRouterState } from '@/routing/router.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 const MENU_ITEM_CLASS = 'h-8 gap-2 px-2 py-0 text-[13px] text-text-secondary'
-const SETTINGS_BINDING = keybindingFor('settings.open')
+const SETTINGS_BINDING = APP_COMMANDS['settings.open'].keybinding
 
-const GRAPH_SWITCH_COMMAND_IDS: readonly AppCommandId[] = [
+const GRAPH_SWITCH_COMMAND_IDS = [
   'graph.switch1',
   'graph.switch2',
   'graph.switch3',
@@ -37,11 +37,11 @@ const GRAPH_SWITCH_COMMAND_IDS: readonly AppCommandId[] = [
   'graph.switch7',
   'graph.switch8',
   'graph.switch9',
-]
+] as const
 
 function graphSwitchBindingFor(index: number): string | null {
   const id = GRAPH_SWITCH_COMMAND_IDS[index]
-  return id === undefined ? null : keybindingFor(id)
+  return id === undefined ? null : APP_COMMANDS[id].keybinding
 }
 
 type SyncStatus = Extract<GitSyncState, { phase: 'connected' }>['status']
@@ -174,9 +174,7 @@ export function GraphFooter({ graph }: GraphFooterProps): ReactElement {
           >
             <Settings aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
             <span className="min-w-0 flex-1 truncate">Preferences</span>
-            {SETTINGS_BINDING && (
-              <ShortcutKeys binding={SETTINGS_BINDING} className="text-[10px]" />
-            )}
+            <ShortcutKeys binding={SETTINGS_BINDING} className="text-[10px]" />
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setAppsOpen(true)} className={MENU_ITEM_CLASS}>
@@ -214,7 +212,7 @@ export function GraphFooter({ graph }: GraphFooterProps): ReactElement {
           }
         />
         <TooltipContent>
-          Settings {SETTINGS_BINDING && <ShortcutKeys binding={SETTINGS_BINDING} />}
+          Settings <ShortcutKeys binding={SETTINGS_BINDING} />
         </TooltipContent>
       </Tooltip>
       <ReflectAppsDialog open={appsOpen} onOpenChange={setAppsOpen} finalFocus={graphTriggerRef} />
