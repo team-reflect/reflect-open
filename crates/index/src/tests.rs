@@ -2038,6 +2038,10 @@ fn stale_generation_writes_are_dropped_end_to_end() {
     assert_eq!(session.remove(stale, "notes/a.md").unwrap(), Applied::Stale);
     assert_eq!(note_count(&session), Value::from(1));
     assert_eq!(
+        session.record_visit(stale, "notes/a.md", 1).unwrap(),
+        Applied::Stale
+    );
+    assert_eq!(
         session
             .apply(fresh, &[note("notes/b.md", "B", vec![])])
             .unwrap(),
@@ -3507,12 +3511,16 @@ fn visited_notes_are_newest_first_and_survive_a_rebuild() {
     apply_note(&conn, &note("notes/a.md", "A", vec![])).unwrap();
     apply_note(&conn, &note("notes/b.md", "B", vec![])).unwrap();
     apply_note(&conn, &daily_note("daily/2026-11-21.md", "2026-11-21")).unwrap();
+    let mut template = note("templates/t.md", "T", vec![]);
+    template.kind = NoteKind::Template;
+    apply_note(&conn, &template).unwrap();
     record(&conn, "notes/a.md", 1).unwrap();
     record(&conn, "notes/b.md", 2).unwrap();
     record(&conn, "daily/2026-11-21.md", 3).unwrap();
-    record(&conn, "notes/deleted.md", 4).unwrap();
-    record(&conn, "notes/a.md", 5).unwrap();
-    // Daily notes and paths without a note are left out.
+    record(&conn, "templates/t.md", 4).unwrap();
+    record(&conn, "notes/deleted.md", 5).unwrap();
+    record(&conn, "notes/a.md", 6).unwrap();
+    // Daily notes, templates, and paths without a note are left out.
     assert_eq!(visited_paths(&conn), ["notes/a.md", "notes/b.md"]);
 
     clear_index(&conn).unwrap();
@@ -3552,4 +3560,23 @@ fn moving_a_note_moves_its_visit() {
             title: "Title".to_string(),
         }]
     );
+}
+
+#[test]
+fn removing_a_note_removes_its_visit() {
+    let graph_dir = tempfile::tempdir().expect("tempdir");
+    let (session, generation) = file_session(graph_dir.path());
+    session
+        .apply(generation, &[note("notes/a.md", "A", vec![])])
+        .unwrap();
+    session.record_visit(generation, "notes/a.md", 1).unwrap();
+    session.remove(generation, "notes/a.md").unwrap();
+    // A new note at the same path starts without the old visit.
+    session
+        .apply(generation, &[note("notes/a.md", "A", vec![])])
+        .unwrap();
+    let visited = session
+        .read(generation, |conn| visited_notes(conn, 10))
+        .unwrap();
+    assert_eq!(visited, []);
 }

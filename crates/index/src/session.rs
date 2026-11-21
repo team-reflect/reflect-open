@@ -202,7 +202,8 @@ impl IndexSession {
     }
 
     /// Remove a note (e.g. deleted on disk) from the index. This is the
-    /// *genuine deletion* entry point, so embedding rows go too; `apply_note`'s
+    /// *genuine deletion* entry point, so embedding rows and the note's visit
+    /// go too; `apply_note`'s
     /// internal remove must NOT do this (it runs on every upsert and would
     /// destroy the chunk hash-skip).
     pub fn remove(&self, generation: u64, path: &str) -> AppResult<Applied> {
@@ -213,6 +214,7 @@ impl IndexSession {
             let tx = conn.transaction()?;
             write::remove_note(&tx, path)?;
             embed_write::remove_chunks(&tx, path)?;
+            visit_write::remove(&tx, path)?;
             tx.commit()?;
             Ok(())
         }))
