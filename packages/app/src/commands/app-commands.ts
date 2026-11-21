@@ -74,7 +74,7 @@ export interface Command extends CommandDeclaration {
 /**
  * The declarations of the app commands, in palette order.
  */
-export const APP_COMMANDS: Readonly<Record<AppCommandId, CommandDeclaration>> = {
+export const APP_COMMANDS = {
   'graph.switch1': {
     title: 'Switch to graph 1',
     keywords: ['graph', 'workspace', 'switch', 'recent'],
@@ -262,12 +262,13 @@ export const APP_COMMANDS: Readonly<Record<AppCommandId, CommandDeclaration>> = 
     keywords: ['devtools', 'inspector', 'debug', 'console', 'inspect', 'web inspector'],
     keybinding: 'Mod-Shift-i',
   },
-}
+} as const satisfies Readonly<Record<AppCommandId, CommandDeclaration>>
 
 /**
  * The declared keybinding for `commandId`, or `null` when the command has
  * none. UI hints (sidebar keycaps, "go to today" affordances) derive bindings
  * through this so they can never drift from the declaration.
+ * FIXME: remove this "keybindingFor"function
  */
 export function keybindingFor(commandId: AppCommandId): string | null {
   return APP_COMMANDS[commandId].keybinding ?? null
