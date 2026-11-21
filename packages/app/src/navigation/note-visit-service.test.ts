@@ -91,6 +91,14 @@ describe('NoteVisitService', () => {
     expect(recorded()).toEqual(['notes/a.md'])
   })
 
+  it('records nothing once another graph opens', () => {
+    const { navigation, graphSession, service, recorded } = setup(false)
+    service.track()
+    navigation.navigate({ kind: 'note', path: 'notes/a.md' })
+    graphSession.adopt({ root: '/other', name: 'other', generation: 2 }, database.generation())
+    expect(recorded()).toEqual([])
+  })
+
   it('writes the visits to the index, most recent first', async () => {
     const { navigation, clock, service } = setup()
     service.track()

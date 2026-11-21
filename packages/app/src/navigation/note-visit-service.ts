@@ -36,8 +36,13 @@ class NoteVisitServiceImpl implements NoteVisitService {
 
   track(): Unlisten {
     const { navigation, graphSession } = this.#deps
+    // A router lives for one graph; another graph's index gets none of its visits.
+    const root = graphSession.get().graph?.root
     let seen: { entryId: number; arrivalSeq: number } | null = null
     const check = (): void => {
+      if (graphSession.get().graph?.root !== root) {
+        return
+      }
       const { route, entryId, arrivalSeq } = navigation.get()
       // A rename rewrites the route in place; only an arrival is a visit.
       if (seen?.entryId === entryId && seen.arrivalSeq === arrivalSeq) {
