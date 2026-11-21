@@ -1,4 +1,4 @@
-import { keybindingFor, newNoteRoute } from '@reflect/app'
+import { keybindingFor } from '@reflect/app'
 import type { ReactElement } from 'react'
 import { useRouterActions } from '@/routing/router.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
@@ -16,7 +16,7 @@ export function NewNoteButton(): ReactElement {
   return (
     <button
       type="button"
-      onClick={() => navigate(newNoteRoute(noteCreation))}
+      onClick={() => navigate({ kind: 'note', path: noteCreation.untitledNotePath() })}
       className="flex items-center gap-2 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-text-on-brand shadow-sm transition-colors duration-100 hover:bg-accent-hover"
     >
       New note

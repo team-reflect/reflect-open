@@ -11,7 +11,6 @@ import {
   formatDayLabel,
 } from '@reflect/core'
 import {
-  newNoteRoute,
   buildAllNotesSearch,
   pendingTagToken,
   searchPlanFor,
@@ -157,7 +156,7 @@ export function MobileAllNotes({
         plus={{
           kind: 'action',
           label: 'New note',
-          onTap: () => navigate(newNoteRoute(noteCreation)),
+          onTap: () => navigate({ kind: 'note', path: noteCreation.untitledNotePath() }),
         }}
         search={{
           value: query,

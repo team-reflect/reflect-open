@@ -1,6 +1,3 @@
-import type { NoteCreationService } from '@reflect/core'
-import type { Route } from '../navigation/route.ts'
-
 /**
  * The id of an app command.
  */
@@ -72,15 +69,6 @@ export interface Command extends CommandDeclaration {
    * Stable id, e.g. `nav.today`.
    */
   readonly id: AppCommandId
-}
-
-/**
- * A fresh note route; the file itself is created lazily on the first keystroke
- * (the same contract as daily notes). Shared by ⌘N and the All Notes screen's
- * New note button so "what a new note is" stays one definition.
- */
-export function newNoteRoute(noteCreation: NoteCreationService): Route {
-  return { kind: 'note', path: noteCreation.untitledNotePath() }
 }
 
 /**

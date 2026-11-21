@@ -1,4 +1,4 @@
-import { newNoteRoute, type AppCommandId } from '@reflect/app'
+import type { AppCommandId } from '@reflect/app'
 import { usePalette } from '@/components/command-palette/palette-provider.tsx'
 import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
 import { useNoteFindActions } from '@/providers/note-find-provider.tsx'
@@ -72,7 +72,7 @@ export function useWorkspaceCommands(): void {
       if (route.kind === 'today' || route.kind === 'daily') {
         clearScrollState()
       }
-      navigate(newNoteRoute(services.noteCreation))
+      navigate({ kind: 'note', path: services.noteCreation.untitledNotePath() })
     },
     'note.random': async () => {
       const path = await services.indexQuery.randomNotePath()

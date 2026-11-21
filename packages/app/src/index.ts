@@ -125,7 +125,6 @@ export {
 export {
   APP_COMMANDS,
   keybindingFor,
-  newNoteRoute,
   type AppCommandId,
   type Command,
 } from './commands/app-commands.ts'
