@@ -24,13 +24,15 @@ const MENUS_BODY =
  * marketing version's list, and each update shows only the items not seen yet.
  */
 export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
-  '0.19.0': [
+  '0.19.1': [
     {
       id: 'recently-opened-notes',
       title: 'Recently opened notes in search',
       body: 'Before you type, search now lists the notes you opened most recently.',
       platforms: ALL_PLATFORMS,
     },
+  ],
+  '0.19.0': [
     {
       id: 'claude-fable-5-2',
       title: 'New AI models',
