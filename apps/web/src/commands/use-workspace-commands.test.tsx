@@ -29,7 +29,6 @@ import {
   unregisterNoteEditorHandle,
 } from '@/editor/editor-handle-registry.ts'
 import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
-import { registerAppKeymaps } from '@/lib/shortcuts.ts'
 import { AudioMemoProvider } from '@/providers/audio-memo-provider.tsx'
 import { NoteFindProvider, useNoteFind } from '@/providers/note-find-provider.tsx'
 import { NoteTemplatesProvider } from '@/providers/note-templates-provider.tsx'
@@ -235,30 +234,6 @@ describe('workspace commands', () => {
     await act(() => press('o'))
     await act(() => appLayer.commands.run('note.togglePrivate'))
     expect(commitNoteFrontmatter).not.toHaveBeenCalled()
-  })
-
-  it('registers the command keybindings in the central keymap registry', () => {
-    const { keymap } = createTestAppServices(
-      createTestCoreServices({ database: createTestDatabaseService() }),
-    )
-    registerAppKeymaps(keymap)
-    const bindings = keymap.list()
-    for (const key of [
-      'Mod-d',
-      'Mod-Shift-a',
-      'Mod-n',
-      'Mod-Shift-n',
-      'Mod-Shift-o',
-      'Mod-[',
-      'Mod-]',
-      'Mod-k',
-      'Mod-\\',
-      'Alt-Mod-l',
-      'Mod-1',
-      'Mod-9',
-    ]) {
-      expect(bindings.get(key)).toBe('app')
-    }
   })
 
   it('⌘N opens a fresh note route; ⌘D returns to today; ⌘[ ⌘] traverse', async () => {

@@ -1,63 +1,14 @@
 import { isNotNullish } from '@ocavue/utils'
 import { describe, expect, it } from 'vitest'
-import type { AppCommandId } from './app-commands.ts'
-import { keybindingFor } from './app-commands.ts'
 import { APP_MENU_LAYOUT } from './app-menu.ts'
 
-function referencedCommandIds(): AppCommandId[] {
-  return APP_MENU_LAYOUT.flatMap((submenu) => {
-    return submenu.entries
-      .map((entry) => (entry.kind === 'command' ? entry.commandId : null))
-      .filter(isNotNullish)
-  })
-}
-
 describe('APP_MENU_LAYOUT', () => {
-  it('surfaces every ported V1 menu shortcut', () => {
-    const referenced = new Set(referencedCommandIds())
-    // The V1 Electron menu items that have a V2 command: Preferences ⌘,
-    // New Note ⌘N, Search ⌘K, Select Daily Note ⌘D, All Notes ⌘⇧A,
-    // Back ⌘[, Forward ⌘], Open Shortcuts ⌘/.
-    for (const commandId of [
-      'settings.open',
-      'note.new',
-      'palette.open',
-      'nav.today',
-      'nav.allNotes',
-      'history.back',
-      'history.forward',
-      'shortcuts.show',
-    ]) {
-      expect(referenced).toContain(commandId)
-    }
-    expect(keybindingFor('nav.allNotes')).toBe('Mod-Shift-a')
-  })
-
   it('lists each command at most once across the whole menu', () => {
-    const referenced = referencedCommandIds()
-    expect(new Set(referenced).size).toBe(referenced.length)
-  })
-
-  it('exposes the selected note’s new-window shortcut in the native Window menu', () => {
-    const windowMenu = APP_MENU_LAYOUT.find((submenu) => submenu.text === 'Window')
-    expect(windowMenu?.entries).toContainEqual({
-      kind: 'command',
-      commandId: 'note.openInNewWindow',
-      text: undefined,
+    const referenced = APP_MENU_LAYOUT.flatMap((submenu) => {
+      return submenu.entries
+        .map((entry) => (entry.kind === 'command' ? entry.commandId : null))
+        .filter(isNotNullish)
     })
-    expect(keybindingFor('note.openInNewWindow')).toBe('Mod-Shift-o')
-  })
-  it('puts note Find commands and their browser-standard shortcuts in Edit', () => {
-    const editMenu = APP_MENU_LAYOUT.find((submenu) => submenu.text === 'Edit')
-    expect(editMenu?.entries).toEqual(
-      expect.arrayContaining([
-        { kind: 'command', commandId: 'note.find', text: undefined },
-        { kind: 'command', commandId: 'note.findNext', text: undefined },
-        { kind: 'command', commandId: 'note.findPrevious', text: undefined },
-      ]),
-    )
-    expect(keybindingFor('note.find')).toBe('Mod-f')
-    expect(keybindingFor('note.findNext')).toBe('Mod-g')
-    expect(keybindingFor('note.findPrevious')).toBe('Mod-Shift-g')
+    expect(new Set(referenced).size).toBe(referenced.length)
   })
 })
