@@ -71,53 +71,55 @@ export interface Command extends CommandDeclaration {
   readonly id: AppCommandId
 }
 
+const graphSwitchKeywords = ['graph', 'workspace', 'switch', 'recent'] as const
+
 /**
  * The declarations of the app commands, in palette order.
  */
 export const APP_COMMANDS = {
   'graph.switch1': {
     title: 'Switch to graph 1',
-    keywords: ['graph', 'workspace', 'switch', 'recent'],
+    keywords: graphSwitchKeywords,
     keybinding: 'Mod-1',
   },
   'graph.switch2': {
     title: 'Switch to graph 2',
-    keywords: ['graph', 'workspace', 'switch', 'recent'],
+    keywords: graphSwitchKeywords,
     keybinding: 'Mod-2',
   },
   'graph.switch3': {
     title: 'Switch to graph 3',
-    keywords: ['graph', 'workspace', 'switch', 'recent'],
+    keywords: graphSwitchKeywords,
     keybinding: 'Mod-3',
   },
   'graph.switch4': {
     title: 'Switch to graph 4',
-    keywords: ['graph', 'workspace', 'switch', 'recent'],
+    keywords: graphSwitchKeywords,
     keybinding: 'Mod-4',
   },
   'graph.switch5': {
     title: 'Switch to graph 5',
-    keywords: ['graph', 'workspace', 'switch', 'recent'],
+    keywords: graphSwitchKeywords,
     keybinding: 'Mod-5',
   },
   'graph.switch6': {
     title: 'Switch to graph 6',
-    keywords: ['graph', 'workspace', 'switch', 'recent'],
+    keywords: graphSwitchKeywords,
     keybinding: 'Mod-6',
   },
   'graph.switch7': {
     title: 'Switch to graph 7',
-    keywords: ['graph', 'workspace', 'switch', 'recent'],
+    keywords: graphSwitchKeywords,
     keybinding: 'Mod-7',
   },
   'graph.switch8': {
     title: 'Switch to graph 8',
-    keywords: ['graph', 'workspace', 'switch', 'recent'],
+    keywords: graphSwitchKeywords,
     keybinding: 'Mod-8',
   },
   'graph.switch9': {
     title: 'Switch to graph 9',
-    keywords: ['graph', 'workspace', 'switch', 'recent'],
+    keywords: graphSwitchKeywords,
     keybinding: 'Mod-9',
   },
   'nav.today': {
