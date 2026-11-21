@@ -23,6 +23,12 @@ interface SidebarProps {
   graph: GraphInfo
 }
 
+const NEW_NOTE_BINDING = APP_COMMANDS['note.new'].keybinding
+const TODAY_BINDING = APP_COMMANDS['nav.today'].keybinding
+const ALL_NOTES_BINDING = APP_COMMANDS['nav.allNotes'].keybinding
+const TASKS_BINDING = APP_COMMANDS['nav.tasks'].keybinding
+const CHAT_BINDING = APP_COMMANDS['chat.open'].keybinding
+
 /**
  * The workspace sidebar, in the original app's shape: history arrows top
  * right, search with the compose and audio memo buttons, primary navigation with hover-revealed shortcut keycaps, the
@@ -48,9 +54,6 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
   // pinned note lights its own row instead; the settings screens light none.
   const sectionRowsLit =
     (rootSectionForRoute(route) !== null || route.kind === 'note') && !hasActivePinnedNote
-
-  // Extract all APP_COMMANDS['A_LITERAL_KEY'].keybinding to the top-level, like what we do in reflect-open/apps/web/src/components/chat/chat-input.tsx. Scan the whole codebase; FIXME
-  const newNoteBinding = APP_COMMANDS['note.new'].keybinding
 
   // Wrap the 16px Lucide glyphs in the custom icons' 24px box so nav rows
   // share one icon footprint.
@@ -89,7 +92,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
               }
             />
             <TooltipContent side="bottom">
-              New note <ShortcutKeys binding={newNoteBinding} />
+              New note <ShortcutKeys binding={NEW_NOTE_BINDING} />
             </TooltipContent>
           </Tooltip>
           <AudioMemoButton />
@@ -99,7 +102,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
           <SidebarItem
             icon={<PencilIcon className="shrink-0" />}
             label="Daily notes"
-            binding={APP_COMMANDS['nav.today'].keybinding}
+            binding={TODAY_BINDING}
             active={sectionRowsLit && section === 'daily'}
             onClick={() => {
               if (onDailySurface) {
@@ -112,7 +115,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
           <SidebarItem
             icon={<ListIcon className="shrink-0" />}
             label="All notes"
-            binding={APP_COMMANDS['nav.allNotes'].keybinding}
+            binding={ALL_NOTES_BINDING}
             active={sectionRowsLit && section === 'all'}
             onClick={() => commands.run('nav.allNotes')}
           />
@@ -123,7 +126,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
               </span>
             }
             label="Tasks"
-            binding={APP_COMMANDS['nav.tasks'].keybinding}
+            binding={TASKS_BINDING}
             active={sectionRowsLit && section === 'tasks'}
             onClick={() => commands.run('nav.tasks')}
           />
@@ -134,7 +137,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
               </span>
             }
             label="Chat"
-            binding={APP_COMMANDS['chat.open'].keybinding}
+            binding={CHAT_BINDING}
             active={sectionRowsLit && section === 'chat'}
             onClick={() => commands.run('chat.open')}
           />
