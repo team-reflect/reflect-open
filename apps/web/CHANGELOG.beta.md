@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.1-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.19.0...v0.19.1-beta.1) (2026-11-21)
+
+
+### Bug Fixes
+
+* handle indexes from newer versions ([#2276](https://github.com/team-reflect/reflect-open/issues/2276)) ([77e2fa4](https://github.com/team-reflect/reflect-open/commit/77e2fa4e9c0039c97c401dfc7d0c68a09f5a77ca))
+
 ## [0.19.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.19.0-beta.6...v0.19.0-beta.7) (2026-11-20)
 
 
