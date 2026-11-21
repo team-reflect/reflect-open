@@ -84,6 +84,10 @@ runs:
           echo "No S3 secrets: sccache uses the local disk only."
         fi
 
+        # Without this, sccache writes a probe file before every write, and a
+        # rate-limited probe makes it skip the write.
+        echo "SCCACHE_SKIP_CACHE_CHECK=true" >> "$GITHUB_ENV"
+
         # Upload only on master.
         if [ "$GITHUB_REF" != "refs/heads/master" ]; then
           echo "SCCACHE_S3_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
