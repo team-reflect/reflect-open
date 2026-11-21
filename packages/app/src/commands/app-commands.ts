@@ -271,13 +271,3 @@ export const APP_COMMANDS = {
     keybinding: 'Mod-Shift-i',
   },
 } as const satisfies Readonly<Record<AppCommandId, CommandDeclaration>>
-
-/**
- * The declared keybinding for `commandId`, or `null` when the command has
- * none. UI hints (sidebar keycaps, "go to today" affordances) derive bindings
- * through this so they can never drift from the declaration.
- * FIXME: remove this "keybindingFor"function
- */
-export function keybindingFor(commandId: AppCommandId): string | null {
-  return APP_COMMANDS[commandId].keybinding ?? null
-}

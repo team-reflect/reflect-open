@@ -10,7 +10,7 @@ import { PencilIcon } from '@/components/icons/pencil-icon.tsx'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { cn } from '@/lib/utils.ts'
-import { keybindingFor, notePathForRoute, rootSectionForRoute } from '@reflect/app'
+import { APP_COMMANDS, notePathForRoute, rootSectionForRoute } from '@reflect/app'
 import { useRouterActions, useRouterState } from '@/routing/router.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { GraphFooter } from './graph-footer.tsx'
@@ -48,7 +48,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
   // pinned note lights its own row instead; the settings screens light none.
   const sectionRowsLit =
     (rootSectionForRoute(route) !== null || route.kind === 'note') && !hasActivePinnedNote
-  const newNoteBinding = keybindingFor('note.new')
+  const newNoteBinding = APP_COMMANDS['note.new'].keybinding
 
   // Wrap the 16px Lucide glyphs in the custom icons' 24px box so nav rows
   // share one icon footprint.
@@ -87,7 +87,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
               }
             />
             <TooltipContent side="bottom">
-              New note {newNoteBinding && <ShortcutKeys binding={newNoteBinding} />}
+              New note <ShortcutKeys binding={newNoteBinding} />
             </TooltipContent>
           </Tooltip>
           <AudioMemoButton />
@@ -97,7 +97,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
           <SidebarItem
             icon={<PencilIcon className="shrink-0" />}
             label="Daily notes"
-            binding={keybindingFor('nav.today') ?? undefined}
+            binding={APP_COMMANDS['nav.today'].keybinding}
             active={sectionRowsLit && section === 'daily'}
             onClick={() => {
               if (onDailySurface) {
@@ -110,7 +110,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
           <SidebarItem
             icon={<ListIcon className="shrink-0" />}
             label="All notes"
-            binding={keybindingFor('nav.allNotes') ?? undefined}
+            binding={APP_COMMANDS['nav.allNotes'].keybinding}
             active={sectionRowsLit && section === 'all'}
             onClick={() => commands.run('nav.allNotes')}
           />
@@ -121,7 +121,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
               </span>
             }
             label="Tasks"
-            binding={keybindingFor('nav.tasks') ?? undefined}
+            binding={APP_COMMANDS['nav.tasks'].keybinding}
             active={sectionRowsLit && section === 'tasks'}
             onClick={() => commands.run('nav.tasks')}
           />
@@ -132,7 +132,7 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
               </span>
             }
             label="Chat"
-            binding={keybindingFor('chat.open') ?? undefined}
+            binding={APP_COMMANDS['chat.open'].keybinding}
             active={sectionRowsLit && section === 'chat'}
             onClick={() => commands.run('chat.open')}
           />

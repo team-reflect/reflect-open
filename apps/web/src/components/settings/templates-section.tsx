@@ -1,4 +1,4 @@
-import { keybindingFor } from '@reflect/app'
+import { APP_COMMANDS } from '@reflect/app'
 import type { TemplateEntry } from '@reflect/types'
 import { useCallback, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -25,7 +25,7 @@ import { SettingsField } from './field.tsx'
 import { SettingsSection } from './section.tsx'
 import { isModEvent } from '@meowdown/core'
 
-const PALETTE_BINDING = keybindingFor('palette.open')
+const PALETTE_BINDING = APP_COMMANDS['palette.open'].keybinding
 
 /**
  * Note templates (docs/porting/note-templates.md): the `templates/` folder as
@@ -52,7 +52,7 @@ export function TemplatesSection(): ReactElement {
     <SettingsSection id="templates">
       <SettingsField
         legend="Note templates"
-        description={`Markdown files in your graph's templates/ folder, inserted from the ${PALETTE_BINDING === null ? '' : `${keymap.formatLabel(PALETTE_BINDING)} `}palette.`}
+        description={`Markdown files in your graph's templates/ folder, inserted from the ${keymap.formatLabel(PALETTE_BINDING)} palette.`}
       >
         {templates !== undefined && templates.length > 0 ? (
           <ul className="mt-3 divide-y divide-border rounded-md border border-border">

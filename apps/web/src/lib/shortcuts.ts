@@ -1,6 +1,6 @@
 import { EDITOR_BINDING_DESCRIPTIONS } from '@/editor/keymap.ts'
 import { isNotNullish } from '@ocavue/utils'
-import { APP_COMMANDS, type KeymapService } from '@reflect/app'
+import { APP_COMMANDS, type CommandDeclaration, type KeymapService } from '@reflect/app'
 
 /** One row of a shortcuts listing: a binding and what it does. */
 export interface Shortcut {
@@ -14,7 +14,7 @@ export interface Shortcut {
  * bindings that actually fire.
  */
 export const APP_SHORTCUTS: Shortcut[] = Object.values(APP_COMMANDS)
-  .map((command) => {
+  .map((command: CommandDeclaration) => {
     return command.keybinding ? { binding: command.keybinding, description: command.title } : null
   })
   .filter(isNotNullish)
