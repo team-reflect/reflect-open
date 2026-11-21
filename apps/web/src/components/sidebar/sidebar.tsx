@@ -48,6 +48,8 @@ export function Sidebar({ graph }: SidebarProps): ReactElement {
   // pinned note lights its own row instead; the settings screens light none.
   const sectionRowsLit =
     (rootSectionForRoute(route) !== null || route.kind === 'note') && !hasActivePinnedNote
+
+  // Extract all APP_COMMANDS['A_LITERAL_KEY'].keybinding to the top-level, like what we do in reflect-open/apps/web/src/components/chat/chat-input.tsx. Scan the whole codebase;
   const newNoteBinding = APP_COMMANDS['note.new'].keybinding
 
   // Wrap the 16px Lucide glyphs in the custom icons' 24px box so nav rows
