@@ -65,7 +65,7 @@ pub fn open_read_only(root: &Path) -> IndexOpen {
     if version == 0 {
         return IndexOpen::Unusable("the index exists but has no schema yet".to_string());
     }
-    let compatible = match is_compatible_schema(&conn, version) {
+    let compatible = match is_compatible_schema(&conn) {
         Ok(compatible) => compatible,
         Err(err) => return IndexOpen::Unusable(format!("could not read the index: {err}")),
     };

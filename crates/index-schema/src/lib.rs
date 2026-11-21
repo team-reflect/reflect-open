@@ -9,8 +9,7 @@
 //! `rusqlite_migration` tracks the applied version in SQLite's `user_version`
 //! pragma. Append a new `M::up(include_str!(...))` (never edit a shipped one)
 //! as later plans add tables — and bump [`LATEST_SCHEMA_VERSION`] with it.
-//! Then decide [`MIN_COMPATIBLE_SCHEMA_VERSION`]: Reflect and Reflect Beta open
-//! the same index file, so an older app must keep working after the migration.
+//! Then decide [`MIN_COMPATIBLE_SCHEMA_VERSION`].
 //!
 //! Almost every table is a rebuildable projection of the markdown — except
 //! the `chat_*` tables (0008), which hold durable chat history. Wipe-style
@@ -27,26 +26,19 @@ pub const INDEX_FILE: &str = "index.sqlite";
 /// (or older) app than they were built for.
 pub const LATEST_SCHEMA_VERSION: usize = 23;
 
-/// The lowest schema version whose app can still read and write an index at
-/// [`LATEST_SCHEMA_VERSION`]. `migrate` stamps it into `index_meta`. An older
-/// app opens a newer index without migrating when the stamp is at or below its
-/// own [`LATEST_SCHEMA_VERSION`].
+/// The oldest schema version whose app can still use an index at
+/// [`LATEST_SCHEMA_VERSION`]. Reflect and Reflect Beta share one index, so an
+/// older app opens a newer index without migrating when this stamp allows it.
 ///
-/// When you add a migration, keep this value only if the migration is
-/// additive: new tables, new indexes, and new columns that an older app's
-/// inserts can omit (nullable or with a default). Set it to the new version
-/// for anything else: a dropped or renamed table or column, a rebuilt table, a
-/// new constraint or trigger, or a view that loses a column.
-///
-/// An additive table or column that the indexer fills also needs a
-/// `PROJECTION_VERSION` bump, so the newer app rebuilds the rows an older app
-/// wrote without it. A new derived table must reference `notes(path)` with
-/// `ON DELETE CASCADE`, so an older app's index wipe clears it too.
+/// Keep it for an additive migration: new tables, indexes, or columns that an
+/// older app's inserts can omit. Set it to the new version for anything else.
+/// Data the indexer fills needs a `PROJECTION_VERSION` bump, and a new derived
+/// table needs `REFERENCES notes(path) ON DELETE CASCADE`, so rows an older
+/// app writes get rebuilt or wiped.
 pub const MIN_COMPATIBLE_SCHEMA_VERSION: usize = 23;
 
-/// The `index_meta` key holding [`MIN_COMPATIBLE_SCHEMA_VERSION`] as stamped by
-/// the newest app that migrated the index.
-pub const MIN_COMPATIBLE_SCHEMA_KEY: &str = "min_compatible_schema";
+/// The `index_meta` key holding [`MIN_COMPATIBLE_SCHEMA_VERSION`].
+const MIN_COMPATIBLE_SCHEMA_KEY: &str = "min_compatible_schema";
 
 /// The `index_meta` key holding the TS-owned projection version (the rows'
 /// derivation version, distinct from the schema version above).
@@ -69,15 +61,12 @@ pub fn configure_connection(conn: &rusqlite::Connection) -> rusqlite::Result<()>
 /// Reads the index's schema version from `PRAGMA user_version`.
 pub fn read_user_version(conn: &rusqlite::Connection) -> rusqlite::Result<usize> {
     let version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-    // SQLite stores the pragma as a signed 32-bit integer, and the migrations
-    // only ever set it to a positive count.
+    // Negative values (never written by migrations) read as 0.
     Ok(usize::try_from(version).unwrap_or(0))
 }
 
-/// Reads the stamped minimum compatible schema version. Returns `None` for an
-/// index without a stamp, which every app older than the index must treat as
-/// incompatible.
-pub fn read_min_compatible_schema(conn: &rusqlite::Connection) -> rusqlite::Result<Option<usize>> {
+/// The stamped [`MIN_COMPATIBLE_SCHEMA_VERSION`], or `None` when unstamped.
+fn read_min_compatible_schema(conn: &rusqlite::Connection) -> rusqlite::Result<Option<usize>> {
     use rusqlite::OptionalExtension;
     let value: Option<String> = conn
         .query_row(
@@ -89,10 +78,10 @@ pub fn read_min_compatible_schema(conn: &rusqlite::Connection) -> rusqlite::Resu
     Ok(value.and_then(|value| value.parse().ok()))
 }
 
-/// Whether an app built for [`LATEST_SCHEMA_VERSION`] can read and write an
-/// index whose `user_version` is `version`.
-pub fn is_compatible_schema(conn: &rusqlite::Connection, version: usize) -> rusqlite::Result<bool> {
-    if version <= LATEST_SCHEMA_VERSION {
+/// Whether this app can use the index: it is not newer than
+/// [`LATEST_SCHEMA_VERSION`], or its stamp allows this app.
+pub fn is_compatible_schema(conn: &rusqlite::Connection) -> rusqlite::Result<bool> {
+    if read_user_version(conn)? <= LATEST_SCHEMA_VERSION {
         return Ok(true);
     }
     let min_compatible = read_min_compatible_schema(conn)?;
@@ -165,7 +154,7 @@ mod schema {
                 SchemaError::VecRegistration(message) => write!(formatter, "{message}"),
                 SchemaError::TooNew { found, supported } => write!(
                     formatter,
-                    "the index has schema version {found}, and this app supports version {supported} or an index that stays compatible with it"
+                    "index schema {found} is newer than this app supports ({supported})"
                 ),
             }
         }
@@ -236,26 +225,22 @@ mod schema {
         Ok(conn)
     }
 
-    /// Bring the connection up to the latest schema version and stamp
-    /// [`MIN_COMPATIBLE_SCHEMA_VERSION`]. An index from a newer app is used as
-    /// is when its stamp allows this app, and is [`SchemaError::TooNew`]
-    /// otherwise. A newer index is never migrated or stamped here.
+    /// Migrates to the latest schema and stamps
+    /// [`MIN_COMPATIBLE_SCHEMA_VERSION`]. A newer index is used unchanged when
+    /// its stamp allows this app, and is [`SchemaError::TooNew`] otherwise.
     ///
     /// [`MIN_COMPATIBLE_SCHEMA_VERSION`]: crate::MIN_COMPATIBLE_SCHEMA_VERSION
     pub fn migrate(conn: &mut Connection) -> Result<(), SchemaError> {
-        let version = crate::read_user_version(conn)?;
-        if version > crate::LATEST_SCHEMA_VERSION {
-            if crate::is_compatible_schema(conn, version)? {
-                return Ok(());
-            }
-            return Err(SchemaError::TooNew {
-                found: version,
-                supported: crate::LATEST_SCHEMA_VERSION,
-            });
+        if crate::read_user_version(conn)? > crate::LATEST_SCHEMA_VERSION {
+            return accept_newer(conn);
         }
-        MIGRATIONS
-            .to_latest(conn)
-            .map_err(|err| SchemaError::Migration(err.to_string()))?;
+        if let Err(err) = MIGRATIONS.to_latest(conn) {
+            // A newer app can migrate the file between the check and here.
+            if crate::read_user_version(conn)? > crate::LATEST_SCHEMA_VERSION {
+                return accept_newer(conn);
+            }
+            return Err(SchemaError::Migration(err.to_string()));
+        }
         let stamp = crate::MIN_COMPATIBLE_SCHEMA_VERSION;
         if crate::read_min_compatible_schema(conn)? != Some(stamp) {
             conn.execute(
@@ -265,6 +250,16 @@ mod schema {
             )?;
         }
         Ok(())
+    }
+
+    fn accept_newer(conn: &Connection) -> Result<(), SchemaError> {
+        if crate::is_compatible_schema(conn)? {
+            return Ok(());
+        }
+        Err(SchemaError::TooNew {
+            found: crate::read_user_version(conn)?,
+            supported: crate::LATEST_SCHEMA_VERSION,
+        })
     }
 
     /// Stop at schema `version`, so schema-evolution tests can stage data in an
@@ -374,10 +369,6 @@ mod schema {
             .unwrap();
         }
 
-        fn user_version(conn: &Connection) -> usize {
-            crate::read_user_version(conn).unwrap()
-        }
-
         #[test]
         fn migrate_stamps_the_min_compatible_schema() {
             let mut conn = open_in_memory().unwrap();
@@ -398,7 +389,7 @@ mod schema {
 
             migrate(&mut conn).unwrap();
 
-            assert_eq!(user_version(&conn), newer);
+            assert_eq!(crate::read_user_version(&conn).unwrap(), newer);
             assert_eq!(
                 crate::read_min_compatible_schema(&conn).unwrap(),
                 Some(crate::LATEST_SCHEMA_VERSION)
@@ -419,7 +410,7 @@ mod schema {
                 matches!(error, SchemaError::TooNew { found, supported } if found == newer && supported == crate::LATEST_SCHEMA_VERSION),
                 "{error}"
             );
-            assert_eq!(user_version(&conn), newer);
+            assert_eq!(crate::read_user_version(&conn).unwrap(), newer);
         }
 
         #[test]
