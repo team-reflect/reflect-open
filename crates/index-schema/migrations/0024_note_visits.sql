@@ -2,6 +2,8 @@
 -- DURABLE like chat_* (0008): not derived from markdown, so `index_clear` and
 -- projection-wipe migrations must leave it alone. No FK to `notes`: a cascade
 -- would empty it on every rebuild. Reads join `notes` to drop deleted paths.
+-- An app on schema 23 moves a note without its visit, so that note leaves
+-- Recent until it is opened again.
 
 CREATE TABLE note_visits (
   path TEXT PRIMARY KEY NOT NULL,

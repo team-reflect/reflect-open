@@ -30,6 +30,7 @@ pub(super) fn record(conn: &Connection, path: &str, visited_ms: i64) -> AppResul
         .column(NoteVisits::Path)
         .from(NoteVisits::Table)
         .order_by(NoteVisits::VisitedMs, Order::Desc)
+        .order_by(NoteVisits::Path, Order::Asc)
         .limit(MAX_VISITS)
         .take();
     sql::execute(
