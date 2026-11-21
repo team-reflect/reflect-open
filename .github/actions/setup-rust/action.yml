@@ -33,7 +33,14 @@ runs:
     - name: Configure cargo
       shell: bash
       run: |
-        echo "CARGO_PROFILE_DEV_DEBUG=line-tables-only" >> "$GITHUB_ENV"
+        echo "CARGO_PROFILE_DEV_DEBUG=false" >> "$GITHUB_ENV"
+
+    - name: Configure cache compression
+      shell: bash
+      run: |
+        # actions/cache runs zstd without a level, so zstd reads ZSTD_CLEVEL.
+        # https://github.com/actions/toolkit/blob/0c3a9c332b678ff1e776f93d728a4ad279803abe/packages/cache/src/internal/tar.ts#L239
+        echo "ZSTD_CLEVEL=10" >> "$GITHUB_ENV"
 
     - name: Install Rust toolchain
       shell: bash
