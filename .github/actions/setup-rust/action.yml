@@ -94,8 +94,6 @@ runs:
           echo "SCCACHE_S3_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
         fi
 
-    # ONNX Runtime depends only on the runner and the ort-sys version, so all
-    # jobs on the same runner share one entry. The post step saves it on a miss.
     - name: Cache ONNX Runtime
       if: inputs.cache == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -109,3 +107,4 @@ runs:
       with:
         cache-targets: ${{ inputs.cache-targets }}
         save-if: ${{ github.ref == 'refs/heads/master' }}
+        prefix-key: 'v1-rust'
