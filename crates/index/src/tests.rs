@@ -628,10 +628,12 @@ fn pinned_migration_drops_stale_note_rows_for_reindex() {
         assert_eq!(count, 0, "{table} should be wiped for the re-index");
     }
     // Bookkeeping outlives the wipe (same contract as index_clear).
-    let meta: i64 = conn
-        .query_row("SELECT count(*) FROM index_meta", [], |row| row.get(0))
+    let meta: String = conn
+        .query_row("SELECT value FROM index_meta WHERE key = 'k'", [], |row| {
+            row.get(0)
+        })
         .unwrap();
-    assert_eq!(meta, 1);
+    assert_eq!(meta, "v");
 }
 
 #[test]
@@ -1042,10 +1044,12 @@ fn kind_invariant_migration_wipes_the_projection_for_reindex() {
         assert_eq!(count, 0, "{table} should be wiped for the re-index");
     }
     // Bookkeeping outlives the wipe (same contract as index_clear).
-    let meta: i64 = conn
-        .query_row("SELECT count(*) FROM index_meta", [], |row| row.get(0))
+    let meta: String = conn
+        .query_row("SELECT value FROM index_meta WHERE key = 'k'", [], |row| {
+            row.get(0)
+        })
         .unwrap();
-    assert_eq!(meta, 1);
+    assert_eq!(meta, "v");
 
     // Every notes index came back with the recreated table.
     for index in [
