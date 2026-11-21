@@ -80,7 +80,7 @@ impl<'a> IndexCommands<'a> {
         Ok(())
     }
 
-    /// Wipes all derived tables. Chat history stays.
+    /// Wipes all derived tables. Chat history and note visits stay.
     fn index_clear(&self, generation: u64) -> AppResult<()> {
         self.announce(self.session.clear(generation)?);
         Ok(())

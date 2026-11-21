@@ -1,4 +1,4 @@
-import type { NoteListEntry, RecentNoteRow, TagFacet } from '@reflect/types'
+import type { NoteListEntry, RecentNoteRow, TagFacet, VisitedNote } from '@reflect/types'
 import { foldTag } from '../markdown/index.ts'
 import type { DatabaseService } from './database-service.ts'
 
@@ -60,6 +60,11 @@ export interface NoteListService {
    * displayed with one deterministic casing.
    */
   listNoteTags(): Promise<TagFacet[]>
+  /**
+   * The notes this device opened, most recent first, at most `limit`. Daily
+   * notes and templates are left out.
+   */
+  listVisitedNotes(limit: number): Promise<VisitedNote[]>
 }
 
 class NoteListServiceImpl implements NoteListService {
@@ -82,6 +87,10 @@ class NoteListServiceImpl implements NoteListService {
 
   async listNoteTags(): Promise<TagFacet[]> {
     return await this.#deps.database.read('index_note_tags', {})
+  }
+
+  async listVisitedNotes(limit: number): Promise<VisitedNote[]> {
+    return await this.#deps.database.read('index_visited_notes', { limit })
   }
 }
 

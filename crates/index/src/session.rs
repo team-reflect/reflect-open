@@ -330,8 +330,8 @@ impl IndexSession {
     }
 
     /// Wipe all derived tables (the TS layer then re-applies every note). The
-    /// `chat_*` tables are deliberately untouched: chat history is durable,
-    /// not a rebuildable projection.
+    /// `chat_*` and `note_visits` tables are deliberately untouched: they are
+    /// durable, not a rebuildable projection.
     pub fn clear(&self, generation: u64) -> AppResult<Applied> {
         Self::applied(self.write(generation, |conn| write::clear_index(conn)))
     }

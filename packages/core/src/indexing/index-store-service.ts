@@ -115,7 +115,7 @@ export interface IndexStoreService {
    */
   touch(entries: readonly IndexTouch[], generation: number): MaybePromise<void>
   /**
-   * Wipe all derived tables (precedes a full rebuild); `chat_*` and `index_meta` stay.
+   * Wipe all derived tables (precedes a full rebuild); `chat_*`, `note_visits`, and `index_meta` stay.
    */
   clear(generation: number): Promise<void>
   /**

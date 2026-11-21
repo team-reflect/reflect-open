@@ -78,6 +78,9 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
       })
     },
     enabled: searching && !parsed.filtered,
+    // Opening a note changes the empty query's recent notes without an index
+    // write, so that answer refetches on every open.
+    staleTime: trimmed === '' ? 0 : Infinity,
   })
   const useHybrid = hybrid && !parsed.filtered
   const {
