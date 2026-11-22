@@ -12,10 +12,13 @@
 
 /**
  * An `Email:` field bullet (or pre-2023 V1 `Emails`), capturing indentation
- * and an optional inline value. A missing colon is accepted only when the
- * label occupies the whole list item.
+ * and an optional inline value (group 3, or group 4 when the colon sits inside
+ * the emphasis). The label may be wrapped in one emphasis marker (`**`, `__`,
+ * `*`, `_`), with the colon inside or outside it. A missing colon is accepted
+ * only when the label occupies the whole list item.
  */
-const EMAIL_FIELD_PATTERN = /^([ \t]*)[-+*][ \t]+emails?[ \t]*(?::(.*))?$/i
+const EMAIL_FIELD_PATTERN =
+  /^([ \t]*)[-+*][ \t]+((?:\*\*|__|\*|_)?)emails?(?:\2[ \t]*(?::(.*))?|[ \t]*:\2(.*))$/i
 
 /** A nested unordered-list item, capturing indentation and value. */
 const LIST_ITEM_PATTERN = /^([ \t]*)[-+*][ \t](.*)$/
@@ -99,7 +102,7 @@ export function extractEmailFields(body: string): string[] {
   for (const line of body.split(/\r\n?|\n/)) {
     const field = line.match(EMAIL_FIELD_PATTERN)
     if (field !== null) {
-      const inlineValue = field[2] ?? ''
+      const inlineValue = field[3] ?? field[4] ?? ''
       appendEmails(inlineValue, seen, emails)
       legacyParentIndent = inlineValue.trim() === '' ? indentationWidth(field[1] ?? '') : null
       continue
