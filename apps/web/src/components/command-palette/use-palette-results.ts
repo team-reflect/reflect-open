@@ -10,6 +10,7 @@ import {
   useSemanticSearchEnabled,
   useWeekStartDay,
 } from '@/providers/settings-provider.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 import type { PaletteSections } from './entries.ts'
 
@@ -58,6 +59,9 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
   // would serve a stale "Tomorrow" afterwards. Computed once so the key and the
   // query agree on the same day.
   const today = useToday()
+  const { route } = useRouterState()
+  const recent = trimmed === ''
+  const currentNote = route.kind === 'note' ? route.path : null
 
   const {
     data: suggestions,
@@ -69,15 +73,20 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
       dateFormat,
       weekStartDay,
       today,
+      // The empty query leaves out the note on screen.
+      currentNote: recent ? currentNote : null,
     }),
     queryFn: () => {
-      return paletteSearch.suggestTitles(trimmed, {
-        today,
-        dateFormat,
-        weekStartDay,
-      })
+      return paletteSearch.suggestTitles(
+        trimmed,
+        { today, dateFormat, weekStartDay },
+        recent ? currentNote : null,
+      )
     },
     enabled: searching && !parsed.filtered,
+    // A visit changes the empty query's answer without an index write, so
+    // that answer refetches each time the palette opens.
+    staleTime: recent ? 0 : Infinity,
   })
   const useHybrid = hybrid && !parsed.filtered
   const {

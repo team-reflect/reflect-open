@@ -129,7 +129,7 @@ async function renderPalette(query: string, handlers?: Partial<Record<AppCommand
       settings: { semanticSearchEnabled: semanticEnabled, dateFormat: 'mdy' },
     },
   )
-  return { view, core }
+  return { view, core, appLayer }
 }
 
 describe('CommandPalette', () => {
@@ -170,6 +170,23 @@ describe('CommandPalette', () => {
     await expect.element(view.getByText('Recent One')).toBeInTheDocument()
     await expect.element(view.getByText('Recent', { exact: true })).toBeInTheDocument()
     expect(view.getByText('Commands').query()).toBeNull() // recall feed only (decided)
+  })
+
+  it('leaves the note on screen out of the recent notes', async () => {
+    suggestWikiTargets.mockResolvedValue([])
+    const { view, core, appLayer } = await renderPalette('')
+    const listVisitedNotes = vi.spyOn(core.noteList, 'listVisitedNotes')
+    listVisitedNotes.mockResolvedValue([
+      { path: 'notes/a.md', title: 'Note A' },
+      { path: 'notes/b.md', title: 'Note B' },
+    ])
+    appLayer.navigation.navigate({ kind: 'note', path: 'notes/a.md' })
+    await expect.element(view.getByText('Note B')).toBeInTheDocument()
+    expect(view.getByText('Note A').query()).toBeNull()
+
+    appLayer.navigation.navigate({ kind: 'note', path: 'notes/b.md' })
+    await expect.element(view.getByText('Note A')).toBeInTheDocument()
+    expect(view.getByText('Note B').query()).toBeNull()
   })
 
   it('ends a typed query with an Ask row that leads to Settings with no AI provider', async () => {

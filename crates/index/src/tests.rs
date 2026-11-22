@@ -7,7 +7,7 @@ use reflect_index_schema::LATEST_SCHEMA_VERSION;
 use reflect_types::{
     ChatConversation, ChatMessageRow, EmbeddedChunk, IndexedAlias, IndexedClaim, IndexedEmail,
     IndexedLink, IndexedNote, IndexedTag, IndexedTask, LinkKind, MovedNoteAddress, NoteKind,
-    TagFacet,
+    TagFacet, VisitedNote,
 };
 use rusqlite::Connection;
 use sea_query::{QueryStatementWriter, SqliteQueryBuilder};
@@ -41,11 +41,13 @@ use super::read::suggest::{
     winning_aliases,
 };
 use super::read::tasks::tasks;
+use super::read::visits::visited_notes;
 use super::read::wiki::{
     address_note, claim_match, link_sources, notes_by_path_key, path_link_sources, resolve,
 };
 use super::scan::scan_reconcile;
 use super::text::fts::build_fts_match;
+use super::visit_write::record;
 use super::write::{apply_note, claim_tier, clear_index, move_note, touch_note};
 use super::{Applied, FileIndexConnections, IndexConnections, IndexSession};
 use reflect_types::{BacklinkSourceCursor, SearchRequest};
@@ -2036,6 +2038,10 @@ fn stale_generation_writes_are_dropped_end_to_end() {
     assert_eq!(session.remove(stale, "notes/a.md").unwrap(), Applied::Stale);
     assert_eq!(note_count(&session), Value::from(1));
     assert_eq!(
+        session.record_visit(stale, "notes/a.md", 1).unwrap(),
+        Applied::Stale
+    );
+    assert_eq!(
         session
             .apply(fresh, &[note("notes/b.md", "B", vec![])])
             .unwrap(),
@@ -3486,5 +3492,72 @@ fn ranked_sql_applies_every_filter_and_skips_private_notes() {
                 ELSE 3 END) ASC, "score" ASC, "fn"."is_pinned" DESC, "fn"."mtime" DESC, "fn"."path" ASC
               LIMIT ?
             [String(Some("\u{1}")), String(Some("\u{2}")), String(Some("\u{1}")), String(Some("\u{2}")), String(Some("(title : \"car\"* OR body : \"car\"*) AND (title : \"trip\"* OR body : \"trip\"*)")), String(Some("\u{1}")), String(Some(" car")), String(Some(" trip")), String(Some("a")), String(Some("b")), String(Some("notes/car.md")), String(Some("notes/trip.md")), Double(Some(1.0)), Double(Some(100.0)), String(Some(" car")), String(Some(" trip")), String(Some("car trip")), String(Some("car trip")), String(Some(" car")), String(Some(" trip")), BigUnsigned(Some(20))]"#]],
+    );
+}
+
+// ---- note_visits ------------------------------------------------------------
+
+fn visited_paths(conn: &Connection) -> Vec<String> {
+    visited_notes(conn, 10)
+        .unwrap()
+        .into_iter()
+        .map(|visit| visit.path)
+        .collect()
+}
+
+#[test]
+fn visited_notes_are_newest_first_and_survive_a_rebuild() {
+    let conn = migrated();
+    apply_note(&conn, &note("notes/a.md", "A", vec![])).unwrap();
+    apply_note(&conn, &note("notes/b.md", "B", vec![])).unwrap();
+    apply_note(&conn, &daily_note("daily/2026-11-21.md", "2026-11-21")).unwrap();
+    let mut template = note("templates/t.md", "T", vec![]);
+    template.kind = NoteKind::Template;
+    apply_note(&conn, &template).unwrap();
+    record(&conn, "notes/a.md", 1).unwrap();
+    record(&conn, "notes/b.md", 2).unwrap();
+    record(&conn, "daily/2026-11-21.md", 3).unwrap();
+    record(&conn, "templates/t.md", 4).unwrap();
+    record(&conn, "notes/deleted.md", 5).unwrap();
+    record(&conn, "notes/a.md", 6).unwrap();
+    // Daily notes, templates, and paths without a note are left out.
+    assert_eq!(visited_paths(&conn), ["notes/a.md", "notes/b.md"]);
+
+    clear_index(&conn).unwrap();
+    apply_note(&conn, &note("notes/a.md", "A", vec![])).unwrap();
+    apply_note(&conn, &note("notes/b.md", "B", vec![])).unwrap();
+    assert_eq!(visited_paths(&conn), ["notes/a.md", "notes/b.md"]);
+}
+
+#[test]
+fn recording_a_visit_keeps_only_the_newest_visits() {
+    let conn = migrated();
+    for index in 0..=200 {
+        record(&conn, &format!("notes/{index}.md"), index).unwrap();
+    }
+    let rows = run_query(
+        &conn,
+        "SELECT min(visited_ms) AS oldest, count(*) AS n FROM note_visits",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(rows[0]["n"], Value::from(200));
+    assert_eq!(rows[0]["oldest"], Value::from(1));
+}
+
+#[test]
+fn moving_a_note_moves_its_visit() {
+    let mut conn = migrated();
+    apply_note(&conn, &note("notes/old.md", "Title", vec![])).unwrap();
+    record(&conn, "notes/old.md", 2).unwrap();
+    // The visit of a note that was deleted at the destination.
+    record(&conn, "notes/new.md", 1).unwrap();
+    move_in_txn(&mut conn, "notes/old.md", "notes/new.md").unwrap();
+    assert_eq!(
+        visited_notes(&conn, 10).unwrap(),
+        [VisitedNote {
+            path: "notes/new.md".to_string(),
+            title: "Title".to_string(),
+        }]
     );
 }

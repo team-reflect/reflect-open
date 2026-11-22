@@ -5,7 +5,8 @@
 //! registered for Plan 09. Parsing happens in TS (`@reflect/core`); this crate
 //! owns every write (one transaction per batch, gated on the session
 //! generation in [`IndexSession`]), every read query (`read/`), the reconcile
-//! delta (`scan.rs`) and the durable `chat_*` tables (`chat_write.rs`).
+//! delta (`scan.rs`) and the durable `chat_*` and `note_visits` tables
+//! (`chat_write.rs`, `visit_write.rs`).
 //!
 //! The shell (a Tauri command, a uniffi export, a wasm binding) decides the
 //! thread each call runs on and how `index:written` reaches the frontend;
@@ -25,6 +26,7 @@ mod sql;
 #[cfg(test)]
 mod tests;
 pub mod text;
+mod visit_write;
 mod write;
 
 pub use commands::{

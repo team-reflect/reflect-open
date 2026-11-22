@@ -115,6 +115,7 @@ macro_rules! commands {
                 index_meta_set(key: String, value: String, generation: u64) -> (),
                 chat_message_save(conversation: ChatConversation, message: ChatMessageRow, generation: u64) -> (),
                 chat_conversation_delete(id: String, generation: u64) -> (),
+                note_visit_record(path: String, visited_ms: i64, generation: u64) -> (),
                 embed_apply(path: String, chunks: Vec<EmbeddedChunk>, generation: u64) -> (),
                 embed_remove(path: String, generation: u64) -> (),
             }
@@ -157,6 +158,7 @@ macro_rules! commands {
                 index_daily_notes(start: String, end: String, limit: u32) -> Vec<DailyNoteRow>,
                 chat_conversations(limit: u32) -> Vec<ChatConversation>,
                 chat_messages(conversation_id: String) -> Vec<ChatMessageRow>,
+                index_visited_notes(limit: u32) -> Vec<VisitedNote>,
             }
             desktop {
                 skill::skill_status() -> AgentSkillStatus,

@@ -72,6 +72,7 @@ function setup() {
     retrieval,
     commands,
     clock: createTestClockService({ now: NOON_JUNE_9 }),
+    noteList: { listVisitedNotes: () => Promise.resolve([]) },
   })
   return { service, searches, retrieval, commands }
 }
@@ -98,18 +99,57 @@ describe('PaletteSearchService', () => {
         logger: createTestLoggerService(),
       }),
       clock: createTestClockService(),
+      noteList: { listVisitedNotes: () => Promise.resolve([]) },
     })
 
-    const suggestions = await service.suggestTitles('tomorrow', {
-      today: '2026-06-09',
-      dateFormat: 'mdy',
-      weekStartDay: 'monday',
-    })
+    const suggestions = await service.suggestTitles(
+      'tomorrow',
+      { today: '2026-06-09', dateFormat: 'mdy', weekStartDay: 'monday' },
+      null,
+    )
     expect(suggestions).toHaveLength(8)
     expect(suggestions.find((suggestion) => suggestion.generated !== undefined)).toMatchObject({
       date: '2026-06-10',
       generated: { phrase: 'Tomorrow' },
     })
+    database.close()
+  })
+
+  it('lists the recently opened notes first for an empty query, without the note on screen', async () => {
+    const database = createTestDatabaseService()
+    seedNotes(database, [
+      { path: 'notes/a.md', markdown: '# A\n' },
+      { path: 'notes/b.md', markdown: '# B\n' },
+      { path: 'notes/c.md', markdown: '# C\n' },
+    ])
+    const service = createPaletteSearchService({
+      suggestions: createSuggestionService({ database }),
+      search: createSearchService({
+        database,
+        wikiResolver: createWikiResolverService({ database }),
+      }),
+      retrieval: createTestRetrievalService(),
+      commands: createCommandService({
+        platform: createTestPlatformService(),
+        logger: createTestLoggerService(),
+      }),
+      clock: createTestClockService(),
+      noteList: {
+        listVisitedNotes: () => {
+          return Promise.resolve([
+            { path: 'notes/a.md', title: 'A' },
+            { path: 'notes/b.md', title: 'B' },
+          ])
+        },
+      },
+    })
+
+    const suggestions = await service.suggestTitles(
+      '',
+      { today: '2026-06-09', dateFormat: 'mdy', weekStartDay: 'monday' },
+      'notes/a.md',
+    )
+    expect(suggestions.map((suggestion) => suggestion.path)).toEqual(['notes/b.md', 'notes/c.md'])
     database.close()
   })
 

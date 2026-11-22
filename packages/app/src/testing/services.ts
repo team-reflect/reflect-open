@@ -13,6 +13,7 @@ import { createTestClipboardService, type TestClipboardService } from './clipboa
 import { createTestNativeMenuHost } from './commands.ts'
 import { createTestOpenerService, type TestOpenerService } from './opener.ts'
 import { createLinkNavigationService } from '../navigation/link-navigation-service.ts'
+import { createNoteVisitService } from '../navigation/note-visit-service.ts'
 import { createTestNavigationService, type TestNavigationService } from './navigation.ts'
 import { createTestLifecycleService, type TestLifecycleService } from './lifecycle.ts'
 import { createTestOperationsService } from './operations.ts'
@@ -107,6 +108,16 @@ export function createTestAppServices(
       activity: lifecycle,
       logger: core.logger,
     })
+  // Over the test navigation, which replaces the one `createAppServices` built.
+  const noteVisits =
+    overrides.noteVisits ??
+    createNoteVisitService({
+      navigation,
+      graphSession: core.graphSession,
+      ipc: core.ipc,
+      clock: core.clock,
+      logger: core.logger,
+    })
   const linkNavigation =
     overrides.linkNavigation ??
     createLinkNavigationService({
@@ -139,6 +150,7 @@ export function createTestAppServices(
     opener,
     lifecycle,
     navigation,
+    noteVisits,
     deepLinkRouter,
     linkNavigation,
   } as TestAppServices

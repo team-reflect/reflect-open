@@ -82,11 +82,16 @@ export function RouterProvider({
   initialSection,
   children,
 }: RouterProviderProps): ReactElement {
-  const { navigation: appNavigation } = useAppServices()
+  const { navigation: appNavigation, noteVisits } = useAppServices()
   const [navigation] = useState(() => {
     appNavigation.reset(initialRoute, initialSection)
     return appNavigation
   })
+
+  // `reset` notifies no subscriber, so tracking starts here, from the route on
+  // screen when this effect runs. StrictMode runs this twice in dev; the
+  // second visit is an upsert.
+  useEffect(() => noteVisits.track(), [noteVisits])
 
   return (
     <RouterActionsProvider navigation={navigation}>

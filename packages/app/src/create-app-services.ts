@@ -55,6 +55,7 @@ import {
   type LinkNavigationService,
 } from './navigation/link-navigation-service.ts'
 import { createNavigationService, type NavigationService } from './navigation/navigation-service.ts'
+import { createNoteVisitService, type NoteVisitService } from './navigation/note-visit-service.ts'
 import type { AppLifecycleService } from './app/lifecycle-service.ts'
 import { createQuitPolicyService, type QuitPolicyService } from './app/quit-policy-service.ts'
 import type { WindowService } from './app/window-service.ts'
@@ -216,6 +217,10 @@ export interface AppServices {
    */
   readonly navigation: NavigationService
   /**
+   * The notes this device opened. The router tracks its arrivals.
+   */
+  readonly noteVisits: NoteVisitService
+  /**
    * Turns the `reflect://` URLs of this webview into navigations.
    */
   readonly deepLinkRouter: DeepLinkRouter
@@ -259,15 +264,23 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
     logger: core.logger,
     host: host.nativeMenu ?? createUnsupportedNativeMenuHost(),
   })
+  const navigation = createNavigationService()
+  const noteVisits = createNoteVisitService({
+    navigation,
+    graphSession: core.graphSession,
+    ipc: core.ipc,
+    clock: core.clock,
+    logger: core.logger,
+  })
   const paletteSearch = createPaletteSearchService({
     suggestions: core.suggestions,
     search: core.search,
     retrieval: core.retrieval,
     commands,
     clock: core.clock,
+    noteList: core.noteList,
   })
   const opener = createOpenerService({ transport: host.opener, logger: core.logger })
-  const navigation = createNavigationService()
   const deepLinkRouter = createDeepLinkRouter({
     intake: core.deepLinkIntake,
     logger: core.logger,
@@ -351,6 +364,7 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
       logger: core.logger,
     }),
     navigation,
+    noteVisits,
     deepLinkRouter,
     linkNavigation,
     lifecycle: host.lifecycle,

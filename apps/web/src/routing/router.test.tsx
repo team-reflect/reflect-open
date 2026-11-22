@@ -87,6 +87,17 @@ describe('router', () => {
     expect(result.current.handlers.savedScroll()).toBeNull()
   })
 
+  it('records the note it starts on as a visit', async () => {
+    const { core } = await routerHook({ kind: 'note', path: 'notes/a.md' })
+    const visits = () => {
+      return core.ipc
+        .calls()
+        .filter((call) => call.command === 'note_visit_record')
+        .map((call) => call.args)
+    }
+    await expect.poll(visits).toContainEqual(expect.objectContaining({ path: 'notes/a.md' }))
+  })
+
   it('restores a saved scroll offset on back/forward, per entry', async () => {
     const { result } = await routerHook()
     await act(() => result.current.handlers.saveScrollState(120)) // scrolling on today

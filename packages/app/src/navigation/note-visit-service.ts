@@ -1,0 +1,82 @@
+import type {
+  ClockService,
+  GraphSessionService,
+  IpcBridgeService,
+  LoggerService,
+  Unlisten,
+} from '@reflect/core'
+import type { NavigationService } from './navigation-service.ts'
+
+/**
+ * Records the notes this device opens in the index's `note_visits` table.
+ */
+export interface NoteVisitService {
+  /**
+   * Record the note on screen, then every later arrival on a note route,
+   * until the returned function runs. A router calls it once for each fresh
+   * history, because `NavigationService.reset` notifies no subscriber.
+   */
+  track(): Unlisten
+}
+
+export interface NoteVisitServiceDeps {
+  readonly navigation: NavigationService
+  readonly graphSession: GraphSessionService
+  readonly ipc: IpcBridgeService
+  readonly clock: ClockService
+  readonly logger: LoggerService
+}
+
+class NoteVisitServiceImpl implements NoteVisitService {
+  readonly #deps: NoteVisitServiceDeps
+
+  constructor(deps: NoteVisitServiceDeps) {
+    this.#deps = deps
+  }
+
+  track(): Unlisten {
+    const { navigation, graphSession } = this.#deps
+    // A router lives for one graph; another graph's index gets none of its visits.
+    const root = graphSession.get().graph?.root
+    let seen: { entryId: number; arrivalSeq: number } | null = null
+    const check = (): void => {
+      if (graphSession.get().graph?.root !== root) {
+        return
+      }
+      const { route, entryId, arrivalSeq } = navigation.get()
+      // A rename rewrites the route in place; only an arrival is a visit.
+      if (seen?.entryId === entryId && seen.arrivalSeq === arrivalSeq) {
+        return
+      }
+      // Without an index, the arrival stays unseen until the index opens.
+      const generation = graphSession.get().indexGeneration
+      if (generation === null) {
+        return
+      }
+      seen = { entryId, arrivalSeq }
+      if (route.kind === 'note') {
+        void this.#record(route.path, generation)
+      }
+    }
+    check()
+    const unlistenNavigation = navigation.subscribe(check)
+    const unlistenGraph = graphSession.subscribe(check)
+    return () => {
+      unlistenNavigation()
+      unlistenGraph()
+    }
+  }
+
+  async #record(path: string, generation: number): Promise<void> {
+    const { ipc, clock, logger } = this.#deps
+    try {
+      await ipc.call('note_visit_record', { path, visitedMs: clock.now(), generation })
+    } catch (error) {
+      logger.warn('recording a note visit failed', error)
+    }
+  }
+}
+
+export function createNoteVisitService(deps: NoteVisitServiceDeps): NoteVisitService {
+  return new NoteVisitServiceImpl(deps)
+}

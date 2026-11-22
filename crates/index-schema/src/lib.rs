@@ -12,8 +12,9 @@
 //! Then decide [`MIN_COMPATIBLE_SCHEMA_VERSION`].
 //!
 //! Almost every table is a rebuildable projection of the markdown — except
-//! the `chat_*` tables (0008), which hold durable chat history. Wipe-style
-//! migrations (0004, 0006) and `index_clear` must never touch them.
+//! the `chat_*` tables (0008) and `note_visits` (0024), which hold durable
+//! data. Wipe-style migrations (0004, 0006) and `index_clear` must never touch
+//! them.
 
 /// Directory inside a graph that holds the index (and marks a dir as a graph).
 pub const REFLECT_DIR: &str = ".reflect";
@@ -24,7 +25,7 @@ pub const INDEX_FILE: &str = "index.sqlite";
 /// `user_version` after every migration has run. Read-only consumers compare
 /// this against `PRAGMA user_version` to detect an index written by a newer
 /// (or older) app than they were built for.
-pub const LATEST_SCHEMA_VERSION: usize = 23;
+pub const LATEST_SCHEMA_VERSION: usize = 24;
 
 /// The oldest schema version whose app can still use an index at
 /// [`LATEST_SCHEMA_VERSION`]. Reflect and Reflect Beta share one index; an older
@@ -140,6 +141,7 @@ mod schema {
             up(include_str!("../migrations/0021_note_has_content.sql")),
             up(include_str!("../migrations/0022_drop_note_text.sql")),
             up(include_str!("../migrations/0023_task_ast_path.sql")),
+            up(include_str!("../migrations/0024_note_visits.sql")),
         ])
     });
 

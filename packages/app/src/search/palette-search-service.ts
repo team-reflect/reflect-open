@@ -2,8 +2,10 @@ import {
   dateFromDailyPath,
   parseSearchQuery,
   updatedPresetFilter,
+  wikiLinkTargetForTitle,
   type ClockService,
   type DateSuggestionContext,
+  type NoteListService,
   type RetrievalService,
   type SearchService,
   type SuggestionService,
@@ -49,8 +51,14 @@ export interface PaletteSectionsInput {
 export interface PaletteSearchService {
   /**
    * Title suggestions for `text` (at most 8), generated date phrases merged in.
+   * An empty `text` lists the recently opened notes first, without
+   * `currentNote` (the note on screen).
    */
-  suggestTitles(text: string, dateContext: DateSuggestionContext): Promise<WikiSuggestion[]>
+  suggestTitles(
+    text: string,
+    dateContext: DateSuggestionContext,
+    currentNote: string | null,
+  ): Promise<WikiSuggestion[]>
   /**
    * The search hits for `text`. Filter tokens (#tag, is:daily, is:pinned,
    * links:, linked-from:, updated:) switch the search into constrained mode
@@ -75,6 +83,7 @@ export interface PaletteSearchServiceDeps {
   readonly retrieval: RetrievalService
   readonly commands: CommandService
   readonly clock: ClockService
+  readonly noteList: Pick<NoteListService, 'listVisitedNotes'>
 }
 
 class PaletteSearchServiceImpl implements PaletteSearchService {
@@ -84,8 +93,39 @@ class PaletteSearchServiceImpl implements PaletteSearchService {
     this.#deps = deps
   }
 
-  async suggestTitles(text: string, dateContext: DateSuggestionContext): Promise<WikiSuggestion[]> {
-    return await this.#deps.suggestions.suggestWikiTargets(text, 8, dateContext)
+  async suggestTitles(
+    text: string,
+    dateContext: DateSuggestionContext,
+    currentNote: string | null,
+  ): Promise<WikiSuggestion[]> {
+    const { suggestions, noteList } = this.#deps
+    if (text !== '') {
+      return await suggestions.suggestWikiTargets(text, 8, dateContext)
+    }
+    const [visited, linked] = await Promise.all([
+      noteList.listVisitedNotes(9),
+      suggestions.suggestWikiTargets(text, 9, dateContext),
+    ])
+    const recent = visited.map(({ path, title }): WikiSuggestion => ({
+      target: wikiLinkTargetForTitle(title),
+      path,
+      title,
+      alias: null,
+      date: null,
+    }))
+    const seen = new Set(currentNote === null ? [] : [currentNote])
+    const merged: WikiSuggestion[] = []
+    for (const suggestion of [...recent, ...linked]) {
+      const { path } = suggestion
+      if (path !== null) {
+        if (seen.has(path)) {
+          continue
+        }
+        seen.add(path)
+      }
+      merged.push(suggestion)
+    }
+    return merged.slice(0, 8)
   }
 
   async search(text: string, options: { hybrid: boolean }): Promise<PaletteHit[]> {

@@ -196,6 +196,7 @@ export {
 export { type BacklinkService } from './indexing/backlink-service.ts'
 export { createSearchService, type SearchService } from './indexing/search-service.ts'
 export { createSuggestionService, type SuggestionService } from './indexing/suggestion-service.ts'
+export { type NoteListService } from './indexing/note-list-service.ts'
 export {
   type IndexFileProgress,
   type IndexLifecycleProgress,
@@ -431,6 +432,7 @@ export {
   splitFrontmatter,
   upsertFrontmatter,
   displayNoteTitle,
+  wikiLinkTargetForTitle,
   foldKey,
   foldTag,
   foldFallbackTitleKey,

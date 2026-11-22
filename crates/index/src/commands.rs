@@ -9,7 +9,8 @@ use reflect_types::{
     ChatMessageRow, ChunkHash, ChunkHit, DailyNoteRow, EmbeddedChunk, GraphStats, IndexTouch,
     IndexedNote, MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry, NotePrivacy, NoteRow,
     PinnedNoteRow, RecentNoteRow, SearchHitRow, SearchRequest, TagFacet, TaskRow, TemplateEntry,
-    WikiCandidates, WikiClaimMatch, WikiKeyWinner, WikiTitleCandidate, WikiWinningAlias,
+    VisitedNote, WikiCandidates, WikiClaimMatch, WikiKeyWinner, WikiTitleCandidate,
+    WikiWinningAlias,
 };
 
 use crate::read;
@@ -79,7 +80,7 @@ impl<'a> IndexCommands<'a> {
         Ok(())
     }
 
-    /// Wipes all derived tables. Chat history stays.
+    /// Wipes all derived tables. Chat history and note visits stay.
     fn index_clear(&self, generation: u64) -> AppResult<()> {
         self.announce(self.session.clear(generation)?);
         Ok(())
@@ -130,6 +131,14 @@ impl<'a> IndexCommands<'a> {
     fn chat_conversation_delete(&self, id: String, generation: u64) -> AppResult<()> {
         self.session
             .delete_chat_conversation(generation, &id)
+            .map(drop)
+    }
+
+    /// Records that this device opened a note. Announces nothing: no
+    /// projection row changed.
+    fn note_visit_record(&self, path: String, visited_ms: i64, generation: u64) -> AppResult<()> {
+        self.session
+            .record_visit(generation, &path, visited_ms)
             .map(drop)
     }
 
@@ -366,6 +375,11 @@ impl<'a> IndexCommands<'a> {
     /// The messages of one conversation, in order.
     fn chat_messages(&self, conversation_id: String) -> AppResult<Vec<ChatMessageRow>> {
         self.read(|conn| read::chat::messages(conn, &conversation_id))
+    }
+
+    /// The notes this device opened, most recent first.
+    fn index_visited_notes(&self, limit: u32) -> AppResult<Vec<VisitedNote>> {
+        self.read(|conn| read::visits::visited_notes(conn, limit))
     }
 }
 
