@@ -4,7 +4,7 @@ import { buildIndexedNote, CLAIM_TIER, PROJECTION_VERSION } from './indexed-note
 
 describe('buildIndexedNote', () => {
   it('carries the projection version that rebuilds heading-chain task breadcrumbs', () => {
-    expect(PROJECTION_VERSION).toBe(22)
+    expect(PROJECTION_VERSION).toBe(23)
   })
 
   it('flattens a parsed note into the index payload', () => {

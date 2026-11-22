@@ -101,8 +101,10 @@ import { serializeWikiSuggestionAddress } from './suggest.ts'
  * of plain text, so every note's tasks must reproject.
  * 22 - task breadcrumbs start with the chain of headings above the task (the
  * `Tasks` heading included), so every note's tasks must reproject.
+ * 23 - `note_emails` also reads Email fields whose label is bold or italic,
+ * so every note's emails must reproject.
  */
-export const PROJECTION_VERSION = 22
+export const PROJECTION_VERSION = 23
 
 /**
  * Precedence of the spellings a note answers to (`note_claims.tier`): the
