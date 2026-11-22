@@ -11,6 +11,7 @@
     "sidecar": "node scripts/build-sidecar.ts",
     "gen:icons": "node scripts/generate-icons.ts",
     "tauri": "tauri",
+    
     "tauri:dev": "tauri dev --config tauri.dev.conf.json",
     "tauri:build:dev": "tauri build --config tauri.dev.conf.json",
     "tauri:build:beta": "tauri build --config tauri.beta.conf.json"
