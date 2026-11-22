@@ -1,5 +1,3 @@
-import type { CommandDeclaration } from './app-commands.ts'
-
 /**
  * The id of an open-pinned-note command: `pinned.open1` opens the top of the
  * Pinned shelf.
@@ -18,7 +16,8 @@ export const PINNED_NOTE_COMMANDS = {
   'pinned.open2': { title: 'Open pinned note 2', keywords: pinnedKeywords, keybinding: 'Mod-7' },
   'pinned.open3': { title: 'Open pinned note 3', keywords: pinnedKeywords, keybinding: 'Mod-8' },
   'pinned.open4': { title: 'Open pinned note 4', keywords: pinnedKeywords, keybinding: 'Mod-9' },
-} as const satisfies Readonly<Record<PinnedNoteCommandId, CommandDeclaration>>
+} as const satisfies Readonly<Record<PinnedNoteCommandId, unknown>>
+// (`APP_COMMANDS` spreads these in and checks their shape.)
 
 /**
  * The open-pinned-note command ids, top of the shelf first.
