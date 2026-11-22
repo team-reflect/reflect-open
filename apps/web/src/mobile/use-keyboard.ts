@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect } from 'react'
+import { setBottomScrollInset } from '@/editor/bottom-scroll-inset.ts'
 import { focusedEditorCommands } from '@/editor/formatting-toolbar-store.ts'
 import { useSelector, useStore } from '@/lib/use-store.ts'
 import { useAppServices } from '@/services/services-provider.tsx'
@@ -9,9 +10,7 @@ function selectIsVisible(height: number): boolean {
 
 /**
  * Whether the software keyboard is up, as reactive state. The tab bar hides
- * on it — with the shell root sized to end at the keyboard's top (decision 8),
- * the bar would otherwise ride up above the keyboard, and V1 lets the
- * keyboard cover it instead.
+ * on it, as in V1: the keyboard covers its slot.
  */
 export function useKeyboardVisible(): boolean {
   const { keyboard } = useAppServices()
@@ -47,9 +46,11 @@ function readKeyboardOverlap(): number {
  * Mirrors the software keyboard's overlap height into `--keyboard-height` on
  * the document root (Plan 19, decision 8). With the webview pinned by the
  * iOS app (`apple/Sources/KeyboardKit`), `visualViewport` is the honest
- * keyboard signal and no native event bridge is needed. The mobile shell root
- * sizes itself to `calc(100dvh - var(--keyboard-height))`, and `DrawerContent`
- * pads its bottom past it so drawers end above the keyboard.
+ * keyboard signal and no native event bridge is needed. The keyboard covers
+ * the bottom of the mobile shell: scrollers and bottom elements pad past the
+ * variable, the editor's caret reveal keeps above it
+ * ({@link setBottomScrollInset}), and `DrawerContent` pads its bottom past it
+ * so drawers end above the keyboard.
  * The height is also published to the `KeyboardService`.
  */
 export function useKeyboardHeightVar(): void {
@@ -93,12 +94,15 @@ export function useKeyboardHeightVar(): void {
   }, [keyboard])
 
   // Service subscriber: touches the CSS variable only when the value changed,
-  // in a layout effect so the shell resizes in the same paint.
+  // in a layout effect so the padding changes in the same paint and the caret
+  // reveal effects below read the new inset.
   const height = useStore(keyboard)
   useLayoutEffect(() => {
     document.documentElement.style.setProperty('--keyboard-height', `${height}px`)
+    setBottomScrollInset(height)
     return () => {
       document.documentElement.style.removeProperty('--keyboard-height')
+      setBottomScrollInset(0)
     }
   }, [height])
 }
@@ -163,9 +167,9 @@ export function useKeyboardFieldReveal(): void {
  * Re-reveals the caret whenever the keyboard changes the visible area.
  *
  * Focus raises the keyboard before any height arrives, so the focus-time
- * reveal ran against the full-height viewport and did nothing; once the shell
- * shrinks, nothing else scrolls the caret back (WebKit's own reveal is pinned
- * off in `KeyboardTuning.swift`). Mounted once: every screen's editors publish
+ * reveal ran against the full-height viewport and did nothing; once the
+ * height arrives, nothing else scrolls the caret above the keyboard (WebKit's
+ * own reveal is pinned off in `KeyboardTuning.swift`). Mounted once: every screen's editors publish
  * to the same focused-editor slot, and `scrollCaretIntoView` is a no-op while
  * the caret is already visible.
  */
@@ -177,11 +181,11 @@ export function useKeyboardCaretReveal(): void {
     if (height <= 0) {
       return
     }
-    // Passive effect: runs after the paint that applied the shrunken shell,
-    // so the scroll container is already at its final height.
+    // Passive effect: runs after the layout effect that set the editor's
+    // bottom scroll inset.
     focusedEditorCommands()?.scrollCaretIntoView()
-    // Backstop for chrome that settles a frame late (the tab bar swaps for
-    // the toolbar); re-read the slot, the focused editor may have changed.
+    // Backstop for chrome that settles a frame late (the tab bar hides);
+    // re-read the slot, the focused editor may have changed.
     const frame = requestAnimationFrame(() => {
       focusedEditorCommands()?.scrollCaretIntoView()
     })

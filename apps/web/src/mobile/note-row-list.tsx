@@ -37,11 +37,11 @@ export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
   return (
     <>
       <div
-        // Keyboard avoidance is the shell root's job (it ends at the keyboard's
-        // top); `pb-safe` only clears the home indicator when the keyboard is down.
+        // The padding lets the last rows scroll above the keyboard, and clears
+        // the home indicator.
         // `isolate` makes a stacking context, so WebKit composites the row surfaces
         // inside this scroller, below the iOS scroll indicator.
-        className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-safe"
+        className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-safe-plus-keyboard"
         ref={scrollRef}
         onScroll={(event) => {
           revealedRow.set(null)

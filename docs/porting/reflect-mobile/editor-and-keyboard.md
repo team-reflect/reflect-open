@@ -21,12 +21,12 @@ set, and the hard-won keyboard/focus lessons.
 > Daily-tab double-tap (the router's one-shot `focusEditor` intent, shared
 > with desktop's ⌘D / Daily-notes-row capture, appending at the note's
 > end). No V1-style 500 ms timer: focus fires on editor mount, after the
-> async load. Keyboard avoidance is **layout, in one place**: the mobile
-> shell root is `calc(100dvh - var(--keyboard-height))`, so scroll
-> containers, the editor, and floating-ui's boundary (`body`) all end at
-> the keyboard's top. The `[[`/`#`/`/` menus fit the visible viewport with
-> no per-popup logic; only `position: fixed` elements (the `+` button) read
-> the variable. The tab bar hides while the keyboard is up (V1 let the
+> async load. Keyboard avoidance (revised 2026-11-17): the keyboard
+> covers the full-height shell root, so the page shows through it. Scroll
+> containers pad past `--keyboard-height`, and the editor keeps the caret
+> above it with a bottom scroll threshold. The `[[`/`#`/`/` menus fit the
+> visible viewport with no per-popup logic, because floating-ui clips to
+> `visualViewport`. The tab bar hides while the keyboard is up (V1 let the
 > keyboard cover it). Checkbox toggles fire the haptics plugin's
 > `impact_light`. **Owed to the spike-B gate:** the simulator/device pass
 > (smart-punctuation typing, menu tappability, caret visibility, haptic
@@ -53,6 +53,10 @@ set, and the hard-won keyboard/focus lessons.
 > simulator, the software keyboard stays hidden while "Connect Hardware
 > Keyboard" is on (⇧⌘K; ⌘K toggles the software keyboard). That is a
 > simulator setting, not an app bug.
+>
+> **Status (2026-11-17): the webview-drawn toolbar is removed.** The iOS
+> shell draws the toolbar in the keyboard's frame; see Plan 19 decision 8's
+> 2026-11-17 refinement. The note below is history.
 >
 > **Status (2026-07-04): the webview-drawn toolbar shipped.** It takes the
 > tab bar's slot at the bottom of the shell root while the keyboard is up.

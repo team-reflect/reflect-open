@@ -3,7 +3,6 @@ import { noop, returnNull } from '@ocavue/utils'
 import type { ChromeRenderer, ShellBarsProps } from '@/mobile/chrome/chrome-renderer.ts'
 import { PlusSlot, WebPlus } from '@/mobile/chrome/web/web-plus.tsx'
 import { WebTopBarRow } from '@/mobile/chrome/web/web-top-bar-row.tsx'
-import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar.tsx'
 import type { MobileForm } from '@/mobile/mobile-form.ts'
 import { TabCapsule } from '@/mobile/mobile-tab-bar.tsx'
 
@@ -11,16 +10,20 @@ const RAIL_BOTTOM =
   'calc(max(var(--twsa-safe-area-inset-bottom), var(--keyboard-height, 0px)) + var(--spacing) * 2)'
 
 /**
- * The shell's bottom chrome in each form. While the keyboard is up the
- * formatting toolbar takes the bottom of the shell root, which ends at the
- * keyboard's top. The rail and the pad's top capsule stay on screen with the
- * keyboard.
+ * The shell's bottom chrome in each form. The keyboard covers the bottom of
+ * the shell, so the bar hides while it is up. The rail and the pad's top
+ * capsule stay on screen with the keyboard. The web renderer draws no
+ * formatting toolbar: only the iOS shell has one, in the keyboard's frame.
  */
-function WebShellBars({ form, tab, onSelectTab, keyboardVisible }: ShellBarsProps): ReactElement {
-  const toolbar = keyboardVisible ? <MobileFormattingToolbar /> : null
+function WebShellBars({
+  form,
+  tab,
+  onSelectTab,
+  keyboardVisible,
+}: ShellBarsProps): ReactElement | null {
   switch (form) {
     case 'bar':
-      return toolbar ?? <BarRow tab={tab} onSelectTab={onSelectTab} />
+      return keyboardVisible ? null : <BarRow tab={tab} onSelectTab={onSelectTab} />
     case 'rail':
       return (
         <>
@@ -32,7 +35,6 @@ function WebShellBars({ form, tab, onSelectTab, keyboardVisible }: ShellBarsProp
             <PlusSlot />
             <TabCapsule tab={tab} onSelect={onSelectTab} orientation="vertical" />
           </aside>
-          {toolbar}
         </>
       )
     case 'pad':
@@ -42,7 +44,6 @@ function WebShellBars({ form, tab, onSelectTab, keyboardVisible }: ShellBarsProp
             <TabCapsule tab={tab} onSelect={onSelectTab} orientation="horizontal" />
           </div>
           <PlusSlot className="fixed right-safe-offset-6 bottom-safe-offset-6 z-30" />
-          {toolbar}
         </>
       )
   }
