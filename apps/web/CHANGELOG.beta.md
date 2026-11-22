@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.20.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.19.1...v0.20.0-beta.1) (2026-11-22)
+
+
+### Features
+
+* show recently opened notes ([#2279](https://github.com/team-reflect/reflect-open/issues/2279)) ([92fc4b7](https://github.com/team-reflect/reflect-open/commit/92fc4b702d45d88596c45457525fc559214bde30))
+
+
+### Bug Fixes
+
+* **core:** index email fields with bold or italic labels ([#2283](https://github.com/team-reflect/reflect-open/issues/2283)) ([8f4a5f3](https://github.com/team-reflect/reflect-open/commit/8f4a5f38270a7c647f16e9e85dbe759ff8c08380))
+
 ## [0.19.1-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.19.0...v0.19.1-beta.1) (2026-11-21)
 
 
