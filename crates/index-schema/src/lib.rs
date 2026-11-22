@@ -25,7 +25,7 @@ pub const INDEX_FILE: &str = "index.sqlite";
 /// `user_version` after every migration has run. Read-only consumers compare
 /// this against `PRAGMA user_version` to detect an index written by a newer
 /// (or older) app than they were built for.
-pub const LATEST_SCHEMA_VERSION: usize = 24;
+pub const LATEST_SCHEMA_VERSION: usize = 25;
 
 /// The oldest schema version whose app can still use an index at
 /// [`LATEST_SCHEMA_VERSION`]. Reflect and Reflect Beta share one index; an older
@@ -142,6 +142,9 @@ mod schema {
             up(include_str!("../migrations/0022_drop_note_text.sql")),
             up(include_str!("../migrations/0023_task_ast_path.sql")),
             up(include_str!("../migrations/0024_note_visits.sql")),
+            up(include_str!(
+                "../migrations/0025_backlinks_to_virtual_days.sql"
+            )),
         ])
     });
 

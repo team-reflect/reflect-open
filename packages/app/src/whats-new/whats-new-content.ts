@@ -24,6 +24,14 @@ const MENUS_BODY =
  * marketing version's list, and each update shows only the items not seen yet.
  */
 export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
+  '0.20.0': [
+    {
+      id: 'backlinks-on-future-days',
+      title: 'Scheduled tasks show on their day',
+      body: 'A task or link dated for a future day now shows in the backlinks of that day, before you write anything on it.',
+      platforms: ALL_PLATFORMS,
+    },
+  ],
   '0.19.1': [
     {
       id: 'recently-opened-notes',

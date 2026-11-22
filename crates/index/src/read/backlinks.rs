@@ -46,6 +46,18 @@ fn links_to(path: &str) -> SelectStatement {
         .take()
 }
 
+/// The ISO date of a daily-note path (`daily/YYYY-MM-DD.md`), or `None`.
+fn virtual_day(path: &str) -> Option<&str> {
+    let date = path.strip_prefix("daily/")?.strip_suffix(".md")?;
+    let bytes = date.as_bytes();
+    let shape = bytes.len() == 10
+        && bytes.iter().enumerate().all(|(i, b)| match i {
+            4 | 7 => *b == b'-',
+            _ => b.is_ascii_digit(),
+        });
+    shape.then_some(date)
+}
+
 /// The sources strictly after `cursor` in (recency DESC, path) order.
 fn after(cursor: &BacklinkSourceCursor) -> Condition {
     Cond::any()
@@ -157,7 +169,7 @@ pub(crate) fn page(
     if limit <= 0 {
         return Err(AppError::parse("the backlink page limit must be positive"));
     }
-    let target_keys = sql::query(
+    let mut target_keys: Vec<String> = sql::query(
         conn,
         Query::select()
             .column(NoteKeys::Key)
@@ -166,6 +178,13 @@ pub(crate) fn page(
             .and_where(Expr::col(NoteKeys::Key).is_not_null()),
         |row| row.get(0),
     )?;
+    // A day with no note yet claims no keys; the date links to it are keyed by
+    // the date itself (see migration 0025).
+    if target_keys.is_empty()
+        && let Some(date) = virtual_day(path)
+    {
+        target_keys.push(date.to_string());
+    }
 
     let mut candidates: Vec<(String, String, i64)> =
         sql::query(conn, &page_sources_query(path, limit, cursor), |row| {

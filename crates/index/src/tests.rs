@@ -335,6 +335,61 @@ fn backlinks_resolve_by_title_at_query_time() {
 }
 
 #[test]
+fn backlinks_reach_a_future_day_before_its_daily_note_exists() {
+    let conn = migrated();
+    // A task in today's note scheduled for tomorrow, whose note does not exist yet.
+    apply_note(
+        &conn,
+        &note(
+            "daily/2026-11-22.md",
+            "2026-11-22",
+            vec![wiki("2026-11-23")],
+        ),
+    )
+    .unwrap();
+    let rows = run_query(
+        &conn,
+        "SELECT source_path FROM backlinks WHERE target_path = ?1",
+        &[Value::from("daily/2026-11-23.md")],
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["source_path"], Value::from("daily/2026-11-22.md"));
+    let page = backlink_page(&conn, "daily/2026-11-23.md", 10, None).unwrap();
+    assert_eq!(page.sources.len(), 1);
+    assert_eq!(page.target_keys, vec!["2026-11-23".to_string()]);
+
+    // Once the day's note exists it claims the date: still one backlink, not two.
+    apply_note(&conn, &daily_note("daily/2026-11-23.md", "2026-11-23")).unwrap();
+    let rows = run_query(
+        &conn,
+        "SELECT source_path FROM backlinks WHERE target_path = ?1",
+        &[Value::from("daily/2026-11-23.md")],
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 1);
+}
+
+#[test]
+fn a_note_named_for_a_date_still_wins_over_the_virtual_day() {
+    let conn = migrated();
+    apply_note(&conn, &note("notes/launch.md", "2026-12-01", vec![])).unwrap();
+    apply_note(
+        &conn,
+        &note("notes/source.md", "Source", vec![wiki("2026-12-01")]),
+    )
+    .unwrap();
+    let rows = run_query(
+        &conn,
+        "SELECT target_path FROM backlinks WHERE source_path = 'notes/source.md'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["target_path"], Value::from("notes/launch.md"));
+}
+
+#[test]
 fn backlinks_resolve_by_alias_when_the_key_has_no_stronger_claimant() {
     let conn = migrated();
     apply_note(
