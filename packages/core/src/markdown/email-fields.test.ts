@@ -65,6 +65,24 @@ describe('extractEmailFields', () => {
     ])
   })
 
+  it('accepts a bold or italic field label, with the colon inside or outside', () => {
+    expect(extractEmailFields('- **Email**: a@x.com')).toEqual(['a@x.com'])
+    expect(extractEmailFields('- **Email:** a@x.com')).toEqual(['a@x.com'])
+    expect(extractEmailFields('- *Email*: a@x.com')).toEqual(['a@x.com'])
+    expect(extractEmailFields('- _Email_: a@x.com')).toEqual(['a@x.com'])
+    expect(extractEmailFields('- __Email__: a@x.com')).toEqual(['a@x.com'])
+  })
+
+  it('reads nested addresses under a bold Emails field', () => {
+    expect(extractEmailFields('- **Emails**:\n  - a@x.com')).toEqual(['a@x.com'])
+    expect(extractEmailFields('- **Emails:**\n  - a@x.com')).toEqual(['a@x.com'])
+  })
+
+  it('ignores bold prose that starts with Email', () => {
+    expect(extractEmailFields('- **Emailed** Ada about the deck a@x.com')).toEqual([])
+    expect(extractEmailFields('- **Email** Ada at a@x.com')).toEqual([])
+  })
+
   it('reads V1 addresses nested under an empty Email field', () => {
     const body = [
       '- Type: #person',
