@@ -123,7 +123,7 @@ export function applyTaskEdits(
   const inserted = created.map((item) => {
     const snapshot = snapshotOf.get(item)
     if (snapshot === undefined) {
-      throw new NoteEditError('notWritable', 'the new task did not survive the edit')
+      throw new NoteEditError('invalidContent', 'the new task did not survive the edit')
     }
     return snapshot
   })
@@ -244,7 +244,7 @@ function requireParagraphMarkdown(markdown: string): string {
   const trimmed = markdown.trim()
   if (/\n[ \t]*\n/.test(trimmed)) {
     throw new NoteEditError(
-      'stale',
+      'invalidContent',
       `task content must be one paragraph: ${JSON.stringify(markdown)}`,
     )
   }
@@ -275,7 +275,7 @@ function assertTasksSurvive(body: string, expected: readonly TaskEntry[]): void 
     })
   if (!survives) {
     throw new NoteEditError(
-      'notWritable',
+      'invalidContent',
       'This text cannot be saved as one task. Remove the line that starts a new block and try again.',
     )
   }
