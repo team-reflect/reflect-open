@@ -100,3 +100,49 @@ checksum = "sha256:8db2d7b9c41f7cbc925c883a2907a2941e8b8bf8d6fc8cc4ce7343a830d61
 checksum_source = "mise-versions"
 url = "https://github.com/MobAI-App/simslim/releases/download/v0.15.0/simslim-v0.15.0-macos-arm64.tar.gz"
 url_api = "https://api.github.com/repos/MobAI-App/simslim/releases/assets/758048374"
+
+[[tools.mr-boxington]]
+version = "1.30.0"
+backend = "packslip:github.com/jdx/mr-boxington"
+specifiers = ["latest"]
+
+[tools.mr-boxington."platforms.linux-arm64"]
+checksum = "sha256:6317bb6780404e78c3b670d95e128c85871809dfc541882b2efaa34120f45e71"
+url = "https://github.com/jdx/mr-boxington/releases/download/v1.30.0/mbx-aarch64-unknown-linux-gnu.tar.gz"
+signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
+repository_ids = { repository = "1340721957" }
+
+[tools.mr-boxington."platforms.linux-arm64-musl"]
+checksum = "sha256:900844b980f9e3daf778d38a19046281cc35e07108a9c821befef6130846df1f"
+url = "https://github.com/jdx/mr-boxington/releases/download/v1.30.0/mbx-aarch64-unknown-linux-musl.tar.gz"
+signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
+repository_ids = { repository = "1340721957" }
+
+[tools.mr-boxington."platforms.linux-x64"]
+checksum = "sha256:f4992b401fe65744b7c6e7400933d2106da205b499405621d088051a31a8f3f2"
+url = "https://github.com/jdx/mr-boxington/releases/download/v1.30.0/mbx-x86_64-unknown-linux-gnu.tar.gz"
+signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
+repository_ids = { repository = "1340721957" }
+
+[tools.mr-boxington."platforms.linux-x64-musl"]
+checksum = "sha256:b523a9324d50fd434e355fc7a5af5f7155d62854dd6a5a74173d52655f168d45"
+url = "https://github.com/jdx/mr-boxington/releases/download/v1.30.0/mbx-x86_64-unknown-linux-musl.tar.gz"
+signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
+repository_ids = { repository = "1340721957" }
+
+[tools.mr-boxington."platforms.macos-arm64"]
+checksum = "sha256:d5b957216c8b61c2df91c9e7aaf5febd45ec74274a60d3714ebe316edc144543"
+url = "https://github.com/jdx/mr-boxington/releases/download/v1.30.0/mbx-aarch64-apple-darwin.tar.gz"
+signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
+repository_ids = { repository = "1340721957" }
+
+[tools.mr-boxington."platforms.windows-x64"]
+checksum = "sha256:2d709445957ea5dae95d51379aa9e7e575cfedb12c0d5731de4761a6972626f5"
+url = "https://github.com/jdx/mr-boxington/releases/download/v1.30.0/mbx-x86_64-pc-windows-msvc.zip"
+signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
+repository_ids = { repository = "1340721957" }
+
+[[tools.rust]]
+version = "1.100.0"
+backend = "core:rust"
+specifiers = ["latest"]

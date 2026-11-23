@@ -1,4 +1,6 @@
 [tools]
+rust = { version = "1.100.0", mr_boxington = true }
+mr-boxington = "1.30.0"
 "github:Boshen/cargo-shear" = "1.14.0"
 "github:EmbarkStudios/cargo-about" = "0.9.3"
 "github:MobAI-App/simslim" = { version = "0.15.0", os = ["macos"] }
