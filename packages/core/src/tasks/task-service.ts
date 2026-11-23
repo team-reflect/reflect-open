@@ -10,7 +10,6 @@ import type { SnippetTask } from '../indexing/snippet-tasks.ts'
 import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { TaskLocator } from '../markdown/index.ts'
-import type { OpenTask } from './open-task.ts'
 import {
   resolveSnippetTask,
   toggleSnippetTask,
@@ -28,27 +27,6 @@ export interface TaskServiceDeps {
   readonly logger: LoggerService
   readonly graphSession: Store<{ readonly session: GraphSession | null }>
   readonly ipc: IpcBridgeService
-}
-
-/**
- * The Tasks view's rows: the tasks of the notes as last read or written, with
- * the writes in flight applied.
- */
-export interface TaskListState {
-  /**
-   * The open tasks; `undefined` until the first read lands.
-   */
-  readonly open: readonly OpenTask[] | undefined
-  /**
-   * The completed tasks; `undefined` until a read lands while
-   * {@link TaskService.includeCompleted} holds the list.
-   */
-  readonly completed: readonly OpenTask[] | undefined
-  /**
-   * The tasks completed in this run of the app that still show, struck, in
-   * the active list. Each is checked.
-   */
-  readonly struck: readonly OpenTask[]
 }
 
 /**
@@ -72,13 +50,13 @@ export interface TaskRef extends TaskLocator {
  * lingers struck, and the whole historical pile stays behind the "show
  * archived" filter.
  */
-export interface TaskService extends Store<TaskListState> {
+export interface TaskService extends Store<TaskStoreView> {
   /**
    * The open graph's task rows. Private notes' tasks are included because
    * this is a local-only surface. The same object is returned until the rows
    * or the open graph change.
    */
-  get: () => TaskListState
+  get: () => TaskStoreView
   /**
    * Call `listener` whenever {@link TaskService.get} changes. The first
    * subscription reads the open tasks; while any listener is subscribed, a
@@ -146,16 +124,12 @@ function sessionKey(session: GraphSession | null): string | null {
   return session === null ? null : `${session.generation}:${session.root}`
 }
 
-function toState(view: TaskStoreView): TaskListState {
-  return { open: view.open, completed: view.completed, struck: view.struck }
-}
-
 class TaskServiceImpl implements TaskService {
   readonly #deps: TaskServiceDeps
   readonly #reader: TaskReader
   #nextTaskId = 0
   #store = this.#createStore()
-  readonly #state = new WritableStore<TaskListState>(toState(this.#store.view()), isShallowEqual)
+  readonly #state = new WritableStore<TaskStoreView>(this.#store.view(), isShallowEqual)
   #sessionKey: string | null = null
   #indexGeneration: number | null = null
   /**
@@ -385,7 +359,7 @@ class TaskServiceImpl implements TaskService {
   }
 
   #publish(): void {
-    this.#state.set(toState(this.#store.view()))
+    this.#state.set(this.#store.view())
   }
 }
 
