@@ -52,11 +52,27 @@ describe('applyTaskEdits: toggle', () => {
     )
   })
 
-  it('refuses a locator from another revision that matches several identical tasks', () => {
+  it('takes the task at the path of a stale locator when it has the content', () => {
     const source = '+ [ ] same\n+ [ ] same\n'
     const stale = { ...locate(source, 1), revision: 'older' }
-    expect(() => applyTaskEdits(source, [{ kind: 'toggle', task: stale }])).toThrow(
-      expect.objectContaining({ kind: 'ambiguous' }),
+    expect(applyTaskEdits(source, [{ kind: 'toggle', task: stale }]).source).toBe(
+      '+ [ ] same\n+ [x] same\n',
+    )
+  })
+
+  it('takes the identical task nearest to the path of a stale locator', () => {
+    const source = '+ [ ] a\n+ [ ] same\n+ [ ] b\n+ [ ] same\n'
+    const stale = { ...locate(source, 1), revision: 'older', astPath: [7] }
+    expect(applyTaskEdits(source, [{ kind: 'toggle', task: stale }]).source).toBe(
+      '+ [ ] a\n+ [ ] same\n+ [ ] b\n+ [x] same\n',
+    )
+  })
+
+  it('takes the earlier of two identical tasks equally near a stale locator', () => {
+    const source = '+ [ ] a\n+ [ ] same\n+ [ ] b\n+ [ ] same\n'
+    const stale = { ...locate(source, 1), revision: 'older', astPath: [2] }
+    expect(applyTaskEdits(source, [{ kind: 'toggle', task: stale }]).source).toBe(
+      '+ [ ] a\n+ [x] same\n+ [ ] b\n+ [ ] same\n',
     )
   })
 
@@ -429,11 +445,13 @@ describe('findTaskMove', () => {
     ).toBeUndefined()
   })
 
-  it('takes the path among identical tasks, and none for a locator from another revision', () => {
+  it('takes the path among identical tasks', () => {
     const twins = '+ [ ] same\n+ [ ] same\n'
     const result = applyTaskEdits(twins, [{ kind: 'toggle', task: locate(twins, 1) }])
     expect(findTaskMove(result, locate(twins, 1))?.to).toMatchObject({ checked: true })
-    expect(findTaskMove(result, { ...locate(twins, 0), revision: 'older' })).toBeUndefined()
+    expect(findTaskMove(result, { ...locate(twins, 0), revision: 'older' })?.from).toMatchObject({
+      astPath: [0],
+    })
   })
 })
 

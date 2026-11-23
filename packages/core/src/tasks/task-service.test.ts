@@ -1120,15 +1120,13 @@ describe('reads racing writes', () => {
     expect(tasks.get().open?.[0]?.markdown).toBe('buy milk')
   })
 
-  it('refuses an edit whose stale path matches two identical tasks', async () => {
+  it('lands an edit whose stale path matches two identical tasks on one of them', async () => {
     const stale = '+ [ ] \n+ [ ] \n'
     const second = ref(stale, 1, NOTE)
     const source = '## Tasks\n\n+ [ ] \n+ [ ] \n'
     noteFile.set(NOTE, source)
 
-    await expect(
-      tasks.writeTask(second, [{ kind: 'setMarkdown', markdown: 'buy milk' }]),
-    ).rejects.toMatchObject({ kind: 'ambiguous' })
-    expect(noteFile.files().get(NOTE)).toBe(source)
+    await tasks.writeTask(second, [{ kind: 'setMarkdown', markdown: 'buy milk' }])
+    expect(noteFile.files().get(NOTE)).toBe('## Tasks\n\n+ [ ] buy milk\n+ [ ] \n')
   })
 })
