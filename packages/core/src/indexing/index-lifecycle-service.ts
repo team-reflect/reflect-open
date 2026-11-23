@@ -15,22 +15,14 @@ import { createNoteIndexer, type NoteIndexer } from './indexer.ts'
 import { createDirtySet } from './dirty-set.ts'
 import {
   createIndexWriter,
+  INDEX_RETRY_MAX_MS,
+  INDEX_RETRY_MIN_MS,
   type IndexingDeps,
   type IndexWriter,
   type IndexWriterDeps,
 } from './index-writer.ts'
 import { followFileChanges, markFileChanges } from './live.ts'
 import { noop } from '@ocavue/utils'
-
-/**
- * The wait before the first retry of a failed sync pass. Each further failure doubles it.
- */
-const PASS_RETRY_MIN_MS = 2_000
-
-/**
- * The longest wait between retries of a failed sync pass.
- */
-const PASS_RETRY_MAX_MS = 5 * 60_000
 
 /**
  * Stage of the index lifecycle that failed.
@@ -339,7 +331,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
   #rebuildInFlight: { generation: number; promise: Promise<void> } | null = null
   #tooNewNotice: OperationHandle | null = null
   #retryTimer: TimerHandle | null = null
-  #retryDelayMs = PASS_RETRY_MIN_MS
+  #retryDelayMs = INDEX_RETRY_MIN_MS
 
   constructor(deps: IndexLifecycleDeps) {
     this.#deps = deps
@@ -469,7 +461,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
         if (controller.signal.aborted || isStale() || this.#isSuspended()) {
           return
         }
-        this.#retryDelayMs = PASS_RETRY_MIN_MS
+        this.#retryDelayMs = INDEX_RETRY_MIN_MS
         this.#emitProgress('live')
       } catch (error) {
         this.#reportError('sync', error)
@@ -478,7 +470,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
             this.#retryTimer = null
             this.refresh(session)
           }, this.#retryDelayMs)
-          this.#retryDelayMs = Math.min(this.#retryDelayMs * 2, PASS_RETRY_MAX_MS)
+          this.#retryDelayMs = Math.min(this.#retryDelayMs * 2, INDEX_RETRY_MAX_MS)
         }
       } finally {
         if (this.#abort === controller && this.#progress.get() === 'reconciling') {

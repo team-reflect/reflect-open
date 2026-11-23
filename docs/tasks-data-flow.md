@@ -75,3 +75,7 @@ the next command that names the row, or the app going to the background, writes
 it again. A change that waited behind the failed write of a new task is written
 with that new task. The user sees a message only when their own text cannot be saved as
 one task, or the note is not writable.
+
+The index writer keeps every file it could not write. An index write that
+fails runs again after a wait that doubles with each failure. A file that is
+gone when the writer reads it loses its rows.

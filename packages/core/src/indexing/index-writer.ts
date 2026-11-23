@@ -6,7 +6,7 @@ import type { XArchiveService } from '../embeds/x-archive-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { isNotePath } from '../graph/paths.ts'
 import { parseNote } from '../markdown/index.ts'
-import type { ClockService } from '../ports/clock-service.ts'
+import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { createAssetDescriptionText, type AssetDescriptionText } from './asset-description-text.ts'
 import type { DatabaseService } from './database-service.ts'
@@ -37,6 +37,16 @@ export interface IndexingDeps {
 }
 
 /**
+ * The wait before the first retry of failed index work. Each further failure doubles it.
+ */
+export const INDEX_RETRY_MIN_MS = 2_000
+
+/**
+ * The longest wait between retries of failed index work.
+ */
+export const INDEX_RETRY_MAX_MS = 5 * 60_000
+
+/**
  * Reports file changes after the index applied them at `generation`.
  */
 export type ChangesAppliedEmitter = (changes: readonly FileChange[], generation: number) => void
@@ -48,7 +58,8 @@ export type ChangesAppliedEmitter = (changes: readonly FileChange[], generation:
  *   re-stamp). `seq` is that commit's seq, `null` for a stale generation.
  * - `unchanged`: the rows already matched the file.
  * - `failed`: the file read (`read`) or the index write (`write`) failed. The
- *   path is no longer dirty.
+ *   path is no longer dirty. The writer tries a failed write again after a
+ *   wait that doubles with each failure.
  * - `deferred`: the writer is paused or disposed. The path stays dirty.
  */
 export type IndexWriteOutcome =
@@ -186,6 +197,12 @@ class IndexWriterImpl implements IndexWriter {
   readonly #first = new Set<string>()
   #tail: Promise<void> = Promise.resolve()
   #seq: number | null = null
+  /**
+   * The entries whose write failed, until the retry timer marks them dirty again.
+   */
+  readonly #failed: DirtyEntry[] = []
+  #retryTimer: TimerHandle | null = null
+  #retryDelayMs = INDEX_RETRY_MIN_MS
   #runQueued = false
   #paused = false
   #disposed = false
@@ -258,6 +275,10 @@ class IndexWriterImpl implements IndexWriter {
   dispose(): void {
     this.#disposed = true
     this.#stopListening()
+    if (this.#retryTimer !== null) {
+      this.#deps.clock.clearTimeout(this.#retryTimer)
+      this.#retryTimer = null
+    }
     this.#deferWaiters()
   }
 
@@ -310,6 +331,9 @@ class IndexWriterImpl implements IndexWriter {
       return
     }
     await this.#settleEntries(this.dirty.take())
+    if (this.#retryTimer === null) {
+      this.#retryDelayMs = INDEX_RETRY_MIN_MS
+    }
     this.#wake()
   }
 
@@ -679,6 +703,25 @@ class IndexWriterImpl implements IndexWriter {
   }
 
   /**
+   * Mark `entry` dirty again after a wait. Its next write is reported.
+   */
+  #retryLater(entry: DirtyEntry): void {
+    if (this.#disposed) {
+      return
+    }
+    this.#failed.push({ ...entry, bulk: false })
+    if (this.#retryTimer !== null) {
+      return
+    }
+    this.#retryTimer = this.#deps.clock.setTimeout(() => {
+      this.#retryTimer = null
+      this.dirty.restore(this.#failed.splice(0))
+      this.#wake()
+    }, this.#retryDelayMs)
+    this.#retryDelayMs = Math.min(this.#retryDelayMs * 2, INDEX_RETRY_MAX_MS)
+  }
+
+  /**
    * Record the outcome of `entry`. A failure nobody waits for is logged.
    */
   #settle(run: WriterRun, entry: DirtyEntry, outcome: IndexWriteOutcome): void {
@@ -686,6 +729,9 @@ class IndexWriterImpl implements IndexWriter {
     const waiter = run.waiters.get(entry.path)
     run.waiters.delete(entry.path)
     if (outcome.status === 'failed') {
+      if (outcome.stage === 'write') {
+        this.#retryLater(entry)
+      }
       if (waiter === undefined) {
         this.#deps.logger.error(`failed to index change for ${entry.path}:`, outcome.error)
       }

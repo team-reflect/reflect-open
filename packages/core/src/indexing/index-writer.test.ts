@@ -13,7 +13,7 @@ import { createDirtySet } from './dirty-set.ts'
 import type { FileChange } from './file-change-service.ts'
 import { createIndexQueryService } from './index-query-service.ts'
 import { INDEX_APPLY_BATCH_SIZE } from './index-store-service.ts'
-import { createIndexWriter } from './index-writer.ts'
+import { createIndexWriter, INDEX_RETRY_MIN_MS } from './index-writer.ts'
 import { buildIndexedNote } from './indexed-note.ts'
 
 const NOW = 1_750_000_000_000
@@ -114,6 +114,7 @@ function setup(options?: {
     })
   }
   const dirty = createDirtySet()
+  const clock = createTestClockService({ now: NOW })
   const writer = createIndexWriter(
     {
       indexStore: store,
@@ -121,7 +122,7 @@ function setup(options?: {
       indexQuery: createIndexQueryService({ database }),
       database,
       xArchive: createTestXArchiveService(),
-      clock: createTestClockService({ now: NOW }),
+      clock,
       logger,
       emitChangesApplied: (changes) => {
         reports.push([...changes])
@@ -140,6 +141,7 @@ function setup(options?: {
     dirty,
     store,
     files,
+    clock,
     logger,
     reads,
     writes,
@@ -359,6 +361,38 @@ describe('createIndexWriter', () => {
     expect(outcomes.map((outcome) => outcome.status)).toEqual(['applied', 'failed', 'applied'])
     expect(outcomes[1]).toMatchObject({ stage: 'write' })
     expect(store.applied().map((note) => note.path)).toEqual(['notes/a.md', 'notes/c.md'])
+  })
+
+  it('writes a note again after its write failed, with a wait that doubles', async () => {
+    let failures = 2
+    const { writer, dirty, clock, store, reports } = setup({
+      files: { 'notes/a.md': '# a' },
+      failStore: (call) => {
+        if (call.method !== 'applyBatch' || failures === 0) {
+          return undefined
+        }
+        failures -= 1
+        return new AppError('io', 'busy')
+      },
+    })
+
+    dirty.add('notes/a.md', { bulk: true })
+    expect(await writer.settled('notes/a.md')).toMatchObject({ status: 'failed', stage: 'write' })
+    expect(dirty.has('notes/a.md')).toBe(false)
+
+    await clock.advance(INDEX_RETRY_MIN_MS)
+    await writer.drained()
+    expect(store.applied()).toEqual([])
+
+    await clock.advance(INDEX_RETRY_MIN_MS)
+    await writer.drained()
+    expect(store.applied()).toEqual([])
+
+    await clock.advance(INDEX_RETRY_MIN_MS)
+    await writer.drained()
+    expect(store.applied().map((note) => note.path)).toEqual(['notes/a.md'])
+    expect(reports).toEqual([[{ path: 'notes/a.md', kind: 'upsert' }]])
+    expect(clock.pendingTimers()).toBe(0)
   })
 
   it('writes at most `INDEX_APPLY_BATCH_SIZE` notes in one transaction', async () => {
