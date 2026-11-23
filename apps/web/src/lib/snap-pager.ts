@@ -48,7 +48,8 @@ export interface SnapPager {
  * Owns the shown page of a snapping horizontal scroller. The page the
  * scroller rests on is the shown page, whoever moved it there: the pager
  * follows every scroll, reports where it settles, stays on the shown page
- * after a resize, and shows the page of an element that takes focus. A scroll
+ * after a resize or a page visibility change until the next gesture, and
+ * shows the page of an element that takes focus. A scroll
  * that comes to rest on the page `show` targets counts as `show`'s, even when
  * a finger or wheel moved the scroller on the way.
  */
@@ -86,6 +87,12 @@ export function attachSnapPager({
     return true
   }
 
+  // The gesture count at the last page visibility change. Until the next
+  // gesture the position is stale: iOS lays a hidden page out at other sizes
+  // for its app switcher snapshots, and the engine re-snaps to another page.
+  let staleAt: number | undefined
+  const isStale = (): boolean => staleAt === watch.gestures()
+
   const setIndex = (next: number, byScroll: boolean): void => {
     if (next !== index) {
       index = next
@@ -115,6 +122,11 @@ export function attachSnapPager({
       if (realign()) {
         return
       }
+      if (isStale()) {
+        expected = undefined
+        restOn(element, index)
+        return
+      }
       const nearest = nearestIndex(element, count())
       const target = expected
       expected = undefined
@@ -135,7 +147,7 @@ export function attachSnapPager({
   element.addEventListener(
     'scroll',
     () => {
-      if (expected !== undefined || realign()) {
+      if (expected !== undefined || realign() || isStale()) {
         return
       }
       const nearest = nearestIndex(element, count())
@@ -146,6 +158,14 @@ export function attachSnapPager({
       scrolling = Math.abs(element.scrollLeft - nearest * width) >= 1
     },
     { passive: true, signal },
+  )
+
+  document.addEventListener(
+    'visibilitychange',
+    () => {
+      staleAt = watch.gestures()
+    },
+    { signal },
   )
 
   // A focused element on another page (keyboard Tab) shows that page.
