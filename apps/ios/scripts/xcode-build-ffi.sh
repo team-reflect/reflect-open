@@ -29,7 +29,7 @@ keep=(
   ORT_CACHE_DIR
 )
 # cargo, rustc and rustup settings, mise's `cargo` wrapper (MISE_*), mbx
-# (MBX_*), and its S3 bucket (AWS_*) and GitHub Actions cache (ACTIONS_*).
+# (MBX_*), and sccache with its S3 bucket and GitHub Actions cache.
 for name in $(compgen -e); do
   case "$name" in
     CARGO_* | RUSTC_* | RUSTUP_* | MISE_* | MBX_* | SCCACHE_* | AWS_* | ACTIONS_*)
