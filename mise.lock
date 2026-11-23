@@ -53,6 +53,7 @@ provenance = "github-attestations"
 version = "0.9.3"
 backend = "github:EmbarkStudios/cargo-about"
 specifiers = ["0.9.3"]
+unsupported_platforms = ["macos-x64"]
 
 [tools."github:EmbarkStudios/cargo-about"."platforms.linux-arm64"]
 checksum = "sha256:eb4d9ff6ebd2518152a8308729431a04b3836e71d2bd5ead7aea69f91a71162e"
@@ -94,6 +95,7 @@ url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/asset
 version = "0.15.0"
 backend = "github:MobAI-App/simslim"
 specifiers = ["0.15.0"]
+unsupported_platforms = ["macos-x64"]
 
 [tools."github:MobAI-App/simslim"."platforms.macos-arm64"]
 checksum = "sha256:8db2d7b9c41f7cbc925c883a2907a2941e8b8bf8d6fc8cc4ce7343a830d61a31"
@@ -105,6 +107,7 @@ url_api = "https://api.github.com/repos/MobAI-App/simslim/releases/assets/758048
 version = "1.30.0"
 backend = "packslip:github.com/jdx/mr-boxington"
 specifiers = ["1.30.0"]
+unsupported_platforms = ["macos-x64"]
 
 [tools.mr-boxington."platforms.linux-arm64"]
 checksum = "sha256:6317bb6780404e78c3b670d95e128c85871809dfc541882b2efaa34120f45e71"
