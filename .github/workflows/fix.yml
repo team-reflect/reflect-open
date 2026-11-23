@@ -60,11 +60,8 @@ jobs:
         if: steps.changes.outputs.rust == 'true'
         run: pnpm gen:types
 
-      # FIXME: add a new scriptpts/lint-swift.sh [--fix] to replace this. scriptpts/check-swift.sh has an optional --fix argument to fix the code. --fix is by default off.
       - name: Fix (Swift)
-        run: |
-          swift format --version
-          git ls-files -z '*.swift' | xargs -0 swift format format --parallel --in-place
+        run: scripts/check-swift.sh --fix
 
       - name: Install dependencies required for license generation
         if: steps.changes.outputs.licenses == 'true'
