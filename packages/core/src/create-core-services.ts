@@ -1252,6 +1252,7 @@ export function composeCoreServices(
     noteMove,
     titleRename: create.titleRename({
       noteFile,
+      noteDocuments,
       wikiResolver,
       backlinks,
       notePath,

@@ -9,6 +9,7 @@ import {
   createTestNoteMoveService,
   createTestNoteSession,
   type TestNoteSession,
+  createTestNoteDocumentService,
 } from '../testing/documents.ts'
 import { createTestFileChangeService } from '../testing/file-change.ts'
 import { createTestGraphSessionService, type TestOpenGraph } from '../testing/graph-session.ts'
@@ -146,18 +147,20 @@ function setup(options?: SetupOptions) {
   const graph = createTestGraphSessionService(
     options?.graph === null ? {} : { graph: options?.graph ?? { generation: 7 } },
   )
+  const failingNoteFile =
+    readError === undefined
+      ? noteFile
+      : overrideNoteFileService(noteFile, {
+          read: async (forPath, generation) => {
+            if (forPath === path) {
+              throw readError
+            }
+            return await noteFile.read(forPath, generation)
+          },
+        })
   const titleRename = createTitleRenameService({
-    noteFile:
-      readError === undefined
-        ? noteFile
-        : overrideNoteFileService(noteFile, {
-            read: async (forPath, generation) => {
-              if (forPath === path) {
-                throw readError
-              }
-              return await noteFile.read(forPath, generation)
-            },
-          }),
+    noteFile: failingNoteFile,
+    noteDocuments: createTestNoteDocumentService({ noteFile: failingNoteFile, openDocuments }),
     wikiResolver,
     backlinks: createBacklinkService({
       database,

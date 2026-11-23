@@ -342,7 +342,6 @@ describe('direct note file writes', () => {
     'contacts/contact-suggestion-service.ts',
     'documents/alias-placement.ts',
     'documents/template-service.ts',
-    'documents/title-rename-service.ts',
   ]
 
   it('come only from the listed modules', () => {
