@@ -382,8 +382,8 @@ describe('rebuild', () => {
     expect(methods()).not.toContain('setMeta')
   })
 
-  it('throws a read failure once the other files are written, without a stamp', async () => {
-    const { indexer, writerAt, store, methods } = setup({
+  it('skips a note that cannot be read, writes the others, and stamps', async () => {
+    const { indexer, writerAt, store, methods, logger } = setup({
       files: notes('notes/a.md', 'notes/bad.md'),
       read: (path) => {
         if (path === 'notes/bad.md') {
@@ -392,10 +392,13 @@ describe('rebuild', () => {
       },
     })
 
-    await expect(indexer.rebuild({ writer: writerAt(1) })).rejects.toMatchObject({ kind: 'io' })
+    expect(await indexer.rebuild({ writer: writerAt(1) })).toBe(true)
 
     expect(store.applied().map((note) => note.path)).toEqual(['notes/a.md'])
-    expect(methods()).not.toContain('setMeta')
+    expect(methods()).toContain('setMeta')
+    expect(logger.getWarnings().map((entry) => entry.message)).toEqual([
+      'index: skipped unreadable notes/bad.md:',
+    ])
   })
 
   it('stops before the next SQLite write when suspended after the rebuild wipe', async () => {

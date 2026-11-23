@@ -78,4 +78,5 @@ one task, or the note is not writable.
 
 The index writer keeps every file it could not write. An index write that
 fails runs again after a wait that doubles with each failure. A file that is
-gone when the writer reads it loses its rows.
+gone when the writer reads it loses its rows. A pass skips a note that cannot
+be read or written, so one such note never fails the pass.

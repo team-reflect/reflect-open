@@ -413,6 +413,9 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
         const completed = await this.#indexer.sync({
           writer,
           signal: controller.signal,
+          onSkippedNote: (note) => {
+            logger.warn(`index: skipped ${note.path}: ${note.message}`)
+          },
           // Guarded: opening a graph swaps the Rust root *before* this pass is
           // stopped, so a superseded pass could otherwise request its old
           // paths against the newly opened graph.

@@ -42,7 +42,8 @@ export interface IndexPassOptions {
    * Called when the writer cannot write one note's projection even alone. The
    * pass continues so one bad projection cannot leave the whole cache empty
    * after `index_clear`. If omitted, that failure is thrown once the writer
-   * settled every file of the pass.
+   * settled every file of the pass. A note that cannot be read never fails
+   * the pass.
    */
   onSkippedNote?: (note: SkippedIndexedNote) => void
   /**
@@ -187,15 +188,7 @@ class NoteIndexerImpl implements NoteIndexer {
     if (outcomes === null) {
       return false
     }
-    for (const [path, outcome] of outcomes) {
-      if (outcome.status !== 'failed') {
-        continue
-      }
-      if (outcome.stage === 'read' || onSkippedNote === undefined) {
-        throw outcome.error
-      }
-      onSkippedNote({ path, message: errorMessage(outcome.error) })
-    }
+    this.#skipFailures(outcomes, onSkippedNote)
     onFileProgress?.(files.length, files.length, readable.length)
     if (evicted.length > 0) {
       onStalePlaceholders?.(evicted)
@@ -240,16 +233,7 @@ class NoteIndexerImpl implements NoteIndexer {
     if (outcomes === null) {
       return false
     }
-    for (const [path, outcome] of outcomes) {
-      // A read failure keeps the row for the next pass.
-      if (outcome.status !== 'failed' || outcome.stage === 'read') {
-        continue
-      }
-      if (onSkippedNote === undefined) {
-        throw outcome.error
-      }
-      onSkippedNote({ path, message: errorMessage(outcome.error) })
-    }
+    this.#skipFailures(outcomes, onSkippedNote)
     onFileProgress?.(total, total, total)
     return true
   }
@@ -268,6 +252,30 @@ class NoteIndexerImpl implements NoteIndexer {
       `index: stored projection version ${stamped === null ? 'none' : `"${stamped}"`} ≠ ${PROJECTION_VERSION} — full rebuild`,
     )
     return await this.rebuild(options)
+  }
+
+  /**
+   * Skip the notes of a pass that failed. A note that cannot be read is
+   * logged, and the next pass reads it again. A note that cannot be written
+   * goes to `onSkippedNote`, or is thrown without one.
+   */
+  #skipFailures(
+    outcomes: ReadonlyMap<string, IndexWriteOutcome>,
+    onSkippedNote: ((note: SkippedIndexedNote) => void) | undefined,
+  ): void {
+    for (const [path, outcome] of outcomes) {
+      if (outcome.status !== 'failed') {
+        continue
+      }
+      if (outcome.stage === 'read') {
+        this.#deps.logger.warn(`index: skipped unreadable ${path}:`, outcome.error)
+        continue
+      }
+      if (onSkippedNote === undefined) {
+        throw outcome.error
+      }
+      onSkippedNote({ path, message: errorMessage(outcome.error) })
+    }
   }
 
   /**

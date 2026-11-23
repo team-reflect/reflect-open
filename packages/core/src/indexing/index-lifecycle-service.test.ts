@@ -643,6 +643,25 @@ describe('createIndexLifecycleService', () => {
     expect(progress).toEqual(['reconciling', 'idle'])
   })
 
+  it('goes live when one note of the pass cannot be written', async () => {
+    const { index, store, progress } = setup({
+      files: { 'notes/a.md': '# a', 'notes/bad.md': '# bad' },
+      store: { meta: {} },
+      failStore: (call) => {
+        return call.method === 'applyBatch' &&
+          call.notes.some((note) => note.path === 'notes/bad.md')
+          ? new Error('refused')
+          : undefined
+      },
+    })
+
+    index.sync(sessionAt(5))
+    await index.settled()
+
+    expect(store.applied().map((note) => note.path)).toEqual(['notes/a.md'])
+    expect(progress).toEqual(['reconciling', 'live'])
+  })
+
   it('retries a failed pass after a wait that doubles, until one goes live', async () => {
     let fail = true
     const { index, clock, passes, progress } = setup({
