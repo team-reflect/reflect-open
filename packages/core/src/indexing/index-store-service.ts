@@ -63,10 +63,6 @@ export interface IndexStoreService {
    */
   reconcileScan(generation: number): MaybePromise<ReconcileScan>
   /**
-   * Broadcast `index:committed` to every window; a stale generation broadcasts nothing.
-   */
-  announce(commit: IndexCommitted, generation: number): Promise<void>
-  /**
    * One `index_meta` value, or `null` when the key has never been written.
    */
   getMeta(key: string): Promise<string | null>
@@ -77,7 +73,8 @@ export interface IndexStoreService {
 }
 
 /**
- * An {@link IndexStoreService} that can also write the note projections.
+ * An {@link IndexStoreService} that can also write the note projections and
+ * announce their commits.
  */
 export interface WritableIndexStoreService extends IndexStoreService {
   /**
@@ -105,6 +102,10 @@ export interface WritableIndexStoreService extends IndexStoreService {
    * Wipe all derived tables (precedes a full rebuild); `chat_*`, `note_visits`, and `index_meta` stay.
    */
   clear(generation: number): Promise<IndexCommit>
+  /**
+   * Broadcast `index:committed` to every window; a stale generation broadcasts nothing.
+   */
+  announce(commit: IndexCommitted, generation: number): Promise<void>
 }
 
 /**

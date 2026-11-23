@@ -24,6 +24,10 @@ code is in `packages/core/src/tasks/`, `packages/core/src/documents/` and
    - Note text: `NoteDocumentService` (`commitSourceEdit`, `commitFrontmatter`) and the editor session save. Only they receive `WritableNoteFileService`.
    - Index projections: `IndexWriter`. Only the index lifecycle receives `WritableIndexStoreService`.
    - Task rows: `TaskStore`.
+
+   Two writes are exceptions:
+   - Asset description files (`*.reflect.md`) are not notes. `AssetDescriptionService` writes them directly.
+   - A note rename (`note_move_indexed`) moves the file and its index rows in one Rust transaction, outside `IndexWriter`.
 3. When a note commit resolves, the index holds the committed text, and the store holds the tasks the commit left.
 4. A read of an older index seq than the store knows for a note does not replace the rows of that note.
 5. The dirty set collects file changes for the whole graph session, through passes, suspends and failures.
