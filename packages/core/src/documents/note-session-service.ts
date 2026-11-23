@@ -659,6 +659,7 @@ class NoteSessionImpl implements NoteSession {
     // the load no editor is mounted yet, so the seed must carry the edit too.
     this.#initialContent = doc.body
     this.#applyToEditor(doc.body) // an already open editor shows the edited line
+    const applied = this.#buffer
     this.#dirty = this.#header + this.#buffer !== this.#disk
     // A no-op edit (transform changed nothing) writes nothing, so a *prior*
     // surfaced save error must not be mistaken for this edit's failure.
@@ -670,7 +671,7 @@ class NoteSessionImpl implements NoteSession {
     if (shouldPersist && this.#error !== null) {
       const message = this.#error
       if (this.#header === doc.header) this.#header = previousHeader
-      if (this.#buffer === doc.body) {
+      if (this.#buffer === applied) {
         this.#buffer = previousBuffer
         this.#initialContent = previousInitialContent
         this.#applyToEditor(previousBuffer)

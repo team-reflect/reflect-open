@@ -1382,6 +1382,25 @@ describe('commitSourceEdit', () => {
     expect(h.snapshots.at(-1)?.error).toBeNull()
   })
 
+  it('reverts a failed edit that the editor reformatted', async () => {
+    const source = '+ [ ] x\n'
+    let target: NoteSession | null = null
+    const h = harness({
+      disk: source,
+      onApply: (markdown) => target?.editorChanged(`${markdown}\n`),
+    })
+    target = h.session
+    h.session.load()
+    await settled()
+
+    h.failWrites('disk full')
+    await expect(h.session.commitSourceEdit(toggleTransform(firstTask(source)))).rejects.toThrow(
+      'disk full',
+    )
+
+    expect(h.session.content()).toBe('+ [ ] x\n\n')
+  })
+
   it('propagates an error the transform throws, such as a stale refusal, without writing', async () => {
     const source = '+ [ ] gone\n'
     const h = harness({ disk: source })
