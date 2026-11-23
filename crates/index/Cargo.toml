@@ -25,5 +25,6 @@ reflect-index-schema = { workspace = true, features = ["default"], optional = tr
 
 [dev-dependencies]
 expect-test = { workspace = true }
+strum = { workspace = true }
 tempfile = { workspace = true }
 reflect-index-schema = { workspace = true, features = ["default"] }
