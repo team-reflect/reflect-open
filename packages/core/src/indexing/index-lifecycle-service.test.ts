@@ -1223,7 +1223,6 @@ describe('followActivity', () => {
 
 describe('index projection writes', () => {
   const PROJECTION_WRITES: ReadonlySet<string> = new Set([
-    'apply',
     'applyBatch',
     'remove',
     'move',

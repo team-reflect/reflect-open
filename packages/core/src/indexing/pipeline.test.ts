@@ -46,7 +46,6 @@ afterEach(() => {
 })
 
 const PROJECTION_WRITES: ReadonlySet<string | symbol> = new Set([
-  'apply',
   'applyBatch',
   'remove',
   'move',
