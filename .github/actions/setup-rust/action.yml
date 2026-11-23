@@ -6,6 +6,10 @@ inputs:
     description: Whether to restore and save the cache.
     required: false
     default: 'true'
+  cache-targets:
+    description: Whether to cache the target directory.
+    required: false
+    default: 'true'
 
 runs:
   using: composite
@@ -44,22 +48,9 @@ runs:
         path: ${{ env.ORT_CACHE_DIR }}
         key: ort-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
 
-    # kache caches the compiler outputs, so rust-cache keeps only the cargo
-    # registry and git checkouts.
     - name: Cache cargo registry
       if: inputs.cache == 'true'
       uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       with:
-        cache-targets: false
+        cache-targets: ${{ inputs.cache-targets }}
         save-if: ${{ github.ref == 'refs/heads/master' }}
-
-    # https://github.com/kunobi-ninja/kache-action#readme
-    - name: Set up kache
-      if: inputs.cache == 'true'
-      uses: kunobi-ninja/kache-action@061011817fd04b0e460f79d6bb3c115b1fc8f029 # v1
-      with:
-        version: v2.3.0
-        cache-key-prefix: kache-v0-${{ github.job }}
-        save-cache: ${{ github.ref == 'refs/heads/master' }}
-        cache-executables: true
-        pr-comment: false

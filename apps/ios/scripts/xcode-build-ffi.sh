@@ -64,10 +64,6 @@ keep=(
   ACTIONS_RESULTS_URL
   ACTIONS_RUNTIME_TOKEN
 )
-# kache, set by kunobi-ninja/kache-action: its store, daemon socket and settings.
-while IFS= read -r name; do
-  keep+=("$name")
-done < <(compgen -e | grep '^KACHE_' || true)
 env_args=()
 for name in "${keep[@]}"; do
   if [ -n "${!name:-}" ]; then
