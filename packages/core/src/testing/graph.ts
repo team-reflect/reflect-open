@@ -26,6 +26,7 @@ import {
 import { bytesToBase64, base64ToBytes } from '@reflect/utils'
 import { createTestDatabaseService } from './database.ts'
 import { createTestIdService } from './id.ts'
+import { sha256HexSync } from './sha256.ts'
 
 function notFound(what: string): AppError {
   return new AppError('notFound', `${what} not found`)
@@ -151,23 +152,21 @@ class TestNoteFileServiceImpl implements TestNoteFileService {
   ): Promise<NoteWriteResult> {
     return Promise.try(() => {
       checkGeneration(this.#generation, pinned)
-      const merged = this.#merges.get(path)
-      if (merged !== undefined) {
+      const merged = this.#merges.get(path) ?? null
+      if (merged !== null) {
         this.#merges.delete(path)
-        this.#store(path, merged, pinned)
-        return { merged }
-      }
-      if (expectedContents !== undefined) {
-        const current = this.#files.get(path)?.contents ?? null
-        if (current !== expectedContents && current !== contents) {
+      } else if (expectedContents !== undefined) {
+        const current = this.#files.get(path)
+        if (current?.contents === contents) {
+          return { merged, hash: sha256HexSync(contents), modifiedMs: current.modifiedMs }
+        }
+        if ((current?.contents ?? null) !== expectedContents) {
           throw new AppError('io', 'Note changed on disk; reload before retrying')
         }
-        if (current === contents) {
-          return { merged: null }
-        }
       }
-      this.#store(path, contents, pinned)
-      return { merged: null }
+      const written = merged ?? contents
+      const modifiedMs = this.#store(path, written, pinned)
+      return { merged, hash: sha256HexSync(written), modifiedMs }
     })
   }
 

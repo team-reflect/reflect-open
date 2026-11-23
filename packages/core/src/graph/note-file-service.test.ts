@@ -41,9 +41,13 @@ describe('createNoteFileService', () => {
 
   it('reports a write as an own write', async () => {
     const { ipc, fileChanges, noteFile } = setup()
-    ipc.onCommand('note_write', () => ({ modifiedMs: 1_234, merged: null }))
+    ipc.onCommand('note_write', () => ({ modifiedMs: 1_234, merged: null, hash: 'h1' }))
 
-    await expect(noteFile.write('notes/a.md', 'new', 7)).resolves.toEqual({ merged: null })
+    await expect(noteFile.write('notes/a.md', 'new', 7)).resolves.toEqual({
+      merged: null,
+      hash: 'h1',
+      modifiedMs: 1_234,
+    })
 
     expect(ipc.calls()).toEqual([
       {
@@ -65,10 +69,13 @@ describe('createNoteFileService', () => {
     ipc.onCommand('note_write', () => ({
       modifiedMs: 1_234,
       merged: 'a\nB\nc',
+      hash: 'h2',
     }))
 
     await expect(noteFile.write('notes/a.md', 'a\nB', 7, 'a\nb')).resolves.toEqual({
       merged: 'a\nB\nc',
+      hash: 'h2',
+      modifiedMs: 1_234,
     })
   })
 
@@ -212,7 +219,7 @@ describe('createTestNoteFileService', () => {
 function installEcho(
   echoOwnWrites: boolean,
   invoke: (command: string) => unknown = (command) => {
-    return command === 'note_write' ? { modifiedMs: null, merged: null } : null
+    return command === 'note_write' ? { modifiedMs: null, merged: null, hash: '' } : null
   },
 ) {
   const ipc = createTestIpcBridgeService()
@@ -256,7 +263,7 @@ describe('local write echo (Plan 19, decision 5)', () => {
     // The reconcile's read-free skip compares the stored row's mtime against
     // the file listing — only the write's own on-disk stamp can ever match.
     const { noteFile, fileChanges } = installEcho(true, (command) => {
-      return command === 'note_write' ? { modifiedMs: 1_234, merged: null } : null
+      return command === 'note_write' ? { modifiedMs: 1_234, merged: null, hash: '' } : null
     })
     const seen: FileChange[][] = []
     const unlisten = fileChanges.subscribe(({ changes }) => {

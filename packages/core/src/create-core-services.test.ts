@@ -97,7 +97,7 @@ describe('createCoreServices', () => {
 
   it('reports note writes to the composed file-change service', async () => {
     const ipc = createTestIpcBridgeService({
-      commands: { note_write: () => ({ modifiedMs: null, merged: null }) },
+      commands: { note_write: () => ({ modifiedMs: null, merged: null, hash: '' }) },
     })
     const { services, internal } = composeCoreServices({
       ...requiredAdapters(),
@@ -110,7 +110,11 @@ describe('createCoreServices', () => {
     services.fileChanges.subscribe((batch) => {
       seen.push({ source: batch.source, paths: batch.changes.map((change) => change.path) })
     })
-    await expect(internal.noteFile.write('notes/a.md', 'a', 1)).resolves.toEqual({ merged: null })
+    await expect(internal.noteFile.write('notes/a.md', 'a', 1)).resolves.toEqual({
+      merged: null,
+      hash: '',
+      modifiedMs: 5,
+    })
     expect(seen).toEqual([{ source: 'own-write', paths: ['notes/a.md'] }])
   })
 

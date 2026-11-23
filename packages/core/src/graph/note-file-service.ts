@@ -13,6 +13,14 @@ export interface NoteWriteResult {
    * The full text now on disk when the write merged with a newer disk text, else `null`.
    */
   merged: string | null
+  /**
+   * Lowercase hex SHA-256 of the text now on disk.
+   */
+  hash: string
+  /**
+   * The modification time of the file after the write, in epoch milliseconds.
+   */
+  modifiedMs: number
 }
 
 /**
@@ -109,7 +117,7 @@ class NoteFileServiceImpl implements NoteFileService {
     })
     const modifiedMs = outcome.modifiedMs ?? clock.now()
     fileChanges.reportOwnWrite([{ path, kind: 'upsert', modifiedMs }])
-    return { merged: outcome.merged }
+    return { merged: outcome.merged, hash: outcome.hash, modifiedMs }
   }
 
   async create(path: string, contents: string, generation: number): Promise<NoteCreateOutcome> {

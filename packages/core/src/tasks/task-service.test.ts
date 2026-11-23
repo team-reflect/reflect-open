@@ -154,6 +154,8 @@ beforeEach(() => {
 
 const flushMicrotasks = () => sleep(0)
 
+const UNMERGED_WRITE: NoteWriteResult = { merged: null, hash: '', modifiedMs: 0 }
+
 describe('write serialization', () => {
   it('serializes concurrent writes to the same note — no read/write interleave', async () => {
     noteFile.set('notes/a.md', '+ [ ] do it\n')
@@ -161,7 +163,7 @@ describe('write serialization', () => {
     let writes = 0
     const writeNote = vi.spyOn(noteFile, 'write').mockImplementation(() => {
       writes += 1
-      return writes === 1 ? pendingFirstWrite.promise : Promise.resolve({ merged: null })
+      return writes === 1 ? pendingFirstWrite.promise : Promise.resolve(UNMERGED_WRITE)
     })
 
     const first = tasks.writeTask(task, [{ kind: 'toggle' }])
@@ -172,7 +174,7 @@ describe('write serialization', () => {
     expect(noteFile.getReads()).toHaveLength(1)
     expect(writeNote).toHaveBeenCalledTimes(1)
 
-    pendingFirstWrite.resolve({ merged: null })
+    pendingFirstWrite.resolve(UNMERGED_WRITE)
     await Promise.all([first, second])
     // The second only read after the first's write settled.
     expect(noteFile.getReads()).toHaveLength(2)
