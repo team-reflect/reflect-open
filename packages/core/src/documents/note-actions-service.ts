@@ -400,22 +400,21 @@ class NoteActionsServiceImpl implements NoteActionsService {
       }
       written = this.#pinOverlay(predicted, order)
       noteRows.setOverlay(path, generation, written)
-      let pinned = false
-      await noteDocuments.commitFrontmatter(
-        path,
+      const pinned =
         kind === 'unpin'
-          ? { pinned: false }
-          : (source) => {
-              pinned = !isPinned(parseNote({ path, source: source ?? '' }).frontmatter)
-              return { pinned: pinned ? (order ?? true) : false }
-            },
-        generation,
-      )
+          ? false
+          : !isPinned(parseNote({ path, source: await noteDocuments.readSource(path) }).frontmatter)
+      const pinOrder = pinned ? order : null
       if (pinned !== predicted) {
         written = this.#pinOverlay(pinned, order)
         noteRows.setOverlay(path, generation, written)
       }
-      return { status: 'done', pinned, pinOrder: pinned ? order : null }
+      await noteDocuments.commitFrontmatter(
+        path,
+        { pinned: pinned ? (pinOrder ?? true) : false },
+        generation,
+      )
+      return { status: 'done', pinned, pinOrder }
     } catch (cause) {
       if (written !== null) {
         noteRows.dropOverlay(path, generation, written)
@@ -435,19 +434,13 @@ class NoteActionsServiceImpl implements NoteActionsService {
       const predicted = !(await this.#readPrivacy(path, generation))
       written = { isPrivate: predicted }
       noteRows.setOverlay(path, generation, written)
-      let isPrivate = false
-      await noteDocuments.commitFrontmatter(
-        path,
-        (source) => {
-          isPrivate = !parseNote({ path, source: source ?? '' }).frontmatter.private
-          return { private: isPrivate }
-        },
-        generation,
-      )
+      const source = await noteDocuments.readSource(path)
+      const isPrivate = !parseNote({ path, source }).frontmatter.private
       if (isPrivate !== predicted) {
         written = { isPrivate }
         noteRows.setOverlay(path, generation, written)
       }
+      await noteDocuments.commitFrontmatter(path, { private: isPrivate }, generation)
       return { status: 'done', isPrivate }
     } catch (cause) {
       if (written !== null) {
