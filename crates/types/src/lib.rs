@@ -53,8 +53,8 @@ pub use git::{
     RemoteDelta, RemoteTip, SkippedFile,
 };
 pub use graph::{
-    GraphInfo, LocalNoteRead, NoteCreateOutcome, NoteWriteOutcome, RecentGraph, VaultScanStats,
-    WindowBootstrap,
+    GraphInfo, LocalNoteRead, NoteCreateOutcome, NoteRead, NoteWriteOutcome, RecentGraph,
+    VaultScanStats, WindowBootstrap,
 };
 pub use icloud::{IcloudStatus, IcloudSweepOutcome, MobileStorageInfo, SweepScope};
 pub use import::{GraphImportProgress, GraphImportStage, GraphImportSummary};

@@ -164,7 +164,10 @@ fn commands_reply_their_pinned_json() {
     ok(
         "note_read",
         json!({"path": "notes/a.md"}),
-        json!("# A\n\nb\n"),
+        json!({
+            "content": "# A\n\nb\n",
+            "hash": "51c2e1731b70029d0cc3027d83651492a492a72f344331278569a6baad11bf9a",
+        }),
     );
     ok("note_exists", json!({"path": "notes/a.md"}), json!(true));
     let note = json!([{"modifiedMs": 0, "path": "notes/a.md", "size": 7}]);
@@ -176,7 +179,7 @@ fn commands_reply_their_pinned_json() {
     ok(
         "note_read",
         json!({"path": "notes/crlf.md"}),
-        json!("a\nb\n"),
+        json!({"content": "a\nb\n", "hash": LF_NOTE_HASH}),
     );
     ok(
         "note_write",

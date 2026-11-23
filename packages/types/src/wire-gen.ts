@@ -796,7 +796,7 @@ export type Commands = {
       path: string
       generation: number | null
     }
-    result: string
+    result: NoteRead
   }
   note_read_local: {
     args: {
@@ -2161,6 +2161,14 @@ export type NoteMoveRequest = {
 export type NotePrivacy = {
   path: string
   isPrivate: boolean
+}
+
+/**  A note's text as the `note_read` command returns it. */
+export type NoteRead = {
+  /**  The note's markdown, with `\n` line endings. */
+  content: string
+  /**  Lowercase hex SHA-256 of `content`. */
+  hash: string
 }
 
 /**  The core fields of one note row. */

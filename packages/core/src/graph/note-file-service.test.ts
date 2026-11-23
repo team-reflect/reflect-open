@@ -22,7 +22,7 @@ describe('createNoteFileService', () => {
     const { ipc, noteFile } = setup(
       createTestIpcBridgeService({
         commands: {
-          note_read: () => '# A\n',
+          note_read: () => ({ content: '# A\n', hash: 'h0' }),
           note_read_local: () => ({ kind: 'evicted' }),
           note_exists: returnTrue,
         },
@@ -30,9 +30,14 @@ describe('createNoteFileService', () => {
     )
 
     await expect(noteFile.read('notes/a.md', 4)).resolves.toBe('# A\n')
+    await expect(noteFile.readWithHash('notes/a.md', 4)).resolves.toEqual({
+      content: '# A\n',
+      hash: 'h0',
+    })
     await expect(noteFile.readLocal('notes/a.md', 4)).resolves.toEqual({ kind: 'evicted' })
     await expect(noteFile.exists('notes/a.md')).resolves.toBe(true)
     expect(ipc.calls()).toEqual([
+      { command: 'note_read', args: { path: 'notes/a.md', generation: 4 } },
       { command: 'note_read', args: { path: 'notes/a.md', generation: 4 } },
       { command: 'note_read_local', args: { path: 'notes/a.md', generation: 4 } },
       { command: 'note_exists', args: { path: 'notes/a.md' } },

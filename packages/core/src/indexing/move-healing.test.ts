@@ -52,7 +52,7 @@ describe('MoveHealing.detectExternalMoves', () => {
 
     const scan = await healing.detectExternalMoves([ORPHAN], [ARRIVAL], 1)
     expect(scan.moves).toEqual([{ from: ORPHAN, to: ARRIVAL }])
-    expect(scan.content.get(ARRIVAL)).toBe(CONTENT)
+    expect(scan.notes.get(ARRIVAL)?.content).toBe(CONTENT)
   })
 
   it('skips an unreadable arrival: no pair, no content, no throw', async () => {
@@ -64,7 +64,7 @@ describe('MoveHealing.detectExternalMoves', () => {
 
     const scan = await healing.detectExternalMoves([ORPHAN], [ARRIVAL], 1)
     expect(scan.moves).toEqual([])
-    expect(scan.content.size).toBe(0)
+    expect(scan.notes.size).toBe(0)
   })
 
   it('never reads or queries when either side is empty', async () => {

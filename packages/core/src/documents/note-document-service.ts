@@ -1,7 +1,7 @@
 import { NoteEditError } from '../tasks/task-errors.ts'
 import { requireGraphSession, type GraphSessionSource } from '../graph/graph-session.ts'
 import { isAppError } from '../errors.ts'
-import type { NoteFileService } from '../graph/note-file-service.ts'
+import type { NoteFileService, NoteRead } from '../graph/note-file-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter.ts'
@@ -214,10 +214,9 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
             'This note can’t be updated right now — try again in a moment.',
           )
         }
-        const [revision, indexSeq] = await Promise.all([
-          sha256Hex(commit.content),
-          this.#indexCommit(path, options.generation, commit.content),
-        ])
+        const revision = await sha256Hex(commit.content)
+        const note = { content: commit.content, hash: revision }
+        const indexSeq = await this.#indexCommit(path, options.generation, note)
         return { ...commit, revision, indexSeq }
       }
       let source = await this.#readForEdit(
@@ -235,7 +234,7 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
           const indexSeq = await this.#indexCommit(
             path,
             options.generation,
-            content,
+            { content, hash: written.hash },
             written.modifiedMs,
           )
           return { content, revision: written.hash, merged: false, indexSeq }
@@ -286,13 +285,13 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
   }
 
   /**
-   * Write `content`, the text a commit left in the note file, to the index of
+   * Write `note`, the text a commit left in the note file, to the index of
    * the graph session that `generation` belongs to.
    */
   async #indexCommit(
     path: string,
     generation: number,
-    content: string,
+    note: NoteRead,
     mtime?: number,
   ): Promise<number | null> {
     const { graphSession, indexLifecycle, logger } = this.#deps
@@ -304,7 +303,7 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
       return await indexLifecycle.indexNote(path, {
         generation: session.indexGeneration,
         fileGeneration: generation,
-        content,
+        note,
         mtime,
       })
     } catch (error) {

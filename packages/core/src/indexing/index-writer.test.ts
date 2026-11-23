@@ -1,5 +1,6 @@
+import type { NoteRead } from '@reflect/types'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { sha256Hex, type MaybePromise } from '@reflect/utils'
+import { sha256Hex, sha256HexSync, type MaybePromise } from '@reflect/utils'
 import { AppError } from '../errors.ts'
 import { parseNote } from '../markdown/index.ts'
 import { createTestXArchiveService } from '../testing/capture.ts'
@@ -45,6 +46,10 @@ interface StoredNote {
  * or reject it. `indexed` and `stored` are the rows the writer reads facts
  * and ids from.
  */
+function noteOf(content: string): NoteRead {
+  return { content, hash: sha256HexSync(content) }
+}
+
 function setup(options?: {
   files?: Readonly<Record<string, string>>
   indexed?: readonly TestNote[]
@@ -182,7 +187,7 @@ describe('createIndexWriter', () => {
   it('writes hinted content without a read', async () => {
     const { writer, dirty, store, reads } = setup({ files: { 'notes/a.md': '# on disk' } })
 
-    dirty.add('notes/a.md', { content: '# hinted', modifiedMs: 7 })
+    dirty.add('notes/a.md', { note: noteOf('# hinted'), modifiedMs: 7 })
     await writer.drained()
 
     expect(reads).toEqual([])
@@ -192,7 +197,7 @@ describe('createIndexWriter', () => {
   it('reads the file when a later add without content replaced a content hint', async () => {
     const { writer, dirty, store, reads } = setup({ files: { 'notes/a.md': '# on disk' } })
 
-    dirty.add('notes/a.md', { content: '# hinted' })
+    dirty.add('notes/a.md', { note: noteOf('# hinted') })
     dirty.add('notes/a.md')
     await writer.drained()
 
@@ -209,7 +214,7 @@ describe('createIndexWriter', () => {
 
     dirty.add('notes/a.md')
     await vi.waitFor(() => expect(reads).toEqual(['notes/a.md']))
-    dirty.add('notes/a.md', { content: '# newer' })
+    dirty.add('notes/a.md', { note: noteOf('# newer') })
     const newer = writer.settled('notes/a.md')
     firstRead.resolve()
 
@@ -253,7 +258,7 @@ describe('createIndexWriter', () => {
     }
     await vi.waitFor(() => expect(reads).toEqual(['notes/a.md']))
 
-    dirty.add('notes/now.md', { content: '# now' })
+    dirty.add('notes/now.md', { note: noteOf('# now') })
     const first = writer.settledFirst('notes/now.md')
     gates['notes/a.md']!.resolve()
 
@@ -282,7 +287,7 @@ describe('createIndexWriter', () => {
     const taken = writer.settled('notes/p.md')
     await vi.waitFor(() => expect(reads).toEqual(['notes/a.md']))
 
-    dirty.add('notes/p.md', { content: '# new' })
+    dirty.add('notes/p.md', { note: noteOf('# new') })
     const first = writer.settledFirst('notes/p.md')
     gate.resolve()
 

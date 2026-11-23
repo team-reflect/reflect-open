@@ -1,3 +1,4 @@
+import type { NoteRead } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { GraphRole, GraphSession } from '../graph/graph-session.ts'
@@ -202,7 +203,7 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
     options: {
       generation: number
       fileGeneration: number
-      content?: string | undefined
+      note?: NoteRead | undefined
       mtime?: number | undefined
     },
   ): Promise<number | null> {

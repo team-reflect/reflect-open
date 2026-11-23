@@ -1,5 +1,6 @@
+import type { NoteRead } from '@reflect/types'
 import { noop, returnFalse } from '@ocavue/utils'
-import { sha256Hex, type MaybePromise } from '@reflect/utils'
+import type { MaybePromise } from '@reflect/utils'
 import type { XArchiveService } from '../embeds/x-archive-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { isNotePath } from '../graph/paths.ts'
@@ -149,9 +150,9 @@ interface WriterRun {
    */
   readonly afterReport: Array<() => void>
   /**
-   * File content read while pairing moves, by path.
+   * The notes read while pairing moves, by path.
    */
-  content: Map<string, string>
+  notes: Map<string, NoteRead>
 }
 
 interface PendingApply {
@@ -315,7 +316,7 @@ class IndexWriterImpl implements IndexWriter {
       waiters: new Map(),
       reported: [],
       afterReport: [],
-      content: new Map(),
+      notes: new Map(),
     }
     for (const entry of entries) {
       const waiter = this.#waiters.get(entry.path)
@@ -436,7 +437,7 @@ class IndexWriterImpl implements IndexWriter {
         continue
       }
       const stored = facts.get(path)
-      const known = entry.content ?? run.content.get(path)
+      const known = entry.note ?? run.notes.get(path)
       if (
         known === undefined &&
         !entry.force &&
@@ -447,8 +448,8 @@ class IndexWriterImpl implements IndexWriter {
       }
       let projection: IndexedNote
       try {
-        const content = known ?? (await noteFile.read(path, this.fileGeneration))
-        const fileHash = await sha256Hex(content)
+        const { content, hash: fileHash } =
+          known ?? (await noteFile.readWithHash(path, this.fileGeneration))
         if (!entry.force && stored?.fileHash === fileHash) {
           if (entry.modifiedMs !== undefined && stored.mtime !== entry.modifiedMs) {
             touches.push({ entry, mtime: entry.modifiedMs })
@@ -520,12 +521,12 @@ class IndexWriterImpl implements IndexWriter {
     try {
       const indexed = await indexQuery.getNoteIdsByPath(upserts.map((entry) => entry.path))
       const arrivals = upserts.filter((entry) => !indexed.has(entry.path))
-      const { moves, content } = await this.#moveHealing.detectExternalMoves(
+      const { moves, notes: read } = await this.#moveHealing.detectExternalMoves(
         removes.map((entry) => entry.path),
         arrivals.map((entry) => entry.path),
         this.fileGeneration,
       )
-      run.content = content
+      run.notes = read
       for (const move of moves) {
         const from = run.open.get(move.from)
         const to = run.open.get(move.to)

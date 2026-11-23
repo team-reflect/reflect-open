@@ -214,7 +214,15 @@ describe('commitSourceEdit', () => {
       noteDocuments.commitSourceEdit('notes/a.md', shout, { generation: 3 }),
     ).resolves.toMatchObject({ content: 'DISK\n', indexSeq: 12 })
     expect(indexNote.mock.calls).toEqual([
-      ['notes/a.md', { generation: 5, fileGeneration: 3, content: 'DISK\n', mtime: 1 }],
+      [
+        'notes/a.md',
+        {
+          generation: 5,
+          fileGeneration: 3,
+          note: { content: 'DISK\n', hash: sha256HexSync('DISK\n') },
+          mtime: 1,
+        },
+      ],
     ])
   })
 
@@ -224,7 +232,15 @@ describe('commitSourceEdit', () => {
       noteDocuments.commitSourceEdit('notes/a.md', shout, { generation: 3 }),
     ).resolves.toMatchObject({ content: 'LIVE\n', indexSeq: 12 })
     expect(indexNote.mock.calls).toEqual([
-      ['notes/a.md', { generation: 5, fileGeneration: 3, content: 'LIVE\n', mtime: undefined }],
+      [
+        'notes/a.md',
+        {
+          generation: 5,
+          fileGeneration: 3,
+          note: { content: 'LIVE\n', hash: sha256HexSync('LIVE\n') },
+          mtime: undefined,
+        },
+      ],
     ])
   })
 

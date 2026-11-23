@@ -27,8 +27,9 @@ use reflect_graph_io::*;
 use reflect_graph_paths::{eviction_placeholder, is_dataless};
 use reflect_types::{
     AppError, AppResult, FileMeta, GraphImportProgress, GraphImportStage, GraphImportSummary,
-    GraphInfo, LocalNoteRead, NoteCreateOutcome, NoteWriteOutcome, VaultScanStats,
+    GraphInfo, LocalNoteRead, NoteCreateOutcome, NoteRead, NoteWriteOutcome, VaultScanStats,
 };
+use reflect_utils::note_hash;
 
 use crate::{Core, Host};
 
@@ -139,11 +140,15 @@ impl Core {
     /// [`Core::note_read_local`]), and an on-demand download from a sync
     /// command would freeze the whole app for its duration, exactly like the
     /// old synchronous asset protocol.
-    pub async fn note_read(&self, path: String, generation: Option<u64>) -> AppResult<String> {
+    pub async fn note_read(&self, path: String, generation: Option<u64>) -> AppResult<NoteRead> {
         let root = root_for(&self.graph, generation)?;
         let abs = resolve(&root, &path)?;
-        self.spawn_blocking(move || Ok(io::read_note_no_follow(&root, &abs)?))
-            .await
+        self.spawn_blocking(move || {
+            let content = io::read_note_no_follow(&root, &abs)?;
+            let hash = note_hash(&content);
+            Ok(NoteRead { content, hash })
+        })
+        .await
     }
 
     /// Command: read a note's markdown **only when its bytes are local**. Bulk

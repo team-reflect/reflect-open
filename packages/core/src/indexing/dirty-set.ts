@@ -1,3 +1,4 @@
+import type { NoteRead } from '@reflect/types'
 import type { Unlisten } from '../unlisten.ts'
 
 /**
@@ -13,9 +14,9 @@ export interface DirtyHint {
    */
   readonly modifiedMs?: number | undefined
   /**
-   * The file's full text, which saves the read.
+   * The file's text and its hash, which saves the read.
    */
-  readonly content?: string | undefined
+  readonly note?: NoteRead | undefined
   /**
    * Write the row even when the file's hash matches the stored one.
    */
@@ -33,7 +34,7 @@ export interface DirtyEntry {
   readonly path: string
   readonly kind: 'upsert' | 'remove'
   readonly modifiedMs: number | undefined
-  readonly content: string | undefined
+  readonly note: NoteRead | undefined
   readonly force: boolean
   readonly bulk: boolean
 }
@@ -44,7 +45,7 @@ export interface DirtyEntry {
 export interface DirtySet {
   /**
    * Mark `path` dirty. The hint replaces the path's earlier hint, so an add
-   * without `content` drops older content. Only `force` survives a later add,
+   * without `note` drops the older text. Only `force` survives a later add,
    * and an entry is `bulk` only while every add for it was.
    */
   add(path: string, hint?: DirtyHint): void
@@ -85,7 +86,7 @@ class DirtySetImpl implements DirtySet {
       path,
       kind: hint?.kind ?? 'upsert',
       modifiedMs: hint?.modifiedMs,
-      content: hint?.content,
+      note: hint?.note,
       force: (hint?.force ?? false) || (earlier?.force ?? false),
       bulk: (hint?.bulk ?? false) && (earlier?.bulk ?? true),
     })

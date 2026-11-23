@@ -9,6 +9,7 @@ import {
 import type {
   LocalNoteRead,
   NoteFileService,
+  NoteRead,
   NoteWriteResult,
   VaultScanStats,
 } from '../graph/note-file-service.ts'
@@ -133,6 +134,11 @@ class TestNoteFileServiceImpl implements TestNoteFileService {
       checkGeneration(this.#generation, pinned)
       return this.#contentsOf(path)
     })
+  }
+
+  async readWithHash(path: string, pinned: number): Promise<NoteRead> {
+    const content = await this.read(path, pinned)
+    return { content, hash: sha256HexSync(content) }
   }
 
   readLocal(path: string, pinned: number): Promise<LocalNoteRead> {
@@ -325,6 +331,17 @@ class NoteFileOverrideService implements NoteFileService {
 
   read(path: string, generation: number): Promise<string> {
     return (this.#overrides.read ?? this.#inner.read.bind(this.#inner))(path, generation)
+  }
+
+  async readWithHash(path: string, generation: number): Promise<NoteRead> {
+    if (this.#overrides.readWithHash !== undefined) {
+      return await this.#overrides.readWithHash(path, generation)
+    }
+    if (this.#overrides.read !== undefined) {
+      const content = await this.#overrides.read(path, generation)
+      return { content, hash: sha256HexSync(content) }
+    }
+    return await this.#inner.readWithHash(path, generation)
   }
 
   readLocal(path: string, generation: number): Promise<LocalNoteRead> {

@@ -3671,6 +3671,34 @@ public struct NotePrivacy: Codable, Sendable, Equatable {
     }
 }
 
+/// A note's text as the `note_read` command returns it.
+public struct NoteRead: Codable, Sendable, Equatable {
+    public let content: String
+    public let hash: String
+
+    private enum CodingKeys: String, CodingKey {
+        case content = "content"
+        case hash = "hash"
+    }
+
+    public init(content: String, hash: String) {
+        self.content = content
+        self.hash = hash
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.content = try container.decode(String.self, forKey: .content)
+        self.hash = try container.decode(String.self, forKey: .hash)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(content, forKey: .content)
+        try container.encode(hash, forKey: .hash)
+    }
+}
+
 /// The core fields of one note row.
 public struct NoteRow: Codable, Sendable, Equatable {
     public let path: String

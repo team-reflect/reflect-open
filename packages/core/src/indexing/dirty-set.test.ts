@@ -28,7 +28,7 @@ describe('createDirtySet', () => {
   it('drops older content when a later add carries none', () => {
     const dirty = createDirtySet()
 
-    dirty.add('notes/a.md', { content: '# old', modifiedMs: 1 })
+    dirty.add('notes/a.md', { note: { content: '# old', hash: 'h' }, modifiedMs: 1 })
     dirty.add('notes/a.md')
 
     expect(dirty.take()).toEqual([
@@ -36,7 +36,7 @@ describe('createDirtySet', () => {
         path: 'notes/a.md',
         kind: 'upsert',
         modifiedMs: undefined,
-        content: undefined,
+        note: undefined,
         force: false,
         bulk: false,
       },
@@ -46,12 +46,12 @@ describe('createDirtySet', () => {
   it('lets the latest kind win', () => {
     const dirty = createDirtySet()
 
-    dirty.add('notes/gone.md', { content: '# text' })
+    dirty.add('notes/gone.md', { note: { content: '# text', hash: 'h' } })
     dirty.add('notes/gone.md', { kind: 'remove' })
     dirty.add('notes/back.md', { kind: 'remove' })
     dirty.add('notes/back.md', { modifiedMs: 7 })
 
-    expect(dirty.take().map((entry) => [entry.path, entry.kind, entry.content])).toEqual([
+    expect(dirty.take().map((entry) => [entry.path, entry.kind, entry.note?.content])).toEqual([
       ['notes/gone.md', 'remove', undefined],
       ['notes/back.md', 'upsert', undefined],
     ])
@@ -83,8 +83,8 @@ describe('createDirtySet', () => {
 
   it('restores a taken entry, and keeps the hint of a newer add', () => {
     const dirty = createDirtySet()
-    dirty.add('notes/kept.md', { content: '# taken' })
-    dirty.add('notes/changed.md', { content: '# taken', force: true })
+    dirty.add('notes/kept.md', { note: { content: '# taken', hash: 'h' } })
+    dirty.add('notes/changed.md', { note: { content: '# taken', hash: 'h' }, force: true })
     const taken = dirty.take()
     dirty.add('notes/changed.md', { modifiedMs: 9 })
 
@@ -93,7 +93,7 @@ describe('createDirtySet', () => {
     expect(
       dirty
         .take()
-        .map((entry) => [entry.path, entry.content, entry.modifiedMs, entry.force])
+        .map((entry) => [entry.path, entry.note?.content, entry.modifiedMs, entry.force])
         .toSorted(),
     ).toEqual([
       ['notes/changed.md', undefined, 9, true],

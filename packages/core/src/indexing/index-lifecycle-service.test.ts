@@ -1130,7 +1130,7 @@ describe('indexNote', () => {
     await index.indexNote('notes/a.md', {
       generation: 7,
       fileGeneration: FILE_GENERATION,
-      content: '# Given',
+      note: { content: '# Given', hash: sha256HexSync('# Given') },
     })
 
     expect(reads).toBe(0)

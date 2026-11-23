@@ -32,6 +32,17 @@ pub enum NoteCreateOutcome {
     Collision,
 }
 
+/// A note's text as the `note_read` command returns it.
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct NoteRead {
+    /// The note's markdown, with `\n` line endings.
+    pub content: String,
+    /// Lowercase hex SHA-256 of `content`.
+    pub hash: String,
+}
+
 /// How a local note read (the desktop `note_read_local` command) found the
 /// note on disk.
 #[derive(Debug, Serialize)]

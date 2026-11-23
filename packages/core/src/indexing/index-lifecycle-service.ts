@@ -1,3 +1,4 @@
+import type { NoteRead } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import type { GraphRole, GraphSession } from '../graph/graph-session.ts'
 import { isNotePath } from '../graph/paths.ts'
@@ -272,7 +273,7 @@ export interface IndexLifecycleService {
   /**
    * Mark one note dirty and wait until the index writer wrote it, ahead of
    * the other dirty files and without waiting for the watcher. For an in-app write whose row must be readable
-   * at once. `content` saves the read, which otherwise carries
+   * at once. `note` saves the read, which otherwise carries
    * `fileGeneration`; the write carries the index `generation`. Resolves
    * with the seq of an index commit that holds the note, `null` when none is
    * known. Rejects when the read or the write failed. Resolves `null` without
@@ -283,7 +284,7 @@ export interface IndexLifecycleService {
     options: {
       generation: number
       fileGeneration: number
-      content?: string | undefined
+      note?: NoteRead | undefined
       mtime?: number | undefined
     },
   ): Promise<number | null>
@@ -653,7 +654,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     options: {
       generation: number
       fileGeneration: number
-      content?: string | undefined
+      note?: NoteRead | undefined
       mtime?: number | undefined
     },
   ): Promise<number | null> {
@@ -661,7 +662,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     if (writer === null) {
       return null
     }
-    writer.dirty.add(path, { content: options.content, modifiedMs: options.mtime })
+    writer.dirty.add(path, { note: options.note, modifiedMs: options.mtime })
     const outcome = await writer.settledFirst(path)
     switch (outcome.status) {
       case 'applied':

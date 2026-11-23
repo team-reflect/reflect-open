@@ -175,7 +175,7 @@ class DevBridgeImpl implements IpcBridge {
         if (contents === null) {
           throw new AppError('notFound', `no such note: ${path}`)
         }
-        return contents
+        return sha256Hex(contents).then((hash) => ({ content: contents, hash }))
       }
       case 'note_read_local': {
         // The in-memory store has no iCloud, so a note is never evicted.

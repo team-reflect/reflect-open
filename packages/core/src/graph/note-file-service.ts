@@ -1,9 +1,15 @@
-import type { FileMeta, LocalNoteRead, NoteCreateOutcome, VaultScanStats } from '@reflect/types'
+import type {
+  FileMeta,
+  LocalNoteRead,
+  NoteCreateOutcome,
+  NoteRead,
+  VaultScanStats,
+} from '@reflect/types'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 
-export type { LocalNoteRead, VaultScanStats } from '@reflect/types'
+export type { LocalNoteRead, NoteRead, VaultScanStats } from '@reflect/types'
 
 /**
  * The outcome of {@link NoteFileService.write}.
@@ -34,6 +40,10 @@ export interface NoteFileService {
    * A note's markdown, pinned to the issuing graph session's `generation`.
    */
   read(path: string, generation: number): Promise<string>
+  /**
+   * A note's markdown and the hash of it, pinned to `generation`.
+   */
+  readWithHash(path: string, generation: number): Promise<NoteRead>
   /**
    * A note's markdown only when its bytes are local: an iCloud-evicted note
    * reports `evicted` instead of being downloaded. A missing file still
@@ -100,6 +110,11 @@ class NoteFileServiceImpl implements NoteFileService {
   }
 
   async read(path: string, generation: number): Promise<string> {
+    const { content } = await this.readWithHash(path, generation)
+    return content
+  }
+
+  async readWithHash(path: string, generation: number): Promise<NoteRead> {
     return await this.#deps.ipc.call('note_read', { path, generation })
   }
 
