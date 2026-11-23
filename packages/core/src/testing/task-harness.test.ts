@@ -59,6 +59,23 @@ describe('TaskHarness', () => {
   })
 })
 
+describe('note commit', () => {
+  it('is readable from the index once it returns', async () => {
+    const harness = await start({ 'notes/a.md': '+ [ ] one\n' })
+
+    const { revision, indexSeq } = await harness.documents.commitSourceEdit(
+      'notes/a.md',
+      (source) => source.replace('one', 'two'),
+      { generation: harness.session.generation },
+    )
+
+    const read = await harness.database.read('index_tasks', { checked: false })
+    expect(indexSeq).not.toBeNull()
+    expect(read.seq).toBeGreaterThanOrEqual(indexSeq!)
+    expect(read.rows.map((row) => [row.markdown, row.noteHash])).toEqual([['two', revision]])
+  })
+})
+
 describe('drained task view', () => {
   it('equals the open tasks of the files after writes, external edits, a pass, and a suspend', async () => {
     const harness = await start({

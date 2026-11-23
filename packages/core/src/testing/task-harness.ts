@@ -1,5 +1,8 @@
 import { noop, sleep } from '@ocavue/utils'
-import { createNoteDocumentService } from '../documents/note-document-service.ts'
+import {
+  createNoteDocumentService,
+  type NoteDocumentService,
+} from '../documents/note-document-service.ts'
 import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
 import { createGraphSession, type GraphSession } from '../graph/graph-session.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
@@ -116,6 +119,7 @@ export class TaskHarness {
   readonly indexStore: TestIndexStoreService
   readonly index: IndexLifecycleService
   readonly clock: TestClockService
+  readonly documents: NoteDocumentService
   readonly tasks: TaskService
   readonly session: GraphSession
   readonly #writes = new StepGate()
@@ -184,15 +188,16 @@ export class TaskHarness {
         return await this.database.read(command, args)
       },
     }
+    this.documents = createNoteDocumentService({
+      openDocuments: createOpenDocumentsService({ fileChanges: this.fileChanges }),
+      noteFile: steppedFiles,
+      graphSession,
+      indexLifecycle: this.index,
+      logger,
+    })
     this.tasks = createTaskService({
       database: steppedDatabase,
-      noteDocuments: createNoteDocumentService({
-        openDocuments: createOpenDocumentsService({ fileChanges: this.fileChanges }),
-        noteFile: steppedFiles,
-        graphSession,
-        indexLifecycle: this.index,
-        logger,
-      }),
+      noteDocuments: this.documents,
       progress: createTestProgressPort(),
       clock: this.clock,
       logger,
