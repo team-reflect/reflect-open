@@ -60,6 +60,9 @@ pub struct NoteWriteOutcome {
     /// The full note text now on disk, when the note had moved past the
     /// expected revision and the file holds something other than `contents`.
     pub merged: Option<String>,
+    /// Lowercase hex SHA-256 of the note text now on disk, read with `\n`
+    /// line endings.
+    pub hash: String,
 }
 
 /// Counts from the vault catalog. `skipped` is what the walk refused or

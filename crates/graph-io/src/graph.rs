@@ -16,6 +16,7 @@ use reflect_graph_paths::eviction_placeholder;
 use reflect_types::{AppError, AppResult, FileMeta, GraphInfo, NoteWriteOutcome};
 
 use crate::graph_lock::with_graph_lock;
+use crate::hash::note_hash;
 use crate::io::{self, atomic_write, modified_ms};
 use crate::own_writes;
 use crate::resolve::resolve;
@@ -181,6 +182,7 @@ fn write_own(root: &Path, rel: &str, target: &Path, contents: &str) -> AppResult
     Ok(NoteWriteOutcome {
         modified_ms,
         merged: None,
+        hash: note_hash(contents),
     })
 }
 
@@ -199,6 +201,7 @@ fn merge_into_moved_note(
     let unchanged = |merged: Option<String>| NoteWriteOutcome {
         modified_ms: disk_ms,
         merged,
+        hash: note_hash(&current),
     };
     if current == contents {
         return Ok(unchanged(None));
@@ -229,10 +232,10 @@ fn merge_into_moved_note(
     if content == current {
         return Ok(unchanged(Some(content)));
     }
-    let modified_ms = write_own(root, rel, target, &content)?.modified_ms;
+    let written = write_own(root, rel, target, &content)?;
     Ok(NoteWriteOutcome {
-        modified_ms,
         merged: Some(content),
+        ..written
     })
 }
 
@@ -689,6 +692,7 @@ mod note_revision_tests {
         )
         .unwrap();
         assert_eq!(outcome.merged, None);
+        assert_eq!(outcome.hash, crate::hash::sha256_hex(b"a\nb!\n"));
         assert_eq!(fs::read_to_string(target).unwrap(), "a\nb!\n");
     }
 
@@ -741,6 +745,7 @@ mod note_revision_tests {
         )
         .unwrap();
         assert_eq!(outcome.merged, Some("A\nb\nc\nd\n".to_string()));
+        assert_eq!(outcome.hash, crate::hash::sha256_hex(b"A\nb\nc\nd\n"));
         assert_eq!(fs::read_to_string(&target).unwrap(), "A\nb\nc\nd\n");
         assert_eq!(
             outcome.modified_ms,
@@ -794,6 +799,7 @@ mod note_revision_tests {
             NoteWriteOutcome {
                 modified_ms: before,
                 merged: None,
+                hash: note_hash("a\nb\n"),
             }
         );
         assert!(!directory.path().join(".reflect").exists());
@@ -805,9 +811,10 @@ mod note_revision_tests {
             serde_json::to_value(NoteWriteOutcome {
                 modified_ms: Some(7),
                 merged: None,
+                hash: "ab".to_string(),
             })
             .unwrap(),
-            serde_json::json!({ "modifiedMs": 7, "merged": null })
+            serde_json::json!({ "modifiedMs": 7, "merged": null, "hash": "ab" })
         );
     }
 

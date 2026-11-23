@@ -3672,27 +3672,32 @@ public struct NoteRow: Codable, Sendable, Equatable {
 public struct NoteWriteOutcome: Codable, Sendable, Equatable {
     public let modifiedMs: UInt64?
     public let merged: String?
+    public let hash: String
 
     private enum CodingKeys: String, CodingKey {
         case modifiedMs = "modifiedMs"
         case merged = "merged"
+        case hash = "hash"
     }
 
-    public init(modifiedMs: UInt64?, merged: String?) {
+    public init(modifiedMs: UInt64?, merged: String?, hash: String) {
         self.modifiedMs = modifiedMs
         self.merged = merged
+        self.hash = hash
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.modifiedMs = try container.decodeIfPresent(UInt64.self, forKey: .modifiedMs)
         self.merged = try container.decodeIfPresent(String.self, forKey: .merged)
+        self.hash = try container.decode(String.self, forKey: .hash)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(modifiedMs, forKey: .modifiedMs)
         try container.encode(merged, forKey: .merged)
+        try container.encode(hash, forKey: .hash)
     }
 }
 

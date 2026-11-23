@@ -2158,6 +2158,11 @@ export type NoteWriteOutcome = {
    *  expected revision and the file holds something other than `contents`.
    */
   merged: string | null
+  /**
+   *  Lowercase hex SHA-256 of the note text now on disk, read with `\n`
+   *  line endings.
+   */
+  hash: string
 }
 
 /**  A pinned note in the iPad sidebar. */

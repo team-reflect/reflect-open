@@ -7,7 +7,7 @@ import {
   type IpcBridge,
 } from '@reflect/core'
 import type { AssetReadBinaryArgs } from '@reflect/types'
-import { base64ToBytes, bytesToBase64 } from '@reflect/utils'
+import { base64ToBytes, bytesToBase64, sha256Hex } from '@reflect/utils'
 import type { DevAssetStore } from '@/dev/dev-asset-store.ts'
 import type { DevFileStore } from '@/dev/dev-file-store.ts'
 import { createWasmIndexBackend, type WasmIndexBackend } from '@reflect/index-wasm'
@@ -194,7 +194,8 @@ class DevBridgeImpl implements IpcBridge {
             throw new AppError('io', 'Note changed on disk; reload before retrying')
           }
         }
-        return { modifiedMs: files.write(path, contents), merged: null }
+        const modifiedMs = files.write(path, contents)
+        return sha256Hex(contents).then((hash) => ({ modifiedMs, merged: null, hash }))
       }
       case 'note_create': {
         const { path, contents, generation } = argsOf('note_create', args)
