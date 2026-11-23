@@ -1296,6 +1296,7 @@ export function composeCoreServices(
     dailyNotes,
     templates: create.templates({
       noteFile,
+      noteDocuments,
       indexQuery,
       notePath,
       noteMove,

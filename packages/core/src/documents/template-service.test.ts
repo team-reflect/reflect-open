@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { createTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
 import { createIndexQueryService } from '../indexing/index-query-service.ts'
 import { createNotePathService } from '../indexing/note-path-service.ts'
-import { createTestNoteMoveService, createTestNoteSession } from '../testing/documents.ts'
+import {
+  createTestNoteDocumentService,
+  createTestNoteMoveService,
+  createTestNoteSession,
+} from '../testing/documents.ts'
 import { createTestFileChangeService } from '../testing/file-change.ts'
 import { createTestNoteFileService } from '../testing/graph.ts'
 import { createTestIndexStoreService } from '../testing/index-store.ts'
@@ -40,6 +44,7 @@ function setup(options?: { files?: Record<string, string>; indexed?: readonly Te
   const graph = createTestGraphSessionService({ graph: { generation: 7 } })
   const templates = createTemplateService({
     noteFile,
+    noteDocuments: createTestNoteDocumentService({ noteFile, openDocuments }),
     indexQuery: createIndexQueryService({ database }),
     notePath: createNotePathService({ database, noteFile }),
     noteMove,
