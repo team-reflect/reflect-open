@@ -564,6 +564,31 @@ describe('createIndexLifecycleService', () => {
     expect(passes()).toBe(2)
   })
 
+  it.fails('applies a change reported while a refresh pass runs', async () => {
+    const held = heldScans()
+    const { index, store, files, fileChanges } = setup({
+      files: { 'a.md': '+ [ ] a\n' },
+      onScan: held.onScan,
+    })
+    index.sync(sessionAt(5))
+    await vi.waitFor(() => expect(held.settles).toHaveLength(1))
+    held.settles[0]!()
+    await index.settled()
+
+    index.refresh(sessionAt(5))
+    await vi.waitFor(() => expect(held.settles).toHaveLength(2))
+    files.set('a.md', '+ [x] a\n', { modifiedMs: 123 })
+    fileChanges.emit({
+      changes: [{ path: 'a.md', kind: 'upsert', modifiedMs: 123 }],
+      source: 'own-write',
+    })
+    held.settles[1]!()
+    await index.settled()
+    await sleep(10)
+
+    expect(store.applied().map((note) => note.path)).toEqual(['a.md'])
+  })
+
   it('refresh() bails without a rerun when superseded', async () => {
     const { index, passes } = setup()
     index.refresh(endedSessionAt(5)) // a newer open owns the lifecycle
