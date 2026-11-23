@@ -243,8 +243,8 @@ describe('TasksScreen', () => {
     await view.findByText('today task')
     const headers = view.getAllByRole('heading', { level: 2 }).map((node) => node.textContent)
     expect(headers).toEqual(['Current', 'Overdue', 'Project'])
-    expect(view.getByText(/overdue task/)).toBeDefined()
-    expect(view.getByText('project task')).toBeDefined()
+    await expect.element(view.getByText(/overdue task/)).toBeInTheDocument()
+    await expect.element(view.getByText('project task')).toBeInTheDocument()
     await view.unmount()
   })
 
@@ -281,7 +281,9 @@ describe('TasksScreen', () => {
     view.getByText('StartupToolbox → Later')
 
     await userEvent.click(context)
-    expect(view.getByRole('button', { name: 'Convert to bullet 2' })).toBeDefined()
+    await expect
+      .element(view.getByRole('button', { name: 'Convert to bullet 2' }))
+      .toBeInTheDocument()
     await view.unmount()
   })
 
@@ -733,7 +735,7 @@ describe('TasksScreen', () => {
     await waitFor(() => expect(writesOf('toggle')).toHaveLength(2))
     // Completing keeps both showing struck (the middle state), not dropped.
     await waitFor(() => expect(view.getAllByRole('button', { name: /^Reopen:/ })).toHaveLength(2))
-    expect(view.getByText('first')).toBeDefined()
+    await expect.element(view.getByText('first')).toBeInTheDocument()
     await view.unmount()
   })
 
@@ -792,7 +794,7 @@ describe('TasksScreen', () => {
         checked: false,
       })
     })
-    expect(view.getByRole('button', { name: 'edited content' })).toBeDefined()
+    await expect.element(view.getByRole('button', { name: 'edited content' })).toBeInTheDocument()
     expect(insertTask).toHaveBeenCalledTimes(1)
     expect(writeTask).not.toHaveBeenCalled()
     await view.unmount()
@@ -850,7 +852,7 @@ describe('TasksScreen', () => {
     await userEvent.keyboard('{Enter}')
     // Nothing was selected, so the new row belongs to today's daily note.
     await view.findByTestId('task-editor')
-    expect(view.getByRole('heading', { name: 'Current' })).toBeDefined()
+    await expect.element(view.getByRole('heading', { name: 'Current' })).toBeInTheDocument()
     expect(insertTask).not.toHaveBeenCalled()
     await view.unmount()
   })
@@ -998,7 +1000,7 @@ describe('TasksScreen', () => {
       )
     })
     await view.findByText('editing:')
-    expect(view.getByRole('button', { name: 'edited content' })).toBeDefined()
+    await expect.element(view.getByRole('button', { name: 'edited content' })).toBeInTheDocument()
     expect(insertTask).not.toHaveBeenCalled()
     await view.unmount()
   })
@@ -1052,9 +1054,12 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'continue-edit' }))
 
     await view.findByText('editing:')
-    expect(view.getByText('later')).toBeDefined()
-    await userEvent.click(view.getByRole('button', { name: 'StartupToolbox → Reflections' }))
-    expect(view.getByRole('button', { name: 'Convert to bullet 2' })).toBeDefined()
+    await expect.element(view.getByText('later')).toBeInTheDocument()
+    // The new row sits under the breadcrumb of the row it continues.
+    expect(view.getAllByRole('button', { name: 'StartupToolbox → Reflections' })).toHaveLength(1)
+    const editor = view.getByTestId('task-editor').element()
+    const nextContext = view.getByRole('button', { name: 'StartupToolbox → Later' }).element()
+    expect(editor.compareDocumentPosition(nextContext)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     await view.unmount()
   })
 
@@ -1074,7 +1079,7 @@ describe('TasksScreen', () => {
         expect.objectContaining({ status: 'failed', message: 'The task could not be saved.' }),
       )
     })
-    expect(view.getByRole('button', { name: 'edited content' })).toBeDefined()
+    await expect.element(view.getByRole('button', { name: 'edited content' })).toBeInTheDocument()
     await view.unmount()
   })
 
@@ -1417,7 +1422,7 @@ describe('TasksScreen', () => {
     })
     // V1's middle state: the row stays visible, struck, until archived.
     await view.findByRole('button', { name: 'Reopen: project task' })
-    expect(view.getByText('project task')).toBeDefined()
+    await expect.element(view.getByText('project task')).toBeInTheDocument()
     await view.unmount()
   })
 
@@ -1471,7 +1476,7 @@ describe('TasksScreen', () => {
     const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'project task' }))
-    expect(view.getByTestId('task-editor')).toBeDefined()
+    await expect.element(view.getByTestId('task-editor')).toBeInTheDocument()
     await userEvent.click(view.getByRole('button', { name: 'Complete: project task' }))
 
     await waitFor(() => {
@@ -1755,7 +1760,7 @@ describe('TasksScreen', () => {
     const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'project task' }))
-    expect(view.getByTestId('task-editor')).toBeDefined()
+    await expect.element(view.getByTestId('task-editor')).toBeInTheDocument()
     await userEvent.click(view.getByRole('button', { name: 'Reopen: project task' }))
 
     await waitFor(() => {
@@ -1856,7 +1861,7 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
     // Flipped to completed in place — still on screen, now marked done.
     await view.findByRole('button', { name: 'Reopen: project task' })
-    expect(view.getByText('project task')).toBeDefined()
+    await expect.element(view.getByText('project task')).toBeInTheDocument()
     await view.unmount()
   })
 
@@ -1875,7 +1880,7 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
     // The row lingers struck and an Archive 1 action appears.
     const archive = await view.findByRole('button', { name: /Archive 1/ })
-    expect(view.getByText('project task')).toBeDefined()
+    await expect.element(view.getByText('project task')).toBeInTheDocument()
 
     await userEvent.click(archive)
     // Archiving hides this session's completed rows (still `[x]` on disk).
