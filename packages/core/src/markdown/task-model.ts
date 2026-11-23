@@ -15,5 +15,6 @@ export interface TaskSnapshot extends TaskLocator {
 
 /** A round task as the projection stores it: its snapshot plus its explicit due date. */
 export interface ParsedTask extends TaskSnapshot {
+  // FIXME: what's the format of this string? YYYY-MM-DD? Add a super simple comment right above the "dueDate: string | null" line
   dueDate: string | null
 }
