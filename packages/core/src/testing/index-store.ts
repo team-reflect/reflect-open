@@ -15,7 +15,6 @@ import type { TestDatabaseService } from './database.ts'
  */
 export type IndexStoreCall =
   | { readonly method: 'open' }
-  | { readonly method: 'apply'; readonly note: IndexedNote; readonly generation: number }
   | {
       readonly method: 'applyBatch'
       readonly notes: readonly IndexedNote[]
@@ -81,7 +80,7 @@ export interface TestIndexStoreService extends IndexStoreService {
    */
   calls(): readonly IndexStoreCall[]
   /**
-   * Every projection written by `apply` and `applyBatch`, in order.
+   * Every projection written by `applyBatch`, in order.
    */
   applied(): readonly IndexedNote[]
   /**
@@ -122,13 +121,6 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
     return Promise.try(() => {
       this.#record({ method: 'open' })
       return this.#generation
-    })
-  }
-
-  apply(note: IndexedNote, writeGeneration: number): Promise<IndexCommit> {
-    return Promise.try(() => {
-      this.#record({ method: 'apply', note, generation: writeGeneration })
-      return this.#writeNotes([note])
     })
   }
 

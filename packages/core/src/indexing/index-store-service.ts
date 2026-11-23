@@ -49,13 +49,9 @@ export interface IndexStoreService {
    */
   open(): MaybePromise<number>
   /**
-   * Apply one note's projection in a single Rust transaction. Every index
-   * write resolves with its commit `seq`, `null` when `generation` is stale.
-   */
-  apply(note: IndexedNote, generation: number): Promise<IndexCommit>
-  /**
-   * Apply many notes' projections in one Rust transaction. An empty batch
-   * never reaches the backend and resolves with a `null` seq.
+   * Apply many notes' projections in one Rust transaction. Every index write
+   * resolves with its commit `seq`, `null` when `generation` is stale. An
+   * empty batch never reaches the backend and resolves with a `null` seq.
    */
   applyBatch(notes: IndexedNote[], generation: number): Promise<IndexCommit>
   /**
@@ -128,10 +124,6 @@ class IndexStoreServiceImpl implements IndexStoreService {
 
   open(): Promise<number> {
     return this.#deps.ipc.call('index_open', {})
-  }
-
-  async apply(note: IndexedNote, generation: number): Promise<IndexCommit> {
-    return await this.#deps.ipc.call('index_apply', { note, generation })
   }
 
   async applyBatch(notes: IndexedNote[], generation: number): Promise<IndexCommit> {

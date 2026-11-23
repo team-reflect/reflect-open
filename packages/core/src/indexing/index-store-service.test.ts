@@ -15,7 +15,6 @@ function note(path: string): IndexedNote {
 function writeCommands(): Record<string, () => null> {
   return Object.fromEntries(
     [
-      'index_apply',
       'index_apply_batch',
       'index_remove',
       'index_move',
@@ -33,7 +32,6 @@ describe('createIndexStoreService', () => {
     const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
     const a = note('notes/a.md')
 
-    await store.apply(a, 3)
     await store.applyBatch([a], 3)
     await store.remove('notes/a.md', 3)
     await store.touch([{ path: 'notes/a.md', mtime: 9 }], 3)
@@ -41,7 +39,6 @@ describe('createIndexStoreService', () => {
     await store.setMeta('k', 'v', 3)
 
     expect(ipc.calls()).toEqual([
-      { command: 'index_apply', args: { note: a, generation: 3 } },
       { command: 'index_apply_batch', args: { notes: [a], generation: 3 } },
       { command: 'index_remove', args: { path: 'notes/a.md', generation: 3 } },
       {
@@ -139,7 +136,7 @@ describe('createTestIndexStoreService', () => {
     const store = createTestIndexStoreService({ database, meta: { seeded: 'yes' } })
     try {
       await store.applyBatch([note('notes/a.md'), note('notes/b.md')], 1)
-      await store.apply(note('notes/a.md'), 1)
+      await store.applyBatch([note('notes/a.md')], 1)
       await store.remove('notes/b.md', 1)
       await store.move('notes/x.md', 'notes/y.md', 1)
       await store.setMeta('k', 'v', 1)
@@ -164,15 +161,17 @@ describe('createTestIndexStoreService', () => {
     const store = createTestIndexStoreService({ database })
     try {
       const source = '# Title\n\n[[Other]] #tag\n'
-      await store.apply(
-        buildIndexedNote(parseNote({ path: 'notes/old.md', source }), {
-          fileHash: 'hash',
-          mtime: 1,
-          source,
-        }),
+      await store.applyBatch(
+        [
+          buildIndexedNote(parseNote({ path: 'notes/old.md', source }), {
+            fileHash: 'hash',
+            mtime: 1,
+            source,
+          }),
+        ],
         1,
       )
-      await store.apply(note('notes/taken.md'), 1)
+      await store.applyBatch([note('notes/taken.md')], 1)
       await store.moveIndexed('notes/old.md', 'notes/New Name.md', 1)
 
       expect(database.query('SELECT path, path_key FROM notes ORDER BY path')).toEqual([
