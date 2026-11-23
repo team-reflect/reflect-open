@@ -18,6 +18,7 @@
     "MBX_*",
     "RUSTUP_*",
     "CARGO_HOME",
+    "CARGO_LOG",
   ],
   "cacheMaxAge": "7d",
   "cacheMaxSize": "4GB",

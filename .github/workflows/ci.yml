@@ -398,12 +398,12 @@ jobs:
       - name: Test
         env:
           CARGO_LOG: cargo::core::compiler::fingerprint=info
-        run: pnpm turbo run test --filter=reflect-workspace
+        run: pnpm turbo run test --filter=reflect-workspace --force
 
       - name: Clippy
         env:
           CARGO_LOG: cargo::core::compiler::fingerprint=info
-        run: pnpm turbo run lint --filter=reflect-workspace
+        run: pnpm turbo run lint --filter=reflect-workspace --force
 
       # The iOS app links the core crates through `reflect-ffi`.
       - name: Clippy (iOS simulator)
