@@ -18,6 +18,7 @@ import {
 } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { ConnectGithubDialog } from './connect-github-dialog.tsx'
+import { noop } from '@ocavue/utils'
 
 // The connect actions of the graph's GitHub connector, scripted per test.
 const sync = {
@@ -128,7 +129,7 @@ describe('ConnectGithubDialog', () => {
 
   it('shows the signed-in identity on the finish step', async () => {
     // Hold the first repo lookup open, so the wizard stays on the finish step.
-    sync.connectExistingRepo.mockReturnValueOnce(new Promise<ConnectExistingResult>(() => {}))
+    sync.connectExistingRepo.mockReturnValueOnce(new Promise<ConnectExistingResult>(noop))
     await renderWizard()
 
     await page.getByRole('button', { name: 'Continue' }).click()
