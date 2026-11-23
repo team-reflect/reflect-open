@@ -10,10 +10,6 @@ inputs:
     description: The name of the mbx cache that this job restores and saves.
     required: false
     default: ${{ github.workflow }}-${{ github.job }}
-  cache-save:
-    description: Whether to save the mbx cache. With 'false', the job only restores it.
-    required: false
-    default: 'true'
 
 runs:
   using: composite
@@ -64,12 +60,10 @@ runs:
     # the mbx object store; a successful push to master or workflow_dispatch
     # saves.
     # https://mr-boxington.jdx.dev/github-action
-    # The action skips the save when ACTIONS_CACHE_MODE does not permit writes.
+    # A job with `cache-mode: read` restores the cache and skips the save.
     # https://github.com/jdx/mr-boxington-action/blob/b3ef673bd77c5426927fe8836c6185cdae04c2dd/src/lib.ts#L489-L505
     - name: Set up mbx
       uses: jdx/mr-boxington-action@b3ef673bd77c5426927fe8836c6185cdae04c2dd # v1.7.4
-      env:
-        ACTIONS_CACHE_MODE: ${{ inputs.cache-save == 'true' && 'write' || 'read' }}
       with:
         backend: ${{ inputs.cache == 'true' && 'github' || 'local' }}
         github-cache-mode: objects
@@ -79,4 +73,4 @@ runs:
         restore-keys: |
           mbx-v2/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/
           mbx-v2/${{ runner.os }}/${{ runner.arch }}/
-        save-on-workflow-dispatch: ${{ inputs.cache-save }}
+        save-on-workflow-dispatch: true

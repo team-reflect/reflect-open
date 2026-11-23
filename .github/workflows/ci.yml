@@ -185,6 +185,8 @@ jobs:
     needs: [classify]
     if: needs.classify.outputs.test-chromium == 'true'
     runs-on: ubuntu-24.04
+    # Restores the mbx cache of another job and saves no caches.
+    cache-mode: read
     strategy:
       fail-fast: false
       matrix:
@@ -211,7 +213,6 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-scope: node
-          cache-save: false
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:chromium
@@ -227,6 +228,8 @@ jobs:
     needs: [classify, test-chromium]
     if: needs.classify.outputs.test-webkit == 'true'
     runs-on: xcode-27
+    # Restores the mbx cache of another job and saves no caches.
+    cache-mode: read
     env:
       REFLECT_TEST_BROWSER: webkit
       # Suspected workaround, root cause unknown: WebContent sometimes
@@ -247,7 +250,6 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-scope: rust
-          cache-save: false
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:webkit
