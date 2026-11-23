@@ -9,7 +9,7 @@
 //! (`chat_write.rs`, `visit_write.rs`).
 //!
 //! The shell (a Tauri command, a uniffi export, a wasm binding) decides the
-//! thread each call runs on and how `index:written` reaches the frontend;
+//! thread each call runs on and how `index:committed` reaches the frontend;
 //! the session only reports whether a write committed.
 
 mod chat_write;

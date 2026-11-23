@@ -8,6 +8,7 @@ import { splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { displayNoteTitle } from '../markdown/note-title.ts'
 import { hasAuthoredTitle, parseNote } from '../markdown/extract.ts'
 import { slugForTitle } from '../markdown/slug.ts'
+import type { NoteDocumentService } from './note-document-service.ts'
 import type { NoteMoveService } from './note-move-service.ts'
 import type { OpenDocumentsService } from './open-documents-service.ts'
 
@@ -93,6 +94,7 @@ export interface TemplateService {
 
 export interface TemplateServiceDeps {
   readonly noteFile: NoteFileService
+  readonly noteDocuments: NoteDocumentService
   readonly indexQuery: IndexQueryService
   readonly notePath: NotePathService
   readonly noteMove: NoteMoveService
@@ -142,11 +144,14 @@ class TemplateServiceImpl implements TemplateService {
   }
 
   async createTemplate(name: string): Promise<string> {
-    const { noteFile, notePath, graphSession } = this.#deps
+    const { noteDocuments, notePath, graphSession } = this.#deps
     const { generation } = requireGraphSession(graphSession)
     const title = name.trim()
     const path = await notePath.availableTemplatePath(slugForTitle(title))
-    await noteFile.write(path, upsertFrontmatter('', { title }), generation)
+    await noteDocuments.commitSourceEdit(path, () => upsertFrontmatter('', { title }), {
+      generation,
+      createIfMissing: true,
+    })
     return path
   }
 
@@ -169,25 +174,19 @@ class TemplateServiceImpl implements TemplateService {
    * Rewrite the file's authored title to `title`, if it authors one.
    */
   async #retitleTemplate(path: string, title: string, generation: number): Promise<void> {
-    const { noteFile } = this.#deps
-    const source = await noteFile.read(path, generation)
-    const parsed = parseNote({ path, source })
-    const h1 = parsed.headings.find((heading) => heading.level === 1 && heading.text)
-    if (h1 !== undefined && h1.text === parsed.title) {
-      if (h1.text === title) {
-        return
-      }
-      await noteFile.write(
-        path,
-        `${source.slice(0, h1.from)}# ${title}${source.slice(h1.to)}`,
-        generation,
-      )
-      return
-    }
-    if (hasAuthoredTitle(parsed)) {
-      // No display-driving H1, so the authored title is frontmatter `title:`.
-      await noteFile.write(path, upsertFrontmatter(source, { title }), generation)
-    }
+    await this.#deps.noteDocuments.commitSourceEdit(
+      path,
+      (source) => {
+        const parsed = parseNote({ path, source })
+        const h1 = parsed.headings.find((heading) => heading.level === 1 && heading.text)
+        if (h1 !== undefined && h1.text === parsed.title) {
+          return `${source.slice(0, h1.from)}# ${title}${source.slice(h1.to)}`
+        }
+        // No display-driving H1, so the authored title is frontmatter `title:`.
+        return hasAuthoredTitle(parsed) ? upsertFrontmatter(source, { title }) : source
+      },
+      { generation },
+    )
   }
 }
 

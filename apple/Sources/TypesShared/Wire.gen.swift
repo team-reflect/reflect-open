@@ -1907,7 +1907,7 @@ public struct EmbeddedChunk: Codable, Sendable, Equatable {
 public enum EventName: String, Codable, Sendable, Equatable, CaseIterable {
     case indexChanged = "index:changed"
     case indexReconcile = "index:reconcile"
-    case indexWritten = "index:written"
+    case indexCommitted = "index:committed"
     case noteMoved = "note:moved"
 }
 
@@ -2594,6 +2594,57 @@ public struct IcloudSweepOutcome: Codable, Sendable, Equatable {
         try container.encode(changed, forKey: .changed)
         try container.encode(copies, forKey: .copies)
         try container.encode(autoResolved, forKey: .autoResolved)
+    }
+}
+
+/// What a write of the index projection committed.
+public struct IndexCommit: Codable, Sendable, Equatable {
+    public let seq: UInt64?
+
+    private enum CodingKeys: String, CodingKey {
+        case seq = "seq"
+    }
+
+    public init(seq: UInt64?) {
+        self.seq = seq
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.seq = try container.decodeIfPresent(UInt64.self, forKey: .seq)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(seq, forKey: .seq)
+    }
+}
+
+/// The payload of [`EventName::IndexCommitted`].
+public struct IndexCommitted: Codable, Sendable, Equatable {
+    public let seq: UInt64
+    public let paths: [String]?
+
+    private enum CodingKeys: String, CodingKey {
+        case seq = "seq"
+        case paths = "paths"
+    }
+
+    public init(seq: UInt64, paths: [String]?) {
+        self.seq = seq
+        self.paths = paths
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.seq = try container.decode(UInt64.self, forKey: .seq)
+        self.paths = try container.decodeIfPresent([String].self, forKey: .paths)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(seq, forKey: .seq)
+        try container.encode(paths, forKey: .paths)
     }
 }
 
@@ -3620,6 +3671,34 @@ public struct NotePrivacy: Codable, Sendable, Equatable {
     }
 }
 
+/// A note's text as the `note_read` command returns it.
+public struct NoteRead: Codable, Sendable, Equatable {
+    public let content: String
+    public let hash: String
+
+    private enum CodingKeys: String, CodingKey {
+        case content = "content"
+        case hash = "hash"
+    }
+
+    public init(content: String, hash: String) {
+        self.content = content
+        self.hash = hash
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.content = try container.decode(String.self, forKey: .content)
+        self.hash = try container.decode(String.self, forKey: .hash)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(content, forKey: .content)
+        try container.encode(hash, forKey: .hash)
+    }
+}
+
 /// The core fields of one note row.
 public struct NoteRow: Codable, Sendable, Equatable {
     public let path: String
@@ -3668,31 +3747,94 @@ public struct NoteRow: Codable, Sendable, Equatable {
     }
 }
 
+/// One note with the tasks that a read selected from it.
+public struct NoteTasks: Codable, Sendable, Equatable {
+    public let path: String
+    public let hash: String
+    public let title: String
+    public let dailyDate: String?
+    public let isPinned: Bool
+    public let pinnedOrder: Double?
+    public let updatedAt: Int64
+    public let tasks: [TaskRow]
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case hash = "hash"
+        case title = "title"
+        case dailyDate = "dailyDate"
+        case isPinned = "isPinned"
+        case pinnedOrder = "pinnedOrder"
+        case updatedAt = "updatedAt"
+        case tasks = "tasks"
+    }
+
+    public init(path: String, hash: String, title: String, dailyDate: String?, isPinned: Bool, pinnedOrder: Double?, updatedAt: Int64, tasks: [TaskRow]) {
+        self.path = path
+        self.hash = hash
+        self.title = title
+        self.dailyDate = dailyDate
+        self.isPinned = isPinned
+        self.pinnedOrder = pinnedOrder
+        self.updatedAt = updatedAt
+        self.tasks = tasks
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.hash = try container.decode(String.self, forKey: .hash)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.dailyDate = try container.decodeIfPresent(String.self, forKey: .dailyDate)
+        self.isPinned = try container.decode(Bool.self, forKey: .isPinned)
+        self.pinnedOrder = try container.decodeIfPresent(Double.self, forKey: .pinnedOrder)
+        self.updatedAt = try container.decode(Int64.self, forKey: .updatedAt)
+        self.tasks = try container.decode([TaskRow].self, forKey: .tasks)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(hash, forKey: .hash)
+        try container.encode(title, forKey: .title)
+        try container.encode(dailyDate, forKey: .dailyDate)
+        try container.encode(isPinned, forKey: .isPinned)
+        try container.encode(pinnedOrder, forKey: .pinnedOrder)
+        try container.encode(updatedAt, forKey: .updatedAt)
+        try container.encode(tasks, forKey: .tasks)
+    }
+}
+
 /// What a note write left on disk.
 public struct NoteWriteOutcome: Codable, Sendable, Equatable {
     public let modifiedMs: UInt64?
     public let merged: String?
+    public let hash: String
 
     private enum CodingKeys: String, CodingKey {
         case modifiedMs = "modifiedMs"
         case merged = "merged"
+        case hash = "hash"
     }
 
-    public init(modifiedMs: UInt64?, merged: String?) {
+    public init(modifiedMs: UInt64?, merged: String?, hash: String) {
         self.modifiedMs = modifiedMs
         self.merged = merged
+        self.hash = hash
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.modifiedMs = try container.decodeIfPresent(UInt64.self, forKey: .modifiedMs)
         self.merged = try container.decodeIfPresent(String.self, forKey: .merged)
+        self.hash = try container.decode(String.self, forKey: .hash)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(modifiedMs, forKey: .modifiedMs)
         try container.encode(merged, forKey: .merged)
+        try container.encode(hash, forKey: .hash)
     }
 }
 
@@ -4967,71 +5109,69 @@ public struct TagFacet: Codable, Sendable, Equatable {
     }
 }
 
-/// One task row with the fields of its note that the task list shows.
-public struct TaskRow: Codable, Sendable, Equatable {
-    public let notePath: String
-    public let astPath: String
-    public let markdown: String
-    public let breadcrumbs: String
-    public let checked: Bool
-    public let noteTitle: String
-    public let dailyDate: String?
-    public let isPinned: Bool
-    public let pinnedOrder: Double?
-    public let updatedAt: Int64
+/// The result of one read of the tasks.
+public struct TaskRead: Codable, Sendable, Equatable {
+    public let seq: UInt64
+    public let notes: [NoteTasks]
 
     private enum CodingKeys: String, CodingKey {
-        case notePath = "notePath"
-        case astPath = "astPath"
-        case markdown = "markdown"
-        case breadcrumbs = "breadcrumbs"
-        case checked = "checked"
-        case noteTitle = "noteTitle"
-        case dailyDate = "dailyDate"
-        case isPinned = "isPinned"
-        case pinnedOrder = "pinnedOrder"
-        case updatedAt = "updatedAt"
+        case seq = "seq"
+        case notes = "notes"
     }
 
-    public init(notePath: String, astPath: String, markdown: String, breadcrumbs: String, checked: Bool, noteTitle: String, dailyDate: String?, isPinned: Bool, pinnedOrder: Double?, updatedAt: Int64) {
-        self.notePath = notePath
-        self.astPath = astPath
-        self.markdown = markdown
-        self.breadcrumbs = breadcrumbs
-        self.checked = checked
-        self.noteTitle = noteTitle
-        self.dailyDate = dailyDate
-        self.isPinned = isPinned
-        self.pinnedOrder = pinnedOrder
-        self.updatedAt = updatedAt
+    public init(seq: UInt64, notes: [NoteTasks]) {
+        self.seq = seq
+        self.notes = notes
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.notePath = try container.decode(String.self, forKey: .notePath)
-        self.astPath = try container.decode(String.self, forKey: .astPath)
-        self.markdown = try container.decode(String.self, forKey: .markdown)
-        self.breadcrumbs = try container.decode(String.self, forKey: .breadcrumbs)
-        self.checked = try container.decode(Bool.self, forKey: .checked)
-        self.noteTitle = try container.decode(String.self, forKey: .noteTitle)
-        self.dailyDate = try container.decodeIfPresent(String.self, forKey: .dailyDate)
-        self.isPinned = try container.decode(Bool.self, forKey: .isPinned)
-        self.pinnedOrder = try container.decodeIfPresent(Double.self, forKey: .pinnedOrder)
-        self.updatedAt = try container.decode(Int64.self, forKey: .updatedAt)
+        self.seq = try container.decode(UInt64.self, forKey: .seq)
+        self.notes = try container.decode([NoteTasks].self, forKey: .notes)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(notePath, forKey: .notePath)
+        try container.encode(seq, forKey: .seq)
+        try container.encode(notes, forKey: .notes)
+    }
+}
+
+/// One task of a note.
+public struct TaskRow: Codable, Sendable, Equatable {
+    public let astPath: [UInt32]
+    public let markdown: String
+    public let breadcrumbs: [String]
+    public let checked: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case astPath = "astPath"
+        case markdown = "markdown"
+        case breadcrumbs = "breadcrumbs"
+        case checked = "checked"
+    }
+
+    public init(astPath: [UInt32], markdown: String, breadcrumbs: [String], checked: Bool) {
+        self.astPath = astPath
+        self.markdown = markdown
+        self.breadcrumbs = breadcrumbs
+        self.checked = checked
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.astPath = try container.decode([UInt32].self, forKey: .astPath)
+        self.markdown = try container.decode(String.self, forKey: .markdown)
+        self.breadcrumbs = try container.decode([String].self, forKey: .breadcrumbs)
+        self.checked = try container.decode(Bool.self, forKey: .checked)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(astPath, forKey: .astPath)
         try container.encode(markdown, forKey: .markdown)
         try container.encode(breadcrumbs, forKey: .breadcrumbs)
         try container.encode(checked, forKey: .checked)
-        try container.encode(noteTitle, forKey: .noteTitle)
-        try container.encode(dailyDate, forKey: .dailyDate)
-        try container.encode(isPinned, forKey: .isPinned)
-        try container.encode(pinnedOrder, forKey: .pinnedOrder)
-        try container.encode(updatedAt, forKey: .updatedAt)
     }
 }
 

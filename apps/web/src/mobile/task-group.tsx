@@ -1,7 +1,6 @@
 import { Fragment, type ReactElement } from 'react'
 import { Plus } from 'lucide-react'
 import {
-  getTaskKey,
   groupTaskContexts,
   type InsertTaskTarget,
   type OpenTask,
@@ -34,10 +33,6 @@ interface MobileTaskGroupProps {
    */
   onToggle: (task: OpenTask) => void
   /**
-   * Whether a Tasks write is in flight; checkboxes wait for it.
-   */
-  togglePending: boolean
-  /**
    * Open a note group's source note from its header, or a row's from its swipe action.
    */
   onOpen: (notePath: string) => void
@@ -65,7 +60,6 @@ export function MobileTaskGroup({
   onAdd,
   onEdit,
   onToggle,
-  togglePending,
   onOpen,
   onDelete,
   revealedRow,
@@ -120,16 +114,15 @@ export function MobileTaskGroup({
       </div>
       <ul className="flex flex-col">
         {contexts.map((context) => (
-          <Fragment key={getTaskKey(context.tasks[0]!)}>
+          <Fragment key={context.tasks[0]!.taskId}>
             <TaskBreadcrumbs breadcrumbs={context.visibleBreadcrumbs} className="px-4 pb-1 pt-3" />
             {context.tasks.map((task) => (
               <MobileTaskRow
-                key={getTaskKey(task)}
+                key={task.taskId}
                 task={task}
                 showSource={showSource}
                 onEdit={onEdit}
                 onToggle={() => onToggle(task)}
-                togglePending={togglePending}
                 revealedRow={revealedRow}
                 onOpenNote={() => onOpen(task.notePath)}
                 onDelete={() => onDelete(task)}

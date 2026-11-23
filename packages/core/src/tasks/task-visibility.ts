@@ -1,6 +1,5 @@
 import { groupTasks, type TaskGroup } from './group-tasks.ts'
 import type { OpenTask } from './open-task.ts'
-import { getTaskKey, isSameTask } from './task-identity.ts'
 
 /**
  * Which task groups the Tasks view shows (V1's task filter store). The five date
@@ -45,9 +44,9 @@ export interface TaskListSources {
    */
   readonly completed: readonly OpenTask[] | undefined
   /**
-   * This session's completed tasks, still showing struck until archived.
+   * The checked tasks that still show in the active list until archived.
    */
-  readonly recentlyCompleted: readonly OpenTask[]
+  readonly struck: readonly OpenTask[]
   readonly filters: TaskFilters
   /**
    * The search text, already trimmed and lowercased (empty = no filter).
@@ -66,27 +65,16 @@ function taskMatchesNeedle(task: OpenTask, needle: string): boolean {
 }
 
 /**
- * The Tasks list every surface renders (Plan 18): open rows merged with the
- * struck "completed" rows, searched, grouped ({@link groupTasks}) and narrowed to
- * the buckets the filters allow. Shared by the desktop screen and the mobile
- * Tasks tab so the two can't drift on the merge rules:
- *
- * - With archived on, the completed query is the full history — but a
- *   just-completed task may not be in it until the reindex refetches (and the
- *   query reloads blank when the filter first flips on), so the session set is
- *   unioned on top, deduped. With archived off, the session set is the only
- *   source of struck rows.
- * - Any open row also present struck is dropped from the open side — a refetch
- *   can briefly restore a just-completed task to the open cache before the
- *   reindex lands, and listing it both open and struck collides React keys.
- *   That shadow is only ever transient: a task genuinely reopened at its source
- *   note leaves the session set via `reconcileRecentlyCompleted` (its reindexed
- *   row carries a newer `updatedAt`), so the live open row takes over.
+ * The Tasks list every surface renders (Plan 18): the open rows and the
+ * struck rows, plus every completed row with archived on, searched, grouped
+ * ({@link groupTasks}) and narrowed to the buckets the filters allow. Shared
+ * by the desktop screen and the mobile Tasks tab. A task has one row, so a
+ * struck row that the completed list holds too shows once.
  */
 export function composeVisibleTaskGroups({
   open,
   completed,
-  recentlyCompleted,
+  struck,
   filters,
   needle,
   today,
@@ -94,16 +82,8 @@ export function composeVisibleTaskGroups({
   if (open === undefined) {
     return []
   }
-  const completedRows = filters.archived
-    ? [
-        ...(completed ?? []),
-        ...recentlyCompleted.filter(
-          (task) => !(completed ?? []).some((row) => isSameTask(row, task)),
-        ),
-      ]
-    : recentlyCompleted
-  const completedKeys = new Set(completedRows.map(getTaskKey))
-  const all = [...open.filter((task) => !completedKeys.has(getTaskKey(task))), ...completedRows]
+  const checked = filters.archived ? new Set([...(completed ?? []), ...struck]) : struck
+  const all = [...open, ...checked]
   const matched = needle ? all.filter((task) => taskMatchesNeedle(task, needle)) : all
   return visibleGroups(groupTasks(matched, today), filters)
 }

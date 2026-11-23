@@ -16,6 +16,7 @@ import {
   createTestClockService,
   createTestFileChangeService,
   createTestLoggerService,
+  createTestNoteDocumentService,
   createTestNoteFileService,
   createTestNoteSession,
   type TestNoteFileService,
@@ -104,7 +105,7 @@ describe('CaptureLinkRepairService', () => {
     openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
     repair = createCaptureLinkRepairService({
       noteFile,
-      openDocuments,
+      noteDocuments: createTestNoteDocumentService({ noteFile, openDocuments }),
       clock: createTestClockService({ now: CAPTURED_AT.getTime() + 60_000 }),
       logger: createTestLoggerService(),
     })
@@ -164,7 +165,7 @@ describe('CaptureLinkRepairService', () => {
     noteFile.set(oldDaily, daily)
     const lateNight = createCaptureLinkRepairService({
       noteFile,
-      openDocuments,
+      noteDocuments: createTestNoteDocumentService({ noteFile, openDocuments }),
       clock: createTestClockService({ now: new Date(2026, 3, 1, 0, 30).getTime() }),
       logger: createTestLoggerService(),
     })
@@ -209,11 +210,16 @@ describe('CaptureLinkRepairService', () => {
     expect(write).not.toHaveBeenCalled()
   })
 
-  it('skips an open daily that cannot take the edit', async () => {
+  it('skips an open daily with unsaved edits that cannot take the edit', async () => {
     await addCapture()
     const daily = `- ${PLACEHOLDER_LINK}\n`
     noteFile.set(DAILY, daily)
-    const session = createTestNoteSession({ path: DAILY, content: daily, accepts: false })
+    const session = createTestNoteSession({
+      path: DAILY,
+      content: daily,
+      accepts: false,
+      dirty: true,
+    })
     openDocuments.register({ session })
 
     await repair.sweep(3)
@@ -222,7 +228,7 @@ describe('CaptureLinkRepairService', () => {
     expect(noteFile.files().get(DAILY)).toBe(daily)
   })
 
-  it('keeps going after a daily changed underneath the write', async () => {
+  it('repairs a daily that changed underneath the write', async () => {
     await addCapture()
     const { identity, source } = await captureNote({
       capturedAt: new Date(2026, 5, 12, 9, 0, 0, 0),
@@ -241,7 +247,7 @@ describe('CaptureLinkRepairService', () => {
 
     await repair.sweep(3)
 
-    expect(noteFile.files().get(DAILY)).toBe(`- ${PLACEHOLDER_LINK}\n- typed meanwhile\n`)
+    expect(noteFile.files().get(DAILY)).toBe(`- ${TITLED_LINK}\n- typed meanwhile\n`)
     expect(noteFile.files().get('daily/2026-06-12.md')).toBe(
       `- [[${identity.base}|Kitchen design decisions part 2]]\n`,
     )

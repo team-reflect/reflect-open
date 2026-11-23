@@ -1,20 +1,22 @@
 import { useState, type ReactNode } from 'react'
 import { page, userEvent, type Locator } from 'vitest/browser'
-import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import {
   createTestDatabaseService,
   createTestCoreServices,
   makeOpenTask as task,
+  TestTaskIndex,
   type TestCoreServices,
   type TestHapticsService,
   type TestStorageService,
 } from '@reflect/core/testing'
-import type { OpenTask, TaskAction, TaskService, TaskWriteResult } from '@reflect/core'
+import type { OpenTask } from '@reflect/core'
 import { createTestSystemPreferencesService } from '@reflect/app/testing'
 import { useRouterState } from '@/routing/router.tsx'
 import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { spyOnTaskWrites, type TaskAction, type TaskWriteSpies } from '@/test-utils/task-writes.ts'
 import { act } from '@/test-utils/act.ts'
 import { scrollElement } from '@/test-utils/scroll.ts'
 import { MobileTasks } from './tasks.tsx'
@@ -110,17 +112,13 @@ vi.mock('@/editor/note-editor.tsx', async () => {
   }
 })
 
-// The screen runs on the real `TaskService` of the test app services; each
-// test steers its reads and writes through these spies.
-let getOpenTasks: MockInstance<TaskService['getOpenTasks']>
-let getCompletedTasks: MockInstance<TaskService['getCompletedTasks']>
-let writeTask: MockInstance<TaskService['writeTask']>
-let insertTask: MockInstance<TaskService['insertTask']>
-
-/**
- * The result of a write that changed nothing the cache needs to re-address.
- */
-const WRITTEN: TaskWriteResult = { source: '', moved: [], inserted: [], tasks: [], updatedAt: 0 }
+// The screen runs on the real `TaskService` of the test app services. Each
+// test supplies the rows the index returns through `getOpenTasks` and
+// `getCompletedTasks`, and steers the writes through the spies.
+let getOpenTasks: Mock<() => Promise<OpenTask[]>>
+let getCompletedTasks: Mock<() => Promise<OpenTask[]>>
+let writeTask: TaskWriteSpies['writeTask']
+let insertTask: TaskWriteSpies['insertTask']
 
 type TaskActionKind = TaskAction['kind']
 
@@ -220,7 +218,7 @@ async function revealSwipeActions(
 
 let storage: TestStorageService
 
-let core: Omit<TestCoreServices, 'tasks'> & { tasks: TaskService }
+let core: TestCoreServices
 
 beforeEach(async () => {
   await page.viewport(375, 700)
@@ -229,14 +227,12 @@ beforeEach(async () => {
     database: createTestDatabaseService(),
   })
   const { tasks } = core
-  getOpenTasks = vi.spyOn(tasks, 'getOpenTasks').mockResolvedValue([])
-  getCompletedTasks = vi.spyOn(tasks, 'getCompletedTasks').mockResolvedValue([])
-  writeTask = vi.spyOn(tasks, 'writeTask').mockResolvedValue(WRITTEN)
-  insertTask = vi.spyOn(tasks, 'insertTask').mockResolvedValue({
-    created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
-    moved: [],
-    updatedAt: 0,
-  })
+  getOpenTasks = vi.fn<() => Promise<OpenTask[]>>().mockResolvedValue([])
+  getCompletedTasks = vi.fn<() => Promise<OpenTask[]>>().mockResolvedValue([])
+  const taskIndex = new TestTaskIndex(core.database, getOpenTasks, getCompletedTasks)
+  const spies = spyOnTaskWrites(tasks.commands, taskIndex)
+  writeTask = spies.writeTask
+  insertTask = spies.insertTask
   storage = core.storage
   haptics = core.mobile.haptics
   // Today is 2026-06-14.
@@ -636,17 +632,20 @@ describe('MobileTasks', () => {
 
     await user.click(await view.findByRole('button', { name: 'Add a task to today' }))
 
-    await waitFor(() => expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md'))
-    // The new (empty) task's quick-edit sheet opens to type into.
+    // The new (empty) task's quick-edit sheet opens to type into; nothing is written yet.
     const input = asTextArea(await view.findByRole('textbox', { name: 'Task text' }))
     expect(input.value).toBe('')
+    expect(insertTask).not.toHaveBeenCalled()
 
     await user.type(input, 'new thing')
     await swipeDrawerClosed()
-    expect(writesOf('setMarkdown')).toHaveLength(1)
-    expect(writeTask).toHaveBeenCalledWith(expect.anything(), [
-      { kind: 'setMarkdown', markdown: 'new thing' },
-    ])
+    await waitFor(() => {
+      expect(insertTask.mock.calls).toEqual([
+        ['daily/2026-06-14.md', { markdown: 'new thing', checked: false }],
+      ])
+    })
+    await expect.element(view.getByText('new thing')).toBeInTheDocument()
+    expect(writeTask).not.toHaveBeenCalled()
     await view.unmount()
   })
 
@@ -658,9 +657,15 @@ describe('MobileTasks', () => {
     await view.findByText('buy milk')
     await user.click(view.getByRole('button', { name: 'New task' }))
 
-    await waitFor(() => expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md'))
     const input = asTextArea(await view.findByRole('textbox', { name: 'Task text' }))
     expect(input.value).toBe('')
+    await user.type(input, 'new thing')
+    await user.click(view.getByRole('button', { name: 'Complete' }))
+    await waitFor(() => {
+      expect(insertTask.mock.calls).toEqual([
+        ['daily/2026-06-14.md', { markdown: 'new thing', checked: true }],
+      ])
+    })
     await view.unmount()
   })
 
@@ -715,7 +720,7 @@ describe('MobileTasks', () => {
     await view.unmount()
   })
 
-  it('abandoning a "+"-added task deletes it instead of ghosting an empty row', async () => {
+  it('drops a "+"-added task left empty, with no write', async () => {
     getOpenTasks.mockResolvedValue([
       task({ text: 'jotted today', dailyDate: '2026-06-14', notePath: 'daily/2026-06-14.md' }),
     ])
@@ -724,10 +729,15 @@ describe('MobileTasks', () => {
 
     await user.click(await view.findByRole('button', { name: 'Add a task to today' }))
     await view.findByRole('textbox', { name: 'Task text' })
+    // The sheet hides the list behind it from the accessibility tree.
+    await expect
+      .element(view.getByRole('button', { name: 'Edit: Empty task', includeHidden: true }))
+      .toBeInTheDocument()
     await swipeDrawerClosed()
 
-    await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
-    expect(writesOf('setMarkdown')).toHaveLength(0)
+    await waitFor(() => expect(view.queryByRole('button', { name: 'Edit: Empty task' })).toBeNull())
+    expect(insertTask).not.toHaveBeenCalled()
+    expect(writeTask).not.toHaveBeenCalled()
     await view.unmount()
   })
 
@@ -750,7 +760,7 @@ describe('MobileTasks', () => {
     ])
   })
 
-  it('deletes an abandoned "+"-added task when the screen unmounts', async () => {
+  it('writes a "+"-added task with text when the screen unmounts', async () => {
     getOpenTasks.mockResolvedValue([
       task({ text: 'jotted today', dailyDate: '2026-06-14', notePath: 'daily/2026-06-14.md' }),
     ])
@@ -758,11 +768,14 @@ describe('MobileTasks', () => {
     const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Add a task to today' }))
-    await view.findByRole('textbox', { name: 'Task text' })
+    await user.type(await view.findByRole('textbox', { name: 'Task text' }), 'new thing')
     await view.unmount()
 
-    await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
-    expect(writesOf('setMarkdown')).toHaveLength(0)
+    await waitFor(() => {
+      expect(insertTask.mock.calls).toEqual([
+        ['daily/2026-06-14.md', { markdown: 'new thing', checked: false }],
+      ])
+    })
   })
 
   it('hides buckets through the filter sheet', async () => {
@@ -831,15 +844,24 @@ describe('MobileTasks', () => {
     await view.findByText('No tasks to show')
     await user.click(view.getByRole('button', { name: 'Add a task' }))
 
-    await waitFor(() => expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md'))
+    await view.findByRole('textbox', { name: 'Task text' })
+    // The sheet hides the list behind it from the accessibility tree.
+    await expect
+      .element(view.getByRole('heading', { name: /Current/, includeHidden: true }))
+      .toBeInTheDocument()
     await view.unmount()
   })
 
-  it('surfaces a failed open-tasks read', async () => {
-    getOpenTasks.mockRejectedValue(new Error('no index'))
+  it('shows no error for a failed read and lists the tasks once a read lands', async () => {
+    getOpenTasks
+      .mockRejectedValueOnce(new Error('no index'))
+      .mockResolvedValue([task({ text: 'buy milk' })])
     const view = await renderScreen()
+    await waitFor(() => expect(getOpenTasks).toHaveBeenCalledTimes(1))
+    expect(view.queryByRole('alert')).toBeNull()
 
-    await view.findByRole('alert')
+    await act(() => core.clock.advance(250))
+    await view.findByText('buy milk')
     await view.unmount()
   })
 

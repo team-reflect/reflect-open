@@ -11,6 +11,7 @@ import {
   type TestNoteFileService,
   type TestNoteSession,
 } from '../testing/index.ts'
+import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createNoteDocumentService } from '../documents/note-document-service.ts'
 import {
   createOpenDocumentsService,
@@ -27,7 +28,7 @@ import {
 } from './contact-suggestion-service.ts'
 import { contactsCanLookup, type ContactsService } from './contacts-service.ts'
 import type { GraphSessionService } from '../graph/graph-session-service.ts'
-import type { NoteFileService } from '../graph/note-file-service.ts'
+import type { WritableNoteFileService } from '../graph/note-file-service.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
 
 const PATH = 'notes/Ada Lovelace.md'
@@ -55,7 +56,7 @@ let service: ContactSuggestionService
 function contactSuggestionsOver(deps?: {
   contacts?: ContactsService
   openDocuments?: OpenDocumentsService
-  noteFile?: NoteFileService
+  noteFile?: WritableNoteFileService
   settings?: SettingsService
   graphSession?: GraphSessionService
 }): ContactSuggestionService {
@@ -69,9 +70,9 @@ function contactSuggestionsOver(deps?: {
       openDocuments,
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
+      indexLifecycle: createTestIndexLifecycleService(),
+      logger: createTestLoggerService(),
     }),
-    openDocuments,
-    noteFile,
     settings: deps?.settings ?? createTestSettingsService(),
     graphSession: deps?.graphSession ?? createTestGraphSessionService({ graph: { generation: 3 } }),
     logger: createTestLoggerService(),
@@ -83,8 +84,8 @@ function contactSuggestionsOver(deps?: {
  * Open the note in a pane: the session's buffer is then the note's live source.
 
  */
-function openNote(content: string, options: { accepts?: boolean } = {}): TestNoteSession {
-  const session = createTestNoteSession({ path: PATH, content, accepts: options.accepts ?? true })
+function openNote(content: string): TestNoteSession {
+  const session = createTestNoteSession({ path: PATH, content })
   openDocuments.register({ session })
   return session
 }
@@ -174,14 +175,21 @@ describe('addToNote', () => {
 
     await service.addToNote(PATH, ADA)
 
-    expect(session.getCalls('commitBodyAppend')).toEqual([[ADA_BLOCK]])
+    expect(session.content()).toBe(`# Ada Lovelace\n\n${ADA_BLOCK}\n`)
     // No frontmatter mark: the appended details suppress the card by content.
     expect(session.getCalls('commitFrontmatter')).toEqual([])
     expect(noteFile.writes()).toEqual([])
   })
 
-  it('refuses rather than clobber when the open session cannot take the append', async () => {
-    openNote('# Ada Lovelace\n', { accepts: false })
+  it('refuses rather than clobber when a session with unsaved edits cannot take the append', async () => {
+    openDocuments.register({
+      session: createTestNoteSession({
+        path: PATH,
+        content: '# Ada Lovelace\n',
+        accepts: false,
+        dirty: true,
+      }),
+    })
 
     await expect(service.addToNote(PATH, ADA)).rejects.toThrow(/can’t be updated right now/)
     expect(noteFile.writes()).toEqual([])
@@ -205,7 +213,7 @@ describe('addToNote', () => {
     const session = openNote('# Grace Hopper\n')
 
     await expect(service.addToNote(PATH, ADA)).rejects.toThrow(/no longer matches/)
-    expect(session.getCalls('commitBodyAppend')).toEqual([])
+    expect(session.content()).toBe('# Grace Hopper\n')
     expect(noteFile.writes()).toEqual([])
   })
 
@@ -214,9 +222,9 @@ describe('addToNote', () => {
 
     await service.addToNote(PATH, ADA)
 
-    expect(session.getCalls('commitBodyAppend')).toEqual([
-      ['- Email: ada@example.com\n- Phone: +1 555 0100'],
-    ])
+    expect(session.content()).toBe(
+      '# Ada Lovelace\n\n- Type: #person\n\n- Email: ada@example.com\n- Phone: +1 555 0100\n',
+    )
   })
 
   it('is retry-idempotent: a body already carrying the block writes nothing', async () => {
@@ -234,7 +242,7 @@ describe('addToNote', () => {
 
     await service.addToNote(PATH, ADA)
 
-    expect(session.getCalls('commitBodyAppend')).toEqual([])
+    expect(session.content()).toBe('# Ada Lovelace\n\nWork mail ada@work.com\n')
     expect(noteFile.writes()).toEqual([])
   })
 
@@ -270,7 +278,6 @@ describe('ignore', () => {
     await service.ignore(PATH, ADA)
 
     expect(session.getCalls('commitFrontmatter')).toEqual([[{ ignoredContacts: ['Ada Lovelace'] }]])
-    expect(session.getCalls('commitBodyAppend')).toEqual([])
     expect(noteFile.writes()).toEqual([])
   })
 

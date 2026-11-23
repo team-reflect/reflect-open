@@ -19,6 +19,7 @@ import {
   createTestClockService,
   createTestFileChangeService,
   createTestActivityPort,
+  createTestNoteDocumentService,
   createTestNoteFileService,
   createTestProgressPort,
   createTestSecretStoreService,
@@ -155,6 +156,7 @@ export async function createAudioMemoTestKit(
 
   const service = createAudioMemoTranscriptionService({
     noteFile,
+    noteDocuments: createTestNoteDocumentService({ noteFile }),
     assetStore,
     backlinkTarget: { ensure: ensureBacklinkTargetMock },
     transcription,

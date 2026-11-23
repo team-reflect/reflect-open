@@ -32,12 +32,13 @@ import { isSilentStop, type ReconcileStop } from '../reconcile/reconcile.ts'
 import type { BacklinkTargetService } from '../capture/backlink-target-service.ts'
 import { errorMessage, isAppError, toAppError } from '../errors.ts'
 import type { AssetStoreService } from '../graph/asset-store-service.ts'
+import type { NoteDocumentService } from '../documents/note-document-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { AUDIO_MEMOS_DIR, dailyPath } from '../graph/paths.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
 import { WritableStore, type Store } from '../store.ts'
 import { wikiLinkSafe } from '../markdown/edit.ts'
-import { appendListItem } from '../markdown/task-ast.ts'
+import { appendListItem } from '../markdown/list-insert.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
 import { returnNull } from '@ocavue/utils'
 
@@ -93,6 +94,7 @@ export interface ReconcileAudioMemosOutcome {
 
 export interface AudioMemoTranscriptionServiceDeps {
   readonly noteFile: NoteFileService
+  readonly noteDocuments: NoteDocumentService
   readonly assetStore: AssetStoreService
   readonly backlinkTarget: BacklinkTargetService
   readonly transcription: TranscriptionService
@@ -386,7 +388,6 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
   async reconcile(input: ReconcileAudioMemosInput): Promise<ReconcileAudioMemosOutcome> {
     const {
       backlinkTarget,
-      noteFile,
       transcription,
       transcriptEnrichment,
       aiProviderConfig,
@@ -489,7 +490,7 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
             sessionTranscript,
             recordingLinks(session),
           )
-          await noteFile.write(memo.notePath, note, input.generation)
+          await this.#writeNote(memo.notePath, note, input.generation)
           await this.#ensureDailyBacklink(memo, memo.title, memosNoteTitle, input.generation)
           transcribed += 1
           continue
@@ -539,7 +540,7 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
         if (stale()) {
           return stalled()
         }
-        await noteFile.write(
+        await this.#writeNote(
           memo.notePath,
           transcriptionNote(memo, title, body, recordingLinks(session)),
           input.generation,
@@ -655,9 +656,18 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
   }
 
   /**
+   * Make `source` the text of the note at `path`, creating the note when it is missing.
+   */
+  async #writeNote(path: string, source: string, generation: number): Promise<void> {
+    await this.#deps.noteDocuments.commitSourceEdit(path, () => source, {
+      generation,
+      createIfMissing: true,
+    })
+  }
+
+  /**
    * Append the memo's wikilink once under `## [[Audio memos]]`, creating the
-   * heading and daily file as needed. The watcher reindexes the direct write;
-   * open dirty editors park a conflict instead of being clobbered.
+   * heading and daily file as needed.
    */
   async #ensureDailyBacklink(
     memo: AudioMemoIdentity,
@@ -665,19 +675,21 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
     memosNoteTitle: string,
     generation: number,
   ): Promise<void> {
-    const { noteFile } = this.#deps
-    const source = await this.#dailyNoteSource(memo.date, generation)
-    if (hasBacklink(source, memo)) {
-      return
-    }
     const displayTitle = wikiLinkSafe(title) || memo.title
-    const entry = `[[${memo.base}|${displayTitle}]]`
-    const updated = appendListItem(source, {
-      kind: 'bullet',
-      markdown: entry,
-      section: { titles: [memosNoteTitle, MEMOS_NOTE_TITLE], linked: true },
-    })
-    await noteFile.write(dailyPath(memo.date), updated, generation)
+    await this.#deps.noteDocuments.commitSourceEdit(
+      dailyPath(memo.date),
+      (source) => {
+        if (hasBacklink(source, memo)) {
+          return source
+        }
+        return appendListItem(source, {
+          kind: 'bullet',
+          markdown: `[[${memo.base}|${displayTitle}]]`,
+          section: { titles: [memosNoteTitle, MEMOS_NOTE_TITLE], linked: true },
+        })
+      },
+      { generation, createIfMissing: true },
+    )
   }
 
   /**

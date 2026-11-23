@@ -5,13 +5,13 @@
 //! transactions and generation gating while these stay directly unit-testable.
 
 use rusqlite::Connection;
-use sea_query::{Expr, ExprTrait, Query};
+use sea_query::{Expr, ExprTrait, OnConflict, Query};
 
 use reflect_types::{AppError, AppResult, IndexedNote, MovedNoteAddress};
 
 use crate::schema::{
-    Aliases, Assets, EmbeddingChunks, EmbeddingVectors, Links, NoteClaims, NoteEmails, NoteVisits,
-    Notes, SearchFts, Tags, Tasks,
+    Aliases, Assets, EmbeddingChunks, EmbeddingVectors, IndexMeta, Links, NoteClaims, NoteEmails,
+    NoteVisits, Notes, SearchFts, Tags, Tasks,
 };
 use crate::sql::{self, lit};
 
@@ -385,6 +385,23 @@ pub(super) fn remove_note(conn: &Connection, path: &str) -> AppResult<()> {
         Query::delete()
             .from_table(SearchFts::Table)
             .and_where(Expr::col(SearchFts::Path).eq(path)),
+    )?;
+    Ok(())
+}
+
+/// Upsert one `index_meta` key.
+pub(super) fn set_meta(conn: &Connection, key: &str, value: &str) -> AppResult<()> {
+    sql::execute(
+        conn,
+        Query::insert()
+            .into_table(IndexMeta::Table)
+            .columns([IndexMeta::Key, IndexMeta::Value])
+            .values_panic([key.into(), value.into()])
+            .on_conflict(
+                OnConflict::column(IndexMeta::Key)
+                    .update_column(IndexMeta::Value)
+                    .to_owned(),
+            ),
     )?;
     Ok(())
 }

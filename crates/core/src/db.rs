@@ -4,15 +4,15 @@
 //! The session owns the connections, the generation gate and every
 //! transaction. This module adds the iOS background assertion a write holds
 //! before it takes the SQLite lock, the thread a read runs on, the
-//! `index:written` / `note:moved` broadcasts after a committed write, and the
-//! repair of a corrupt index file after a failed command.
+//! `index:committed` / `note:moved` broadcasts after a committed write, and
+//! the repair of a corrupt index file after a failed command.
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use reflect_index::{FileIndexConnections, IndexCommands, IndexEvents};
+use reflect_types::events::{EventName, IndexCommitted};
 use reflect_types::{AppError, AppResult, NoteMoveRequest, ReconcileScan};
-use serde_json::Value;
 
 use crate::{Core, Reply, background_task};
 
@@ -24,8 +24,11 @@ fn now_ms() -> u64 {
 }
 
 impl IndexEvents for Core {
-    fn index_written(&self) {
-        self.emit_index_written();
+    fn index_committed(&self, commit: &IndexCommitted) {
+        self.host().emit(
+            EventName::IndexCommitted.as_str(),
+            serde_json::json!(commit),
+        );
     }
 
     fn note_moved(&self, from: &str, to: &str) {
@@ -80,24 +83,15 @@ impl Core {
         if let Err(err) = &result
             && self.index.repair(generation, err)
         {
-            self.host().emit(
-                reflect_types::events::EventName::IndexReconcile.as_str(),
-                Value::Null,
-            );
+            self.host()
+                .emit(EventName::IndexReconcile.as_str(), serde_json::Value::Null);
         }
         result
     }
 
-    fn emit_index_written(&self) {
-        self.host().emit(
-            reflect_types::events::EventName::IndexWritten.as_str(),
-            Value::Null,
-        );
-    }
-
     fn emit_note_moved(&self, from: &str, to: &str) {
         self.host().emit(
-            reflect_types::events::EventName::NoteMoved.as_str(),
+            EventName::NoteMoved.as_str(),
             serde_json::json!({ "from": from, "to": to }),
         );
     }
@@ -137,9 +131,12 @@ impl Core {
                 reflect_graph_io::move_note_file(&root, &request.from, &request.to)
             })
         });
-        self.repair_index(index_generation, moved)?;
+        let seq = self.repair_index(index_generation, moved)?;
         reflect_graph_io::invalidate_file_catalog(&self.graph, &root);
-        self.emit_index_written();
+        self.index_committed(&IndexCommitted {
+            seq,
+            paths: Some(vec![request.from.clone(), request.to.clone()]),
+        });
         self.emit_note_moved(&request.from, &request.to);
         Ok(())
     }
@@ -187,6 +184,8 @@ impl Core {
 mod tests {
     use std::sync::Mutex;
 
+    use serde_json::Value;
+
     use super::*;
     use crate::{CoreConfig, Host, Reply};
 
@@ -233,13 +232,16 @@ mod tests {
             core.dispatch("index_clear", args.as_bytes(), b"{}", None)
                 .await
                 .unwrap();
+            assert_eq!(*host.events.lock().unwrap(), []);
+            let args = format!(r#"{{"seq":1,"paths":["notes/a.md"],"generation":{generation}}}"#);
+            core.dispatch("index_announce", args.as_bytes(), b"{}", None)
+                .await
+                .unwrap();
             assert_eq!(
                 *host.events.lock().unwrap(),
                 [(
-                    reflect_types::events::EventName::IndexWritten
-                        .as_str()
-                        .to_string(),
-                    Value::Null
+                    EventName::IndexCommitted.as_str().to_string(),
+                    serde_json::json!({ "seq": 1, "paths": ["notes/a.md"] })
                 )]
             );
             assert_eq!(

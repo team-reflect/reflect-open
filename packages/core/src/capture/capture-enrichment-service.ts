@@ -26,6 +26,7 @@ import type { ReconcileStop } from '../reconcile/reconcile.ts'
 import type { WebFetchService } from '../link-preview/web-fetch-service.ts'
 import { errorMessage, isAppError, toAppError } from '../errors.ts'
 import type { AssetStoreService } from '../graph/asset-store-service.ts'
+import type { NoteDocumentService } from '../documents/note-document-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { dailyPath } from '../graph/paths.ts'
 import type { PageMeta } from '../link-preview/metadata.ts'
@@ -97,6 +98,7 @@ interface GenerateEnrichmentInput {
 
 export interface CaptureEnrichmentServiceDeps {
   readonly noteFile: NoteFileService
+  readonly noteDocuments: NoteDocumentService
   readonly assetStore: AssetStoreService
   readonly webFetch: WebFetchService
   readonly pageMeta: PageMetaService
@@ -131,7 +133,7 @@ class CaptureEnrichmentServiceImpl implements CaptureEnrichmentService {
 
   constructor(deps: CaptureEnrichmentServiceDeps) {
     this.#deps = deps
-    this.#writes = { noteFile: deps.noteFile }
+    this.#writes = { noteFile: deps.noteFile, noteDocuments: deps.noteDocuments }
   }
 
   async listPending(generation: number): Promise<CaptureIdentity[]> {
@@ -163,7 +165,7 @@ class CaptureEnrichmentServiceImpl implements CaptureEnrichmentService {
   async reconcile(
     input: ReconcileCaptureEnrichmentInput,
   ): Promise<ReconcileCaptureEnrichmentOutcome> {
-    const { noteFile, assetStore, aiProviderConfig, aiCredentials } = this.#deps
+    const { noteFile, noteDocuments, assetStore, aiProviderConfig, aiCredentials } = this.#deps
     const pageMetaService = this.#deps.pageMeta
     const writes = this.#writes
     let pending: CaptureIdentity[]
@@ -211,22 +213,24 @@ class CaptureEnrichmentServiceImpl implements CaptureEnrichmentService {
       skipped,
       stopped,
     })
-    const markSkipped = async (source: string, identity: CaptureIdentity): Promise<void> => {
-      await noteFile.write(
+    const markSkipped = async (identity: CaptureIdentity): Promise<void> => {
+      await noteDocuments.commitSourceEdit(
         identity.notePath,
-        upsertFrontmatter(source, {
-          captureStatus: 'skipped',
-          captureDailyFromTitle: undefined,
-          captureFinalizeStatus: undefined,
-        }),
-        input.generation,
+        (source) => {
+          return upsertFrontmatter(source, {
+            captureStatus: 'skipped',
+            captureDailyFromTitle: undefined,
+            captureFinalizeStatus: undefined,
+          })
+        },
+        { generation: input.generation },
       )
       skipped += 1
     }
     const skipPending = async (identity: CaptureIdentity): Promise<void> => {
       const snapshot = await readPendingCaptureSnapshot(writes, identity, input.generation)
       if (snapshot !== null) {
-        await markSkipped(snapshot.source, identity)
+        await markSkipped(identity)
       }
     }
     const currentCapture = async (
@@ -244,7 +248,7 @@ class CaptureEnrichmentServiceImpl implements CaptureEnrichmentService {
         notePrivate(dailySource) ||
         bodyHash !== (expectedHash ?? snapshot.meta.captureHash)
       ) {
-        await markSkipped(snapshot.source, identity)
+        await markSkipped(identity)
         return null
       }
       return snapshot

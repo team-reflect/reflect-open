@@ -142,9 +142,10 @@ class BacklinkServiceImpl implements BacklinkService {
     await Promise.all(
       pageSources.map(async ({ sourcePath }) => {
         try {
-          const source = prepareBlockContext(await noteFile.read(sourcePath, generation))
+          const { content, hash } = await noteFile.readWithHash(sourcePath, generation)
+          const source = prepareBlockContext(content)
           sources.set(sourcePath, source)
-          locators.set(sourcePath, createSourceTaskLocator(source))
+          locators.set(sourcePath, createSourceTaskLocator(source, hash))
         } catch {
           sources.set(sourcePath, null)
         }

@@ -1,5 +1,4 @@
 import type { ReactElement } from 'react'
-import { getTaskKey } from '@reflect/core'
 import { routeForPath } from '@reflect/app'
 import {
   useMobileAudioMemo,
@@ -36,12 +35,11 @@ export function useDailyCapture(): { plus: ChromePlus; sheet: ReactElement | nul
     sheet:
       newTask.task === null ? null : (
         <MobileTaskEditSheet
-          key={getTaskKey(newTask.task)}
+          key={newTask.task.taskId}
           task={newTask.task}
           open={newTask.open}
           onOpenChange={newTask.setOpen}
           today={newTask.today}
-          actions={newTask.actions}
           onOpenNote={(path) => navigate(routeForPath(path))}
           autoFocusEditor
         />

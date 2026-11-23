@@ -1,3 +1,4 @@
+import type { NoteRead } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { GraphRole, GraphSession } from '../graph/graph-session.ts'
@@ -19,7 +20,7 @@ import {
   type IndexReconciledEvent,
 } from '../indexing/index-lifecycle-service.ts'
 import { createIndexQueryService, type IndexQueryService } from '../indexing/index-query-service.ts'
-import type { IndexStoreService } from '../indexing/index-store-service.ts'
+import type { WritableIndexStoreService } from '../indexing/index-store-service.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { XArchiveService } from '../embeds/x-archive-service.ts'
 import { createTestXArchiveService } from './capture.ts'
@@ -38,7 +39,7 @@ import { noop } from '@ocavue/utils'
  * The services a test lifecycle runs on; each defaults to a fresh test double.
  */
 export interface TestIndexLifecycleServiceOptions {
-  indexStore?: IndexStoreService
+  indexStore?: WritableIndexStoreService
   noteFile?: NoteFileService
   fileChanges?: FileChangeService
   /**
@@ -169,17 +170,16 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
     }
   }
 
-  applyChanges(
-    changes: FileChange[],
-    generation: number,
-    fileGeneration: number,
-    canApply?: () => boolean,
-  ): Promise<number> {
-    return this.#inner.applyChanges(changes, generation, fileGeneration, canApply)
-  }
-
   onReconciled(listener: (event: IndexReconciledEvent) => MaybePromise<void>): Unlisten {
     return this.#inner.onReconciled(listener)
+  }
+
+  markDirty(changes: readonly FileChange[], generation: number, fileGeneration: number): void {
+    this.#inner.markDirty(changes, generation, fileGeneration)
+  }
+
+  drained(): Promise<void> {
+    return this.#inner.drained()
   }
 
   onMoved(listener: (from: string, to: string) => void): Unlisten {
@@ -203,10 +203,10 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
     options: {
       generation: number
       fileGeneration: number
-      content?: string | undefined
+      note?: NoteRead | undefined
       mtime?: number | undefined
     },
-  ): Promise<void> {
+  ): Promise<number | null> {
     return this.#inner.indexNote(path, options)
   }
 

@@ -13,11 +13,10 @@ pub enum EventName {
     /// Asks the frontend for one full reconcile pass. Carries no payload.
     #[serde(rename = "index:reconcile")]
     IndexReconcile,
-    /// Fired after a note-projection write commits. Secondary note windows run
-    /// no indexer of their own and refetch their index-backed queries on this
-    /// signal.
-    #[serde(rename = "index:written")]
-    IndexWritten,
+    /// Fired after note-projection writes committed, with an
+    /// [`IndexCommitted`]. Every window hears it.
+    #[serde(rename = "index:committed")]
+    IndexCommitted,
     /// Fired after a note's rows move to a new path (an in-app rename or an
     /// id-healed external one), with `{ "from": ..., "to": ... }`.
     #[serde(rename = "note:moved")]
@@ -30,8 +29,19 @@ impl EventName {
         match self {
             Self::IndexChanged => "index:changed",
             Self::IndexReconcile => "index:reconcile",
-            Self::IndexWritten => "index:written",
+            Self::IndexCommitted => "index:committed",
             Self::NoteMoved => "note:moved",
         }
     }
+}
+
+/// The payload of [`EventName::IndexCommitted`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct IndexCommitted {
+    /// A commit sequence of the index that covers the announced writes.
+    pub seq: u64,
+    /// The notes whose rows changed, or `None` when any note may have.
+    pub paths: Option<Vec<String>>,
 }

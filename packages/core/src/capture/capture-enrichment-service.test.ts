@@ -3,6 +3,7 @@ import type { CaptureEnvelope } from './capture-envelope.ts'
 import { captureIdentity } from './capture-identity.ts'
 import { DescriptionRejectedError } from '../ai/page-describer-service.ts'
 import { AppError } from '../errors.ts'
+import type { NoteWriteResult } from '../graph/note-file-service.ts'
 import {
   API_KEY_SECRET,
   CAPTURE_URL,
@@ -13,6 +14,8 @@ import {
   NO_PROVIDERS,
   type CaptureTestKit,
 } from './capture-test-kit.ts'
+
+const UNMERGED_WRITE: NoteWriteResult = { merged: null, hash: '', modifiedMs: 0 }
 
 let kit: CaptureTestKit
 
@@ -857,7 +860,7 @@ describe('CaptureEnrichmentService', () => {
     kit.writeNoteMock
       .mockImplementationOnce((path, contents) => {
         kit.noteFile.set(path, contents)
-        return Promise.resolve({ merged: null })
+        return Promise.resolve(UNMERGED_WRITE)
       })
       .mockRejectedValueOnce(new AppError('io', 'disk full'))
 
@@ -900,7 +903,7 @@ describe('CaptureEnrichmentService', () => {
     kit.writeNoteMock
       .mockImplementationOnce((path, contents) => {
         kit.noteFile.set(path, contents)
-        return Promise.resolve({ merged: null })
+        return Promise.resolve(UNMERGED_WRITE)
       })
       .mockRejectedValueOnce(new AppError('io', 'disk full'))
 
@@ -958,13 +961,13 @@ describe('CaptureEnrichmentService', () => {
     kit.writeNoteMock
       .mockImplementationOnce((path, contents) => {
         kit.noteFile.set(path, contents)
-        return Promise.resolve({ merged: null })
+        return Promise.resolve(UNMERGED_WRITE)
       })
       .mockImplementationOnce((path, contents) => {
         kit.noteFile.set(path, contents)
         const prepared = kit.noteFile.files().get(IDENTITY.notePath) ?? ''
         kit.noteFile.set(IDENTITY.notePath, prepared.replace('---\n', '---\nprivate: true\n'))
-        return Promise.resolve({ merged: null })
+        return Promise.resolve(UNMERGED_WRITE)
       })
 
     const outcome = await kit.reconcile({ providers: NO_PROVIDERS })

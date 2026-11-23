@@ -90,7 +90,10 @@ beforeEach(() => {
   readNoteSource.mockReset().mockImplementation(() => Promise.resolve(noteSource))
   commitNoteFrontmatter.mockReset().mockImplementation((_path, patch) => {
     return Promise.try(() => {
-      noteSource = upsertFrontmatter(noteSource, frontmatterPatchToYaml(patch))
+      const resolved = typeof patch === 'function' ? patch(noteSource) : patch
+      if (resolved !== null) {
+        noteSource = upsertFrontmatter(noteSource, frontmatterPatchToYaml(resolved))
+      }
     })
   })
 })

@@ -58,25 +58,25 @@ describe('dev bridge index_reconcile_scan', () => {
 })
 
 describe('dev bridge index events', () => {
-  it('announces a committed index write and stays silent for a stale one', async () => {
+  it('announces an index commit and stays silent for a stale generation', async () => {
     const bridge = createDevBridge({ files: createDevFileStore({}), assets: createDevAssetStore() })
-    const written = vi.fn()
-    const unlisten = await bridge.listen('index:written', written)
+    const committed = vi.fn()
+    const unlisten = await bridge.listen('index:committed', committed)
     const generation = (await bridge.invoke('index_open', {})) as number
-    const note = projection('notes/a.md', 1, 'hash')
+    const commit = { seq: 1, paths: ['notes/a.md'] }
 
-    await bridge.invoke('index_apply', { note, generation: generation + 1 })
-    expect(written).not.toHaveBeenCalled()
+    await bridge.invoke('index_announce', { ...commit, generation: generation + 1 })
+    expect(committed).not.toHaveBeenCalled()
 
     // The event arrives after the command has replied.
-    const reply = bridge.invoke('index_apply', { note, generation })
-    expect(written).not.toHaveBeenCalled()
+    const reply = bridge.invoke('index_announce', { ...commit, generation })
+    expect(committed).not.toHaveBeenCalled()
     await reply
-    expect(written).toHaveBeenCalledExactlyOnceWith(null)
+    expect(committed).toHaveBeenCalledExactlyOnceWith(commit)
 
     unlisten()
-    await bridge.invoke('index_apply', { note, generation })
-    expect(written).toHaveBeenCalledOnce()
+    await bridge.invoke('index_announce', { ...commit, generation })
+    expect(committed).toHaveBeenCalledOnce()
   })
 
   it('announces a note move with both paths, and nothing for a stale graph generation', async () => {
@@ -84,9 +84,9 @@ describe('dev bridge index events', () => {
     const bridge = createDevBridge({ files, assets: createDevAssetStore() })
     const generation = (await bridge.invoke('index_open', {})) as number
     await bridge.invoke('index_apply', { note: projection('notes/a.md', 1, 'hash'), generation })
-    const written = vi.fn()
+    const committed = vi.fn()
     const moved = vi.fn()
-    await bridge.listen('index:written', written)
+    await bridge.listen('index:committed', committed)
     await bridge.listen('note:moved', moved)
     const address = (stem: string) => ({
       pathKey: `notes/${stem}.md`,
@@ -107,7 +107,10 @@ describe('dev bridge index events', () => {
     expect(files.exists('notes/a.md')).toBe(true)
 
     await bridge.invoke('note_move_indexed', { request, generation: 1 })
-    expect(written).toHaveBeenCalledExactlyOnceWith(null)
+    expect(committed).toHaveBeenCalledExactlyOnceWith({
+      seq: 2,
+      paths: ['notes/a.md', 'notes/b.md'],
+    })
     expect(moved).toHaveBeenCalledExactlyOnceWith({ from: 'notes/a.md', to: 'notes/b.md' })
     expect(files.exists('notes/b.md')).toBe(true)
   })

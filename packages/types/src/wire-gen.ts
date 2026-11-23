@@ -796,7 +796,7 @@ export type Commands = {
       path: string
       generation: number | null
     }
-    result: string
+    result: NoteRead
   }
   note_read_local: {
     args: {
@@ -812,6 +812,7 @@ export type Commands = {
       generation: number
       checkContents: boolean | null
       expectedContents: string | null
+      rejectMismatch: boolean | null
     }
     result: NoteWriteOutcome
   }
@@ -988,27 +989,27 @@ export type Commands = {
       note: IndexedNote
       generation: number
     }
-    result: null
+    result: IndexCommit
   }
   index_apply_batch: {
     args: {
       notes: IndexedNote[]
       generation: number
     }
-    result: null
+    result: IndexCommit
   }
   index_remove: {
     args: {
       path: string
       generation: number
     }
-    result: null
+    result: IndexCommit
   }
   index_clear: {
     args: {
       generation: number
     }
-    result: null
+    result: IndexCommit
   }
   index_move: {
     args: {
@@ -1017,11 +1018,19 @@ export type Commands = {
       generation: number
       toAddress: MovedNoteAddress
     }
-    result: null
+    result: IndexCommit
   }
   index_touch: {
     args: {
       entries: IndexTouch[]
+      generation: number
+    }
+    result: IndexCommit
+  }
+  index_announce: {
+    args: {
+      seq: number
+      paths: string[] | null
       generation: number
     }
     result: null
@@ -1170,9 +1179,10 @@ export type Commands = {
   }
   index_tasks: {
     args: {
-      checked: boolean
+      checked: boolean | null
+      paths: string[] | null
     }
-    result: TaskRow[]
+    result: TaskRead
   }
   index_resolve_wiki: {
     args: {
@@ -1566,11 +1576,10 @@ export type EventName =
   /**  Asks the frontend for one full reconcile pass. Carries no payload. */
   | 'index:reconcile'
   /**
-   *  Fired after a note-projection write commits. Secondary note windows run
-   *  no indexer of their own and refetch their index-backed queries on this
-   *  signal.
+   *  Fired after note-projection writes committed, with an
+   *  [`IndexCommitted`]. Every window hears it.
    */
-  | 'index:written'
+  | 'index:committed'
   /**
    *  Fired after a note's rows move to a new path (an in-app rename or an
    *  id-healed external one), with `{ "from": ..., "to": ... }`.
@@ -1831,6 +1840,24 @@ export type IcloudSweepOutcome = {
   copies: string[]
   /**  Conflicts resolved without user interaction. */
   autoResolved: number
+}
+
+/**  What a write of the index projection committed. */
+export type IndexCommit = {
+  /**
+   *  The commit sequence of the index after the write: the number of
+   *  projection write transactions the running index session committed.
+   *  Absent when the generation was stale, so nothing was written.
+   */
+  seq: number | null
+}
+
+/**  The payload of [`EventName::IndexCommitted`]. */
+export type IndexCommitted = {
+  /**  A commit sequence of the index that covers the announced writes. */
+  seq: number
+  /**  The notes whose rows changed, or `None` when any note may have. */
+  paths: string[] | null
 }
 
 /**
@@ -2136,6 +2163,14 @@ export type NotePrivacy = {
   isPrivate: boolean
 }
 
+/**  A note's text as the `note_read` command returns it. */
+export type NoteRead = {
+  /**  The note's markdown, with `\n` line endings. */
+  content: string
+  /**  Lowercase hex SHA-256 of `content`. */
+  hash: string
+}
+
 /**  The core fields of one note row. */
 export type NoteRow = {
   path: string
@@ -2149,15 +2184,41 @@ export type NoteRow = {
   gistStale: boolean
 }
 
+/**  One note with the tasks that a read selected from it. */
+export type NoteTasks = {
+  path: string
+  /**
+   *  Lowercase hex SHA-256 of the note text that the tasks were projected
+   *  from, read with `\n` line endings.
+   */
+  hash: string
+  title: string
+  dailyDate: string | null
+  isPinned: boolean
+  /**  The explicit `pinned: <n>` order of the note. */
+  pinnedOrder: number | null
+  /**  When the note's row last changed (epoch ms). */
+  updatedAt: number
+  /**  In no fixed order. */
+  tasks: TaskRow[]
+}
+
 /**  What a note write left on disk. */
 export type NoteWriteOutcome = {
   /**  The note's on-disk mtime (epoch ms) after the call. */
   modifiedMs: number | null
   /**
    *  The full note text now on disk, when the note had moved past the
-   *  expected revision and the file holds something other than `contents`.
+   *  expected revision and the file holds something other than `contents`:
+   *  the merge of both, or the file's own text when the write rejects a
+   *  mismatch.
    */
   merged: string | null
+  /**
+   *  Lowercase hex SHA-256 of the note text now on disk, read with `\n`
+   *  line endings.
+   */
+  hash: string
 }
 
 /**  A pinned note in the iPad sidebar. */
@@ -2559,22 +2620,31 @@ export type TagFacet = {
   count: number
 }
 
-/**  One task row with the fields of its note that the task list shows. */
+/**  The result of one read of the tasks. */
+export type TaskRead = {
+  /**
+   *  A commit sequence of the index that the state of `notes` covers: the
+   *  rows hold every write up to it, and may hold later ones.
+   */
+  seq: number
+  /**  The notes with a selected task, by path. */
+  notes: NoteTasks[]
+}
+
+/**  One task of a note. */
 export type TaskRow = {
-  notePath: string
-  /**  The stored address of the task: JSON text that the frontend decodes. */
-  astPath: string
+  /**
+   *  The address of the task: the child indexes from the root of the note's
+   *  Markdown tree down to the task's list item.
+   */
+  astPath: number[]
   markdown: string
-  /**  The stored breadcrumbs: JSON text that the frontend decodes. */
-  breadcrumbs: string
+  /**
+   *  The headings above the task, then the labels of its ancestor list
+   *  items, outermost first, as Markdown.
+   */
+  breadcrumbs: string[]
   checked: boolean
-  noteTitle: string
-  dailyDate: string | null
-  isPinned: boolean
-  /**  The explicit `pinned: <n>` order of the note. */
-  pinnedOrder: number | null
-  /**  When the note's row last changed (epoch ms). */
-  updatedAt: number
 }
 
 /**  One template. */
@@ -2745,6 +2815,7 @@ export type IndexWriteCommand =
   | 'index_clear'
   | 'index_move'
   | 'index_touch'
+  | 'index_announce'
   | 'index_meta_set'
   | 'chat_message_save'
   | 'chat_conversation_delete'

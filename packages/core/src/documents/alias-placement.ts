@@ -1,9 +1,7 @@
-import type { NoteFileService } from '../graph/note-file-service.ts'
 import { nextAliases } from '../indexing/rename.ts'
 import { parseNote } from '../markdown/extract.ts'
-import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { foldKey } from '../markdown/keys.ts'
-import type { OpenDocumentsService } from './open-documents-service.ts'
+import type { NoteDocumentService } from './note-document-service.ts'
 
 /**
  * Old-title alias placement after a settled rename (Plan 07b): the renamed
@@ -27,14 +25,6 @@ export interface SettledRename {
   previousAutoAliases: readonly string[]
 }
 
-/**
- * What {@link placeOldTitleAlias} reads and writes through.
- */
-export interface AliasPlacementDeps {
-  noteFile: NoteFileService
-  openDocuments: OpenDocumentsService
-}
-
 /** The entries of `next` that `current` did not already carry. */
 function addedAliases(current: readonly string[], next: readonly string[]): string[] {
   const kept = new Set(current.map((alias) => foldKey(alias)))
@@ -51,40 +41,28 @@ function addedAliases(current: readonly string[], next: readonly string[]): stri
  * concurrently-gained entries. Throws on failure; the caller owns reporting.
  */
 export async function placeOldTitleAlias(
-  deps: AliasPlacementDeps,
+  noteDocuments: NoteDocumentService,
   path: string,
   rename: SettledRename,
   generation: number,
 ): Promise<string[]> {
-  const { noteFile, openDocuments } = deps
-  const aliasesOf = (source: string): string[] => parseNote({ path, source }).frontmatter.aliases
-  const owner = openDocuments.sessionFor(path)
-  let placed = false
   let added: string[] = []
-  if (owner !== null) {
-    // Read and patch in the same tick (no await between): atomic against the
-    // session. Through its frontmatter channel — the editor view never
-    // churns — and flushed rather than riding the debounce: a settle is
-    // exactly the moment to persist, and quit-time teardown awaits this.
-    const current = aliasesOf(owner.content())
-    const aliases = nextAliases(current, rename)
-    placed = aliases === null || owner.updateFrontmatter({ aliases })
-    if (placed && aliases !== null) {
-      added = addedAliases(current, aliases)
-      await owner.flush()
-    }
-  }
-  if (!placed) {
-    const content = await noteFile.read(path, generation)
-    const current = aliasesOf(content)
-    const aliases = nextAliases(current, rename)
-    if (aliases !== null) {
-      const patched = upsertFrontmatter(content, { aliases })
-      if (patched !== content) {
-        await noteFile.write(path, patched, generation)
+  await noteDocuments.commitFrontmatter(
+    path,
+    (source) => {
+      added = []
+      if (source === null) {
+        return null
+      }
+      const current = parseNote({ path, source }).frontmatter.aliases
+      const aliases = nextAliases(current, rename)
+      if (aliases === null) {
+        return null
       }
       added = addedAliases(current, aliases)
-    }
-  }
+      return { aliases }
+    },
+    generation,
+  )
   return added
 }

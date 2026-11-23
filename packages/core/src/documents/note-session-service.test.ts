@@ -1,6 +1,9 @@
+import { sha256HexSync } from '@reflect/utils'
 import type { RoundTripFidelity } from '@meowdown/markdown'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { applyTaskEdits, projectTasks, TaskStaleError } from '../markdown/task-ast.ts'
+import { splitFrontmatter } from '../markdown/frontmatter.ts'
+import { applyTaskEdits } from '../markdown/task-edit.ts'
+import { projectTasks } from '../markdown/task-project.ts'
 import type { TaskLocator } from '../markdown/task-model.ts'
 import { createTestClockService, type TestClockService } from '../testing/clock.ts'
 import { createTestNoteFileService, overrideNoteFileService } from '../testing/graph.ts'
@@ -10,18 +13,35 @@ import {
 } from '../testing/graph-session.ts'
 import { createTestLoggerService, type TestLoggerService } from '../testing/logger.ts'
 import { createNoteSessionService } from './note-session-service.ts'
-import type { NoteSession, NoteSessionSnapshot } from './note-session-types.ts'
+import type {
+  NoteSession,
+  NoteSessionCommit,
+  NoteSessionSnapshot,
+  NoteSourceTransform,
+} from './note-session-types.ts'
 import { createTitleRenameTracker, type TitleRename } from './title-rename-tracker.ts'
+
+/**
+ * The locator of the `index`th task as the index records it.
+ */
+function taskAt(source: string, index: number): TaskLocator {
+  const task = projectTasks(splitFrontmatter(source).body)[index]
+  return {
+    revision: sha256HexSync(source),
+    astPath: task!.astPath,
+    markdown: task!.markdown,
+    checked: task!.checked,
+  }
+}
 
 /** The first task's locator as the index records it. */
 function firstTask(source: string): TaskLocator {
-  const [task] = projectTasks(source)
-  return { astPath: task!.astPath, markdown: task!.markdown, checked: task!.checked }
+  return taskAt(source, 0)
 }
 
 /** The Tasks view's open-note write: toggle `task` through the live buffer. */
-function toggleTransform(task: TaskLocator): (source: string) => string {
-  return (source) => applyTaskEdits({ logger }, source, [{ kind: 'toggle', task }]).source
+function toggleTransform(task: TaskLocator): NoteSourceTransform {
+  return (source, revision) => applyTaskEdits(source, revision, [{ kind: 'toggle', task }]).source
 }
 
 /**
@@ -1190,11 +1210,66 @@ describe('commitSourceEdit', () => {
     h.session.editorChanged('# Todo\n\n+ [ ] buy milk\n\njot\n')
     expect(h.snapshots.at(-1)?.dirty).toBe(true)
 
-    expect(await h.session.commitSourceEdit(toggleTransform(firstTask(source)))).toBe(true)
+    expect(await h.session.commitSourceEdit(toggleTransform(firstTask(source)))).toEqual({
+      content: '# Todo\n\n+ [x] buy milk\n\njot\n',
+      revision: sha256HexSync('# Todo\n\n+ [x] buy milk\n\njot\n'),
+      merged: false,
+    })
     // The write carries both the unsaved edit and the toggled checkbox.
     expect(h.writes.at(-1)?.contents).toBe('# Todo\n\n+ [x] buy milk\n\njot\n')
     // The open editor was updated to show the toggled checkbox.
     expect(h.applied.at(-1)).toBe('# Todo\n\n+ [x] buy milk\n\njot\n')
+  })
+
+  it('returns the merged text when the flush merged with a newer disk text', async () => {
+    const source = '# Todo\n\n+ [ ] buy milk\n'
+    const h = harness({ disk: source })
+    h.session.load()
+    await settled()
+
+    h.setDisk('# Todo\n\n+ [ ] buy milk\n\ntheirs\n')
+    h.mergeNextWrite('# Todo\n\n+ [x] buy milk\n\ntheirs\n')
+
+    expect(await h.session.commitSourceEdit(toggleTransform(firstTask(source)))).toEqual({
+      content: '# Todo\n\n+ [x] buy milk\n\ntheirs\n',
+      revision: sha256HexSync('# Todo\n\n+ [x] buy milk\n\ntheirs\n'),
+      merged: true,
+    })
+  })
+
+  it('toggles the second of two equal tasks in a clean buffer the editor reformatted', async () => {
+    const loose = '+ [ ] same\n\n+ [ ] same\n'
+    let target: NoteSession | null = null
+    const h = harness({
+      onApply: (markdown) => target?.editorChanged(markdown.replaceAll('\n\n+', '\n+')),
+    })
+    target = h.session
+    h.session.load()
+    await settled()
+    h.setDisk(loose)
+    h.session.externalChanged()
+    await settled()
+    expect(h.snapshots.at(-1)?.dirty).toBe(false)
+
+    const transform = vi.fn(toggleTransform(taskAt(loose, 1)))
+    await h.session.commitSourceEdit(transform)
+
+    expect(transform).toHaveBeenCalledWith('+ [ ] same\n+ [ ] same\n', null)
+    expect(h.disk()).toBe('+ [ ] same\n+ [x] same\n')
+  })
+
+  it('gives the transform no revision while the buffer holds unsaved edits', async () => {
+    const source = '+ [ ] ship it\n'
+    const h = harness({ disk: source })
+    h.session.load()
+    await settled()
+    h.session.editorChanged('+ [ ] ship it\n\njot\n')
+
+    const transform = vi.fn(toggleTransform(firstTask(source)))
+    await h.session.commitSourceEdit(transform)
+
+    expect(transform).toHaveBeenCalledWith('+ [ ] ship it\n\njot\n', null)
+    expect(h.disk()).toBe('+ [x] ship it\n\njot\n')
   })
 
   it('keeps the frontmatter around a body transform', async () => {
@@ -1203,9 +1278,9 @@ describe('commitSourceEdit', () => {
     h.session.load()
     await settled()
 
-    expect(await h.session.commitSourceEdit(toggleTransform(firstTask('+ [ ] ship it\n')))).toBe(
-      true,
-    )
+    expect(
+      await h.session.commitSourceEdit(toggleTransform(firstTask('+ [ ] ship it\n'))),
+    ).not.toBeNull()
     expect(h.writes.at(-1)?.contents).toBe('---\nid: 01abc\n---\n\n+ [x] ship it\n')
   })
 
@@ -1221,7 +1296,7 @@ describe('commitSourceEdit', () => {
     h.session.load()
     expect(h.snapshots.at(-1)?.status).toBe('loading')
 
-    let result: boolean | undefined
+    let result: NoteSessionCommit | null | undefined
     const commit = h.session
       .commitSourceEdit((full) => full.replace('buy milk', 'buy oat milk'))
       .then((applied) => {
@@ -1234,7 +1309,11 @@ describe('commitSourceEdit', () => {
     pendingRead.resolve()
     await commit
     await settled()
-    expect(result).toBe(true)
+    expect(result).toEqual({
+      content: '# Todo\n\n+ [ ] buy oat milk\n',
+      revision: sha256HexSync('# Todo\n\n+ [ ] buy oat milk\n'),
+      merged: false,
+    })
     expect(h.writes.at(-1)?.contents).toBe('# Todo\n\n+ [ ] buy oat milk\n')
     expect(h.applied.at(-1)).toBe('# Todo\n\n+ [ ] buy oat milk\n')
     // The pane mounts its editor from `initialContent` only after the ready
@@ -1243,7 +1322,7 @@ describe('commitSourceEdit', () => {
     expect(h.snapshots.at(-1)?.initialContent).toBe('# Todo\n\n+ [ ] buy oat milk\n')
   })
 
-  it('refuses (returns false) a note that loads as protected while the edit waits', async () => {
+  it('refuses (returns null) a note that loads as protected while the edit waits', async () => {
     // Protection is decided by the load, so the gate must run after the wait.
     const pendingRead = Promise.withResolvers<void>()
     const h = harness({
@@ -1256,13 +1335,13 @@ describe('commitSourceEdit', () => {
     const transform = vi.fn(toggleTransform(firstTask('+ [ ] x\n')))
     const commit = h.session.commitSourceEdit(transform)
     pendingRead.resolve()
-    expect(await commit).toBe(false)
+    expect(await commit).toBeNull()
     expect(h.snapshots.at(-1)?.protected).toBe(true)
     expect(transform).not.toHaveBeenCalled()
     expect(h.writes).toEqual([])
   })
 
-  it('refuses (returns false) a session whose load failed', async () => {
+  it('refuses (returns null) a session whose load failed', async () => {
     const h = harness({
       disk: '+ [ ] x\n',
       beforeRead: () => Promise.reject(new Error('read failed')),
@@ -1270,19 +1349,19 @@ describe('commitSourceEdit', () => {
     h.session.load()
 
     const transform = vi.fn(toggleTransform(firstTask('+ [ ] x\n')))
-    expect(await h.session.commitSourceEdit(transform)).toBe(false)
+    expect(await h.session.commitSourceEdit(transform)).toBeNull()
     expect(h.snapshots.at(-1)?.status).toBe('error')
     expect(transform).not.toHaveBeenCalled()
     expect(h.writes).toEqual([])
   })
 
-  it('refuses (returns false) a protected note rather than write', async () => {
+  it('refuses (returns null) a protected note rather than write', async () => {
     const h = harness({ disk: '+ [ ] x\n', classify: () => 'lossy' })
     h.session.load()
     await settled()
 
     const transform = vi.fn(toggleTransform(firstTask('+ [ ] x\n')))
-    expect(await h.session.commitSourceEdit(transform)).toBe(false)
+    expect(await h.session.commitSourceEdit(transform)).toBeNull()
     expect(transform).not.toHaveBeenCalled()
     expect(h.writes).toEqual([])
   })
@@ -1305,7 +1384,26 @@ describe('commitSourceEdit', () => {
     expect(h.snapshots.at(-1)?.error).toBeNull()
   })
 
-  it('propagates an error the transform throws, such as TaskStaleError, without writing', async () => {
+  it('reverts a failed edit that the editor reformatted', async () => {
+    const source = '+ [ ] x\n'
+    let target: NoteSession | null = null
+    const h = harness({
+      disk: source,
+      onApply: (markdown) => target?.editorChanged(`${markdown}\n`),
+    })
+    target = h.session
+    h.session.load()
+    await settled()
+
+    h.failWrites('disk full')
+    await expect(h.session.commitSourceEdit(toggleTransform(firstTask(source)))).rejects.toThrow(
+      'disk full',
+    )
+
+    expect(h.session.content()).toBe('+ [ ] x\n\n')
+  })
+
+  it('propagates an error the transform throws, such as a stale refusal, without writing', async () => {
     const source = '+ [ ] gone\n'
     const h = harness({ disk: source })
     h.session.load()
@@ -1314,7 +1412,7 @@ describe('commitSourceEdit', () => {
     h.session.editorChanged('+ [ ] something else entirely\n')
     await expect(
       h.session.commitSourceEdit(toggleTransform(firstTask(source))),
-    ).rejects.toBeInstanceOf(TaskStaleError)
+    ).rejects.toMatchObject({ kind: 'stale' })
     expect(h.writes).toEqual([])
     expect(h.session.content()).toBe('+ [ ] something else entirely\n')
   })
@@ -1328,7 +1426,7 @@ describe('commitSourceEdit', () => {
       await h.session.commitSourceEdit(
         (source) => `---\nreceipt: saved\n---\n${source}\n[X post](https://x.com/i/status/20)\n`,
       ),
-    ).toBe(true)
+    ).not.toBeNull()
     expect(h.writes.at(-1)?.contents).toContain('# My unsaved thought')
     expect(h.writes.at(-1)?.contents).toContain('receipt: saved')
     expect(h.writes.at(-1)?.contents).toContain('https://x.com/i/status/20')

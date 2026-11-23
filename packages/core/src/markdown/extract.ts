@@ -6,7 +6,7 @@ import { foldTag } from './keys.ts'
 import { parseInlineLink } from './link-syntax.ts'
 import { headingLevelOf } from './node-types.ts'
 import { buildPlainText, stripAtxHeadingMarks, unescapeMarkdownText } from './plain-text.ts'
-import { projectTasks } from './task-ast.ts'
+import { projectTasks } from './task-project.ts'
 import { isWikiNodeName, wikiBracketStart } from './wiki-nodes.ts'
 import type {
   AssetRef,

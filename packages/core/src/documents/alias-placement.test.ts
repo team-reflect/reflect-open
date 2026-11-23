@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
-import { createTestNoteSession } from '../testing/documents.ts'
+import { createTestNoteDocumentService, createTestNoteSession } from '../testing/documents.ts'
 import { createTestFileChangeService } from '../testing/file-change.ts'
 import { createTestNoteFileService } from '../testing/graph.ts'
 import { placeOldTitleAlias } from './alias-placement.ts'
@@ -43,7 +43,7 @@ function setup(options?: {
   if (session !== null) {
     openDocuments.register({ session })
   }
-  return { deps: { noteFile, openDocuments }, noteFile, session }
+  return { deps: createTestNoteDocumentService({ noteFile, openDocuments }), noteFile, session }
 }
 
 describe('placeOldTitleAlias', () => {
@@ -62,25 +62,23 @@ describe('placeOldTitleAlias', () => {
     expect(noteFile.writes()[0]!.contents).toContain('# Old Title\n\nbody\n') // body untouched
   })
 
-  it('routes through a live session: frontmatter channel, then flush, no disk write', async () => {
+  it('routes through a live session: frontmatter channel, no disk write', async () => {
     const { deps, noteFile, session } = setup({ disk: null, session: '# Old Title\n\nbody\n' })
 
     await placeOldTitleAlias(deps, PATH, RENAME, 7)
 
-    expect(session!.getCalls('updateFrontmatter')).toEqual([[{ aliases: ['Old Title'] }]])
-    expect(session!.getCalls('flush')).toHaveLength(1)
+    expect(session!.getCalls('commitFrontmatter')).toEqual([[{ aliases: ['Old Title'] }]])
     expect(noteFile.writes()).toEqual([])
   })
 
   it('falls back to disk when the session cannot take the patch', async () => {
-    const { deps, noteFile, session } = setup({
+    const { deps, noteFile } = setup({
       session: '# Old Title\n\nbody\n',
       takesPatch: false,
     })
 
     await placeOldTitleAlias(deps, PATH, RENAME, 7)
 
-    expect(session!.getCalls('flush')).toHaveLength(0)
     expect(noteFile.writes()).toHaveLength(1)
   })
 
@@ -91,8 +89,7 @@ describe('placeOldTitleAlias', () => {
 
     await placeOldTitleAlias(deps, PATH, { ...RENAME, from: 'new title' }, 7)
 
-    expect(session!.getCalls('updateFrontmatter')).toEqual([])
-    expect(session!.getCalls('flush')).toHaveLength(0)
+    expect(session!.getCalls('commitFrontmatter')).toEqual([])
     expect(noteFile.writes()).toEqual([])
   })
 
@@ -109,7 +106,7 @@ describe('placeOldTitleAlias', () => {
     )
 
     expect(added).toEqual(['Tim MacCaw', 'Tim MacCaw // Dad'])
-    expect(session!.getCalls('updateFrontmatter')).toEqual([
+    expect(session!.getCalls('commitFrontmatter')).toEqual([
       [{ aliases: ['Dad', 'Tim MacCaw', 'Tim MacCaw // Dad'] }],
     ])
   })
@@ -130,7 +127,7 @@ describe('placeOldTitleAlias', () => {
     )
 
     expect(added).toEqual(['Bob', 'Dad', 'Bob // Dad'])
-    expect(session!.getCalls('updateFrontmatter')).toEqual([
+    expect(session!.getCalls('commitFrontmatter')).toEqual([
       [{ aliases: ['Bob', 'Dad', 'Bob // Dad'] }],
     ])
   })
@@ -155,7 +152,7 @@ describe('placeOldTitleAlias', () => {
 
     await placeOldTitleAlias(deps, PATH, RENAME, 7)
 
-    expect(session!.getCalls('updateFrontmatter')).toEqual([
+    expect(session!.getCalls('commitFrontmatter')).toEqual([
       [{ aliases: ['Gained Elsewhere', 'Old Title'] }],
     ])
   })

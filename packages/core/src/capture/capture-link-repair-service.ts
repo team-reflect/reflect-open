@@ -1,7 +1,7 @@
 import { addDays, formatIsoDate } from '@reflect/utils'
 import { captureFromPath, type CaptureIdentity } from './capture-identity.ts'
-import { captureNoteMeta, displayTitle, noteSource } from './capture-note.ts'
-import type { OpenDocumentsService } from '../documents/open-documents-service.ts'
+import { captureNoteMeta, displayTitle } from './capture-note.ts'
+import type { NoteDocumentService } from '../documents/note-document-service.ts'
 import { isAppError } from '../errors.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { dailyPath } from '../graph/paths.ts'
@@ -9,6 +9,7 @@ import { isWikiLinkSafeText } from '../indexing/suggest.ts'
 import { parseNote } from '../markdown/extract.ts'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
+import { NoteEditError } from '../documents/note-edit-error.ts'
 
 /**
  * One capture whose Daily link text is still the drain's placeholder.
@@ -82,7 +83,7 @@ export const CAPTURE_LINK_REPAIR_WINDOW_DAYS = 30
 
 export interface CaptureLinkRepairServiceDeps {
   readonly noteFile: NoteFileService
-  readonly openDocuments: OpenDocumentsService
+  readonly noteDocuments: NoteDocumentService
   readonly clock: ClockService
   readonly logger: LoggerService
 }
@@ -159,24 +160,22 @@ class CaptureLinkRepairServiceImpl implements CaptureLinkRepairService {
     repairs: ReadonlyMap<string, CaptureLinkRepair>,
     generation: number,
   ): Promise<void> {
-    const { noteFile, openDocuments } = this.#deps
-    const source = await noteSource(noteFile, path, generation)
-    if (source === '') {
-      return
+    try {
+      await this.#deps.noteDocuments.commitSourceEdit(
+        path,
+        (source) => repairCaptureLinks(source, repairs),
+        { generation },
+      )
+    } catch (cause) {
+      // A missing daily holds no link, and a busy session takes the repair on a later sweep.
+      if (
+        (cause instanceof NoteEditError && cause.kind === 'notWritable') ||
+        (isAppError(cause) && cause.kind === 'notFound')
+      ) {
+        return
+      }
+      throw cause
     }
-    const next = repairCaptureLinks(source, repairs)
-    if (next === source) {
-      return
-    }
-    const session = openDocuments.sessionFor(path)
-    if (session !== null) {
-      // Edit the live buffer so unsaved typing survives; a busy session retries next pass.
-      await session.commitSourceEdit((current) => {
-        return current === source ? next : repairCaptureLinks(current, repairs)
-      })
-      return
-    }
-    await noteFile.write(path, next, generation, source)
   }
 
   async #readCapture(identity: CaptureIdentity, generation: number): Promise<string | null> {

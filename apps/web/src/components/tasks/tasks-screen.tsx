@@ -10,8 +10,6 @@ import {
 import { Archive, CalendarClock, List, Search } from 'lucide-react'
 import {
   composeVisibleTaskGroups,
-  getTaskKey,
-  isSameTask,
   type InsertTaskTarget,
   type OpenTask,
   type TaskGroup,
@@ -19,16 +17,13 @@ import {
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { useNoteLinkNavigation, type ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
-import { useRecentlyCompleted } from '@/lib/tasks/recently-completed.ts'
 import { scrollTaskIntoView } from '@/lib/tasks/task-navigation.ts'
-import { useTaskActions } from '@/lib/tasks/use-task-actions.ts'
 import { useTaskRowHandlers } from '@/lib/tasks/use-task-row-handlers.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
 import { useTaskKeyboard } from '@/lib/tasks/use-task-keyboard.ts'
 import { useTaskSelection } from '@/lib/tasks/use-task-selection.ts'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { useToday } from '@/lib/use-today.ts'
-import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useStore } from '@/lib/use-store.ts'
 import { routeForPath } from '@reflect/app'
@@ -68,13 +63,13 @@ function focusedSelectedKey(
  * selection opens the inline editor.
  *
  * Completing a task keeps it showing (struck) in place — V1's middle state — via
- * the session-scoped {@link useRecentlyCompleted} set, until "Archive" (⌘⇧↵)
+ * the struck set of `TaskService`, until "Archive" (⌘⇧↵)
  * hides this run's completed tasks. They stay `[x]` on disk and remain under the
  * "show archived" filter, which reveals the whole completed history.
  */
 export function TasksScreen(): ReactElement {
-  const graph = useGraphInfo()
   const { tasks: taskService } = useCoreServices()
+  const { commands } = taskService
   const navigateNoteLink = useNoteLinkNavigation()
   const today = useToday()
   const { filters, toggle } = useTaskFilters()
@@ -83,39 +78,29 @@ export function TasksScreen(): ReactElement {
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
-  const { open, completed, openFailed, completedFailed } = useStore(taskService)
+  const { open, completed, struck } = useStore(taskService)
   useEffect(
     () => (filters.archived ? taskService.includeCompleted() : undefined),
     [taskService, filters.archived],
   )
 
-  // Either read failing surfaces the alert — a failed completed read must not
-  // leave `ready` stuck (and the list blank) just because its data never arrived.
-  // The completed error only counts while archived is on: the service keeps the
-  // last error of a list it no longer reads, so turning archived off must clear it.
-  const isError = openFailed || (filters.archived && completedFailed)
   // When archived is on, the list merges open + completed, so the empty state
   // must wait for both — else a graph with only completed tasks flashes "No
   // tasks to show." while the completed query is still loading.
   const ready = open !== undefined && (!filters.archived || completed !== undefined)
   const { onScroll } = useScrollRestoration(scrollRef, ready)
 
-  // This session's completed tasks, still showing struck until archived —
-  // reconciled against the open read so a task reopened at its source note
-  // sheds its struck shadow instead of masking the live row.
-  const recentlyCompleted = useRecentlyCompleted(graph?.root ?? null, open)
-
   const needle = query.trim().toLowerCase()
   const groups = useMemo(
-    () => composeVisibleTaskGroups({ open, completed, recentlyCompleted, filters, needle, today }),
-    [open, completed, recentlyCompleted, filters, needle, today],
+    () => composeVisibleTaskGroups({ open, completed, struck, filters, needle, today }),
+    [open, completed, struck, filters, needle, today],
   )
 
   // The flat, render-order list of tasks the selection and its shortcuts act on.
   const orderedTasks = useMemo(() => groups.flatMap((group) => group.tasks), [groups])
-  const orderedKeys = useMemo(() => orderedTasks.map(getTaskKey), [orderedTasks])
+  const orderedKeys = useMemo(() => orderedTasks.map((task) => task.taskId), [orderedTasks])
   const tasksByKey = useMemo(
-    () => new Map(orderedTasks.map((task) => [getTaskKey(task), task])),
+    () => new Map(orderedTasks.map((task) => [task.taskId, task])),
     [orderedTasks],
   )
   const selection = useTaskSelection(orderedKeys)
@@ -125,13 +110,12 @@ export function TasksScreen(): ReactElement {
   if (scheduleOpen && selection.selectedCount === 0) {
     setScheduleOpen(false)
   }
-  const actions = useTaskActions()
   const scrollToKey = useCallback((key: string | null) => {
     if (key !== null) {
       scrollTaskIntoView(rootRef.current, key)
     }
   }, [])
-  const editHandlers = useTaskRowHandlers({ selection, actions, orderedTasks, scrollToKey })
+  const editHandlers = useTaskRowHandlers({ selection, orderedTasks, scrollToKey, setQuery })
   const selectedTaskKeys = selection.selected
   const activeTaskKey = selection.activeKey
   // Selection opens the focused task's inline editor, often after an async insert
@@ -141,19 +125,15 @@ export function TasksScreen(): ReactElement {
     scrollToKey(focusedSelectedKey(selectedTaskKeys, activeTaskKey))
   }, [activeTaskKey, orderedKeys, scrollToKey, selectedTaskKeys])
   // The group headers' "+ Add" (V1): drop any search filter so the new row is
-  // visible, write it, then select it so its editor opens focused.
+  // visible, then select it so its editor opens focused.
   const onAdd = useCallback(
     (target: InsertTaskTarget) => {
       setQuery('')
-      void actions.insert(target).then((created) => {
-        if (created !== null) {
-          const key = getTaskKey(created)
-          selection.clickSelect(key, { metaKey: false, ctrlKey: false, shiftKey: false })
-          scrollToKey(key)
-        }
-      })
+      const key = commands.add(target).taskId
+      selection.clickSelect(key, { metaKey: false, ctrlKey: false, shiftKey: false })
+      scrollToKey(key)
     },
-    [actions, selection, scrollToKey],
+    [commands, selection, scrollToKey],
   )
   // The tasks behind the current selection's keys, in selection order — what the
   // toolbar actions (schedule, convert) act on. A row whose key no longer
@@ -163,45 +143,45 @@ export function TasksScreen(): ReactElement {
       .map((key) => tasksByKey.get(key))
       .filter((task): task is OpenTask => task !== undefined)
   }, [selection, tasksByKey])
+  // A checkbox click toggles its row, with the text typed into it, and ends the edit.
+  const onCheckboxToggle = useCallback(
+    (task: OpenTask) => {
+      void commands.toggle([task])
+      if (selection.isSoleSelected(task.taskId)) {
+        selection.clear()
+      }
+    },
+    [commands, selection],
+  )
   const onSelectionCheckboxToggle = useCallback(
     (task: OpenTask) => {
       const tasks = selectedTasks()
-      if (tasks.length <= 1 || !tasks.some((selectedTask) => isSameTask(selectedTask, task))) {
-        actions.checkboxToggle(task)
+      if (tasks.length <= 1 || !tasks.some((selectedTask) => selectedTask.taskId === task.taskId)) {
+        onCheckboxToggle(task)
         return
       }
       if (task.checked) {
-        actions.toggle(tasks.filter((selectedTask) => selectedTask.checked))
+        void commands.toggle(tasks.filter((selectedTask) => selectedTask.checked))
       } else {
-        actions.complete(tasks)
+        void commands.complete(tasks)
       }
     },
-    [actions, selectedTasks],
+    [commands, onCheckboxToggle, selectedTasks],
   )
   // Schedule the current selection (the calendar / ⌘⇧S), then deselect (V1).
   const onSchedule = useCallback(
     (isoDate: string | null) => {
-      actions.schedule(selectedTasks(), isoDate)
+      void commands.schedule(selectedTasks(), isoDate)
       selection.clear()
     },
-    [actions, selection, selectedTasks],
+    [commands, selection, selectedTasks],
   )
   // Convert the current selection to plain bullets (the toolbar / ⌘⇧K): the rows
-  // leave the Tasks view, so deselect after, like scheduling. When a single row is
-  // being inline-edited it holds a flush-then-convert trigger here — route through
-  // it so the unsaved draft is saved first, never written stale by the convert
-  // landing ahead of the editor's commit (the keyboard ⌘⇧K hits the editor's own
-  // keymap; this covers the toolbar button and an unfocused sole selection).
-  const convertControllerRef = useRef<(() => void) | null>(null)
+  // leave the Tasks view, so deselect after, like scheduling.
   const onConvertToBullet = useCallback(() => {
-    const convertEditing = convertControllerRef.current
-    if (convertEditing !== null) {
-      convertEditing()
-    } else {
-      actions.convertToBullet(selectedTasks())
-      selection.clear()
-    }
-  }, [actions, selection, selectedTasks])
+    void commands.convert(selectedTasks())
+    selection.clear()
+  }, [commands, selection, selectedTasks])
   const openNote = useCallback(
     (path: string, event?: ModClickEvent) => {
       navigateNoteLink({
@@ -213,12 +193,17 @@ export function TasksScreen(): ReactElement {
   )
   useTaskKeyboard({
     selection,
-    actions,
+    commands,
     tasksByKey,
     orderedTasks,
     query,
     setQuery,
     today,
+    showCurrent: () => {
+      if (!filters.current) {
+        toggle('current')
+      }
+    },
     rootRef,
     scrollToKey,
     onToggleFilters: () => setFiltersOpen((open) => !open),
@@ -287,17 +272,17 @@ export function TasksScreen(): ReactElement {
             <TaskToolbarCountBadge count={selection.selectedCount} />
           </Button>
         ) : null}
-        {recentlyCompleted.length > 0 ? (
+        {struck.length > 0 ? (
           <Button
             type="button"
             variant="ghost"
-            aria-label={`Archive ${recentlyCompleted.length}`}
-            onClick={actions.archive}
+            aria-label={`Archive ${struck.length}`}
+            onClick={() => commands.archive()}
             className="window-drag-control text-xs text-text-muted"
           >
             <Archive aria-hidden className="size-3.5" />
             Archive
-            <TaskToolbarCountBadge count={recentlyCompleted.length} />
+            <TaskToolbarCountBadge count={struck.length} />
           </Button>
         ) : null}
         <TaskFiltersMenu
@@ -308,11 +293,7 @@ export function TasksScreen(): ReactElement {
         />
       </header>
       <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-auto pb-8">
-        {isError ? (
-          <p role="alert" className="px-4 py-6 text-sm text-text-muted lg:px-12">
-            Couldn’t load tasks.
-          </p>
-        ) : ready && groups.length === 0 ? (
+        {ready && groups.length === 0 ? (
           <p className="px-4 py-6 text-sm text-text-muted lg:px-12">
             {needle ? 'No matching tasks.' : 'No tasks to show.'}
           </p>
@@ -324,12 +305,10 @@ export function TasksScreen(): ReactElement {
                 group={group}
                 selection={selection}
                 editHandlers={editHandlers}
-                taskActionPending={actions.isPending}
-                onCheckboxToggle={actions.checkboxToggle}
+                onCheckboxToggle={onCheckboxToggle}
                 onSelectionCheckboxToggle={onSelectionCheckboxToggle}
                 today={today}
                 onAdd={onAdd}
-                convertControllerRef={convertControllerRef}
                 onOpen={openNote}
               />
             ))}

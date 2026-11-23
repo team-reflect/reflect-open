@@ -32,6 +32,17 @@ pub enum NoteCreateOutcome {
     Collision,
 }
 
+/// A note's text as the `note_read` command returns it.
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct NoteRead {
+    /// The note's markdown, with `\n` line endings.
+    pub content: String,
+    /// Lowercase hex SHA-256 of `content`.
+    pub hash: String,
+}
+
 /// How a local note read (the desktop `note_read_local` command) found the
 /// note on disk.
 #[derive(Debug, Serialize)]
@@ -58,8 +69,13 @@ pub struct NoteWriteOutcome {
     /// The note's on-disk mtime (epoch ms) after the call.
     pub modified_ms: Option<u64>,
     /// The full note text now on disk, when the note had moved past the
-    /// expected revision and the file holds something other than `contents`.
+    /// expected revision and the file holds something other than `contents`:
+    /// the merge of both, or the file's own text when the write rejects a
+    /// mismatch.
     pub merged: Option<String>,
+    /// Lowercase hex SHA-256 of the note text now on disk, read with `\n`
+    /// line endings.
+    pub hash: String,
 }
 
 /// Counts from the vault catalog. `skipped` is what the walk refused or

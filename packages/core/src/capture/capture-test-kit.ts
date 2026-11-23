@@ -9,7 +9,7 @@ import type { AiProvidersState } from '../ai/provider-config.ts'
 import type { WebFetchService } from '../link-preview/web-fetch-service.ts'
 import type { AssetStoreService } from '../graph/asset-store-service.ts'
 import type { CaptureInboxService } from '../graph/capture-inbox-service.ts'
-import type { NoteFileService } from '../graph/note-file-service.ts'
+import type { WritableNoteFileService } from '../graph/note-file-service.ts'
 import { createPrivacyService } from '../privacy/privacy-service.ts'
 import type { SecretStoreService } from '../secrets/secret-store-service.ts'
 import {
@@ -18,7 +18,7 @@ import {
   createTestCaptureInboxService,
   createTestClockService,
   createTestIdService,
-  createTestLoggerService,
+  createTestNoteDocumentService,
   createTestNoteFileService,
   createTestPageDescriberService,
   createTestSecretStoreService,
@@ -95,7 +95,7 @@ export interface CaptureTestKit {
   captureInbox: TestCaptureInboxService
   xArchive: TestXArchiveService
   clock: TestClockService
-  writeNoteMock: MockInstance<NoteFileService['write']>
+  writeNoteMock: MockInstance<WritableNoteFileService['write']>
   inboxRemoveMock: MockInstance<CaptureInboxService['remove']>
   promoteMock: MockInstance<CaptureInboxService['promoteScreenshot']>
   readAssetMock: MockInstance<AssetStoreService['readBase64']>
@@ -133,7 +133,7 @@ class CaptureTestKitImpl implements CaptureTestKit {
   readonly captureInbox: TestCaptureInboxService
   readonly xArchive: TestXArchiveService
   readonly clock: TestClockService
-  readonly writeNoteMock: MockInstance<NoteFileService['write']>
+  readonly writeNoteMock: MockInstance<WritableNoteFileService['write']>
   readonly inboxRemoveMock: MockInstance<CaptureInboxService['remove']>
   readonly promoteMock: MockInstance<CaptureInboxService['promoteScreenshot']>
   readonly readAssetMock: MockInstance<AssetStoreService['readBase64']>
@@ -188,10 +188,10 @@ class CaptureTestKitImpl implements CaptureTestKit {
     this.#drainService = createCaptureDrainService({
       captureInbox,
       noteFile,
+      noteDocuments: createTestNoteDocumentService({ noteFile }),
       xArchive,
       backlinkTarget: { ensure: ensureBacklinkTargetMock },
       clock,
-      logger: createTestLoggerService(),
     })
   }
 
@@ -237,6 +237,7 @@ class CaptureTestKitImpl implements CaptureTestKit {
     await settings.whenLoaded()
     const enrichment = createCaptureEnrichmentService({
       noteFile: this.noteFile,
+      noteDocuments: createTestNoteDocumentService({ noteFile: this.noteFile }),
       assetStore: this.#assetStore,
       webFetch: this.#webFetch,
       pageMeta: { scrape: this.scrapeMock },

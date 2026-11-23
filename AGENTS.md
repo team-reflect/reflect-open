@@ -130,6 +130,10 @@ by a **Tauri 2** desktop shell and a Swift iOS shell. The Rust crates form one
   CLI reader.
 - `design-system/`, `docs/` (product and architecture docs, `docs/plans/`).
 
+### Note writes and tasks
+
+Read [docs/tasks-data-flow.md](docs/tasks-data-flow.md) before you change `packages/core/src/tasks/`, note writes or the index writer. Change the text of a note only through `NoteDocumentService` (`commitSourceEdit`, `commitFrontmatter`).
+
 ### Sync
 
 Read the sync safety rules in [docs/git-backup-safety.md](docs/git-backup-safety.md) (S1 to S9) before you change `git/`, `conflict/`, `icloud/`, `fs/` or `packages/core/src/sync/`.

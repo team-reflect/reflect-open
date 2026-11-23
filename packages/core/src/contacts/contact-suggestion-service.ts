@@ -1,8 +1,6 @@
 import { requireGraphSession } from '../graph/graph-session.ts'
 import type { NoteDocumentService } from '../documents/note-document-service.ts'
-import type { OpenDocumentsService } from '../documents/open-documents-service.ts'
 import type { GraphSessionService } from '../graph/graph-session-service.ts'
-import type { NoteFileService } from '../graph/note-file-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { isDaily } from '../graph/paths.ts'
 import { parseNote } from '../markdown/extract.ts'
@@ -131,11 +129,17 @@ export function canPromptForContacts(authorization: ContactsAuthorization | null
 export interface ContactSuggestionServiceDeps {
   readonly contacts: ContactsService
   readonly noteDocuments: NoteDocumentService
-  readonly openDocuments: OpenDocumentsService
-  readonly noteFile: NoteFileService
   readonly settings: SettingsService
   readonly graphSession: GraphSessionService
   readonly logger: LoggerService
+}
+
+/**
+ * Whether the note still carries the name of `contact`: a card is a cached
+ * answer, and the title may have changed since it resolved.
+ */
+function isStillMatching(path: string, source: string, contact: ContactMatch): boolean {
+  return matchContactForTitle(parseNote({ path, source }).title, [contact]) !== null
 }
 
 class ContactSuggestionServiceImpl implements ContactSuggestionService {
@@ -167,48 +171,39 @@ class ContactSuggestionServiceImpl implements ContactSuggestionService {
   }
 
   async addToNote(path: string, contact: ContactMatch): Promise<void> {
-    const { openDocuments, noteFile, graphSession } = this.#deps
+    const { noteDocuments, graphSession } = this.#deps
     const { generation } = requireGraphSession(graphSession)
-    const source = await this.#sourceIfStillMatching(path, contact)
-    if (source === null) {
-      throw new Error('The note title no longer matches this contact.')
-    }
-    const body = splitFrontmatter(source).body
-    // The same content gate the card renders through: a body that already
-    // carries contact details — a previous Add's block, or an email the user
-    // typed under a still-cached card — must not get a (second) block. The
-    // body-aware block also drops the `- Type: #person` line when the note was
-    // already typed at creation (meeting flow, link menu).
-    const details = contactDetailsMarkdown(contact, body)
-    if (details === '' || noteHasContactDetails(body)) {
-      return
-    }
-    const owner = openDocuments.sessionFor(path)
-    if (owner !== null) {
-      if (!(await owner.commitBodyAppend(details))) {
-        throw new Error('This note can’t be updated right now — try again in a moment.')
-      }
-      return
-    }
-    // Reuse the validated snapshot — with no session, `source` came from disk.
-    // A second read here would reopen the window between the check and the write.
-    await noteFile.write(path, appendContactDetails(source, contact), generation)
+    await noteDocuments.commitSourceEdit(
+      path,
+      (source) => {
+        if (!isStillMatching(path, source, contact)) {
+          throw new Error('The note title no longer matches this contact.')
+        }
+        // The same content gate the card renders through: a body that already
+        // carries contact details — a previous Add's block, or an email the user
+        // typed under a still-cached card — must not get a (second) block.
+        return noteHasContactDetails(splitFrontmatter(source).body)
+          ? source
+          : appendContactDetails(source, contact)
+      },
+      { generation },
+    )
   }
 
   async ignore(path: string, contact: ContactMatch): Promise<void> {
     const { noteDocuments, graphSession } = this.#deps
     const { generation } = requireGraphSession(graphSession)
-    const source = await this.#sourceIfStillMatching(path, contact)
-    if (source === null) {
-      return
-    }
-    const ignored = parseNote({ path, source }).frontmatter.ignoredContacts
-    if (ignored.some((name) => contactNamesEqual(name, contact.fullName))) {
-      return
-    }
     await noteDocuments.commitFrontmatter(
       path,
-      { ignoredContacts: [...ignored, contact.fullName] },
+      (source) => {
+        if (source === null || !isStillMatching(path, source, contact)) {
+          return null
+        }
+        const ignored = parseNote({ path, source }).frontmatter.ignoredContacts
+        return ignored.some((name) => contactNamesEqual(name, contact.fullName))
+          ? null
+          : { ignoredContacts: [...ignored, contact.fullName] }
+      },
       generation,
     )
   }
@@ -224,19 +219,6 @@ class ContactSuggestionServiceImpl implements ContactSuggestionService {
       // A failed request leaves the access status unchanged.
       this.#deps.logger.warn('requesting contacts access failed:', error)
     }
-  }
-
-  /**
-   * Action-time revalidation: the card's suggestion is a cached answer, but the
-   * title may have been edited (even unsaved) since it resolved. Returns the
-   * live source when the note still carries the contact's name, else null —
-   * a stale card must neither merge the wrong details nor dismiss the new
-   * title's own suggestion.
-   */
-  async #sourceIfStillMatching(path: string, contact: ContactMatch): Promise<string | null> {
-    const source = await this.#deps.noteDocuments.readSource(path)
-    const title = parseNote({ path, source }).title
-    return matchContactForTitle(title, [contact]) === null ? null : source
   }
 
   /**

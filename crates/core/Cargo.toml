@@ -23,6 +23,7 @@ reflect-git = { workspace = true }
 reflect-graph-io = { workspace = true }
 reflect-index = { workspace = true, features = ["native"] }
 reflect-types = { workspace = true }
+reflect-utils = { workspace = true }
 reqwest = { workspace = true }
 image = { workspace = true, features = ["gif", "ico", "jpeg", "png", "webp"] }
 serde = { workspace = true }

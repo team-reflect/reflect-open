@@ -5,7 +5,6 @@ import { parseNote } from '../markdown/index.ts'
 import { createTestXArchiveService } from '../testing/capture.ts'
 import { createTestClockService } from '../testing/clock.ts'
 import { createTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
-import { createTestFileChangeService } from '../testing/file-change.ts'
 import { createTestNoteFileService } from '../testing/graph.ts'
 import {
   createTestIndexStoreService,
@@ -15,9 +14,10 @@ import {
 import { createTestLoggerService } from '../testing/logger.ts'
 import type { FileChange } from './file-change-service.ts'
 import { createIndexQueryService } from './index-query-service.ts'
+import type { WritableIndexStoreService } from './index-store-service.ts'
 import { buildIndexedNote, PROJECTION_VERSION } from './indexed-note.ts'
-import { createNoteIndexer, PROJECTION_VERSION_KEY, type ChangesAppliedEmitter } from './indexer.ts'
-import { createLiveIndex } from './live.ts'
+import { createIndexWriter, type ChangesAppliedEmitter, type IndexWriter } from './index-writer.ts'
+import { createNoteIndexer, PROJECTION_VERSION_KEY } from './indexer.ts'
 
 const NOW = 1_750_000_000_000
 
@@ -43,6 +43,34 @@ afterEach(() => {
   }
 })
 
+const PROJECTION_WRITES: ReadonlySet<string | symbol> = new Set([
+  'applyBatch',
+  'remove',
+  'move',
+  'touch',
+  'clear',
+])
+
+/**
+ * `store` without its projection writes: each one throws.
+ */
+function withoutProjectionWrites(store: WritableIndexStoreService): WritableIndexStoreService {
+  return new Proxy(store, {
+    get(target, key) {
+      if (PROJECTION_WRITES.has(key)) {
+        return () => {
+          throw new Error(`an index pass called \`${String(key)}\` on the index store`)
+        }
+      }
+      const value: unknown = Reflect.get(target, key, target)
+      if (typeof value !== 'function') {
+        return value
+      }
+      return (...args: unknown[]): unknown => Reflect.apply(value, target, args)
+    },
+  })
+}
+
 /**
  * A row as an earlier pass stored it, with the facts the next pass compares.
  */
@@ -54,7 +82,8 @@ interface StoredNote {
 }
 
 /**
- * The indexer and the live index over test doubles. `files` defaults to one
+ * The indexer over test doubles. Only the writers of `writerAt` can write
+ * the projection: the indexer's own store throws on a projection write. `files` defaults to one
  * note (`notes/a.md`, modified at 5); `read` runs before each note read and
  * may reject it.
  */
@@ -100,7 +129,7 @@ function setup(options?: {
   })
   const appliedListeners = new Set<ChangesAppliedEmitter>()
   /**
-   * Listen for the batches the indexer and the live index report as applied.
+   * Listen for the changes the index writers report as applied.
    */
   function subscribeIndexApplied(listener: ChangesAppliedEmitter): () => void {
     appliedListeners.add(listener)
@@ -109,14 +138,8 @@ function setup(options?: {
     }
   }
   const deps = {
-    emitChangesApplied: (changes: readonly FileChange[], generation: number) => {
-      for (const listener of appliedListeners) {
-        listener(changes, generation)
-      }
-    },
     indexStore: store,
     noteFile: files,
-    fileChanges: createTestFileChangeService(),
     indexQuery: createIndexQueryService({ database }),
     database,
     xArchive: createTestXArchiveService(),
@@ -133,10 +156,40 @@ function setup(options?: {
       .calls()
       .find((call): call is Extract<IndexStoreCall, { method: Method }> => call.method === method)
   }
+  const moves: Array<[string, string]> = []
+  const gate = { canWrite: true }
+  const writers = new Map<number, IndexWriter>()
+  /**
+   * The index writer at index generation `generation`.
+   */
+  function writerAt(generation: number): IndexWriter {
+    let writer = writers.get(generation)
+    if (writer === undefined) {
+      writer = createIndexWriter(
+        {
+          ...deps,
+          emitChangesApplied: (changes: readonly FileChange[], appliedGeneration: number) => {
+            for (const listener of appliedListeners) {
+              listener(changes, appliedGeneration)
+            }
+          },
+          emitMoved: (from: string, to: string) => {
+            moves.push([from, to])
+          },
+          canWrite: () => gate.canWrite,
+        },
+        { generation, fileGeneration: FILE_GENERATION },
+      )
+      writers.set(generation, writer)
+    }
+    return writer
+  }
   return {
-    indexer: createNoteIndexer(deps),
-    liveIndex: createLiveIndex(deps),
+    indexer: createNoteIndexer({ ...deps, indexStore: withoutProjectionWrites(store) }),
+    writerAt,
+    gate,
     subscribeIndexApplied,
+    moves,
     store,
     clock,
     logger,
@@ -155,36 +208,11 @@ function notes(...paths: string[]): Record<string, { contents: string; modifiedM
   )
 }
 
-describe('indexNote', () => {
-  it('reads, parses, and applies a built index payload with its generation', async () => {
-    const { indexer, findCall } = setup()
-    await indexer.indexNote('notes/a.md', {
-      generation: 7,
-      fileGeneration: FILE_GENERATION,
-      mtime: 5,
-    })
-    const apply = findCall('apply')
-    expect(apply).toBeDefined()
-    expect(apply!.generation).toBe(7)
-    expect(apply!.note.path).toBe('notes/a.md')
-    expect(apply!.note.title).toBe('Hello')
-    expect(apply!.note.mtime).toBe(5)
-    expect(apply!.note.fileHash).toMatch(/^[0-9a-f]{64}$/)
-    expect(apply!.note.links.map((link) => link.targetKey)).toContain('world')
-  })
-
-  it('stamps "now" when no mtime is given', async () => {
-    const { indexer, findCall } = setup()
-    await indexer.indexNote('notes/a.md', { generation: 7, fileGeneration: FILE_GENERATION })
-    expect(findCall('apply')!.note.mtime).toBe(NOW)
-  })
-})
-
 describe('reindexNotesReferencing', () => {
   const REFERENCING = '# Hello\n\n![pic](assets/pic.png)\n'
 
-  it('re-applies referencing notes and emits the post-apply signal', async () => {
-    const { indexer, findCall, subscribeIndexApplied } = setup({
+  it('re-applies referencing notes, and the writer reports them', async () => {
+    const { indexer, writerAt, findCall, subscribeIndexApplied } = setup({
       files: { 'notes/a.md': { contents: REFERENCING, modifiedMs: 5 } },
       indexed: [{ path: 'notes/a.md', markdown: REFERENCING }],
     })
@@ -193,25 +221,23 @@ describe('reindexNotesReferencing', () => {
       emitted.push([changes, generation])
     })
     try {
-      await indexer.reindexNotesReferencing(['assets/pic.png'], {
-        generation: 7,
-        fileGeneration: FILE_GENERATION,
-      })
+      await indexer.reindexNotesReferencing(['assets/pic.png'], writerAt(7))
+      await writerAt(7).drained()
     } finally {
       unsubscribe()
     }
 
-    const apply = findCall('apply')
+    const apply = findCall('applyBatch')
     expect(apply).toBeDefined()
     expect(apply!.generation).toBe(7)
 
-    // These writes bypass the watcher pipeline, so the emit is the only way
-    // followers (the embedding sync) hear about the refreshed notes.
+    // The note file did not change, so the report is the only way followers
+    // (the embedding sync) hear about the refreshed notes.
     expect(emitted).toEqual([[[{ path: 'notes/a.md', kind: 'upsert' }], 7]])
   })
 
-  it('still emits the applied prefix when a later note’s re-index throws', async () => {
-    const { indexer, subscribeIndexApplied } = setup({
+  it('throws a failed re-index after the other notes are written and reported', async () => {
+    const { indexer, writerAt, subscribeIndexApplied } = setup({
       files: {
         'notes/a.md': { contents: REFERENCING, modifiedMs: 5 },
         'notes/b.md': { contents: REFERENCING, modifiedMs: 5 },
@@ -232,31 +258,27 @@ describe('reindexNotesReferencing', () => {
     })
     try {
       await expect(
-        indexer.reindexNotesReferencing(['assets/pic.png'], {
-          generation: 7,
-          fileGeneration: FILE_GENERATION,
-        }),
+        indexer.reindexNotesReferencing(['assets/pic.png'], writerAt(7)),
       ).rejects.toMatchObject({
         kind: 'io',
       })
+      await writerAt(7).drained()
     } finally {
       unsubscribe()
     }
-    // notes/a.md was applied before the failure — followers must hear it.
+    // notes/a.md was applied although notes/b.md failed: followers must hear it.
     expect(emitted).toEqual([[{ path: 'notes/a.md', kind: 'upsert' }]])
   })
 
   it('emits nothing when no note references the assets', async () => {
-    const { indexer, subscribeIndexApplied } = setup()
+    const { indexer, writerAt, subscribeIndexApplied } = setup()
     const emitted: unknown[] = []
     const unsubscribe = subscribeIndexApplied((changes) => {
       emitted.push(changes)
     })
     try {
-      await indexer.reindexNotesReferencing(['assets/pic.png'], {
-        generation: 7,
-        fileGeneration: FILE_GENERATION,
-      })
+      await indexer.reindexNotesReferencing(['assets/pic.png'], writerAt(7))
+      await writerAt(7).drained()
     } finally {
       unsubscribe()
     }
@@ -266,11 +288,10 @@ describe('reindexNotesReferencing', () => {
 
 describe('rebuild', () => {
   it('clears, lists, applies every file in one batch, then stamps the projection version', async () => {
-    const { indexer, reads, methods, findCall } = setup()
+    const { indexer, writerAt, reads, methods, findCall } = setup()
     const progress: Array<[number, number, number]> = []
     await indexer.rebuild({
-      generation: 1,
-      fileGeneration: FILE_GENERATION,
+      writer: writerAt(1),
       onFileProgress: (done, total, worked) => {
         progress.push([done, total, worked])
       },
@@ -292,7 +313,7 @@ describe('rebuild', () => {
   })
 
   it('splits a failed rebuild batch and still applies the notes individually', async () => {
-    const { indexer, store, methods } = setup({
+    const { indexer, writerAt, store, methods } = setup({
       files: notes('notes/a.md', 'notes/b.md', 'notes/c.md'),
       store: {
         fail: (call) => {
@@ -303,7 +324,7 @@ describe('rebuild', () => {
       },
     })
 
-    await indexer.rebuild({ generation: 1, fileGeneration: FILE_GENERATION })
+    await indexer.rebuild({ writer: writerAt(1) })
 
     const attempted = store.calls().flatMap((call) => {
       return call.method === 'applyBatch' ? [call.notes.map((note) => note.path)] : []
@@ -324,7 +345,7 @@ describe('rebuild', () => {
   })
 
   it('reports and skips a note whose projection cannot be written alone', async () => {
-    const { indexer, methods } = setup({
+    const { indexer, writerAt, methods } = setup({
       files: notes('notes/bad.md'),
       store: {
         fail: (call) => {
@@ -337,8 +358,7 @@ describe('rebuild', () => {
     const skipped: Array<{ path: string; message: string }> = []
 
     await indexer.rebuild({
-      generation: 1,
-      fileGeneration: FILE_GENERATION,
+      writer: writerAt(1),
       onSkippedNote: (note) => {
         skipped.push(note)
       },
@@ -349,7 +369,7 @@ describe('rebuild', () => {
   })
 
   it('throws a single-note write failure when no skip callback is registered', async () => {
-    const { indexer, methods } = setup({
+    const { indexer, writerAt, methods } = setup({
       files: notes('notes/bad.md'),
       store: {
         fail: (call) => {
@@ -358,22 +378,41 @@ describe('rebuild', () => {
       },
     })
 
-    await expect(
-      indexer.rebuild({ generation: 1, fileGeneration: FILE_GENERATION }),
-    ).rejects.toThrow('single note refused')
+    await expect(indexer.rebuild({ writer: writerAt(1) })).rejects.toThrow('single note refused')
     expect(methods()).not.toContain('setMeta')
+  })
+
+  it('skips a note that cannot be read, writes the others, and stamps', async () => {
+    const { indexer, writerAt, store, methods, logger } = setup({
+      files: notes('notes/a.md', 'notes/bad.md'),
+      read: (path) => {
+        if (path === 'notes/bad.md') {
+          throw new AppError('io', 'disk error')
+        }
+      },
+    })
+
+    expect(await indexer.rebuild({ writer: writerAt(1) })).toBe(true)
+
+    expect(store.applied().map((note) => note.path)).toEqual(['notes/a.md'])
+    expect(methods()).toContain('setMeta')
+    expect(logger.getWarnings().map((entry) => entry.message)).toEqual([
+      'index: skipped unreadable notes/bad.md:',
+    ])
   })
 
   it('stops before the next SQLite write when suspended after the rebuild wipe', async () => {
     const controller = new AbortController()
-    const { indexer, methods } = setup({
+    const { indexer, writerAt, gate, methods } = setup({
       // Models iOS becoming hidden while filesystem work is in flight.
-      read: () => controller.abort(),
+      read: () => {
+        controller.abort()
+        gate.canWrite = false
+      },
     })
 
     await indexer.rebuild({
-      generation: 1,
-      fileGeneration: FILE_GENERATION,
+      writer: writerAt(1),
       signal: controller.signal,
     })
 
@@ -387,10 +426,10 @@ describe('rebuild', () => {
 
 describe('sync', () => {
   it('reconciles (no wipe) when the stored projection version is current', async () => {
-    const { indexer, logger, methods } = setup({
+    const { indexer, writerAt, logger, methods } = setup({
       store: { meta: { [PROJECTION_VERSION_KEY]: String(PROJECTION_VERSION) } },
     })
-    await indexer.sync({ generation: 2, fileGeneration: FILE_GENERATION })
+    await indexer.sync({ writer: writerAt(2) })
     expect(methods()).toContain('reconcileScan')
     expect(methods()).not.toContain('clear')
     expect(methods()).not.toContain('setMeta')
@@ -399,8 +438,8 @@ describe('sync', () => {
 
   it('rebuilds and stamps when the index predates the current projection', async () => {
     // never stamped (or written by an older app)
-    const { indexer, logger, methods, findCall } = setup()
-    await indexer.sync({ generation: 3, fileGeneration: FILE_GENERATION })
+    const { indexer, writerAt, logger, methods, findCall } = setup()
+    await indexer.sync({ writer: writerAt(3) })
     expect(methods()).toContain('clear')
     expect(findCall('setMeta')).toMatchObject({
       key: PROJECTION_VERSION_KEY,
@@ -410,103 +449,6 @@ describe('sync', () => {
     expect(logger.getWarnings().map((entry) => entry.message)).toEqual([
       `index: stored projection version none ≠ ${PROJECTION_VERSION} — full rebuild`,
     ])
-  })
-})
-
-describe('LiveIndex.apply (watcher dispatch)', () => {
-  it('re-indexes upserts (batched) and removes deletes at the given generation', async () => {
-    const { liveIndex, findCall } = setup()
-    const mutations = await liveIndex.apply(
-      [
-        { path: 'notes/a.md', kind: 'upsert', modifiedMs: 4242 },
-        { path: 'notes/gone.md', kind: 'remove' },
-      ],
-      9,
-      FILE_GENERATION,
-    )
-    const apply = findCall('applyBatch')
-    expect(apply!.generation).toBe(9)
-    expect(apply!.notes.map((note) => note.path)).toEqual(['notes/a.md'])
-    expect(apply!.notes[0]!.mtime).toBe(4242)
-    expect(findCall('remove')).toMatchObject({ path: 'notes/gone.md', generation: 9 })
-    expect(mutations).toBe(2)
-  })
-
-  it('stamps "now" — never epoch zero — when an upsert carries no modifiedMs', async () => {
-    const { liveIndex, store } = setup()
-    await liveIndex.apply([{ path: 'notes/a.md', kind: 'upsert' }], 9, FILE_GENERATION)
-    expect(store.applied()[0]!.mtime).toBe(NOW)
-  })
-
-  it('skips upserts whose indexed row already matches an old mtime, without reading', async () => {
-    // The iCloud watch's initial gather re-reports every downloaded note; a
-    // row indexed at the same (settled) mtime must cost neither a read nor a
-    // write — and a zero-mutation batch reports 0 so no invalidation fires.
-    const { liveIndex, reads, methods } = setup({
-      stored: [{ path: 'notes/a.md', markdown: '# Hello', fileHash: 'stored', mtime: 1_000 }],
-    })
-
-    const mutations = await liveIndex.apply(
-      [{ path: 'notes/a.md', kind: 'upsert', modifiedMs: 1_000 }],
-      9,
-      FILE_GENERATION,
-    )
-
-    expect(mutations).toBe(0)
-    expect(reads).toEqual([])
-    expect(methods()).not.toContain('applyBatch')
-    expect(methods()).not.toContain('touch')
-  })
-
-  it('re-stamps the stored mtime when content is unchanged but the mtime moved', async () => {
-    const content = '# same content\n'
-    const { liveIndex, methods, findCall } = setup({
-      files: { 'notes/a.md': { contents: content, modifiedMs: 2_000 } },
-      stored: [
-        {
-          path: 'notes/a.md',
-          markdown: content,
-          fileHash: await sha256Hex(content),
-          mtime: 1_000,
-        },
-      ],
-    })
-
-    const mutations = await liveIndex.apply(
-      [{ path: 'notes/a.md', kind: 'upsert', modifiedMs: 2_000 }],
-      9,
-      FILE_GENERATION,
-    )
-
-    // The re-stamp counts as a mutation: `updated_at` moved, so
-    // recency-ordered queries must be invalidated.
-    expect(mutations).toBe(1)
-    expect(findCall('touch')).toEqual({
-      method: 'touch',
-      entries: [{ path: 'notes/a.md', mtime: 2_000 }],
-      generation: 9,
-    })
-    expect(methods()).not.toContain('applyBatch')
-  })
-
-  it('still reads when the reported mtime is too fresh to trust', async () => {
-    // Local write echoes stamp rows with the current time: two
-    // same-millisecond saves would look "unchanged" by mtime alone, so fresh
-    // mtimes always take the read-and-hash path.
-    const { liveIndex, reads, methods } = setup({
-      files: { 'notes/a.md': { contents: '# fresh content', modifiedMs: NOW - 10 } },
-      stored: [{ path: 'notes/a.md', markdown: '# Hello', fileHash: 'stale', mtime: NOW - 10 }],
-    })
-
-    const mutations = await liveIndex.apply(
-      [{ path: 'notes/a.md', kind: 'upsert', modifiedMs: NOW - 10 }],
-      9,
-      FILE_GENERATION,
-    )
-
-    expect(mutations).toBe(1)
-    expect(reads).toEqual(['notes/a.md'])
-    expect(methods()).toContain('applyBatch')
   })
 })
 
@@ -531,39 +473,27 @@ describe('reconcile move healing (Plan 17)', () => {
     })
   }
 
-  it('moves the rows and skips the re-index when content is unchanged', async () => {
-    const { indexer, store, findCall } = setupRename({ storedHash: await sha256Hex(CONTENT) })
-
-    await indexer.reconcile({ generation: 4, fileGeneration: FILE_GENERATION })
-
-    expect(findCall('move')).toEqual({ method: 'move', from: OLD, to: NEW, generation: 4 })
-    // The moved row carried its hash: identical content means no re-apply —
-    // and crucially no remove, so embeddings survived.
-    expect(store.applied()).toEqual([])
-    expect(store.removed()).toEqual([])
-  })
-
-  it('announces the heal via onMoved so the app can follow', async () => {
-    const { indexer } = setupRename({ storedHash: await sha256Hex(CONTENT) })
-    const moves: Array<[string, string]> = []
-
-    await indexer.reconcile({
-      generation: 4,
-      fileGeneration: FILE_GENERATION,
-      onMoved: (from, to) => {
-        moves.push([from, to])
-      },
+  it('moves the rows, then writes the new path, and removes nothing', async () => {
+    const { indexer, writerAt, store, findCall, moves } = setupRename({
+      storedHash: await sha256Hex(CONTENT),
     })
 
+    await indexer.reconcile({ writer: writerAt(4) })
+
+    expect(findCall('move')).toEqual({ method: 'move', from: OLD, to: NEW, generation: 4 })
+    // The rows moved, so embeddings survived. The projection also depends on
+    // the path, so the new path is written even though the content is the same.
+    expect(store.applied().map((note) => note.path)).toEqual([NEW])
+    expect(store.removed()).toEqual([])
     expect(moves).toEqual([[OLD, NEW]])
   })
 
   it('re-indexes at the new path when content changed in transit', async () => {
-    const { indexer, store, findCall } = setupRename({
+    const { indexer, writerAt, store, findCall } = setupRename({
       storedHash: 'stale-hash-from-before-the-edit',
     })
 
-    await indexer.reconcile({ generation: 4, fileGeneration: FILE_GENERATION })
+    await indexer.reconcile({ writer: writerAt(4) })
 
     expect(store.moved()).toEqual([{ from: OLD, to: NEW }])
     expect(store.removed()).toEqual([])
@@ -571,12 +501,12 @@ describe('reconcile move healing (Plan 17)', () => {
   })
 
   it('a legacy file without an id still reconciles as delete+create', async () => {
-    const { indexer, store } = setupRename({
+    const { indexer, writerAt, store } = setupRename({
       storedHash: 'whatever',
       content: '# Meeting Notes\n',
     })
 
-    await indexer.reconcile({ generation: 4, fileGeneration: FILE_GENERATION })
+    await indexer.reconcile({ writer: writerAt(4) })
 
     expect(store.moved()).toEqual([])
     expect(store.applied().map((note) => note.path)).toEqual([NEW])
@@ -584,7 +514,7 @@ describe('reconcile move healing (Plan 17)', () => {
   })
 
   it('logs a refused move and degrades to delete+create', async () => {
-    const { indexer, store, logger } = setup({
+    const { indexer, writerAt, store, logger } = setup({
       files: { [NEW]: { contents: CONTENT, modifiedMs: 9 } },
       indexed: [{ path: OLD, markdown: CONTENT }],
       store: {
@@ -598,7 +528,7 @@ describe('reconcile move healing (Plan 17)', () => {
       },
     })
 
-    await indexer.reconcile({ generation: 4, fileGeneration: FILE_GENERATION })
+    await indexer.reconcile({ writer: writerAt(4) })
 
     expect(logger.getErrors().map((entry) => entry.message)).toEqual([
       `id-based move failed (${OLD} → ${NEW}):`,
@@ -613,14 +543,13 @@ describe('reconcile over the native scan delta', () => {
     // Mtime-matched files never leave Rust (the scan's own tests cover the
     // classification); an empty delta must cost no reads, no writes, and no
     // visible progress.
-    const { indexer, reads, methods } = setup({
+    const { indexer, writerAt, reads, methods } = setup({
       store: { scan: { total: 7_000, candidates: [], orphans: [], stalePlaceholders: [] } },
     })
     const progress: Array<[number, number, number]> = []
 
     await indexer.reconcile({
-      generation: 4,
-      fileGeneration: FILE_GENERATION,
+      writer: writerAt(4),
       onFileProgress: (done, total, worked) => {
         progress.push([done, total, worked])
       },
@@ -636,8 +565,9 @@ describe('reconcile over the native scan delta', () => {
   it('reads (and hash-skips) a candidate whose stored mtime differs — providers rewrite mtimes', async () => {
     const content = '# Hello\n'
     const storedHash = await sha256Hex(content)
-    const { indexer, reads, methods, findCall } = setup({
+    const { indexer, writerAt, reads, methods, findCall } = setup({
       files: { 'notes/a.md': { contents: content, modifiedMs: 2_000 } },
+      stored: [{ path: 'notes/a.md', markdown: content, fileHash: storedHash, mtime: 1_000 }],
       store: {
         scan: {
           total: 1,
@@ -651,8 +581,7 @@ describe('reconcile over the native scan delta', () => {
     const progress: Array<[number, number, number]> = []
 
     await indexer.reconcile({
-      generation: 4,
-      fileGeneration: FILE_GENERATION,
+      writer: writerAt(4),
       onFileProgress: (done, total, worked) => {
         progress.push([done, total, worked])
       },
@@ -673,7 +602,7 @@ describe('reconcile over the native scan delta', () => {
   })
 
   it('re-indexes changed candidates and drops orphans', async () => {
-    const { indexer, store, findCall } = setup({
+    const { indexer, writerAt, store, findCall } = setup({
       files: notes('notes/changed.md'),
       store: {
         scan: {
@@ -687,7 +616,7 @@ describe('reconcile over the native scan delta', () => {
       },
     })
 
-    await indexer.reconcile({ generation: 4, fileGeneration: FILE_GENERATION })
+    await indexer.reconcile({ writer: writerAt(4) })
 
     const applied = store.applied()
     expect(applied.map((note) => note.path)).toEqual(['notes/changed.md'])
@@ -695,8 +624,40 @@ describe('reconcile over the native scan delta', () => {
     expect(findCall('remove')).toMatchObject({ path: 'notes/gone.md', generation: 4 })
   })
 
+  it('returns early once aborted, and the writer still writes the marked files', async () => {
+    const controller = new AbortController()
+    const { indexer, writerAt, store } = setup({
+      files: notes('notes/changed.md'),
+      store: {
+        scan: {
+          total: 1,
+          candidates: [
+            { path: 'notes/changed.md', modifiedMs: 2_000, storedMtime: 1_000, storedHash: 'old' },
+          ],
+          orphans: [],
+          stalePlaceholders: [],
+        },
+      },
+      read: () => controller.abort(),
+    })
+    const progress: Array<[number, number, number]> = []
+
+    await indexer.reconcile({
+      writer: writerAt(4),
+      signal: controller.signal,
+      onFileProgress: (done, total, worked) => {
+        progress.push([done, total, worked])
+      },
+    })
+    expect(progress).toEqual([])
+    expect(store.applied()).toEqual([])
+
+    await writerAt(4).drained()
+    expect(store.applied().map((note) => note.path)).toEqual(['notes/changed.md'])
+  })
+
   it('removes the row for a candidate that vanished between the scan and the read', async () => {
-    const { indexer, findCall } = setup({
+    const { indexer, writerAt, findCall } = setup({
       files: {},
       store: {
         scan: {
@@ -710,7 +671,7 @@ describe('reconcile over the native scan delta', () => {
       },
     })
 
-    await indexer.reconcile({ generation: 4, fileGeneration: FILE_GENERATION })
+    await indexer.reconcile({ writer: writerAt(4) })
 
     expect(findCall('remove')).toMatchObject({ path: 'notes/ghost.md', generation: 4 })
   })
@@ -721,7 +682,7 @@ describe('iCloud eviction placeholders (Plan 21)', () => {
   // now live in the Rust scan — `reconcile_scan_classifies_candidates_orphans_and_skips`
   // in crates/index/src/tests.rs covers them. Only the rebuild path still walks the listing here.
   it('rebuild indexes readable files and skips evicted ones', async () => {
-    const { indexer, store, reads } = setup({
+    const { indexer, writerAt, store, reads } = setup({
       files: {
         'notes/real.md': { contents: '# Real\n', modifiedMs: 5 },
         'notes/evicted.md': { contents: '# Evicted\n', modifiedMs: 5 },
@@ -731,8 +692,7 @@ describe('iCloud eviction placeholders (Plan 21)', () => {
 
     const stale: string[][] = []
     await indexer.rebuild({
-      generation: 6,
-      fileGeneration: FILE_GENERATION,
+      writer: writerAt(6),
       onStalePlaceholders: (paths) => {
         stale.push([...paths])
       },
@@ -747,7 +707,7 @@ describe('iCloud eviction placeholders (Plan 21)', () => {
   })
 
   it('reconcile surfaces stale placeholders for targeted downloads', async () => {
-    const { indexer, reads } = setup({
+    const { indexer, writerAt, reads } = setup({
       store: {
         scan: {
           total: 3,
@@ -760,8 +720,7 @@ describe('iCloud eviction placeholders (Plan 21)', () => {
 
     const stale: string[][] = []
     await indexer.reconcile({
-      generation: 4,
-      fileGeneration: FILE_GENERATION,
+      writer: writerAt(4),
       onStalePlaceholders: (paths) => {
         stale.push([...paths])
       },

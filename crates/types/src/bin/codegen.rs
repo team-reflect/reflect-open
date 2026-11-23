@@ -5,7 +5,7 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use reflect_types::commands;
-use reflect_types::events::EventName;
+use reflect_types::events::{EventName, IndexCommitted};
 use reflect_types::{
     APP_GROUP_KEY, AppError, AssetResolveReply, CaptureAck, CapturePointer, CaptureWireMessage,
     ChromeIntent, ChromeMessage, CoreStartConfig, FileChange, GraphImportProgress,
@@ -28,6 +28,7 @@ fn main() {
         Types::default()
             .register::<AppError>()
             .register::<EventName>()
+            .register::<IndexCommitted>()
             .register::<FileChange>()
             .register::<GraphImportProgress>()
             .register::<CoreStartConfig>()

@@ -230,6 +230,17 @@ pub struct MovedNoteAddress {
     pub daily_date: Option<String>,
 }
 
+/// What a write of the index projection committed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct IndexCommit {
+    /// The commit sequence of the index after the write: the number of
+    /// projection write transactions the running index session committed.
+    /// Absent when the generation was stale, so nothing was written.
+    pub seq: Option<u64>,
+}
+
 /// One `touch` entry: re-stamp `path`'s stored mtime to `mtime` (epoch ms, as
 /// listed by the file walk).
 #[derive(Debug, Deserialize)]

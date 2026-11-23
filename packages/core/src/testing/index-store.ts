@@ -1,25 +1,23 @@
-import { isIsoDate } from '@reflect/utils'
+import { INDEX_COMMITTED_EVENT } from '../ipc/ipc-service.ts'
+import type { TestIpcBridgeService } from './ipc.ts'
+import { isIsoDate, type MaybePromise } from '@reflect/utils'
 import { noteBasenameKey } from '../graph/note-reference.ts'
 import { dateFromDailyPath, foldGraphPath } from '../graph/paths.ts'
 import type { IndexedNote } from '../indexing/indexed-note.ts'
-import {
-  createIndexApplyBatchWriter,
-  createMtimeTouchBatchWriter,
-  type IndexApplyBatch,
-  type IndexTouch,
-  type IndexStoreService,
-  type MtimeTouchBatch,
-  type SkippedIndexedNote,
-  type ReconcileScan,
+import type {
+  IndexCommit,
+  IndexCommitted,
+  IndexTouch,
+  WritableIndexStoreService,
+  ReconcileScan,
 } from '../indexing/index-store-service.ts'
 import type { TestDatabaseService } from './database.ts'
 
 /**
- * One recorded {@link IndexStoreService} call.
+ * One recorded {@link WritableIndexStoreService} call.
  */
 export type IndexStoreCall =
   | { readonly method: 'open' }
-  | { readonly method: 'apply'; readonly note: IndexedNote; readonly generation: number }
   | {
       readonly method: 'applyBatch'
       readonly notes: readonly IndexedNote[]
@@ -55,8 +53,8 @@ export type IndexStoreCall =
 
 export interface TestIndexStoreServiceOptions {
   /**
-   * Mirror applies, removes, moves, clears and `index_meta` into this
-   * database, so reads through it see what the store wrote.
+   * Mirror applies, removes, moves, touches, clears and `index_meta` into
+   * this database, so reads through it see what the store wrote.
    */
   database?: TestDatabaseService
   /**
@@ -64,13 +62,18 @@ export interface TestIndexStoreServiceOptions {
    */
   generation?: number
   /**
-   * What `reconcileScan` resolves with. Defaults to an empty scan.
+   * What `reconcileScan` resolves with: a fixed scan, or a function called
+   * once per scan. Defaults to an empty scan.
    */
-  scan?: ReconcileScan
+  scan?: ReconcileScan | (() => MaybePromise<ReconcileScan>)
   /**
    * Initial `index_meta` entries.
    */
   meta?: Readonly<Record<string, string>>
+  /**
+   * Where `announce` emits `index:committed`, as the native index does to every window.
+   */
+  ipc?: TestIpcBridgeService
   /**
    * Called after a call is recorded and before it takes effect. A returned
    * `Error` rejects the call with it.
@@ -78,13 +81,13 @@ export interface TestIndexStoreServiceOptions {
   fail?: (call: IndexStoreCall) => Error | undefined
 }
 
-export interface TestIndexStoreService extends IndexStoreService {
+export interface TestIndexStoreService extends WritableIndexStoreService {
   /**
    * Every call, in order, including calls that `fail` rejected.
    */
   calls(): readonly IndexStoreCall[]
   /**
-   * Every projection written by `apply` and `applyBatch`, in order.
+   * Every projection written by `applyBatch`, in order.
    */
   applied(): readonly IndexedNote[]
   /**
@@ -95,6 +98,10 @@ export interface TestIndexStoreService extends IndexStoreService {
    * Every successful `move` and `moveIndexed`, in order.
    */
   moved(): readonly { readonly from: string; readonly to: string }[]
+  /**
+   * Every commit passed to `announce`, in order. `calls` leaves them out.
+   */
+  announced(): readonly IndexCommitted[]
 }
 
 const EMPTY_SCAN: ReconcileScan = { total: 0, candidates: [], orphans: [], stalePlaceholders: [] }
@@ -102,18 +109,22 @@ const EMPTY_SCAN: ReconcileScan = { total: 0, candidates: [], orphans: [], stale
 class TestIndexStoreServiceImpl implements TestIndexStoreService {
   readonly #database: TestDatabaseService | undefined
   readonly #generation: number
-  readonly #scan: ReconcileScan
+  readonly #ipc: TestIpcBridgeService | undefined
+  readonly #scan: ReconcileScan | (() => MaybePromise<ReconcileScan>)
   readonly #fail: ((call: IndexStoreCall) => Error | undefined) | undefined
   readonly #meta: Map<string, string>
   readonly #log: IndexStoreCall[] = []
   readonly #appliedNotes: IndexedNote[] = []
   readonly #removedPaths: string[] = []
   readonly #moves: { from: string; to: string }[] = []
+  readonly #announcements: IndexCommitted[] = []
   #metaSeeded: boolean
+  #seq = 0
 
   constructor(options: TestIndexStoreServiceOptions | undefined) {
     this.#database = options?.database
     this.#generation = options?.generation ?? 1
+    this.#ipc = options?.ipc
     this.#scan = options?.scan ?? EMPTY_SCAN
     this.#fail = options?.fail
     this.#meta = new Map(Object.entries(options?.meta ?? {}))
@@ -127,33 +138,31 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
     })
   }
 
-  apply(note: IndexedNote, writeGeneration: number): Promise<void> {
-    return Promise.try(() => {
-      this.#record({ method: 'apply', note, generation: writeGeneration })
-      this.#writeNotes([note])
-    })
-  }
-
-  applyBatch(notes: IndexedNote[], writeGeneration: number): Promise<void> {
+  applyBatch(notes: IndexedNote[], writeGeneration: number): Promise<IndexCommit> {
     return Promise.try(() => {
       this.#record({ method: 'applyBatch', notes: [...notes], generation: writeGeneration })
-      this.#writeNotes(notes)
+      return this.#writeNotes(notes)
     })
   }
 
-  remove(path: string, writeGeneration: number): Promise<void> {
+  remove(path: string, writeGeneration: number): Promise<IndexCommit> {
     return Promise.try(() => {
       this.#record({ method: 'remove', path, generation: writeGeneration })
-      this.#database?.invoke('index_remove', { path, generation: this.#database.generation() })
+      const commit = this.#database?.invoke('index_remove', {
+        path,
+        generation: this.#database.generation(),
+      })
       this.#removedPaths.push(path)
+      return commit ?? this.#commit()
     })
   }
 
-  move(from: string, to: string, writeGeneration: number): Promise<void> {
+  move(from: string, to: string, writeGeneration: number): Promise<IndexCommit> {
     return Promise.try(() => {
       this.#record({ method: 'move', from, to, generation: writeGeneration })
-      this.#moveRows(from, to)
+      const commit = this.#moveRows(from, to)
       this.#moves.push({ from, to })
+      return commit
     })
   }
 
@@ -168,21 +177,35 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
   reconcileScan(scanGeneration: number): Promise<ReconcileScan> {
     return Promise.try(() => {
       this.#record({ method: 'reconcileScan', generation: scanGeneration })
-      return this.#scan
+      return typeof this.#scan === 'function' ? this.#scan() : this.#scan
     })
   }
 
-  touch(entries: readonly IndexTouch[], writeGeneration: number): Promise<void> {
+  touch(entries: readonly IndexTouch[], writeGeneration: number): Promise<IndexCommit> {
     return Promise.try(() => {
       this.#record({ method: 'touch', entries: [...entries], generation: writeGeneration })
+      const commit = this.#database?.invoke('index_touch', {
+        entries: [...entries],
+        generation: this.#database.generation(),
+      })
+      return commit ?? this.#commit()
     })
   }
 
-  clear(writeGeneration: number): Promise<void> {
+  clear(writeGeneration: number): Promise<IndexCommit> {
     return Promise.try(() => {
       this.#record({ method: 'clear', generation: writeGeneration })
-      this.#database?.invoke('index_clear', { generation: this.#database.generation() })
+      const commit = this.#database?.invoke('index_clear', {
+        generation: this.#database.generation(),
+      })
+      return commit ?? this.#commit()
     })
+  }
+
+  announce(commit: IndexCommitted): Promise<void> {
+    this.#announcements.push(commit)
+    this.#ipc?.emit(INDEX_COMMITTED_EVENT, commit)
+    return Promise.resolve()
   }
 
   async getMeta(key: string): Promise<string | null> {
@@ -203,26 +226,12 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
     })
   }
 
-  createApplyBatch(
-    writeGeneration: number,
-    onSkippedNote?: (note: SkippedIndexedNote) => void,
-  ): IndexApplyBatch {
-    return createIndexApplyBatchWriter(
-      (notes, generation) => this.applyBatch(notes, generation),
-      writeGeneration,
-      onSkippedNote,
-    )
-  }
-
-  createTouchBatch(writeGeneration: number): MtimeTouchBatch {
-    return createMtimeTouchBatchWriter(
-      (entries, generation) => this.touch(entries, generation),
-      writeGeneration,
-    )
-  }
-
   calls(): readonly IndexStoreCall[] {
     return [...this.#log]
+  }
+
+  announced(): readonly IndexCommitted[] {
+    return [...this.#announcements]
   }
 
   applied(): readonly IndexedNote[] {
@@ -267,20 +276,33 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
     })
   }
 
-  #writeNotes(notes: readonly IndexedNote[]): void {
-    const database = this.#database
-    for (const note of notes) {
-      if (database !== undefined) {
-        database.applyProjection(note)
-      }
-      this.#appliedNotes.push(note)
-    }
+  /**
+   * The next commit of a store without a database.
+   */
+  #commit(): IndexCommit {
+    this.#seq += 1
+    return { seq: this.#seq }
   }
 
-  #moveRows(from: string, to: string): void {
+  #writeNotes(notes: readonly IndexedNote[]): IndexCommit {
+    const database = this.#database
+    this.#appliedNotes.push(...notes)
+    if (notes.length === 0) {
+      return { seq: null }
+    }
+    if (database === undefined) {
+      return this.#commit()
+    }
+    return database.invoke('index_apply_batch', {
+      notes: [...notes],
+      generation: database.generation(),
+    })
+  }
+
+  #moveRows(from: string, to: string): IndexCommit {
     const database = this.#database
     if (database === undefined) {
-      return
+      return this.#commit()
     }
     const date = dateFromDailyPath(to)
     const toAddress = {
@@ -288,12 +310,17 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
       basenameKey: noteBasenameKey(to),
       dailyDate: date !== null && isIsoDate(date) ? date : null,
     }
-    database.invoke('index_move', { from, to, generation: database.generation(), toAddress })
+    return database.invoke('index_move', {
+      from,
+      to,
+      generation: database.generation(),
+      toAddress,
+    })
   }
 }
 
 /**
- * An in-memory {@link IndexStoreService} that records every call.
+ * An in-memory {@link WritableIndexStoreService} that records every call.
  */
 export function createTestIndexStoreService(
   options?: TestIndexStoreServiceOptions,

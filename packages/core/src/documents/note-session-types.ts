@@ -120,6 +120,32 @@ export interface NoteSessionOptions {
 /**
  * One open note's document lifecycle. Create via {@link NoteSessionService.create}.
  */
+/**
+ * Rewrites the full text of a note. `revision` is the hash of `source` as the
+ * note file holds it, or `null` when `source` holds unsaved edits or the note
+ * has no file.
+ */
+export type NoteSourceTransform = (source: string, revision: string | null) => string
+
+/**
+ * What {@link NoteSession.commitSourceEdit} left on disk.
+ */
+export interface NoteSessionCommit {
+  /**
+   * The full note text on disk after the flush.
+   */
+  readonly content: string
+  /**
+   * Lowercase hex SHA-256 of `content`; `null` when the note has no file.
+   */
+  readonly revision: string | null
+  /**
+   * Whether `content` differs from the text the transform returned: the write
+   * merged with a newer disk text, or keystrokes landed during the flush.
+   */
+  readonly merged: boolean
+}
+
 export interface NoteSession {
   /** The graph-relative path this session is bound to (mutable via {@link NoteSession.retarget}). */
   readonly path: string
@@ -200,27 +226,18 @@ export interface NoteSession {
    */
   commitFrontmatter(patch: FrontmatterPatch): Promise<boolean>
   /**
-   * Append a markdown block to the end of the body (own paragraph, blank-line
-   * separated — `appendBlock`) from an out-of-editor action like the
-   * suggested-contact card's Add, applied to the live buffer so unsaved edits
-   * survive, reflected in the open editor, and flushed now. Same gating,
-   * `false`-when-busy, and transactional revert as {@link commitSourceEdit}.
-   * A blank block is refused (`false`) — there is nothing to write.
-   */
-  commitBodyAppend(block: string): Promise<boolean>
-  /**
    * Apply a synchronous full-source transform to the live buffer (so unsaved
    * edits survive), reflect it in the open editor, and flush now. The Tasks
    * view routes its edits here whenever the note is open: the buffer is read
    * synchronously, so there is no read/write race with the editor. A session
    * still loading waits for the load, then applies the edit to the loaded
-   * buffer. Returns false when the session can't take it (failed to load,
+   * buffer. Returns `null` when the session can't take it (failed to load,
    * protected, or disposed) so the caller refuses rather than clobber the
    * buffer; an error thrown by `transform` (a stale task locator) propagates
    * untouched, and a failed flush reverts the in-memory edit before
    * rethrowing.
    */
-  commitSourceEdit(transform: (source: string) => string): Promise<boolean>
+  commitSourceEdit(transform: NoteSourceTransform): Promise<NoteSessionCommit | null>
   /** Flush pending edits and detach: no further snapshots are emitted. */
   dispose(): void
   /**

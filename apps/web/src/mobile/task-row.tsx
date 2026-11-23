@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { ArrowRight, Circle, CircleCheck, Trash2 } from 'lucide-react'
 import { getIsComposing } from '@meowdown/core'
 import { TaskText } from '@/components/tasks/task-text.tsx'
-import { getTaskKey, type OpenTask, formatShortDate, type WritableStore } from '@reflect/core'
+import { type OpenTask, formatShortDate, type WritableStore } from '@reflect/core'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
@@ -27,15 +27,11 @@ interface MobileTaskRowProps {
    */
   onToggle: () => void
   /**
-   * Whether a Tasks write is in flight; the checkbox waits for it.
-   */
-  togglePending: boolean
-  /**
    * Open the quick-edit sheet for this task (V1 mobile: tap edits in place).
    */
   onEdit: (task: OpenTask) => void
   /**
-   * The list's one revealed row, keyed by `getTaskKey`.
+   * The list's one revealed row, keyed by `taskId`.
    */
   revealedRow: WritableStore<string | null>
   /**
@@ -62,7 +58,6 @@ export function MobileTaskRow({
   task,
   showSource,
   onToggle,
-  togglePending,
   onEdit,
   revealedRow,
   onOpenNote,
@@ -70,7 +65,7 @@ export function MobileTaskRow({
 }: MobileTaskRowProps): ReactElement {
   const { haptics } = useMobileServices()
   const dateFormat = useDateFormat()
-  const key = getTaskKey(task)
+  const key = task.taskId
   const { revealed, reveal, close, beginInteraction } = useRevealedRow(revealedRow, key)
   const label = task.text || 'Empty task'
   const edit = (): void => onEdit(task)
@@ -127,14 +122,13 @@ export function MobileTaskRow({
           <button
             type="button"
             aria-label={task.checked ? `Reopen: ${label}` : `Complete: ${label}`}
-            disabled={togglePending}
             onClick={() => {
               hapticImpactLight(haptics)
               onToggle()
             }}
             // A generous touch target around the small glyph; self-stretch keeps
             // the circle vertically centered in the row as task text wraps.
-            className="flex shrink-0 self-stretch items-center pl-4 pr-3 text-text-muted disabled:opacity-50"
+            className="flex shrink-0 self-stretch items-center pl-4 pr-3 text-text-muted"
           >
             {task.checked ? (
               <CircleCheck aria-hidden className="size-5 text-accent" strokeWidth={2} />

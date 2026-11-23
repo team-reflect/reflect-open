@@ -37,7 +37,7 @@ export interface TestWindowService extends WindowService {
    */
   title(): string | null
   emitNavigate(url: string): void
-  emitIndexWritten(): void
+  emitIndexCommitted(): void
   /**
    * Deliver an event to {@link WindowService.subscribeWindowEvent} listeners.
    */
@@ -59,7 +59,7 @@ class TestWindowServiceImpl implements TestWindowService {
   readonly #opened: string[] = []
   readonly #emittedEvents: { label: string; event: string; payload: unknown }[] = []
   readonly #navigate = new Listeners<[url: string]>()
-  readonly #indexWritten = new Listeners()
+  readonly #indexCommitted = new Listeners()
   readonly #windowEvents = new Map<string, Listeners<[payload: unknown]>>()
   readonly #closeHandlers = new Set<CloseRequestedHandler>()
   #closeCalls = 0
@@ -104,8 +104,8 @@ class TestWindowServiceImpl implements TestWindowService {
     return this.#navigate.add(listener)
   }
 
-  subscribeIndexWritten(listener: () => void): Unlisten {
-    return this.#indexWritten.add(listener)
+  subscribeIndexCommitted(listener: () => void): Unlisten {
+    return this.#indexCommitted.add(listener)
   }
 
   subscribeWindowEvent(event: string, listener: (payload: unknown) => void): Unlisten {
@@ -156,8 +156,8 @@ class TestWindowServiceImpl implements TestWindowService {
     this.#navigate.emit(url)
   }
 
-  emitIndexWritten(): void {
-    this.#indexWritten.emit()
+  emitIndexCommitted(): void {
+    this.#indexCommitted.emit()
   }
 
   emitWindowEvent(event: string, payload: unknown): void {

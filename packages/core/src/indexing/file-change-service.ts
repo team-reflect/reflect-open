@@ -38,8 +38,7 @@ export type { FileChange }
  *
  * - `external`: observed on disk by the Rust watcher or the iCloud metadata
  *   query: another app, another device, or an echo of our own write.
- * - `own-write`: a write this app just made (the mobile write echo, a
- *   conflict resolution).
+ * - `own-write`: a write this app just made.
  * - `pull`: files a Git pull wrote.
  * - `icloud-sweep`: files the iCloud conflict sweep wrote.
  */
@@ -79,8 +78,7 @@ export interface FileChangeService {
   emit(batch: FileChangeBatch): void
   /**
    * Report changes a write command just made, after the write has landed.
-   * The change stream hears the batch (tagged `own-write`) only when
-   * `echoOwnWrites` is on.
+   * The change stream hears the batch, tagged `own-write`.
    */
   reportOwnWrite(changes: readonly FileChange[]): void
   /**
@@ -96,12 +94,6 @@ export interface FileChangeService {
 export interface FileChangeServiceDeps {
   readonly ipc: IpcBridgeService
   readonly logger: LoggerService
-  /**
-   * Echo own writes onto the change stream. Hosts without a file watcher
-   * (mobile) turn it on, so the derived layer sees local writes the way the
-   * desktop watcher reports them.
-   */
-  readonly echoOwnWrites: boolean
 }
 
 class FileChangeServiceImpl implements FileChangeService {
@@ -140,9 +132,7 @@ class FileChangeServiceImpl implements FileChangeService {
   }
 
   reportOwnWrite(changes: readonly FileChange[]): void {
-    if (this.#deps.echoOwnWrites) {
-      this.#batches.emit({ changes: [...changes], source: 'own-write' })
-    }
+    this.#batches.emit({ changes: [...changes], source: 'own-write' })
   }
 
   async startWatcher(): Promise<void> {

@@ -24,6 +24,7 @@ import {
   createTestActivityPort,
   createTestLoggerService,
   createTestNoteCreationService,
+  createTestNoteDocumentService,
   createTestNoteFileService,
   createTestProgressPort,
   createTestPlatformService,
@@ -115,6 +116,7 @@ async function setup(options?: SetupOptions) {
   const audioMemo = createAudioMemoService({
     assetStore,
     noteFile,
+    noteDocuments: createTestNoteDocumentService({ noteFile }),
     backlinkTarget: createBacklinkTargetService({
       noteFile,
       noteCreation: createTestNoteCreationService({ noteFile }),

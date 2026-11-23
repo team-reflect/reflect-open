@@ -1,3 +1,4 @@
+import type { NoteRead } from '@reflect/types'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { parseNote } from '../markdown/index.ts'
 import type { IndexQueryService } from './index-query-service.ts'
@@ -5,7 +6,7 @@ import { pairMovesById, type DetectedMove } from './move-detection.ts'
 
 /**
  * External-move detection (Plan 17), shared by the open-time reconcile
- * (`indexer.ts`) and the live watcher batch (`live.ts`). Both observe the
+ * (`indexer.ts`) and the index writer (`index-writer.ts`). Both observe the
  * same shape after a rename Reflect didn't perform: an indexed row whose file
  * vanished (an **orphan**) and an unindexed file that appeared (an
  * **arrival**). When an arrival carries an orphan's frontmatter id, the pair
@@ -29,10 +30,10 @@ export interface ExternalMoveScan {
    */
   moves: DetectedMove[]
   /**
-   * Arrival content read while pairing, keyed by path — handed back so the
+   * Arrival notes read while pairing, keyed by path — handed back so the
    * caller's indexing pass doesn't read the same files twice.
    */
-  content: Map<string, string>
+  notes: Map<string, NoteRead>
 }
 
 export interface MoveHealingDeps {
@@ -73,26 +74,26 @@ class MoveHealingImpl implements MoveHealing {
     options?: { signal?: AbortSignal | undefined },
   ): Promise<ExternalMoveScan> {
     const { noteFile, indexQuery } = this.#deps
-    const content = new Map<string, string>()
+    const notes = new Map<string, NoteRead>()
     if (orphanPaths.length === 0 || arrivalPaths.length === 0) {
-      return { moves: [], content }
+      return { moves: [], notes }
     }
     const orphanIds = await indexQuery.getNoteIdsByPath(orphanPaths)
     const arrivalIds = new Map<string, string | null>()
     for (const path of arrivalPaths) {
       if (options?.signal?.aborted) {
-        return { moves: [], content }
+        return { moves: [], notes }
       }
       try {
-        const source = await noteFile.read(path, fileGeneration)
-        content.set(path, source)
-        const parsed = parseNote({ path, source })
+        const note = await noteFile.readWithHash(path, fileGeneration)
+        notes.set(path, note)
+        const parsed = parseNote({ path, source: note.content })
         arrivalIds.set(path, parsed.frontmatter.id ?? null)
       } catch {
         // Unreadable arrival: it can't pair; the caller's plain path retries.
       }
     }
-    return { moves: pairMovesById(orphanIds, arrivalIds), content }
+    return { moves: pairMovesById(orphanIds, arrivalIds), notes }
   }
 }
 

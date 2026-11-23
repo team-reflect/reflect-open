@@ -189,7 +189,7 @@ describe('installQueryInvalidation for the index and the graph', () => {
     vi.useFakeTimers()
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
     const main = installApp(createTestCoreServices({ database: createTestDatabaseService() }))
-    main.window.emitIndexWritten()
+    main.window.emitIndexCommitted()
     expect(invalidate).not.toHaveBeenCalled()
     main.stop()
     main.core.database.close()
@@ -198,7 +198,7 @@ describe('installQueryInvalidation for the index and the graph', () => {
       createTestCoreServices({ database: createTestDatabaseService(), role: 'note-window' }),
       createTestWindowService({ label: 'note-1' }),
     )
-    note.window.emitIndexWritten()
+    note.window.emitIndexCommitted()
     vi.advanceTimersByTime(3_000)
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.index.all })
     note.stop()

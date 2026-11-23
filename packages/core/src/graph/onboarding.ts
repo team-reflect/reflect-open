@@ -74,7 +74,7 @@ export async function ensureWelcomeNote(
   const seeded = stats.notes === 0 && stats.attachments === 0 && stats.skipped === 0
   if (seeded) {
     const source = upsertFrontmatter(WELCOME_BODY, { id: ctx.id.noteId(), pinned: true })
-    await ctx.noteFile.write(WELCOME_NOTE_PATH, source, options.fileGeneration)
+    await ctx.noteFile.create(WELCOME_NOTE_PATH, source, options.fileGeneration)
   }
   await ctx.indexStore.setMeta(WELCOME_SEEDED_META_KEY, 'true', options.indexGeneration)
   return seeded

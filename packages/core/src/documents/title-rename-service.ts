@@ -4,15 +4,14 @@ import type { LoggerService } from '../ports/logger-service.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import { errorMessage } from '../errors.ts'
 import { isReflectManagedNote } from '../graph/note-management.ts'
-import type { NoteFileService } from '../graph/note-file-service.ts'
 import type { BacklinkService } from '../indexing/backlink-service.ts'
 import type { NotePathService } from '../indexing/note-path-service.ts'
 import { rewriteLinksForTitleChange, rewritePathLinksForMove } from '../indexing/rename.ts'
 import type { WikiResolverService } from '../indexing/wiki-resolver-service.ts'
 import { placeOldTitleAlias } from './alias-placement.ts'
+import type { NoteDocumentService } from './note-document-service.ts'
 import type { NoteMoveService } from './note-move-service.ts'
 import type { NoteContentOrigin } from './note-session-types.ts'
-import type { OpenDocumentsService } from './open-documents-service.ts'
 import { composeRenameFailure, type RenamePhaseFailures } from './rename-failure.ts'
 import {
   createTitleRenameTracker,
@@ -87,12 +86,11 @@ export interface TitleRenameService {
 }
 
 export interface TitleRenameServiceDeps {
-  readonly noteFile: NoteFileService
+  readonly noteDocuments: NoteDocumentService
   readonly wikiResolver: WikiResolverService
   readonly backlinks: BacklinkService
   readonly notePath: NotePathService
   readonly noteMove: NoteMoveService
-  readonly openDocuments: OpenDocumentsService
   readonly progress: ProgressPort
   /**
    * Runs each title tracker's quiet timer.
@@ -183,7 +181,7 @@ class RenameCoordinatorImpl implements RenameCoordinator {
     gen: number,
     options?: { rewriteInboundPathLinks?: boolean | undefined },
   ): Promise<void> {
-    const { noteFile, wikiResolver, notePath, noteMove, logger } = this.#deps
+    const { noteDocuments, wikiResolver, notePath, noteMove, logger } = this.#deps
     const target = await notePath.slugPathForTitle(this.#currentPath, title)
     if (target === this.#currentPath) {
       return
@@ -203,9 +201,8 @@ class RenameCoordinatorImpl implements RenameCoordinator {
       try {
         await rewritePathLinksForMove(from, target, {
           pathLinkSources: (targetPathKey) => wikiResolver.getPathLinkSources(targetPathKey),
-          read: (forPath) => noteFile.read(forPath, gen),
-          write: async (forPath, contents) => {
-            await noteFile.write(forPath, contents, gen)
+          edit: async (forPath, transform) => {
+            await noteDocuments.commitSourceEdit(forPath, transform, { generation: gen })
           },
         })
       } catch (cause) {
@@ -220,8 +217,7 @@ class RenameCoordinatorImpl implements RenameCoordinator {
   // Rust). A rename pending across a graph switch is dropped, never
   // cross-written.
   #runRename(rename: TitleRename): void {
-    const { noteFile, wikiResolver, backlinks, openDocuments, progress, logger, graphSession } =
-      this.#deps
+    const { noteDocuments, wikiResolver, backlinks, progress, logger, graphSession } = this.#deps
     this.#chain = this.#chain.then(async () => {
       const gen = this.#graph === null ? null : writeGenerationFor(graphSession, this.#graph)
       if (gen === null) {
@@ -268,9 +264,8 @@ class RenameCoordinatorImpl implements RenameCoordinator {
             io: {
               sources: (targetKey) => wikiResolver.getLinkSources(targetKey),
               backlinks: (forPath) => backlinks.getBacklinks(forPath),
-              read: (forPath) => noteFile.read(forPath, gen),
-              write: async (forPath, contents) => {
-                await noteFile.write(forPath, contents, gen)
+              edit: async (forPath, transform) => {
+                await noteDocuments.commitSourceEdit(forPath, transform, { generation: gen })
               },
               resolve: (target) => wikiResolver.resolveWikiTarget(target),
             },
@@ -296,7 +291,7 @@ class RenameCoordinatorImpl implements RenameCoordinator {
         if (!collision) {
           try {
             this.#autoAliases = await placeOldTitleAlias(
-              { noteFile, openDocuments },
+              noteDocuments,
               this.#currentPath,
               { from, to: rename.to, previousAutoAliases },
               gen,

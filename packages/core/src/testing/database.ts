@@ -1,4 +1,5 @@
 import type { IndexReadCommand, IndexWriteCommand } from '@reflect/types'
+import { sha256HexSync } from '@reflect/utils'
 import { createWasmIndexBackend, type WasmIndexBackend } from '@reflect/index-wasm'
 import { toAppError } from '../errors.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
@@ -141,7 +142,7 @@ export function seedNotes(database: TestDatabaseService, notes: readonly TestNot
   for (const { path, markdown, mtime } of notes) {
     database.applyProjection(
       buildIndexedNote(parseNote({ path, source: markdown }), {
-        fileHash: `hash-${path}`,
+        fileHash: sha256HexSync(markdown),
         mtime: mtime ?? 0,
         source: markdown,
       }),

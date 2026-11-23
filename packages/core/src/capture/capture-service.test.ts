@@ -23,6 +23,7 @@ import {
   createTestActivityPort,
   createTestLoggerService,
   createTestNoteFileService,
+  createTestNoteDocumentService,
   createTestNoteSession,
   createTestProgressPort,
   createTestPageDescriberService,
@@ -73,7 +74,7 @@ function setup(options: { mobile?: boolean; settings?: Partial<Settings> } = {})
     captureInbox,
     noteFile,
     assetStore: createTestAssetStoreService(),
-    openDocuments,
+    noteDocuments: createTestNoteDocumentService({ openDocuments, noteFile }),
     backlinkTarget: { ensure: (title) => title },
     xArchive: createTestXArchiveService(),
     webFetch: createTestWebFetchService(),
@@ -582,20 +583,34 @@ describe('CaptureService (X posts)', () => {
 
     const session = kit.capture.openSession({ generation: 3 })
     session.start()
-    await flush()
+    await vi.waitFor(() => expect(kit.captureInbox.files().size).toBe(0))
 
     expect(daily.content()).toBe(
       'Unsaved draft\n\n## X bookmarks\n\n![](https://x.com/i/status/20)\n',
     )
     expect(kit.noteFile.writes()).toEqual([])
-    expect(kit.captureInbox.files().size).toBe(0)
     session.dispose()
   })
 
-  it('keeps the X post queued while the open daily document cannot take it', async () => {
+  it('routes a text capture through the open daily document', async () => {
+    const kit = setup()
+    const daily = createTestNoteSession({ path: DAILY, content: 'Unsaved draft\n' })
+    kit.openDocuments.register({ session: daily })
+    kit.captureInbox.add(`${TEXT.id}.json`, TEXT)
+
+    const session = kit.capture.openSession({ generation: 3 })
+    session.start()
+    await vi.waitFor(() => expect(kit.captureInbox.files().size).toBe(0))
+
+    expect(daily.content()).toBe('Unsaved draft\n\n- call the bank\n')
+    expect(kit.noteFile.writes()).toEqual([])
+    session.dispose()
+  })
+
+  it('keeps the X post queued while the open daily with unsaved edits cannot take it', async () => {
     const kit = setup()
     kit.openDocuments.register({
-      session: createTestNoteSession({ path: DAILY, accepts: false }),
+      session: createTestNoteSession({ path: DAILY, accepts: false, dirty: true }),
     })
     kit.captureInbox.add(`${X_POST.id}.json`, X_POST)
 

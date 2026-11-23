@@ -27,7 +27,7 @@ class TestPersistenceFlushServiceImpl implements TestPersistenceFlushService {
   }
 
   async flushAll(): Promise<void> {
-    for (const kind of ['documents', 'git-sync'] as const) {
+    for (const kind of ['tasks', 'documents', 'git-sync'] as const) {
       try {
         await this.#flushers.get(kind)?.()
       } catch {

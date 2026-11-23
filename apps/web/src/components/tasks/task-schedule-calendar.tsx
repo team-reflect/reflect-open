@@ -23,8 +23,7 @@ interface TaskScheduleCalendarProps {
  * The Tasks view's schedule calendar (V1): a month grid in a popover anchored to
  * the "Schedule" button. Picking a day sets the selected tasks' due date — a
  * `[[YYYY-MM-DD]]` link the projection reads — and "Clear date" removes it. The
- * picked day re-buckets the tasks (Current/Overdue/Upcoming) once the reindex
- * re-derives the date. Reuses {@link buildMonthGrid}, so it shares the daily
+ * picked day re-buckets the tasks (Current/Overdue/Upcoming) at once. Reuses {@link buildMonthGrid}, so it shares the daily
  * sidebar's calendar math.
  */
 export function TaskScheduleCalendar({

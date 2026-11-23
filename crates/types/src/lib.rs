@@ -53,22 +53,22 @@ pub use git::{
     RemoteDelta, RemoteTip, SkippedFile,
 };
 pub use graph::{
-    GraphInfo, LocalNoteRead, NoteCreateOutcome, NoteWriteOutcome, RecentGraph, VaultScanStats,
-    WindowBootstrap,
+    GraphInfo, LocalNoteRead, NoteCreateOutcome, NoteRead, NoteWriteOutcome, RecentGraph,
+    VaultScanStats, WindowBootstrap,
 };
 pub use icloud::{IcloudStatus, IcloudSweepOutcome, MobileStorageInfo, SweepScope};
 pub use import::{GraphImportProgress, GraphImportStage, GraphImportSummary};
 pub use index::{
-    ChatConversation, ChatMessageRow, EmbeddedChunk, IndexTouch, IndexedAlias, IndexedClaim,
-    IndexedEmail, IndexedLink, IndexedNote, IndexedTag, IndexedTask, LinkKind, MovedNoteAddress,
-    NoteKind, NoteMoveRequest, ReconcileScan, ScanCandidate, ScanOrphan,
+    ChatConversation, ChatMessageRow, EmbeddedChunk, IndexCommit, IndexTouch, IndexedAlias,
+    IndexedClaim, IndexedEmail, IndexedLink, IndexedNote, IndexedTag, IndexedTask, LinkKind,
+    MovedNoteAddress, NoteKind, NoteMoveRequest, ReconcileScan, ScanCandidate, ScanOrphan,
 };
 pub use index_read::{
     Backlink, BacklinkPage, BacklinkSource, BacklinkSourceCursor, ChunkHash, ChunkHit,
     DailyNoteRow, GraphStats, NoteFileFacts, NoteId, NoteListEntry, NotePrivacy, NoteRow,
-    PinnedNoteRow, RecentNoteRow, SearchHitRow, SearchRequest, TagFacet, TaskRow, TemplateEntry,
-    VisitedNote, WikiAliasCandidate, WikiCandidates, WikiClaimMatch, WikiKeyWinner,
-    WikiTitleCandidate, WikiWinningAlias,
+    NoteTasks, PinnedNoteRow, RecentNoteRow, SearchHitRow, SearchRequest, TagFacet, TaskRead,
+    TaskRow, TemplateEntry, VisitedNote, WikiAliasCandidate, WikiCandidates, WikiClaimMatch,
+    WikiKeyWinner, WikiTitleCandidate, WikiWinningAlias,
 };
 pub use link_preview::LinkPreviewHtml;
 pub use settings::SettingsDoc;

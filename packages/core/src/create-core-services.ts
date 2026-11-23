@@ -768,7 +768,7 @@ export interface CoreInternalServices {
    */
   readonly assetStore: AssetStoreService
   /**
-   * Reads and writes Markdown notes by graph-relative path.
+   * Reads, creates and deletes Markdown notes by graph-relative path.
    */
   readonly noteFile: NoteFileService
   /**
@@ -877,11 +877,7 @@ export function composeCoreServices(
     localStorage: adapters.storage.local,
     sessionStorage: adapters.storage.session,
   })
-  const fileChanges = create.fileChanges({
-    ipc,
-    logger,
-    echoOwnWrites: isMobilePlatform(adapters.platform.appPlatform),
-  })
+  const fileChanges = create.fileChanges({ ipc, logger })
   const id = adapters.id ?? createSystemIdService()
   const secretStore = create.secretStore({ ipc })
   // The desktop shell's web-auth plugin answers every sign-in as cancelled.
@@ -976,11 +972,6 @@ export function composeCoreServices(
   })
   const path = create.path({ transport: adapters.path })
   const mobileStorage = create.mobileStorage({ ipc })
-  const noteDocuments = create.noteDocuments({
-    openDocuments,
-    noteFile,
-    graphSession: lateGraphSession,
-  })
   const noteMove = create.noteMove({ ipc, indexStore, openDocuments, logger })
   const captureInbox = create.captureInbox({ ipc })
   const webFetch = create.webFetch({ ipc })
@@ -1011,6 +1002,13 @@ export function composeCoreServices(
     activity,
     platform,
     role: adapters.role,
+  })
+  const noteDocuments = create.noteDocuments({
+    openDocuments,
+    noteFile,
+    graphSession: lateGraphSession,
+    indexLifecycle,
+    logger,
   })
   const noteRows = create.noteRows({
     // The graph session is built on these rows.
@@ -1089,6 +1087,7 @@ export function composeCoreServices(
   const audioMemo = create.audioMemo({
     assetStore,
     noteFile,
+    noteDocuments,
     backlinkTarget,
     transcription,
     transcriptEnrichment,
@@ -1176,14 +1175,13 @@ export function composeCoreServices(
     contactSuggestions: create.contactSuggestions({
       contacts,
       noteDocuments,
-      openDocuments,
-      noteFile,
       settings,
       graphSession,
       logger,
     }),
     meetings: create.meetings({
       noteFile,
+      noteDocuments,
       noteCreation,
       wikiResolver,
       suggestions,
@@ -1251,12 +1249,11 @@ export function composeCoreServices(
     openDocuments,
     noteMove,
     titleRename: create.titleRename({
-      noteFile,
+      noteDocuments,
       wikiResolver,
       backlinks,
       notePath,
       noteMove,
-      openDocuments,
       progress,
       clock,
       logger,
@@ -1276,15 +1273,12 @@ export function composeCoreServices(
       clock,
       logger,
       graphSession,
-      indexLifecycle,
-      role: adapters.role,
       ipc,
     }),
     noteActions: create.noteActions({
       noteDocuments,
       noteFile,
       openDocuments,
-      indexLifecycle,
       indexQuery,
       noteRows,
       progress,
@@ -1297,6 +1291,7 @@ export function composeCoreServices(
     dailyNotes,
     templates: create.templates({
       noteFile,
+      noteDocuments,
       indexQuery,
       notePath,
       noteMove,
@@ -1350,7 +1345,7 @@ export function composeCoreServices(
       captureInbox,
       noteFile,
       assetStore,
-      openDocuments,
+      noteDocuments,
       backlinkTarget,
       xArchive,
       webFetch,
@@ -1422,5 +1417,6 @@ export function composeCoreServices(
     assetPrivacy,
     captureInbox,
   }
+  persistenceFlush.registerFlusher('tasks', () => services.tasks.commands.commitDrafts())
   return { services, internal }
 }

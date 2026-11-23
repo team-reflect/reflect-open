@@ -1,6 +1,8 @@
+import { sha256HexSync } from '@reflect/utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '../errors.ts'
 import { createGraphSession, type GraphRole, type GraphSession } from '../graph/graph-session.ts'
+import { parseNote } from '../markdown/index.ts'
 import type { AppPlatform } from '../ports/platform-facts.ts'
 import { createTestXArchiveService } from '../testing/capture.ts'
 import { createTestClockService } from '../testing/clock.ts'
@@ -25,9 +27,10 @@ import {
   type IndexReconciledEvent,
 } from './index-lifecycle-service.ts'
 import { createIndexQueryService } from './index-query-service.ts'
-import { PROJECTION_VERSION } from './indexed-note.ts'
+import type { WritableIndexStoreService, ReconcileScan } from './index-store-service.ts'
+import { buildIndexedNote, PROJECTION_VERSION } from './indexed-note.ts'
 import { PROJECTION_VERSION_KEY } from './indexer.ts'
-import { sleep, noop, returnFalse } from '@ocavue/utils'
+import { sleep, noop } from '@ocavue/utils'
 
 const databases: { close(): void }[] = []
 
@@ -62,9 +65,9 @@ afterEach(() => {
 /**
  * A lifecycle over test doubles, with every event recorded. The index is
  * stamped with the current projection version, so a sync pass is one
- * reconcile scan (`scan` in `steps`). The hooks run inside the matching call
- * of the pass: `onScan` may hold or reject the reconcile, `onSubscribe` runs
- * as the live subscription attaches, `onWatchStart` as the watcher starts.
+ * reconcile scan (`scan` in `steps`). The hooks run inside the matching
+ * call: `onScan` may hold or reject the reconcile, `onWatchStart` runs as the
+ * watcher starts.
  */
 function setup(options?: {
   files?: Readonly<Record<string, string>>
@@ -73,7 +76,6 @@ function setup(options?: {
   failStore?: (call: IndexStoreCall) => Error | undefined
   onScan?: () => Promise<void>
   onClear?: () => Promise<void>
-  onSubscribe?: () => void
   onWatchStart?: () => void
   onRead?: () => void
   appPlatform?: AppPlatform
@@ -110,14 +112,12 @@ function setup(options?: {
   vi.spyOn(store, 'clear').mockImplementation(async (generation) => {
     steps.push('clear')
     await options?.onClear?.()
-    await clear(generation)
+    return await clear(generation)
   })
   const subscribe = fileChanges.subscribe.bind(fileChanges)
   vi.spyOn(fileChanges, 'subscribe').mockImplementation((listener) => {
     steps.push('subscribe')
-    const unlisten = subscribe(listener)
-    options?.onSubscribe?.()
-    return unlisten
+    return subscribe(listener)
   })
   const startWatcher = fileChanges.startWatcher.bind(fileChanges)
   vi.spyOn(fileChanges, 'startWatcher').mockImplementation(async () => {
@@ -202,6 +202,7 @@ function setup(options?: {
     files,
     fileChanges,
     logger,
+    clock,
     operations,
     steps,
     progress,
@@ -216,7 +217,7 @@ function setup(options?: {
      */
     passes: () => steps.filter((step) => step === 'scan').length,
     /**
-     * Live subscriptions currently attached to the change stream.
+     * Subscriptions currently attached to the change stream.
      */
     subscriptions: () => fileChanges.listenerCount().changes,
   }
@@ -284,14 +285,13 @@ describe('createIndexLifecycleService', () => {
     expect(steps).toEqual(['watchStop'])
   })
 
-  it('sync(session) reconciles, then subscribes, then starts the watcher', async () => {
+  it('sync(session) subscribes, then reconciles, then starts the watcher', async () => {
     const { index, store, fileChanges, steps, applied, subscriptions } = setup()
     index.sync(sessionAt(5))
     await index.settled() // settle without aborting: `stop()` skips the tail
 
     expect(store.calls()).toContainEqual({ method: 'reconcileScan', generation: 5 })
-    // Sequenced: reconcile → subscribe → watchStart.
-    expect(steps).toEqual(['scan', 'subscribe', 'watchStart'])
+    expect(steps).toEqual(['subscribe', 'scan', 'watchStart'])
     // The initial reconcile is itself an index change: invalidate once there.
     expect(applied).toEqual([{ generation: 5, changes: null }])
     expect(fileChanges.watcherRunning()).toBe(true)
@@ -321,6 +321,34 @@ describe('createIndexLifecycleService', () => {
     fileChanges.emit({ changes, source: 'external' })
     await index.close()
     expect(batches).toHaveLength(2)
+  })
+
+  it('announces a pass once without paths, and a watcher batch by its note paths', async () => {
+    const { index, store, fileChanges } = setup({
+      files: { 'notes/a.md': '# A', 'notes/b.md': '# B' },
+      store: {
+        scan: {
+          total: 1,
+          candidates: [{ path: 'notes/a.md', modifiedMs: 9, storedMtime: null, storedHash: null }],
+          orphans: [],
+          stalePlaceholders: [],
+        },
+      },
+    })
+    index.sync(sessionAt(5))
+    await index.settled()
+    expect(store.announced()).toEqual([{ seq: 1, paths: null }])
+
+    fileChanges.emit({
+      changes: [
+        { path: 'notes/b.md', kind: 'upsert' },
+        { path: 'assets/photo.png', kind: 'upsert' },
+      ],
+      source: 'external',
+    })
+    await vi.waitFor(() => expect(store.announced()).toHaveLength(2))
+    expect(store.announced()[1]).toEqual({ seq: 2, paths: ['notes/b.md'] })
+    await index.close()
   })
 
   it('reports the notes a description re-index applied, to its own listeners only', async () => {
@@ -405,7 +433,7 @@ describe('createIndexLifecycleService', () => {
     expect(reconciled).toEqual([])
   })
 
-  it('an aborted pass runs no tail: no events, no subscribe, no watcher', async () => {
+  it('an aborted pass runs no tail: no events, no watcher', async () => {
     // `stop()` aborts without ending the session, so an interrupted pass
     // bails on its own signal. Whoever stopped it either starts a replacement
     // pass (`refresh`, a graph switch) or tears the lifecycle down (`close`),
@@ -415,7 +443,6 @@ describe('createIndexLifecycleService', () => {
     await index.stop()
     expect(applied).toEqual([])
     expect(reconciled).toEqual([])
-    expect(steps).not.toContain('subscribe')
     expect(steps).not.toContain('watchStart')
     expect(logger.getInfos()).toEqual([])
   })
@@ -439,40 +466,40 @@ describe('createIndexLifecycleService', () => {
     expect(progress).toEqual(['reconciling', 'idle'])
   })
 
-  it('bails after reconcile when superseded — no subscribe, no watcher', async () => {
+  it('bails after reconcile when superseded: no watcher', async () => {
     const { index, steps } = setup()
     index.sync(endedSessionAt(5)) // stale immediately after reconcile
     await index.settled()
-    expect(steps).toEqual(['scan'])
+    expect(steps).toEqual(['subscribe', 'scan'])
   })
 
-  it('tears down a subscription created after supersession (no listener leak)', async () => {
+  it('writes no change reported after its session ends', async () => {
     const opened = new AbortController()
-    // Fresh through the reconcile, stale by the time the subscription exists.
-    const { index, steps, subscriptions } = setup({
-      onSubscribe: () => {
-        opened.abort()
-      },
-    })
+    const { index, store, files, fileChanges } = setup()
     index.sync(sessionAt(5, opened.signal))
     await index.settled()
-    expect(steps).toEqual(['scan', 'subscribe'])
-    expect(subscriptions()).toBe(0) // pending subscription cleaned up
+
+    opened.abort()
+    files.set('notes/a.md', '# A')
+    fileChanges.emit({ changes: [{ path: 'notes/a.md', kind: 'upsert' }], source: 'external' })
+    await index.drained()
+    expect(store.applied()).toEqual([])
   })
 
-  it('an abort during the subscribe drops the pending subscription', async () => {
-    const harness = setup({
-      onSubscribe: () => {
-        void harness.index.stop()
-      },
-    })
-    harness.index.sync(sessionAt(5))
-    await harness.index.settled()
-    expect(harness.steps).toEqual(['scan', 'subscribe'])
-    expect(harness.subscriptions()).toBe(0) // pending subscription cleaned up
+  it('keeps one subscription across refresh passes', async () => {
+    const { index, steps, subscriptions } = setup()
+    const session = sessionAt(5)
+    index.sync(session)
+    await index.settled()
+    index.refresh(session)
+    await vi.waitFor(() => expect(steps.filter((step) => step === 'scan')).toHaveLength(2))
+    await index.settled()
+
+    expect(steps.filter((step) => step === 'subscribe')).toHaveLength(1)
+    expect(subscriptions()).toBe(1)
   })
 
-  it('an abort during the watcher start leaves the subscription unadopted', async () => {
+  it('an abort during the watcher start keeps the subscription and never goes live', async () => {
     const harness = setup({
       onWatchStart: () => {
         void harness.index.stop()
@@ -480,11 +507,11 @@ describe('createIndexLifecycleService', () => {
     })
     harness.index.sync(sessionAt(5))
     await harness.index.settled()
-    // Dropped rather than adopted, and the pass never claims to be live. The
-    // watcher stays up for the replacement pass; only `close` stops it.
-    expect(harness.subscriptions()).toBe(0)
+    // The pass never claims to be live. The watcher stays up for the
+    // replacement pass; only `close` stops it.
+    expect(harness.subscriptions()).toBe(1)
     expect(harness.fileChanges.watcherRunning()).toBe(true)
-    expect(harness.progress).toEqual(['reconciling'])
+    expect(harness.progress).toEqual(['reconciling', 'idle'])
   })
 
   it('logs a sync failure but stop() still settles', async () => {
@@ -514,7 +541,7 @@ describe('createIndexLifecycleService', () => {
     held.settles[0]!()
     await stopping
     // Aborted before the reconcile returned: the pass wrote nothing further.
-    expect(steps).toEqual(['scan'])
+    expect(steps).toEqual(['subscribe', 'scan'])
   })
 
   it('stop() before any sync resolves immediately', async () => {
@@ -533,14 +560,15 @@ describe('createIndexLifecycleService', () => {
     expect(fileChanges.watcherRunning()).toBe(false)
   })
 
-  it('sync() drops the previous live subscription before the next pass', async () => {
-    const { index, subscriptions } = setup()
+  it('keeps one subscription across generations', async () => {
+    const { index, steps, subscriptions } = setup()
     index.sync(sessionAt(5))
     await index.settled()
 
-    index.sync(endedSessionAt(6))
-    expect(subscriptions()).toBe(0)
+    index.sync(sessionAt(6))
     await index.settled()
+    expect(steps.filter((step) => step === 'subscribe')).toHaveLength(1)
+    expect(subscriptions()).toBe(1)
   })
 
   it('refresh() coalesces stacked triggers into a single queued rerun', async () => {
@@ -564,6 +592,97 @@ describe('createIndexLifecycleService', () => {
     expect(passes()).toBe(2)
   })
 
+  it('applies a change reported while a refresh pass runs', async () => {
+    const held = heldScans()
+    const { index, store, files, fileChanges } = setup({
+      files: { 'a.md': '+ [ ] a\n' },
+      onScan: held.onScan,
+    })
+    index.sync(sessionAt(5))
+    await vi.waitFor(() => expect(held.settles).toHaveLength(1))
+    held.settles[0]!()
+    await index.settled()
+
+    index.refresh(sessionAt(5))
+    await vi.waitFor(() => expect(held.settles).toHaveLength(2))
+    files.set('a.md', '+ [x] a\n', { modifiedMs: 123 })
+    fileChanges.emit({
+      changes: [{ path: 'a.md', kind: 'upsert', modifiedMs: 123 }],
+      source: 'own-write',
+    })
+    held.settles[1]!()
+    await index.settled()
+    await index.drained()
+
+    expect(store.applied().map((note) => note.path)).toEqual(['a.md'])
+  })
+
+  it('reports idle when a newer generation replaces the writer of the running pass', async () => {
+    const held = heldScans()
+    const { index, progress } = setup({ onScan: held.onScan })
+    index.sync(sessionAt(5))
+    await vi.waitFor(() => expect(held.settles).toHaveLength(1))
+    index.markDirty([], 6, FILE_GENERATION)
+    held.settles[0]!()
+    await index.settled()
+    expect(progress).toEqual(['reconciling', 'idle'])
+  })
+
+  it('goes live when one note of the pass cannot be written', async () => {
+    const { index, store, progress } = setup({
+      files: { 'notes/a.md': '# a', 'notes/bad.md': '# bad' },
+      store: { meta: {} },
+      failStore: (call) => {
+        return call.method === 'applyBatch' &&
+          call.notes.some((note) => note.path === 'notes/bad.md')
+          ? new Error('refused')
+          : undefined
+      },
+    })
+
+    index.sync(sessionAt(5))
+    await index.settled()
+
+    expect(store.applied().map((note) => note.path)).toEqual(['notes/a.md'])
+    expect(progress).toEqual(['reconciling', 'live'])
+  })
+
+  it('retries a failed pass after a wait that doubles, until one goes live', async () => {
+    let fail = true
+    const { index, clock, passes, progress } = setup({
+      failStore: (call) => {
+        return fail && call.method === 'reconcileScan' ? new Error('boom') : undefined
+      },
+    })
+    index.sync(sessionAt(5))
+    await index.settled()
+    expect(progress).toEqual(['reconciling', 'idle'])
+
+    await clock.advance(2_000)
+    await index.settled()
+    expect(passes()).toBe(2)
+
+    fail = false
+    await clock.advance(2_000)
+    expect(passes()).toBe(2)
+    await clock.advance(2_000)
+    await index.settled()
+    expect(passes()).toBe(3)
+    expect(progress.at(-1)).toBe('live')
+    expect(clock.pendingTimers()).toBe(0)
+  })
+
+  it('close() cancels the retry of a failed pass', async () => {
+    const { index, clock, passes } = setup({
+      failStore: (call) => (call.method === 'reconcileScan' ? new Error('boom') : undefined),
+    })
+    index.sync(sessionAt(5))
+    await index.settled()
+    await index.close()
+    await clock.advance(60_000)
+    expect(passes()).toBe(1)
+  })
+
   it('refresh() bails without a rerun when superseded', async () => {
     const { index, passes } = setup()
     index.refresh(endedSessionAt(5)) // a newer open owns the lifecycle
@@ -579,14 +698,14 @@ describe('createIndexLifecycleService', () => {
 
     index.sync(sessionAt(5))
     await Promise.resolve()
-    expect(steps).toEqual([])
+    expect(steps).toEqual(['subscribe'])
 
     backgrounded = false
     index.resume(sessionAt(5))
     await vi.waitFor(() => expect(passes()).toBe(1))
     await index.settled()
 
-    expect(steps).toEqual(['scan', 'subscribe', 'watchStart'])
+    expect(steps).toEqual(['subscribe', 'scan', 'watchStart'])
   })
 
   it('resume(null) clears suspension without starting work before graph open', async () => {
@@ -599,10 +718,10 @@ describe('createIndexLifecycleService', () => {
 
     index.sync(sessionAt(5))
     await index.settled()
-    expect(steps).toEqual(['scan', 'subscribe', 'watchStart'])
+    expect(steps).toEqual(['subscribe', 'scan', 'watchStart'])
   })
 
-  it('suspend() aborts bulk work, drops live work, and resume coalesces catch-up triggers', async () => {
+  it('suspend() aborts bulk work, keeps changes dirty, and resume coalesces catch-up triggers', async () => {
     const settles: Array<() => void> = []
     let hold = false
     const { index, store, files, fileChanges, passes, subscriptions, progress } = setup({
@@ -620,9 +739,9 @@ describe('createIndexLifecycleService', () => {
     expect(subscriptions()).toBe(1)
 
     index.suspend()
-    expect(subscriptions()).toBe(0)
+    expect(subscriptions()).toBe(1)
     expect(progress.at(-1)).toBe('idle')
-    // A batch that arrives while suspended is not applied.
+    // A batch that arrives while suspended is not written until resume.
     files.set('notes/a.md', '# A, edited')
     fileChanges.emit({ changes: [{ path: 'notes/a.md', kind: 'upsert' }], source: 'external' })
     await sleep(0)
@@ -631,6 +750,7 @@ describe('createIndexLifecycleService', () => {
     hold = true
     index.resume(sessionAt(5))
     await vi.waitFor(() => expect(settles).toHaveLength(1))
+    expect(store.applied().map((note) => note.path)).toEqual(['notes/a.md'])
     index.refresh(sessionAt(5))
     index.refresh(sessionAt(5))
 
@@ -666,7 +786,8 @@ describe('createIndexLifecycleService', () => {
 
 describe('file progress', () => {
   /**
-   * 32 changed candidates: the reconcile reports at file 16 and at the end.
+   * 32 changed candidates: the reconcile reports at file 16 and at the end,
+   * once the index writer wrote them.
    */
   function setupLargePass(onRead?: () => void) {
     const paths = Array.from({ length: 32 }, (_, position) => `notes/n${position}.md`)
@@ -703,20 +824,19 @@ describe('file progress', () => {
     await index.settled()
 
     expect(fileProgress).toEqual([
-      { done: 16, total: 32, worked: 15 },
-      { done: 32, total: 32, worked: 31 },
+      { done: 16, total: 32, worked: 16 },
       { done: 32, total: 32, worked: 32 },
       null, // the pass went live: the pill clears
     ])
     expect(atLive).toEqual([null])
     index.suspend()
-    expect(fileProgress).toHaveLength(4) // already clear: no notification
+    expect(fileProgress).toHaveLength(3) // already clear: no notification
   })
 
-  it('stops reporting file progress once the pass is superseded', async () => {
+  it('stops writing and reporting file progress once the pass is superseded', async () => {
     let reads = 0
     const opened = new AbortController()
-    const { index, fileProgress } = setupLargePass(() => {
+    const { index, store, fileProgress } = setupLargePass(() => {
       reads += 1
       if (reads === 20) {
         opened.abort() // a superseded pass must go quiet
@@ -725,7 +845,9 @@ describe('file progress', () => {
     index.sync(sessionAt(5, opened.signal))
     await index.settled()
 
-    expect(fileProgress).toEqual([{ done: 16, total: 32, worked: 15 }])
+    expect(reads).toBe(20)
+    expect(store.applied()).toEqual([])
+    expect(fileProgress).toEqual([])
   })
 
   it('a test lifecycle seeds file progress for its subscribers', () => {
@@ -775,6 +897,7 @@ describe('rebuildVisibly', () => {
     expect(reconciled).toEqual([
       { generation: 7, fileGeneration: FILE_GENERATION, source: 'rebuild' },
     ])
+    expect(store.announced()).toEqual([{ seq: 2, paths: null }])
   })
 
   it('coalesces concurrent requests at the same generation onto one pass', async () => {
@@ -785,6 +908,7 @@ describe('rebuildVisibly', () => {
     const second = index.rebuildVisibly()
 
     expect(second).toBe(first)
+    await vi.waitFor(() => expect(held.settles).toHaveLength(1))
     expect(clears(steps)).toBe(1)
 
     held.settles[0]!()
@@ -902,6 +1026,24 @@ describe('rebuildVisibly', () => {
     ])
   })
 
+  it('fails the operation when the index is suspended during the rebuild', async () => {
+    const context = setup({
+      files: { 'notes/a.md': '# A' },
+      onRead: () => {
+        context.index.suspend()
+      },
+    })
+    const { index, store, operations, reconciled } = context
+
+    await index.rebuildVisibly()
+
+    expect(store.calls().map((call) => call.method)).toEqual(['clear'])
+    expect(operations.snapshot()).toMatchObject([
+      { status: 'failed', message: 'The rebuild was interrupted.' },
+    ])
+    expect(reconciled).toEqual([])
+  })
+
   it('a test lifecycle records the requested generations', async () => {
     const session = sessionAt(7)
     const index = createTestIndexLifecycleService({
@@ -912,13 +1054,13 @@ describe('rebuildVisibly', () => {
   })
 })
 
-describe('applyChanges', () => {
-  it('applies the changed notes without a live subscription and reports them', async () => {
+describe('markDirty', () => {
+  it('writes the marked notes without a live subscription and reports them', async () => {
     const { index, store, applied, steps } = setup({
       files: { 'notes/pulled.md': '# Pulled\n' },
     })
 
-    const mutations = await index.applyChanges(
+    index.markDirty(
       [
         { path: 'notes/pulled.md', kind: 'upsert', modifiedMs: 5 },
         { path: 'audio-memos/memo.m4a', kind: 'upsert', modifiedMs: 6 },
@@ -926,37 +1068,105 @@ describe('applyChanges', () => {
       4,
       FILE_GENERATION,
     )
+    await index.drained()
 
-    expect(mutations).toBe(1)
-    expect(store.applied().map((note) => note.path)).toEqual(['notes/pulled.md'])
+    expect(store.applied().map((note) => [note.path, note.mtime])).toEqual([['notes/pulled.md', 5]])
     expect(applied).toEqual([
       { generation: 4, changes: [{ path: 'notes/pulled.md', kind: 'upsert', modifiedMs: 5 }] },
     ])
     expect(steps).not.toContain('subscribe')
   })
 
-  it('reports nothing when no index row changed', async () => {
-    const { index, applied } = setup()
+  it('ignores a generation older than the one it writes at', async () => {
+    const { index, store } = setup({ files: { 'notes/a.md': '# A', 'notes/b.md': '# B' } })
 
-    expect(
-      await index.applyChanges([{ path: 'assets/a.png', kind: 'upsert' }], 4, FILE_GENERATION),
-    ).toBe(0)
-    expect(applied).toEqual([])
+    index.markDirty([{ path: 'notes/a.md', kind: 'upsert' }], 4, FILE_GENERATION)
+    index.markDirty([{ path: 'notes/b.md', kind: 'upsert' }], 3, FILE_GENERATION)
+    await index.drained()
+
+    expect(store.applied().map((note) => note.path)).toEqual(['notes/a.md'])
   })
 
-  it('writes nothing while `canApply` says no', async () => {
-    const { index, store, applied } = setup({ files: { 'notes/pulled.md': '# Pulled\n' } })
+  it('keeps a note marked while the app is hidden and writes it once visible', async () => {
+    const { index, store, activity } = setup({
+      appPlatform: 'ios',
+      files: { 'notes/pulled.md': '# Pulled\n' },
+    })
+    index.followActivity()
+    activity.emitHidden()
 
-    const mutations = await index.applyChanges(
-      [{ path: 'notes/pulled.md', kind: 'upsert', modifiedMs: 5 }],
-      4,
-      FILE_GENERATION,
-      returnFalse,
-    )
-
-    expect(mutations).toBe(0)
+    index.markDirty([{ path: 'notes/pulled.md', kind: 'upsert' }], 7, FILE_GENERATION)
+    await index.drained()
     expect(store.applied()).toEqual([])
-    expect(applied).toEqual([])
+
+    activity.emitVisible()
+    await index.drained()
+    expect(store.applied().map((note) => note.path)).toEqual(['notes/pulled.md'])
+  })
+})
+
+describe('indexNote', () => {
+  it('reads, parses, and writes the note at its generation', async () => {
+    const { index, store } = setup({ files: { 'notes/a.md': '# Hello\n\n[[World]]' } })
+
+    await expect(
+      index.indexNote('notes/a.md', { generation: 7, fileGeneration: FILE_GENERATION, mtime: 5 }),
+    ).resolves.toBe(1)
+
+    expect(store.calls()).toMatchObject([{ method: 'applyBatch', generation: 7 }])
+    const [note] = store.applied()
+    expect(note!.path).toBe('notes/a.md')
+    expect(note!.title).toBe('Hello')
+    expect(note!.mtime).toBe(5)
+    expect(note!.fileHash).toMatch(/^[0-9a-f]{64}$/)
+    expect(note!.links.map((link) => link.targetKey)).toContain('world')
+  })
+
+  it('writes the given content without a read, stamped with the current time', async () => {
+    let reads = 0
+    const { index, store } = setup({
+      files: { 'notes/a.md': '# On disk' },
+      onRead: () => {
+        reads += 1
+      },
+    })
+
+    await index.indexNote('notes/a.md', {
+      generation: 7,
+      fileGeneration: FILE_GENERATION,
+      note: { content: '# Given', hash: sha256HexSync('# Given') },
+    })
+
+    expect(reads).toBe(0)
+    expect(store.applied().map((note) => [note.title, note.mtime])).toEqual([['Given', 0]])
+  })
+
+  it('rejects when the note cannot be read', async () => {
+    const { index, store } = setup({
+      files: { 'notes/a.md': '# Hello' },
+      onRead: () => {
+        throw new AppError('io', 'unreadable')
+      },
+    })
+
+    await expect(
+      index.indexNote('notes/a.md', { generation: 7, fileGeneration: FILE_GENERATION }),
+    ).rejects.toMatchObject({ kind: 'io' })
+    expect(store.calls()).toEqual([])
+  })
+
+  it('writes the note after resume when the index is suspended', async () => {
+    const { index, store } = setup({ files: { 'notes/a.md': '# Hello' } })
+    index.suspend()
+
+    await expect(
+      index.indexNote('notes/a.md', { generation: 7, fileGeneration: FILE_GENERATION }),
+    ).resolves.toBeNull()
+    expect(store.calls()).toEqual([])
+
+    index.resume(null)
+    await index.drained()
+    expect(store.applied().map((note) => note.path)).toEqual(['notes/a.md'])
   })
 })
 
@@ -1003,16 +1213,22 @@ describe('followActivity', () => {
     await expect.poll(() => context.passes()).toBe(1)
   })
 
-  it('suspends the live index when the app hides', async () => {
-    const context = setup({ appPlatform: 'ios' })
+  it('stops index writes and passes when the app hides', async () => {
+    const context = setup({ appPlatform: 'ios', files: { 'notes/a.md': '# A' } })
     context.index.followActivity()
     const session = sessionAt(7)
     context.index.sync(session)
-    await expect.poll(() => context.subscriptions()).toBe(1)
+    await expect.poll(() => context.passes()).toBe(1)
+    await settle(context.index)
 
     context.activity.emitHidden()
+    context.fileChanges.emit({
+      changes: [{ path: 'notes/a.md', kind: 'upsert' }],
+      source: 'external',
+    })
+    await sleep(0)
 
-    expect(context.subscriptions()).toBe(0)
+    expect(context.store.applied()).toEqual([])
     context.index.refresh(session)
     await settle(context.index)
     expect(context.passes()).toBe(1)
@@ -1040,5 +1256,139 @@ describe('followActivity', () => {
     context.index.sync(sessionAt(7))
     await settle(context.index)
     expect(context.passes()).toBe(1)
+  })
+})
+
+describe('index projection writes', () => {
+  const PROJECTION_WRITES: ReadonlySet<string> = new Set([
+    'applyBatch',
+    'remove',
+    'move',
+    'touch',
+    'clear',
+  ])
+
+  /**
+   * `store`, with each projection write recorded as its method and whether
+   * `index-writer.ts` is on the stack of the call.
+   */
+  function traceProjectionWrites(store: WritableIndexStoreService) {
+    const writes: Array<{ method: string; fromWriter: boolean }> = []
+    const traced = new Proxy(store, {
+      get(target, key) {
+        const value: unknown = Reflect.get(target, key, target)
+        if (typeof value !== 'function') {
+          return value
+        }
+        return (...args: unknown[]): unknown => {
+          if (typeof key === 'string' && PROJECTION_WRITES.has(key)) {
+            const stack = new Error('trace').stack ?? ''
+            writes.push({ method: key, fromWriter: /[/\\]index-writer\.ts/.test(stack) })
+          }
+          return Reflect.apply(value, target, args)
+        }
+      },
+    })
+    return { traced, writes }
+  }
+
+  it('come only from the index writer, for every source of index changes', async () => {
+    const OLD = 'notes/01arz3ndektsv4rrffq69g5fav.md'
+    const NEW = 'notes/meeting-notes.md'
+    const MOVED = '---\nid: 01abcdefghjkmnpqrstvwxyz00\n---\n# Meeting Notes\n'
+    const SAME = '# Same\n'
+    const REFERENCING = '# Pic\n\n![pic](assets/pic.png)\n'
+    const database = createTestDatabaseService()
+    databases.push(database)
+    const stored = [
+      { path: 'notes/changed.md', source: '# Before\n', fileHash: 'old' },
+      { path: 'notes/same.md', source: SAME, fileHash: sha256HexSync(SAME) },
+      { path: 'notes/gone.md', source: '# Gone\n', fileHash: 'gone' },
+      { path: 'notes/pic.md', source: REFERENCING, fileHash: sha256HexSync(REFERENCING) },
+      { path: OLD, source: MOVED, fileHash: sha256HexSync(MOVED) },
+    ]
+    for (const { path, source, fileHash } of stored) {
+      database.applyProjection(
+        buildIndexedNote(parseNote({ path, source }), { fileHash, mtime: 1_000, source }),
+      )
+    }
+    const scans: ReconcileScan[] = [
+      {
+        total: 3,
+        candidates: [
+          { path: 'notes/changed.md', modifiedMs: 2_000, storedMtime: 1_000, storedHash: 'old' },
+          {
+            path: 'notes/same.md',
+            modifiedMs: 2_000,
+            storedMtime: 1_000,
+            storedHash: sha256HexSync(SAME),
+          },
+        ],
+        orphans: [{ path: 'notes/gone.md', storedMtime: 1_000, storedHash: 'gone' }],
+        stalePlaceholders: [],
+      },
+    ]
+    const { traced, writes } = traceProjectionWrites(
+      createTestIndexStoreService({
+        database,
+        meta: { [PROJECTION_VERSION_KEY]: String(PROJECTION_VERSION) },
+        scan: () => {
+          return scans.shift() ?? { total: 0, candidates: [], orphans: [], stalePlaceholders: [] }
+        },
+      }),
+    )
+    const fileChanges = createTestFileChangeService()
+    const session = sessionAt(7)
+    const index = createTestIndexLifecycleService({
+      indexStore: traced,
+      noteFile: createTestNoteFileService({
+        files: {
+          'notes/changed.md': '# After\n',
+          'notes/same.md': SAME,
+          'notes/pic.md': REFERENCING,
+          'notes/pulled.md': '# Pulled\n',
+          'notes/own.md': '# Own\n',
+          [NEW]: MOVED,
+        },
+        generation: FILE_GENERATION,
+      }),
+      fileChanges,
+      database,
+      graphSession: { get: () => ({ session }), subscribe: () => noop },
+    })
+    const methods = (): string[] => [...new Set(writes.map((write) => write.method))].toSorted()
+
+    index.sync(session)
+    await index.settled()
+    expect(methods()).toEqual(['applyBatch', 'remove', 'touch'])
+
+    fileChanges.emit({
+      changes: [
+        { path: OLD, kind: 'remove' },
+        { path: NEW, kind: 'upsert' },
+      ],
+      source: 'external',
+    })
+    await index.drained()
+    expect(methods()).toEqual(['applyBatch', 'move', 'remove', 'touch'])
+
+    const applies = (): number => writes.filter((write) => write.method === 'applyBatch').length
+    const appliesBefore = applies()
+    index.markDirty([{ path: 'notes/pulled.md', kind: 'upsert' }], 7, FILE_GENERATION)
+    await index.drained()
+    await index.indexNote('notes/own.md', { generation: 7, fileGeneration: FILE_GENERATION })
+    await index.reindexNotesReferencing(['assets/pic.png'], {
+      generation: 7,
+      fileGeneration: FILE_GENERATION,
+    })
+    expect(applies() - appliesBefore).toBe(3)
+
+    await index.rebuildVisibly()
+    expect(methods()).toEqual(['applyBatch', 'clear', 'move', 'remove', 'touch'])
+
+    expect(writes.filter((write) => !write.fromWriter)).toEqual([])
+
+    await traced.remove('notes/own.md', 7)
+    expect(writes.at(-1)).toEqual({ method: 'remove', fromWriter: false })
   })
 })

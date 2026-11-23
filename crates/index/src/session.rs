@@ -2,14 +2,14 @@
 //! gated on that generation.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
-use rusqlite::Connection;
-use sea_query::{OnConflict, Query};
+use rusqlite::{Connection, Transaction};
 
 use reflect_types::{
-    AppError, AppResult, ChatConversation, ChatMessageRow, EmbeddedChunk, FileMeta, IndexTouch,
-    IndexedNote, MovedNoteAddress, NoteMoveRequest, ReconcileScan,
+    AppError, AppResult, ChatConversation, ChatMessageRow, EmbeddedChunk, FileMeta, IndexCommit,
+    IndexTouch, IndexedNote, MovedNoteAddress, NoteMoveRequest, ReconcileScan,
 };
 
 use crate::chat_write;
@@ -17,8 +17,6 @@ use crate::chat_write;
 use crate::connections::{is_corrupt, reset_corrupt};
 use crate::embed_write;
 use crate::scan;
-use crate::schema::IndexMeta;
-use crate::sql;
 use crate::visit_write;
 use crate::write;
 
@@ -83,6 +81,9 @@ struct ReaderInner {
 pub struct IndexSession {
     writer: Mutex<WriterInner>,
     reader: Mutex<ReaderInner>,
+    /// The number of index write transactions this session committed, over
+    /// every open and every index file. It only grows.
+    commit_seq: AtomicU64,
 }
 
 impl IndexSession {
@@ -185,6 +186,60 @@ impl IndexSession {
         body(conn).map(Some)
     }
 
+    /// The commit sequence now. A read takes it before it queries, and a
+    /// write returns it after it commits.
+    pub fn commit_seq(&self) -> u64 {
+        self.commit_seq.load(Ordering::SeqCst)
+    }
+
+    /// Count one committed index write and return the new commit sequence.
+    /// The caller holds the writer lock.
+    fn bump_commit_seq(&self) -> u64 {
+        self.commit_seq.fetch_add(1, Ordering::SeqCst) + 1
+    }
+
+    /// Run `body` on `conn` in one transaction that counts as one index
+    /// commit. Returns the commit sequence after it.
+    fn commit_on(
+        &self,
+        conn: &mut Connection,
+        body: impl FnOnce(&Transaction) -> AppResult<()>,
+    ) -> AppResult<u64> {
+        let tx = conn.transaction()?;
+        body(&tx)?;
+        tx.commit()?;
+        Ok(self.bump_commit_seq())
+    }
+
+    /// One committed row-move transaction (the rename pipeline's halves).
+    /// Returns the commit sequence after it.
+    fn move_rows_on(
+        &self,
+        conn: &mut Connection,
+        from: &str,
+        to: &str,
+        address: &MovedNoteAddress,
+    ) -> AppResult<u64> {
+        self.commit_on(conn, |tx| {
+            // Child tables FK `notes(path)`; deferring lets the parent key move
+            // first and the constraint re-check at commit, when the children have
+            // followed.
+            tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;
+            write::move_note(tx, from, to, address)
+        })
+    }
+
+    /// Run `body` on the writer in one transaction that counts as one index
+    /// commit, when `generation` is current.
+    fn commit(
+        &self,
+        generation: u64,
+        body: impl FnOnce(&Transaction) -> AppResult<()>,
+    ) -> AppResult<IndexCommit> {
+        let seq = self.write(generation, |conn| self.commit_on(conn, body))?;
+        Ok(IndexCommit { seq })
+    }
+
     fn applied(outcome: AppResult<Option<()>>) -> AppResult<Applied> {
         outcome.map(|committed| match committed {
             Some(()) => Applied::Committed,
@@ -195,32 +250,27 @@ impl IndexSession {
     /// Apply note projections in one transaction. One transaction plus cached
     /// statements keeps a full rebuild cheap; an empty batch commits a no-op
     /// transaction.
-    pub fn apply(&self, generation: u64, notes: &[IndexedNote]) -> AppResult<Applied> {
-        Self::applied(self.write(generation, |conn| {
-            let tx = conn.transaction()?;
+    pub fn apply(&self, generation: u64, notes: &[IndexedNote]) -> AppResult<IndexCommit> {
+        self.commit(generation, |tx| {
             for note in notes {
-                write::apply_note(&tx, note)?;
+                write::apply_note(tx, note)?;
             }
-            tx.commit()?;
             Ok(())
-        }))
+        })
     }
 
     /// Remove a note (e.g. deleted on disk) from the index. This is the
     /// *genuine deletion* entry point, so embedding rows go too; `apply_note`'s
     /// internal remove must NOT do this (it runs on every upsert and would
     /// destroy the chunk hash-skip).
-    pub fn remove(&self, generation: u64, path: &str) -> AppResult<Applied> {
-        Self::applied(self.write(generation, |conn| {
-            // One transaction: a half-removed note (row gone, chunks left)
-            // would let a later note at the same path surface stale chunk text
-            // in semantic search until a re-embed.
-            let tx = conn.transaction()?;
-            write::remove_note(&tx, path)?;
-            embed_write::remove_chunks(&tx, path)?;
-            tx.commit()?;
-            Ok(())
-        }))
+    pub fn remove(&self, generation: u64, path: &str) -> AppResult<IndexCommit> {
+        // One transaction: a half-removed note (row gone, chunks left) would
+        // let a later note at the same path surface stale chunk text in
+        // semantic search until a re-embed.
+        self.commit(generation, |tx| {
+            write::remove_note(tx, path)?;
+            embed_write::remove_chunks(tx, path)
+        })
     }
 
     /// Move a note's projection rows **only** (the id-based reconcile, Plan
@@ -233,8 +283,11 @@ impl IndexSession {
         from: &str,
         to: &str,
         address: &MovedNoteAddress,
-    ) -> AppResult<Applied> {
-        Self::applied(self.write(generation, |conn| move_rows(conn, from, to, address)))
+    ) -> AppResult<IndexCommit> {
+        let seq = self.write(generation, |conn| {
+            self.move_rows_on(conn, from, to, address)
+        })?;
+        Ok(IndexCommit { seq })
     }
 
     /// Move a note's rows and then let `rename` move the file (Plan 17): the
@@ -253,7 +306,7 @@ impl IndexSession {
         root: &Path,
         request: &NoteMoveRequest,
         rename: impl FnOnce() -> AppResult<()>,
-    ) -> AppResult<()> {
+    ) -> AppResult<u64> {
         let mut writer = self.lock_writer()?;
         if writer.root.as_deref() != Some(root) {
             return Err(AppError::io(
@@ -261,12 +314,14 @@ impl IndexSession {
             ));
         }
         let conn = writer.conn.as_mut().ok_or_else(AppError::no_graph)?;
-        move_rows(conn, &request.from, &request.to, &request.to_address)?;
+        let seq = self.move_rows_on(conn, &request.from, &request.to, &request.to_address)?;
         if let Err(err) = rename() {
             // Compensate: the disk refused, so the rows go back. Best-effort:
             // a failed compensation must surface the *original* error, and
             // the reconcile heals any residue by id.
-            if let Err(comp) = move_rows(conn, &request.to, &request.from, &request.from_address) {
+            if let Err(comp) =
+                self.move_rows_on(conn, &request.to, &request.from, &request.from_address)
+            {
                 tracing::error!(
                     ?comp,
                     "rename compensation failed; reconcile will heal by id"
@@ -274,7 +329,7 @@ impl IndexSession {
             }
             return Err(err);
         }
-        Ok(())
+        Ok(seq)
     }
 
     /// Compare the listed notes against the stored rows and return only what
@@ -300,15 +355,13 @@ impl IndexSession {
     /// Re-stamp stored mtimes for notes whose content already matches disk
     /// (the reconcile's hash-match skip). One transaction for the batch; a
     /// path whose row vanished in between updates nothing.
-    pub fn touch(&self, generation: u64, entries: &[IndexTouch]) -> AppResult<Applied> {
-        Self::applied(self.write(generation, |conn| {
-            let tx = conn.transaction()?;
+    pub fn touch(&self, generation: u64, entries: &[IndexTouch]) -> AppResult<IndexCommit> {
+        self.commit(generation, |tx| {
             for entry in entries {
-                write::touch_note(&tx, &entry.path, entry.mtime)?;
+                write::touch_note(tx, &entry.path, entry.mtime)?;
             }
-            tx.commit()?;
             Ok(())
-        }))
+        })
     }
 
     /// Upsert one `index_meta` key. The table is bookkeeping the TS policy
@@ -317,35 +370,25 @@ impl IndexSession {
     ///
     /// [`clear`]: IndexSession::clear
     pub fn set_meta(&self, generation: u64, key: &str, value: &str) -> AppResult<Applied> {
-        Self::applied(self.write(generation, |conn| {
-            sql::execute(
-                conn,
-                Query::insert()
-                    .into_table(IndexMeta::Table)
-                    .columns([IndexMeta::Key, IndexMeta::Value])
-                    .values_panic([key.into(), value.into()])
-                    .on_conflict(
-                        OnConflict::column(IndexMeta::Key)
-                            .update_column(IndexMeta::Value)
-                            .to_owned(),
-                    ),
-            )?;
-            Ok(())
-        }))
+        Self::applied(self.write(generation, |conn| write::set_meta(conn, key, value)))
     }
 
     /// Wipe all derived tables (the TS layer then re-applies every note). The
     /// `chat_*` and `note_visits` tables are deliberately untouched: they are
     /// durable, not a rebuildable projection. A corrupt file is reset to an
     /// empty index instead, and the durable tables are lost with it.
-    pub fn clear(&self, generation: u64) -> AppResult<Applied> {
-        Self::applied(
-            self.write(generation, |conn| match write::clear_index(conn) {
+    pub fn clear(&self, generation: u64) -> AppResult<IndexCommit> {
+        let seq = self.write(generation, |conn| {
+            match self.commit_on(conn, |tx| write::clear_index(tx)) {
                 #[cfg(any(feature = "native", test))]
-                Err(err) if is_corrupt(&err) => reset_corrupt(conn, &err),
+                Err(err) if is_corrupt(&err) => {
+                    reset_corrupt(conn, &err)?;
+                    Ok(self.bump_commit_seq())
+                }
                 result => result,
-            }),
-        )
+            }
+        })?;
+        Ok(IndexCommit { seq })
     }
 
     /// Resets the index file of `generation` after `err` showed that it is
@@ -476,20 +519,4 @@ impl IndexSession {
             body(&tx)
         })
     }
-}
-
-/// One committed row-move transaction (the rename pipeline's halves).
-fn move_rows(
-    conn: &mut Connection,
-    from: &str,
-    to: &str,
-    address: &MovedNoteAddress,
-) -> AppResult<()> {
-    let tx = conn.transaction()?;
-    // Child tables FK `notes(path)`; deferring lets the parent key move first
-    // and the constraint re-check at commit, when the children have followed.
-    tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;
-    write::move_note(&tx, from, to, address)?;
-    tx.commit()?;
-    Ok(())
 }

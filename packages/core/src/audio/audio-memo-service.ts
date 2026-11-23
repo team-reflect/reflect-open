@@ -25,6 +25,7 @@ import type { PlatformFacts } from '../ports/platform-facts.ts'
 import type { BacklinkTargetService } from '../capture/backlink-target-service.ts'
 import { errorMessage } from '../errors.ts'
 import type { AssetStoreService } from '../graph/asset-store-service.ts'
+import type { NoteDocumentService } from '../documents/note-document-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { AUDIO_MEMOS_DIR } from '../graph/paths.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
@@ -292,6 +293,7 @@ export interface AudioMemoSession extends Store<AudioMemoSessionState> {
 export interface AudioMemoServiceDeps {
   readonly assetStore: AssetStoreService
   readonly noteFile: NoteFileService
+  readonly noteDocuments: NoteDocumentService
   readonly backlinkTarget: BacklinkTargetService
   readonly transcription: TranscriptionService
   readonly transcriptEnrichment: TranscriptEnrichmentService
@@ -867,6 +869,7 @@ class AudioMemoServiceImpl implements AudioMemoService {
     this.#mainWindow = deps.role === 'main'
     this.#transcriptions = createAudioMemoTranscriptionService({
       noteFile: deps.noteFile,
+      noteDocuments: deps.noteDocuments,
       assetStore: deps.assetStore,
       backlinkTarget: deps.backlinkTarget,
       transcription: deps.transcription,

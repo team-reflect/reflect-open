@@ -11,7 +11,6 @@ import type { PathService } from '../ports/path-service.ts'
 import { errorMessage } from '../errors.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { dateFromDailyPath, isDaily } from '../graph/paths.ts'
-import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
 import type { IndexQueryService } from '../indexing/index-query-service.ts'
 import { parseNote } from '../markdown/extract.ts'
 import { dailyDeepLink, noteDeepLink } from '../navigation/deep-link-format.ts'
@@ -174,7 +173,6 @@ export interface NoteActionsServiceDeps {
   readonly noteDocuments: NoteDocumentService
   readonly noteFile: NoteFileService
   readonly openDocuments: OpenDocumentsService
-  readonly indexLifecycle: IndexLifecycleService
   readonly indexQuery: IndexQueryService
   readonly noteRows: NoteRowService
   readonly progress: ProgressPort
@@ -501,7 +499,7 @@ class NoteActionsServiceImpl implements NoteActionsService {
   }
 
   async #deepLinkFor(path: string, session: GraphSession): Promise<string> {
-    const { noteDocuments, id, indexLifecycle } = this.#deps
+    const { noteDocuments, id } = this.#deps
     if (isDaily(path)) {
       const date = dateFromDailyPath(path)
       // Calendar-validated like the router: a daily/ file with an impossible
@@ -520,19 +518,6 @@ class NoteActionsServiceImpl implements NoteActionsService {
     }
     const minted = id.noteId()
     await noteDocuments.commitFrontmatter(path, { id: minted }, session.generation)
-    // Resolution reads the index, which trails local writes by a watcher
-    // debounce: index the mint now so the copied link resolves immediately.
-    // Best-effort: the watcher pass covers this on its own schedule anyway.
-    if (session.indexGeneration !== null) {
-      try {
-        await indexLifecycle.indexNote(path, {
-          generation: session.indexGeneration,
-          fileGeneration: session.generation,
-        })
-      } catch {
-        // the copied link still works once the watcher reindexes the note
-      }
-    }
     return noteDeepLink(minted)
   }
 }

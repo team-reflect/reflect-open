@@ -7,7 +7,7 @@ import {
   type IpcBridge,
 } from '@reflect/core'
 import type { AssetReadBinaryArgs } from '@reflect/types'
-import { base64ToBytes, bytesToBase64 } from '@reflect/utils'
+import { base64ToBytes, bytesToBase64, sha256Hex } from '@reflect/utils'
 import type { DevAssetStore } from '@/dev/dev-asset-store.ts'
 import type { DevFileStore } from '@/dev/dev-file-store.ts'
 import { createWasmIndexBackend, type WasmIndexBackend } from '@reflect/index-wasm'
@@ -175,7 +175,7 @@ class DevBridgeImpl implements IpcBridge {
         if (contents === null) {
           throw new AppError('notFound', `no such note: ${path}`)
         }
-        return contents
+        return sha256Hex(contents).then((hash) => ({ content: contents, hash }))
       }
       case 'note_read_local': {
         // The in-memory store has no iCloud, so a note is never evicted.
@@ -187,14 +187,25 @@ class DevBridgeImpl implements IpcBridge {
         return { kind: 'content', content: contents }
       }
       case 'note_write': {
-        const { path, contents, checkContents, expectedContents } = argsOf('note_write', args)
+        const { path, contents, checkContents, expectedContents, rejectMismatch } = argsOf(
+          'note_write',
+          args,
+        )
         if (checkContents === true) {
           const current = files.read(path)
           if (current !== (expectedContents ?? null) && current !== contents) {
+            if (rejectMismatch === true && current !== null) {
+              return sha256Hex(current).then((hash) => ({
+                modifiedMs: null,
+                merged: current,
+                hash,
+              }))
+            }
             throw new AppError('io', 'Note changed on disk; reload before retrying')
           }
         }
-        return { modifiedMs: files.write(path, contents), merged: null }
+        const modifiedMs = files.write(path, contents)
+        return sha256Hex(contents).then((hash) => ({ modifiedMs, merged: null, hash }))
       }
       case 'note_create': {
         const { path, contents, generation } = argsOf('note_create', args)
@@ -353,7 +364,7 @@ class DevBridgeImpl implements IpcBridge {
     return bytes
   }
 
-  // The index events (`index:written`, `note:moved`) fire like the native
+  // The index events (`index:committed`, `note:moved`) fire like the native
   // broadcast: after the command that caused them has replied. The other native event streams (watcher, embeddings, EventKit)
   // do not exist in the browser: those subscriptions succeed and never fire.
   // Plugin event registrations do the same, so the keyboard and recorder

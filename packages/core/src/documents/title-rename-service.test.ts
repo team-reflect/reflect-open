@@ -9,6 +9,7 @@ import {
   createTestNoteMoveService,
   createTestNoteSession,
   type TestNoteSession,
+  createTestNoteDocumentService,
 } from '../testing/documents.ts'
 import { createTestFileChangeService } from '../testing/file-change.ts'
 import { createTestGraphSessionService, type TestOpenGraph } from '../testing/graph-session.ts'
@@ -146,18 +147,19 @@ function setup(options?: SetupOptions) {
   const graph = createTestGraphSessionService(
     options?.graph === null ? {} : { graph: options?.graph ?? { generation: 7 } },
   )
+  const failingNoteFile =
+    readError === undefined
+      ? noteFile
+      : overrideNoteFileService(noteFile, {
+          read: async (forPath, generation) => {
+            if (forPath === path) {
+              throw readError
+            }
+            return await noteFile.read(forPath, generation)
+          },
+        })
   const titleRename = createTitleRenameService({
-    noteFile:
-      readError === undefined
-        ? noteFile
-        : overrideNoteFileService(noteFile, {
-            read: async (forPath, generation) => {
-              if (forPath === path) {
-                throw readError
-              }
-              return await noteFile.read(forPath, generation)
-            },
-          }),
+    noteDocuments: createTestNoteDocumentService({ noteFile: failingNoteFile, openDocuments }),
     wikiResolver,
     backlinks: createBacklinkService({
       database,
@@ -166,7 +168,6 @@ function setup(options?: SetupOptions) {
     }),
     notePath: createNotePathService({ database, noteFile }),
     noteMove,
-    openDocuments,
     progress,
     clock,
     logger,
@@ -281,8 +282,7 @@ describe('rename coordinator', () => {
     })
     await renameOnce(coordinator, 'Old Title', 'New Title')
 
-    expect(session!.getCalls('updateFrontmatter')).toEqual([[{ aliases: ['Old Title'] }]])
-    expect(session!.getCalls('flush')).toHaveLength(1)
+    expect(session!.getCalls('commitFrontmatter')).toEqual([[{ aliases: ['Old Title'] }]])
     expect(noteFile.writes()).toEqual([])
     expect((await operationOutcomes())[0]!.outcome).toBe('done')
   })

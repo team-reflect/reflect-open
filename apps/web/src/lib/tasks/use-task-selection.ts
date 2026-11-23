@@ -1,8 +1,7 @@
 import { useListSelection, type ListSelection } from '@/lib/selection/use-list-selection.ts'
 
 /**
- * Multi-select over a flat, ordered list of task keys
- * ({@link import('@reflect/core').getTaskKey}), built on the generic
+ * Multi-select over a flat, ordered list of task ids, built on the generic
  * {@link useListSelection}.
  *
  * `isSoleSelected` is the state that mounts a task row's inline editor;

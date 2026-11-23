@@ -1,16 +1,10 @@
-import {
-  useRef,
-  type KeyboardEvent,
-  type MouseEvent,
-  type MutableRefObject,
-  type ReactElement,
-} from 'react'
+import type { KeyboardEvent, MouseEvent, ReactElement } from 'react'
 import { Circle, CircleCheck } from 'lucide-react'
-import { getTaskKey, type OpenTask } from '@reflect/core'
+import type { OpenTask } from '@reflect/core'
 import { getIsComposing } from '@meowdown/core'
 import { cn } from '@/lib/utils.ts'
 import type { ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
-import { TaskEditor, type TaskNavigate } from './task-editor.tsx'
+import { TaskEditor, type TaskEditorHandlers } from './task-editor.tsx'
 import { TaskText } from './task-text.tsx'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
@@ -29,10 +23,6 @@ interface TaskRowProps {
    */
   editing: boolean
   /**
-   * Whether a Tasks-view write is already in flight.
-   */
-  taskActionPending: boolean
-  /**
    * Whether this checkbox click should apply to the whole multi-selection.
    */
   togglesSelection: boolean
@@ -49,49 +39,9 @@ interface TaskRowProps {
    */
   onSelectionCheckboxToggle: () => void
   /**
-   * Persist an inline edit (content after the marker) and exit edit mode.
+   * What the keys of the inline editor do for this row.
    */
-  onEditCommit: (content: string) => void
-  /**
-   * Enter in the editor: persist this row then add the next task (V1 continuous entry).
-   */
-  onEditContinue: (content: string | null) => void
-  /**
-   * Delete the task from the inline editor (emptied via ⌘↵ / ⌘⌫) and exit edit mode.
-   */
-  onEditDelete: () => void
-  /**
-   * Backspace on an empty row in the editor: delete it and select the previous task.
-   */
-  onEditDeleteEmpty: () => void
-  /**
-   * Exit edit mode without writing (Escape / unchanged).
-   */
-  onEditCancel: () => void
-  /**
-   * ⌘↵ in the editor: complete the task, saving the edit first when `content` isn't null.
-   */
-  onEditComplete: (content: string | null) => void
-  /**
-   * Checkbox click while editing: save any draft, then toggle checked state.
-   */
-  onEditCheckboxToggle: (content: string | null) => void
-  /**
-   * ⌘⇧K in the editor: convert the task to a bullet, saving the edit first when changed.
-   */
-  onEditConvertToBullet: (content: string | null) => void
-  /**
-   * Persist a changed edit when the row unmounts (selection moved), without exiting.
-   */
-  onEditFlush: (content: string) => void
-  /**
-   * ↑/↓ in the editor: move the selection between rows (Shift extends).
-   */
-  onEditNavigate: TaskNavigate
-  /**
-   * Holds the editing row's flush-then-convert trigger for the toolbar button.
-   */
-  convertControllerRef: MutableRefObject<(() => void) | null>
+  editHandlers: TaskEditorHandlers
   onOpen: (notePath: string, event?: ModClickEvent) => void
 }
 
@@ -110,26 +60,14 @@ export function TaskRow({
   showSource,
   selected,
   editing,
-  taskActionPending,
   togglesSelection,
   onSelect,
   onCheckboxToggle,
   onSelectionCheckboxToggle,
-  onEditCommit,
-  onEditContinue,
-  onEditDelete,
-  onEditDeleteEmpty,
-  onEditCancel,
-  onEditComplete,
-  onEditCheckboxToggle,
-  onEditConvertToBullet,
-  onEditFlush,
-  onEditNavigate,
-  convertControllerRef,
+  editHandlers,
   onOpen,
 }: TaskRowProps): ReactElement {
   const noteLabel = useNoteLabel()
-  const checkboxToggleControllerRef = useRef<(() => void) | null>(null)
   const done = task.checked
   const label = task.text || 'Empty task'
   const selectFromKeyboard = (event: KeyboardEvent<HTMLDivElement>): void => {
@@ -156,7 +94,7 @@ export function TaskRow({
 
   return (
     <li
-      data-task-key={getTaskKey(task)}
+      data-task-key={task.taskId}
       onClick={selectFromRow}
       className={cn(
         'group/task flex min-h-10 items-start gap-3 border-b border-border bg-surface-canvas px-4 py-2 lg:px-12',
@@ -170,13 +108,8 @@ export function TaskRow({
         type="button"
         data-task-row
         aria-label={task.checked ? `Reopen: ${label}` : `Complete: ${label}`}
-        disabled={taskActionPending}
         onClick={(event) => {
           event.stopPropagation()
-          if (editing) {
-            checkboxToggleControllerRef.current?.()
-            return
-          }
           if (togglesSelection) {
             onSelectionCheckboxToggle()
             return
@@ -185,7 +118,7 @@ export function TaskRow({
         }}
         // h-6 matches the text/editor's 24px line so the circle centers on
         // the first line (items-start keeps it there when a task wraps).
-        className="flex h-6 shrink-0 items-center text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none disabled:cursor-default"
+        className="flex h-6 shrink-0 items-center text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none"
       >
         {done ? (
           <CircleCheck aria-hidden className="size-[18px] text-accent" strokeWidth={2} />
@@ -194,21 +127,7 @@ export function TaskRow({
         )}
       </button>
       {editing ? (
-        <TaskEditor
-          task={task}
-          onCommit={onEditCommit}
-          onContinue={onEditContinue}
-          onDelete={onEditDelete}
-          onDeleteEmpty={onEditDeleteEmpty}
-          onCancel={onEditCancel}
-          onComplete={onEditComplete}
-          onCheckboxToggle={onEditCheckboxToggle}
-          onConvertToBullet={onEditConvertToBullet}
-          onFlush={onEditFlush}
-          onNavigate={onEditNavigate}
-          checkboxToggleControllerRef={checkboxToggleControllerRef}
-          convertControllerRef={convertControllerRef}
-        />
+        <TaskEditor task={task} {...editHandlers} />
       ) : (
         <div
           role="button"

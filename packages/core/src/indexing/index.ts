@@ -4,11 +4,9 @@ export {
   type FileChange,
   type FileChangeSource,
 } from './file-change-service.ts'
-export type { ApplyErrorHandler, MovedHandler } from './live.ts'
 export {
   buildIndexedNote,
   CLAIM_TIER,
-  decodeTaskBreadcrumbs,
   encodeTaskBreadcrumbs,
   PROJECTION_VERSION,
   type IndexedNote,

@@ -22,9 +22,11 @@ export interface RenameIo {
   sources: (targetKey: string) => MaybePromise<string[]>
   /** Links that currently resolve to the renamed note's subject path. */
   backlinks: (path: string) => MaybePromise<RenameBacklink[]>
-  read: (path: string) => MaybePromise<string>
-  /** Write with the graph generation pre-bound (stale → loud rejection). */
-  write: (path: string, content: string) => MaybePromise<void>
+  /**
+   * Replace the text of the note at `path` with what `transform` returns for
+   * it.
+   */
+  edit: (path: string, transform: (content: string) => string) => MaybePromise<void>
   resolve: (target: string) => MaybePromise<Resolution>
 }
 
@@ -180,10 +182,13 @@ export async function rewriteLinksForTitleChange(
   let done = 0
   for (const source of sources) {
     try {
-      const content = await io.read(source)
-      const next = retitleWikiLinks(content, { repoint, display, subjectTargetKeys })
-      if (next !== content) {
-        await io.write(source, next)
+      let changed = false
+      await io.edit(source, (content) => {
+        const next = retitleWikiLinks(content, { repoint, display, subjectTargetKeys })
+        changed = next !== content
+        return next
+      })
+      if (changed) {
         rewritten.push(source)
       }
     } catch {
@@ -235,9 +240,11 @@ function aliasFamily(title: string): string[] {
 export interface PathLinkRewriteIo {
   /** Distinct source paths of links whose folded target path key matches. */
   pathLinkSources: (targetPathKey: string) => MaybePromise<string[]>
-  read: (path: string) => MaybePromise<string>
-  /** Write with the graph generation pre-bound (stale → loud rejection). */
-  write: (path: string, content: string) => MaybePromise<void>
+  /**
+   * Replace the text of the note at `path` with what `transform` returns for
+   * it.
+   */
+  edit: (path: string, transform: (content: string) => string) => MaybePromise<void>
 }
 
 /** What {@link rewritePathLinksForMove} touched, mirroring the title result. */
@@ -277,10 +284,13 @@ export async function rewritePathLinksForMove(
   const failed: string[] = []
   for (const source of sources) {
     try {
-      const content = await io.read(source)
-      const next = repointPathWikiLinks(content, { fromPathKey, to })
-      if (next !== content) {
-        await io.write(source, next)
+      let changed = false
+      await io.edit(source, (content) => {
+        const next = repointPathWikiLinks(content, { fromPathKey, to })
+        changed = next !== content
+        return next
+      })
+      if (changed) {
         rewritten.push(source)
       }
     } catch {

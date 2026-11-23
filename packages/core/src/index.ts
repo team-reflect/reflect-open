@@ -10,7 +10,7 @@
  */
 export {
   createIpcBridgeService,
-  INDEX_WRITTEN_EVENT,
+  INDEX_COMMITTED_EVENT,
   listenNow,
   type CommandArgs,
   type CommandName,
@@ -464,16 +464,9 @@ export {
 } from './indexing/index.ts'
 export { groupTaskContexts, type TaskContext, type TaskGroup } from './tasks/group-tasks.ts'
 export { type OpenTask } from './tasks/open-task.ts'
-export { resolveTaskEdit, type TaskDraftResolution } from './tasks/task-content.ts'
-export { getTaskKey, isSameTask } from './tasks/task-identity.ts'
 export { type InsertTaskTarget } from './tasks/task-insert-target.ts'
 export { previousTaskKey, todaysDailyTarget } from './tasks/task-navigation.ts'
 export { withDraftDueDate } from './tasks/task-schedule-content.ts'
-export {
-  withoutReopenedTasks,
-  type RecentlyCompleted,
-  type TaskAction,
-  type TaskService,
-  type TaskWriteResult,
-} from './tasks/task-service.ts'
+export type { TaskCommands } from './tasks/task-commands.ts'
+export { type TaskService } from './tasks/task-service.ts'
 export { composeVisibleTaskGroups, type TaskFilters } from './tasks/task-visibility.ts'

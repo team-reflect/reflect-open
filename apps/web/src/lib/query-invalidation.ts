@@ -49,10 +49,9 @@ export function installQueryInvalidation(core: CoreServices, { window }: AppServ
     core.graphSession.onGraphDeleted(dropIcloudStatusQuery),
   ]
   if (!window.isMainWindow()) {
-    // A note window runs no indexer: the Rust `index:written` broadcast
-    // (fired after the main window's applies commit) keeps its index-backed
-    // queries fresh.
-    unlisteners.push(window.subscribeIndexWritten(throttledInvalidateIndexQueries))
+    // A note window runs no indexer: the `index:committed` broadcast of the
+    // main window's index writer keeps its index-backed queries fresh.
+    unlisteners.push(window.subscribeIndexCommitted(throttledInvalidateIndexQueries))
   }
   return () => {
     for (const unlisten of unlisteners) {

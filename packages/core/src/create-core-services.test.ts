@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { noop } from '@ocavue/utils'
+import { describe, expect, it, vi } from 'vitest'
 import { parseSearchQuery } from './indexing/filter-query.ts'
 import { createTestClockService } from './testing/clock.ts'
 import { createTestDatabaseService, seedNotes } from './testing/database.ts'
@@ -76,28 +77,9 @@ describe('createCoreServices', () => {
     expect(mobile.mobile?.mobileAudioMemo).toBeDefined()
   })
 
-  it('echoes own writes onto the file-change stream on mobile only', () => {
-    for (const [appPlatform, echoed] of [
-      ['desktop', 0],
-      ['ios', 1],
-    ] as const) {
-      const services = createCoreServices({
-        ...requiredAdapters(),
-        logger: createTestLoggerService(),
-        platform: createTestPlatformService({ appPlatform }),
-      })
-      let batches = 0
-      services.fileChanges.subscribe(() => {
-        batches++
-      })
-      services.fileChanges.reportOwnWrite([{ path: 'notes/a.md', kind: 'upsert' }])
-      expect(batches, appPlatform).toBe(echoed)
-    }
-  })
-
-  it('reports note writes to the composed file-change service', async () => {
+  it('reports note creates to the composed file-change service', async () => {
     const ipc = createTestIpcBridgeService({
-      commands: { note_write: () => ({ modifiedMs: null, merged: null }) },
+      commands: { note_create: () => ({ kind: 'created', modifiedMs: null }) },
     })
     const { services, internal } = composeCoreServices({
       ...requiredAdapters(),
@@ -110,7 +92,10 @@ describe('createCoreServices', () => {
     services.fileChanges.subscribe((batch) => {
       seen.push({ source: batch.source, paths: batch.changes.map((change) => change.path) })
     })
-    await expect(internal.noteFile.write('notes/a.md', 'a', 1)).resolves.toEqual({ merged: null })
+    await expect(internal.noteFile.create('notes/a.md', 'a', 1)).resolves.toEqual({
+      kind: 'created',
+      modifiedMs: null,
+    })
     expect(seen).toEqual([{ source: 'own-write', paths: ['notes/a.md'] }])
   })
 
@@ -155,6 +140,22 @@ describe('createTestCoreServices', () => {
     await expect(services.notePath.slugPathForTitle('notes/new.md', 'Plan')).resolves.toBe(
       'notes/plan-3.md',
     )
+  })
+
+  it('writes the typed text of a task when the persistence flush runs', async () => {
+    const services = createTestCoreServices({ database: createTestDatabaseService() })
+    seedNotes(services.database, [{ path: 'notes/a.md', markdown: '+ [ ] one\n+ [ ] two\n' }])
+    await services.noteFile.write('notes/a.md', '+ [ ] one\n+ [ ] two\n', 1)
+    services.graphSession.setGraph({ root: '/g', name: 'g', generation: 1 })
+    services.tasks.subscribe(noop)
+    await vi.waitFor(() => expect(services.tasks.get().open).toHaveLength(2))
+    const [one, two] = services.tasks.get().open!
+
+    services.tasks.commands.setDraft(one!, 'one more')
+    services.tasks.commands.setDraft(two!, '')
+    await services.persistenceFlush.flushAll()
+
+    expect(services.noteFile.files().get('notes/a.md')).toBe('+ [ ] one more\n+ [ ] two\n')
   })
 
   it('builds the index reads over an overriding database', async () => {

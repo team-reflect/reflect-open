@@ -9,6 +9,8 @@ import {
 import type {
   LocalNoteRead,
   NoteFileService,
+  WritableNoteFileService,
+  NoteRead,
   NoteWriteResult,
   VaultScanStats,
 } from '../graph/note-file-service.ts'
@@ -23,7 +25,7 @@ import {
   createWikiResolverService,
   type WikiResolverService,
 } from '../indexing/wiki-resolver-service.ts'
-import { bytesToBase64, base64ToBytes } from '@reflect/utils'
+import { bytesToBase64, base64ToBytes, sha256HexSync } from '@reflect/utils'
 import { createTestDatabaseService } from './database.ts'
 import { createTestIdService } from './id.ts'
 
@@ -72,7 +74,7 @@ export interface NoteFileRead {
   generation: number | undefined
 }
 
-export interface TestNoteFileService extends NoteFileService {
+export interface TestNoteFileService extends WritableNoteFileService {
   /**
    * Put a file into the graph without recording a write.
    */
@@ -135,6 +137,11 @@ class TestNoteFileServiceImpl implements TestNoteFileService {
     })
   }
 
+  async readWithHash(path: string, pinned: number): Promise<NoteRead> {
+    const content = await this.read(path, pinned)
+    return { content, hash: sha256HexSync(content) }
+  }
+
   readLocal(path: string, pinned: number): Promise<LocalNoteRead> {
     return Promise.try(() => {
       checkGeneration(this.#generation, pinned)
@@ -148,26 +155,38 @@ class TestNoteFileServiceImpl implements TestNoteFileService {
     contents: string,
     pinned: number,
     expectedContents?: string | null,
+    onMismatch?: 'merge' | 'reject',
   ): Promise<NoteWriteResult> {
     return Promise.try(() => {
       checkGeneration(this.#generation, pinned)
-      const merged = this.#merges.get(path)
-      if (merged !== undefined) {
-        this.#merges.delete(path)
-        this.#store(path, merged, pinned)
-        return { merged }
+      const current = this.#files.get(path)
+      if (
+        onMismatch === 'reject' &&
+        expectedContents !== undefined &&
+        current !== undefined &&
+        current.contents !== expectedContents &&
+        current.contents !== contents
+      ) {
+        return {
+          merged: current.contents,
+          hash: sha256HexSync(current.contents),
+          modifiedMs: current.modifiedMs,
+        }
       }
-      if (expectedContents !== undefined) {
-        const current = this.#files.get(path)?.contents ?? null
-        if (current !== expectedContents && current !== contents) {
+      const merged = this.#merges.get(path) ?? null
+      if (merged !== null) {
+        this.#merges.delete(path)
+      } else if (expectedContents !== undefined) {
+        if (current?.contents === contents) {
+          return { merged, hash: sha256HexSync(contents), modifiedMs: current.modifiedMs }
+        }
+        if ((current?.contents ?? null) !== expectedContents) {
           throw new AppError('io', 'Note changed on disk; reload before retrying')
         }
-        if (current === contents) {
-          return { merged: null }
-        }
       }
-      this.#store(path, contents, pinned)
-      return { merged: null }
+      const written = merged ?? contents
+      const modifiedMs = this.#store(path, written, pinned)
+      return { merged, hash: sha256HexSync(written), modifiedMs }
     })
   }
 
@@ -302,17 +321,28 @@ export function createTestNoteFileService(
  * A {@link NoteFileService} that forwards each member to `inner`, except the
  * ones `overrides` replaces. The inner service keeps its own behavior.
  */
-class NoteFileOverrideService implements NoteFileService {
-  readonly #inner: NoteFileService
-  readonly #overrides: Partial<NoteFileService>
+class NoteFileOverrideService implements WritableNoteFileService {
+  readonly #inner: WritableNoteFileService
+  readonly #overrides: Partial<WritableNoteFileService>
 
-  constructor(inner: NoteFileService, overrides: Partial<NoteFileService>) {
+  constructor(inner: WritableNoteFileService, overrides: Partial<WritableNoteFileService>) {
     this.#inner = inner
     this.#overrides = overrides
   }
 
   read(path: string, generation: number): Promise<string> {
     return (this.#overrides.read ?? this.#inner.read.bind(this.#inner))(path, generation)
+  }
+
+  async readWithHash(path: string, generation: number): Promise<NoteRead> {
+    if (this.#overrides.readWithHash !== undefined) {
+      return await this.#overrides.readWithHash(path, generation)
+    }
+    if (this.#overrides.read !== undefined) {
+      const content = await this.#overrides.read(path, generation)
+      return { content, hash: sha256HexSync(content) }
+    }
+    return await this.#inner.readWithHash(path, generation)
   }
 
   readLocal(path: string, generation: number): Promise<LocalNoteRead> {
@@ -324,12 +354,14 @@ class NoteFileOverrideService implements NoteFileService {
     contents: string,
     generation: number,
     expectedContents?: string | null,
+    onMismatch?: 'merge' | 'reject',
   ): Promise<NoteWriteResult> {
     return (this.#overrides.write ?? this.#inner.write.bind(this.#inner))(
       path,
       contents,
       generation,
       expectedContents,
+      onMismatch,
     )
   }
 
@@ -375,9 +407,9 @@ class NoteFileOverrideService implements NoteFileService {
  * service, which would drop its prototype methods.
  */
 export function overrideNoteFileService(
-  inner: NoteFileService,
-  overrides: Partial<NoteFileService>,
-): NoteFileService {
+  inner: WritableNoteFileService,
+  overrides: Partial<WritableNoteFileService>,
+): WritableNoteFileService {
   return new NoteFileOverrideService(inner, overrides)
 }
 

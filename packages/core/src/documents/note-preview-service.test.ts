@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AppError } from '../errors.ts'
-import type { NoteFileService } from '../graph/note-file-service.ts'
+import type { WritableNoteFileService } from '../graph/note-file-service.ts'
 import type {
   ExistingWikiTargetResolution,
   NoteLinkResolverService,
@@ -23,6 +23,7 @@ import { createNoteDocumentService, type NoteDocumentService } from './note-docu
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createNotePreviewService, type NotePreviewServiceDeps } from './note-preview-service.ts'
 import { createOpenDocumentsService } from './open-documents-service.ts'
+import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 
 /**
  * A test graph session with a graph of generation 7 open.
@@ -54,6 +55,8 @@ function documentsWith(read: () => Promise<string>): NoteDocumentService {
     openDocuments: createOpenDocumentsService({ fileChanges: createTestFileChangeService() }),
     noteFile: createTestNoteFileService(),
     graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
+    indexLifecycle: createTestIndexLifecycleService(),
+    logger: createTestLoggerService(),
   })
   vi.spyOn(noteDocuments, 'readExisting').mockImplementation(read)
   return noteDocuments
@@ -63,7 +66,7 @@ function documentsWith(read: () => Promise<string>): NoteDocumentService {
  * The real service over a link resolver and note documents over `noteFile` (empty by default).
  */
 function notePreviewOver(
-  options?: Partial<NotePreviewServiceDeps> & { noteFile?: NoteFileService },
+  options?: Partial<NotePreviewServiceDeps> & { noteFile?: WritableNoteFileService },
 ) {
   const noteFile = options?.noteFile ?? createTestNoteFileService()
   return createNotePreviewService({
@@ -74,6 +77,8 @@ function notePreviewOver(
         openDocuments: createOpenDocumentsService({ fileChanges: createTestFileChangeService() }),
         noteFile,
         graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
+        indexLifecycle: createTestIndexLifecycleService(),
+        logger: createTestLoggerService(),
       }),
     attachments: options?.attachments ?? createTestAttachmentService(),
     graphSession: options?.graphSession ?? openGraph(),
@@ -85,7 +90,7 @@ function notePreviewOver(
  */
 function attachmentsOver(listing: () => Promise<readonly { path: string; size: number }[]>) {
   const clock = createTestClockService()
-  const noteFile: NoteFileService = Object.assign(createTestNoteFileService(), {
+  const noteFile: WritableNoteFileService = Object.assign(createTestNoteFileService(), {
     async listAttachments(): Promise<FileMeta[]> {
       return (await listing()).map((entry) => ({ ...entry, modifiedMs: 0 }))
     },
@@ -132,6 +137,8 @@ describe('previewWikiTarget', () => {
         openDocuments,
         noteFile,
         graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
+        indexLifecycle: createTestIndexLifecycleService(),
+        logger: createTestLoggerService(),
       }),
     })
 

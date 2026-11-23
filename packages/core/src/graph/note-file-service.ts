@@ -1,23 +1,40 @@
-import type { FileMeta, LocalNoteRead, NoteCreateOutcome, VaultScanStats } from '@reflect/types'
+import type {
+  FileMeta,
+  LocalNoteRead,
+  NoteCreateOutcome,
+  NoteRead,
+  VaultScanStats,
+} from '@reflect/types'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 
-export type { LocalNoteRead, VaultScanStats } from '@reflect/types'
+export type { LocalNoteRead, NoteRead, VaultScanStats } from '@reflect/types'
 
 /**
  * The outcome of {@link NoteFileService.write}.
  */
 export interface NoteWriteResult {
   /**
-   * The full text now on disk when the write merged with a newer disk text, else `null`.
+   * The full text now on disk when the disk text had moved past the expected
+   * one, else `null`: the merge of both, or the unchanged disk text when the
+   * write rejected the mismatch.
    */
   merged: string | null
+  /**
+   * Lowercase hex SHA-256 of the text now on disk.
+   */
+  hash: string
+  /**
+   * The modification time of the file after the write, in epoch milliseconds.
+   */
+  modifiedMs: number
 }
 
 /**
- * Markdown notes by graph-relative path. Every write, create and delete is
- * reported to {@link FileChangeService.reportOwnWrite} after it lands.
+ * Markdown notes by graph-relative path: reads, and the changes that cannot
+ * replace the text of a note. Every create and delete is reported to
+ * {@link FileChangeService.reportOwnWrite} after it lands.
  */
 export interface NoteFileService {
   /**
@@ -25,23 +42,15 @@ export interface NoteFileService {
    */
   read(path: string, generation: number): Promise<string>
   /**
+   * A note's markdown and the hash of it, pinned to `generation`.
+   */
+  readWithHash(path: string, generation: number): Promise<NoteRead>
+  /**
    * A note's markdown only when its bytes are local: an iCloud-evicted note
    * reports `evicted` instead of being downloaded. A missing file still
    * rejects with `notFound`.
    */
   readLocal(path: string, generation: number): Promise<LocalNoteRead>
-  /**
-   * Write a note atomically, pinned to `generation`. With `expectedContents`
-   * the write is checked: `null` requires a missing file, and a note whose
-   * disk text moved past `expectedContents` is merged with it (see
-   * {@link NoteWriteResult.merged}). Omitting it writes unconditionally.
-   */
-  write(
-    path: string,
-    contents: string,
-    generation: number,
-    expectedContents?: string | null,
-  ): Promise<NoteWriteResult>
   /**
    * Create a note only when `path` is free. A collision is returned, never overwritten.
    */
@@ -72,13 +81,36 @@ export interface NoteFileService {
   vaultScanStats(generation: number): Promise<VaultScanStats>
 }
 
+/**
+ * A {@link NoteFileService} that can also replace the text of a file. Every
+ * write is reported to {@link FileChangeService.reportOwnWrite} after it lands.
+ */
+export interface WritableNoteFileService extends NoteFileService {
+  /**
+   * Write a note atomically, pinned to `generation`. With `expectedContents`
+   * the write is checked: `null` requires a missing file, and a note whose
+   * disk text moved past `expectedContents` is merged with it (see
+   * {@link NoteWriteResult.merged}). Omitting it writes unconditionally.
+   * With `onMismatch: 'reject'` a checked write whose disk text is neither
+   * `expectedContents` nor `contents` writes nothing and resolves with the
+   * disk text as `merged`.
+   */
+  write(
+    path: string,
+    contents: string,
+    generation: number,
+    expectedContents?: string | null,
+    onMismatch?: 'merge' | 'reject',
+  ): Promise<NoteWriteResult>
+}
+
 export interface NoteFileServiceDeps {
   readonly ipc: IpcBridgeService
   readonly clock: ClockService
   readonly fileChanges: FileChangeService
 }
 
-class NoteFileServiceImpl implements NoteFileService {
+class NoteFileServiceImpl implements WritableNoteFileService {
   readonly #deps: NoteFileServiceDeps
 
   constructor(deps: NoteFileServiceDeps) {
@@ -86,6 +118,11 @@ class NoteFileServiceImpl implements NoteFileService {
   }
 
   async read(path: string, generation: number): Promise<string> {
+    const { content } = await this.readWithHash(path, generation)
+    return content
+  }
+
+  async readWithHash(path: string, generation: number): Promise<NoteRead> {
     return await this.#deps.ipc.call('note_read', { path, generation })
   }
 
@@ -98,6 +135,7 @@ class NoteFileServiceImpl implements NoteFileService {
     contents: string,
     generation: number,
     expectedContents?: string | null,
+    onMismatch?: 'merge' | 'reject',
   ): Promise<NoteWriteResult> {
     const { ipc, clock, fileChanges } = this.#deps
     const outcome = await ipc.call('note_write', {
@@ -106,10 +144,13 @@ class NoteFileServiceImpl implements NoteFileService {
       generation,
       checkContents: expectedContents === undefined ? null : true,
       expectedContents: expectedContents ?? null,
+      rejectMismatch: onMismatch === 'reject' ? true : null,
     })
     const modifiedMs = outcome.modifiedMs ?? clock.now()
-    fileChanges.reportOwnWrite([{ path, kind: 'upsert', modifiedMs }])
-    return { merged: outcome.merged }
+    if (onMismatch !== 'reject' || outcome.merged === null) {
+      fileChanges.reportOwnWrite([{ path, kind: 'upsert', modifiedMs }])
+    }
+    return { merged: outcome.merged, hash: outcome.hash, modifiedMs }
   }
 
   async create(path: string, contents: string, generation: number): Promise<NoteCreateOutcome> {
@@ -149,6 +190,6 @@ class NoteFileServiceImpl implements NoteFileService {
   }
 }
 
-export function createNoteFileService(deps: NoteFileServiceDeps): NoteFileService {
+export function createNoteFileService(deps: NoteFileServiceDeps): WritableNoteFileService {
   return new NoteFileServiceImpl(deps)
 }

@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { AppError } from '../errors.ts'
 import { parseNote } from '../markdown/index.ts'
 import { createTestDatabaseService } from '../testing/database.ts'
 import { createTestIndexStoreService } from '../testing/index-store.ts'
 import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { buildIndexedNote, type IndexedNote } from './indexed-note.ts'
-import { createIndexStoreService, INDEX_APPLY_BATCH_SIZE } from './index-store-service.ts'
+import { createIndexStoreService } from './index-store-service.ts'
 import { returnNull } from '@ocavue/utils'
 
 function note(path: string): IndexedNote {
@@ -16,7 +15,6 @@ function note(path: string): IndexedNote {
 function writeCommands(): Record<string, () => null> {
   return Object.fromEntries(
     [
-      'index_apply',
       'index_apply_batch',
       'index_remove',
       'index_move',
@@ -34,7 +32,6 @@ describe('createIndexStoreService', () => {
     const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
     const a = note('notes/a.md')
 
-    await store.apply(a, 3)
     await store.applyBatch([a], 3)
     await store.remove('notes/a.md', 3)
     await store.touch([{ path: 'notes/a.md', mtime: 9 }], 3)
@@ -42,7 +39,6 @@ describe('createIndexStoreService', () => {
     await store.setMeta('k', 'v', 3)
 
     expect(ipc.calls()).toEqual([
-      { command: 'index_apply', args: { note: a, generation: 3 } },
       { command: 'index_apply_batch', args: { notes: [a], generation: 3 } },
       { command: 'index_remove', args: { path: 'notes/a.md', generation: 3 } },
       {
@@ -134,107 +130,13 @@ describe('createIndexStoreService', () => {
   })
 })
 
-describe('createApplyBatch', () => {
-  it('splits a refused batch until the failing note stands alone', async () => {
-    const batches: string[][] = []
-    const ipc = createTestIpcBridgeService({
-      commands: {
-        index_apply_batch: (args) => {
-          const paths = (args['notes'] as IndexedNote[]).map((indexed) => indexed.path)
-          batches.push(paths)
-          if (paths.includes('notes/bad.md')) {
-            throw new AppError('parse', 'bad projection')
-          }
-          return null
-        },
-      },
-    })
-    const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
-    const skipped: { path: string; message: string }[] = []
-    const batch = store.createApplyBatch(2, (skip) => {
-      skipped.push(skip)
-    })
-
-    for (const path of ['notes/a.md', 'notes/bad.md', 'notes/c.md']) {
-      await batch.add(note(path))
-    }
-    await batch.flush()
-
-    expect(batches).toEqual([
-      ['notes/a.md', 'notes/bad.md', 'notes/c.md'],
-      ['notes/a.md', 'notes/bad.md'],
-      ['notes/a.md'],
-      ['notes/bad.md'],
-      ['notes/c.md'],
-    ])
-    expect(skipped).toEqual([{ path: 'notes/bad.md', message: 'bad projection' }])
-    expect(batch.applied()).toBe(2)
-  })
-
-  it('throws a lone failure without a skip callback', async () => {
-    const ipc = createTestIpcBridgeService({
-      commands: {
-        index_apply_batch: () => {
-          throw new AppError('parse', 'refused')
-        },
-      },
-    })
-    const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
-    const batch = store.createApplyBatch(1)
-
-    await batch.add(note('notes/a.md'))
-
-    await expect(batch.flush()).rejects.toMatchObject({ message: 'refused' })
-  })
-
-  it('flushes on its own at the transaction cap', async () => {
-    const ipc = createTestIpcBridgeService({ commands: writeCommands() })
-    const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
-    const batch = store.createApplyBatch(1)
-    const projection = note('notes/a.md')
-
-    for (let i = 0; i < INDEX_APPLY_BATCH_SIZE; i++) {
-      await batch.add(projection)
-    }
-
-    expect(ipc.calls()).toHaveLength(1)
-    expect(batch.applied()).toBe(INDEX_APPLY_BATCH_SIZE)
-  })
-})
-
-describe('createTouchBatch', () => {
-  it('applies queued re-stamps in one `index_touch`', async () => {
-    const ipc = createTestIpcBridgeService({ commands: writeCommands() })
-    const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
-    const touches = store.createTouchBatch(6)
-
-    await touches.add({ path: 'notes/a.md', mtime: 1 })
-    await touches.add({ path: 'notes/b.md', mtime: 2 })
-    await touches.flush()
-    await touches.flush()
-
-    expect(ipc.calls()).toEqual([
-      {
-        command: 'index_touch',
-        args: {
-          entries: [
-            { path: 'notes/a.md', mtime: 1 },
-            { path: 'notes/b.md', mtime: 2 },
-          ],
-          generation: 6,
-        },
-      },
-    ])
-    expect(touches.applied()).toBe(2)
-  })
-})
 describe('createTestIndexStoreService', () => {
   it('records calls and mirrors applies into its database', async () => {
     const database = createTestDatabaseService()
     const store = createTestIndexStoreService({ database, meta: { seeded: 'yes' } })
     try {
       await store.applyBatch([note('notes/a.md'), note('notes/b.md')], 1)
-      await store.apply(note('notes/a.md'), 1)
+      await store.applyBatch([note('notes/a.md')], 1)
       await store.remove('notes/b.md', 1)
       await store.move('notes/x.md', 'notes/y.md', 1)
       await store.setMeta('k', 'v', 1)
@@ -259,15 +161,17 @@ describe('createTestIndexStoreService', () => {
     const store = createTestIndexStoreService({ database })
     try {
       const source = '# Title\n\n[[Other]] #tag\n'
-      await store.apply(
-        buildIndexedNote(parseNote({ path: 'notes/old.md', source }), {
-          fileHash: 'hash',
-          mtime: 1,
-          source,
-        }),
+      await store.applyBatch(
+        [
+          buildIndexedNote(parseNote({ path: 'notes/old.md', source }), {
+            fileHash: 'hash',
+            mtime: 1,
+            source,
+          }),
+        ],
         1,
       )
-      await store.apply(note('notes/taken.md'), 1)
+      await store.applyBatch([note('notes/taken.md')], 1)
       await store.moveIndexed('notes/old.md', 'notes/New Name.md', 1)
 
       expect(database.query('SELECT path, path_key FROM notes ORDER BY path')).toEqual([

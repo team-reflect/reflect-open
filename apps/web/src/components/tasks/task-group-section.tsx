@@ -1,7 +1,6 @@
-import { Fragment, type MutableRefObject, type ReactElement } from 'react'
+import { Fragment, type ReactElement } from 'react'
 import { Plus } from 'lucide-react'
 import {
-  getTaskKey,
   groupTaskContexts,
   type InsertTaskTarget,
   type OpenTask,
@@ -9,7 +8,7 @@ import {
 } from '@reflect/core'
 import { addTargetForGroup, taskGroupHeaderStyle } from '@/lib/tasks/task-group-presentation.tsx'
 import type { TaskSelection } from '@/lib/tasks/use-task-selection.ts'
-import type { TaskRowEditHandlers } from '@/lib/tasks/use-task-row-handlers.ts'
+import type { TaskEditorHandlers } from './task-editor.tsx'
 import { cn } from '@/lib/utils.ts'
 import type { ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
 import { TaskBreadcrumbs } from './task-breadcrumbs.tsx'
@@ -21,11 +20,7 @@ interface TaskGroupSectionProps {
   /**
    * The inline-editor callbacks for a row, built once by the screen.
    */
-  editHandlers: (task: OpenTask) => TaskRowEditHandlers
-  /**
-   * Whether a Tasks-view write is already in flight.
-   */
-  taskActionPending: boolean
+  editHandlers: (task: OpenTask) => TaskEditorHandlers
   /**
    * Complete/reopen the selected rows using the clicked task's next checkbox state.
    */
@@ -39,10 +34,6 @@ interface TaskGroupSectionProps {
    * Add a task to this group and open its editor (the header's "+ Add", V1).
    */
   onAdd: (target: InsertTaskTarget) => void
-  /**
-   * Holds the editing row's flush-then-convert trigger for the toolbar button.
-   */
-  convertControllerRef: MutableRefObject<(() => void) | null>
   onOpen: (notePath: string, event?: ModClickEvent) => void
 }
 
@@ -56,12 +47,10 @@ export function TaskGroupSection({
   group,
   selection,
   editHandlers,
-  taskActionPending,
   onCheckboxToggle,
   onSelectionCheckboxToggle,
   today,
   onAdd,
-  convertControllerRef,
   onOpen,
 }: TaskGroupSectionProps): ReactElement {
   const showSource = group.kind !== 'note'
@@ -106,13 +95,13 @@ export function TaskGroupSection({
           contexts.map((context) => {
             const firstTask = context.tasks[0]!
             return (
-              <Fragment key={getTaskKey(firstTask)}>
+              <Fragment key={firstTask.taskId}>
                 <TaskBreadcrumbs
                   breadcrumbs={context.visibleBreadcrumbs}
-                  onSelect={() => selection.select(context.tasks.map(getTaskKey))}
+                  onSelect={() => selection.select(context.tasks.map((task) => task.taskId))}
                 />
                 {context.tasks.map((task) => {
-                  const key = getTaskKey(task)
+                  const key = task.taskId
                   const selected = selection.isSelected(key)
                   return (
                     <TaskRow
@@ -121,13 +110,11 @@ export function TaskGroupSection({
                       showSource={showSource}
                       selected={selected}
                       editing={selection.isSoleSelected(key)}
-                      taskActionPending={taskActionPending}
                       togglesSelection={selected && selection.selectedCount > 1}
                       onSelect={(event) => selection.clickSelect(key, event)}
                       onCheckboxToggle={() => onCheckboxToggle(task)}
                       onSelectionCheckboxToggle={() => onSelectionCheckboxToggle(task)}
-                      {...editHandlers(task)}
-                      convertControllerRef={convertControllerRef}
+                      editHandlers={editHandlers(task)}
                       onOpen={onOpen}
                     />
                   )

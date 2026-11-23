@@ -189,11 +189,7 @@ export {
   createTestPersistenceFlushService,
   type TestPersistenceFlushService,
 } from './persistence-flush.ts'
-export {
-  createTestFileChangeService,
-  type TestFileChangeService,
-  type TestFileChangeServiceOptions,
-} from './file-change.ts'
+export { createTestFileChangeService, type TestFileChangeService } from './file-change.ts'
 export {
   createTestAppStoreService,
   createTestHapticsService,
@@ -235,7 +231,7 @@ export {
   type TestAttachmentService,
   type TestAttachmentServiceOptions,
 } from './attachments.ts'
-export { makeOpenTask } from './tasks.ts'
+export { makeOpenTask, TestTaskIndex } from './tasks.ts'
 export {
   createTestNoteSession,
   type NoteSessionCall,
@@ -243,6 +239,7 @@ export {
   type TestNoteSessionOptions,
   createTestNoteMoveService,
   type TestNoteMoveService,
+  createTestNoteDocumentService,
 } from './documents.ts'
 export {
   createTestAppStoreEnvironmentService,

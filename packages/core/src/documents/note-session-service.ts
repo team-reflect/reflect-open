@@ -2,8 +2,11 @@ import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import { writeGenerationFor, type GraphSessionSource } from '../graph/graph-session.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { errorMessage, isAppError, AppError } from '../errors.ts'
-import type { NoteFileService, NoteWriteResult } from '../graph/note-file-service.ts'
-import { appendBlock } from '../markdown/append-section.ts'
+import type {
+  NoteRead,
+  NoteWriteResult,
+  WritableNoteFileService,
+} from '../graph/note-file-service.ts'
 import { hasAuthoredTitle, parseNote } from '../markdown/extract.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { notePrivate } from '../privacy/privacy-service.ts'
@@ -11,6 +14,8 @@ import { splitDoc } from './note-session-doc.ts'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter.ts'
 import type {
   NoteSession,
+  NoteSessionCommit,
+  NoteSourceTransform,
   NoteSessionEditor,
   NoteSessionOptions,
   NoteSessionService,
@@ -22,7 +27,7 @@ import type {
  * File access of one session, with the graph generation bound to its writes.
  */
 interface NoteSessionIo {
-  readonly read: (path: string) => Promise<string>
+  readonly read: (path: string) => Promise<NoteRead>
   readonly write:
     | ((
         path: string,
@@ -35,7 +40,7 @@ interface NoteSessionIo {
 const DEFAULT_SAVE_DEBOUNCE_MS = 800
 
 export interface NoteSessionServiceDeps {
-  readonly noteFile: NoteFileService
+  readonly noteFile: WritableNoteFileService
   readonly clock: ClockService
   readonly logger: LoggerService
   readonly graphSession: GraphSessionSource
@@ -98,6 +103,10 @@ class NoteSessionImpl implements NoteSession {
    */
   #disk = ''
   /**
+   * The hash of `#disk`; `null` while no file holds that text.
+   */
+  #diskHash: string | null = null
+  /**
    * The text the buffer was typed on: the base a checked write names. It
    * differs from `#disk` only after a merged write raced newer keystrokes.
    */
@@ -158,7 +167,7 @@ class NoteSessionImpl implements NoteSession {
         if (graph === null) {
           throw new AppError('noGraph', 'No graph is open.')
         }
-        return await noteFile.read(forPath, writeGenerationFor(graphSession, graph))
+        return await noteFile.readWithHash(forPath, writeGenerationFor(graphSession, graph))
       },
       write:
         options.readOnly === true || graph === null
@@ -266,12 +275,13 @@ class NoteSessionImpl implements NoteSession {
           this.#retriedFailedSave = false
           if (result.merged === null) {
             this.#disk = content
+            this.#diskHash = result.hash
             this.#writeBase = content
             this.#dirty = this.#header + this.#buffer !== content
             this.#emit()
             this.#onContent?.(content, 'saved')
           } else {
-            this.#adoptMergedWrite(content, result.merged)
+            this.#adoptMergedWrite(content, result.merged, result.hash)
           }
         } finally {
           this.#inFlightWrite = null
@@ -288,9 +298,10 @@ class NoteSessionImpl implements NoteSession {
   }
 
   /**
-   * Take the text a write merged into the file. `sent` is the content given to that write.
+   * Take the text a write merged into the file, and its hash. `sent` is the
+   * content given to that write.
    */
-  #adoptMergedWrite(sent: string, merged: string): void {
+  #adoptMergedWrite(sent: string, merged: string, hash: string): void {
     this.#inFlightWrite = null
     // A merge that kept the title we sent is a local save for the rename tracker
     // (it may still hold a pending rename); any other title comes from elsewhere.
@@ -300,12 +311,13 @@ class NoteSessionImpl implements NoteSession {
       // Keystrokes arrived during the write. They were typed on `sent`, so the
       // next save names it as the base and merges them with the file again.
       this.#disk = merged
+      this.#diskHash = hash
       this.#writeBase = sent
       this.#dirty = true
       this.#emit()
       return
     }
-    this.#adoptCleanContent(merged)
+    this.#adoptCleanContent(merged, hash)
   }
 
   #titleOf(content: string): string | null {
@@ -403,13 +415,15 @@ class NoteSessionImpl implements NoteSession {
   }
 
   /**
-   * Adopt `content` as the new clean document state, re-gating protection.
+   * Adopt `content`, the file text with hash `hash`, as the new clean
+   * document state, re-gating protection.
    */
-  #adoptCleanContent(content: string): void {
+  #adoptCleanContent(content: string, hash: string): void {
     const doc = splitDoc(content)
     this.#header = doc.header
     this.#buffer = doc.body
     this.#disk = content
+    this.#diskHash = hash
     this.#writeBase = content
     this.#dirty = false
     this.#missing = false // external content means the file exists on disk now
@@ -434,8 +448,9 @@ class NoteSessionImpl implements NoteSession {
    */
   async #reconcileFromDisk(saveIfDirty: boolean): Promise<void> {
     let content: string
+    let hash: string
     try {
-      content = await this.#io.read(this.path)
+      ;({ content, hash } = await this.#io.read(this.path))
     } catch (cause) {
       if (!this.#disposed && isAppError(cause) && cause.kind === 'notFound') {
         this.#missing = true
@@ -470,19 +485,19 @@ class NoteSessionImpl implements NoteSession {
       }
       return
     }
-    this.#adoptCleanContent(content)
+    this.#adoptCleanContent(content, hash)
     this.#onContent?.(content, 'external')
   }
 
   /**
    * The initial read; with `createIfMissing`, a missing file is an empty note.
    */
-  async #readInitial(): Promise<{ content: string; fileMissing: boolean }> {
+  async #readInitial(): Promise<{ content: string; hash: string | null }> {
     try {
-      return { content: await this.#io.read(this.path), fileMissing: false }
+      return await this.#io.read(this.path)
     } catch (cause) {
       if (this.#createIfMissing && isAppError(cause) && cause.kind === 'notFound') {
-        return { content: '', fileMissing: true } // lazy note: created by the first save
+        return { content: '', hash: null } // lazy note: created by the first save
       }
       throw cause
     }
@@ -496,7 +511,8 @@ class NoteSessionImpl implements NoteSession {
     this.#emit()
     this.#loadPromise = (async () => {
       try {
-        const { content, fileMissing } = await this.#readInitial()
+        const { content, hash } = await this.#readInitial()
+        const fileMissing = hash === null
         if (this.#disposed) {
           return
         }
@@ -508,6 +524,7 @@ class NoteSessionImpl implements NoteSession {
         this.#header = doc.header
         this.#buffer = doc.body
         this.#disk = adopted
+        this.#diskHash = hash
         this.#writeBase = adopted
         this.#dirty = false
         this.#missing = fileMissing
@@ -606,19 +623,19 @@ class NoteSessionImpl implements NoteSession {
    * refreshes promptly. A session still loading waits for the load first:
    * navigating to a note (⌘D to today) opens its session in the same tick the
    * Tasks view's unmount flush writes to it, and the pending read is a moment,
-   * not a reason to refuse. Returns false when the session can't safely take a
+   * not a reason to refuse. Returns `null` when the session can't safely take a
    * body edit (no write channel, disposed, protected/read-only, or failed to
    * load) so the caller refuses rather than clobber the buffer
-   * via disk. `transform` runs before any mutation, so a `TaskStaleError` (the
+   * via disk. `transform` runs before any mutation, so a stale refusal (the
    * marker can't be located) propagates with nothing changed. And the write is
    * all-or-nothing: a failed flush reverts the in-memory edit so the editor and
    * the Tasks list can't diverge, then re-throws the failure.
    */
-  async commitSourceEdit(transform: (full: string) => string): Promise<boolean> {
+  async commitSourceEdit(transform: NoteSourceTransform): Promise<NoteSessionCommit | null> {
     // What the load can't change is refused at once; a stalled read must not
     // hold a session that could never write.
     if (this.#io.write === null || this.#disposed) {
-      return false
+      return null
     }
     if (this.#status === 'loading') {
       // Never rejects: a failed load settles as `status === 'error'`, which the
@@ -627,19 +644,22 @@ class NoteSessionImpl implements NoteSession {
     }
     // Protection is decided by the load, so this gate runs after the wait.
     if (this.#disposed || this.#isProtected || this.#status !== 'ready') {
-      return false
+      return null
     }
     this.#reconcilePendingEditorInput()
     const previousHeader = this.#header
     const previousBuffer = this.#buffer
     const previousInitialContent = this.#initialContent
-    const doc = splitDoc(transform(this.#header + this.#buffer))
+    const source = this.#header + this.#buffer
+    const edited = transform(source, source === this.#disk ? this.#diskHash : null)
+    const doc = splitDoc(edited)
     this.#header = doc.header
     this.#buffer = doc.body
     // The pane seeds a mounting editor from `initialContent`; after a wait on
     // the load no editor is mounted yet, so the seed must carry the edit too.
     this.#initialContent = doc.body
     this.#applyToEditor(doc.body) // an already open editor shows the edited line
+    const applied = this.#buffer
     this.#dirty = this.#header + this.#buffer !== this.#disk
     // A no-op edit (transform changed nothing) writes nothing, so a *prior*
     // surfaced save error must not be mistaken for this edit's failure.
@@ -651,7 +671,7 @@ class NoteSessionImpl implements NoteSession {
     if (shouldPersist && this.#error !== null) {
       const message = this.#error
       if (this.#header === doc.header) this.#header = previousHeader
-      if (this.#buffer === doc.body) {
+      if (this.#buffer === applied) {
         this.#buffer = previousBuffer
         this.#initialContent = previousInitialContent
         this.#applyToEditor(previousBuffer)
@@ -661,14 +681,7 @@ class NoteSessionImpl implements NoteSession {
       this.#emit()
       throw new Error(message)
     }
-    return true
-  }
-
-  commitBodyAppend(block: string): Promise<boolean> {
-    if (block.trim() === '') {
-      return Promise.resolve(false)
-    }
-    return this.commitSourceEdit((full) => appendBlock(full, block))
+    return { content: this.#disk, revision: this.#diskHash, merged: this.#disk !== edited }
   }
 
   dispose(): void {

@@ -16,7 +16,7 @@ import type { ProgressPort } from '../ports/progress-port.ts'
 import { isSilentStop, type ReconcileStop } from '../reconcile/reconcile.ts'
 import { errorMessage, isAppError, toAppError } from '../errors.ts'
 import type { AssetStoreService } from '../graph/asset-store-service.ts'
-import type { NoteFileService } from '../graph/note-file-service.ts'
+import type { NoteFileService, WritableNoteFileService } from '../graph/note-file-service.ts'
 import { ASSETS_DIR, descriptionPathFor, isNotePath } from '../graph/paths.ts'
 import type { FileMeta } from '../graph/schemas.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
@@ -276,7 +276,7 @@ export interface AssetDescriptionService {
 
 export interface AssetDescriptionServiceDeps {
   readonly assetStore: AssetStoreService
-  readonly noteFile: NoteFileService
+  readonly noteFile: WritableNoteFileService
   readonly assetPrivacy: AssetPrivacyService
   readonly assetDescriber: AssetDescriberService
   readonly aiProviderConfig: AiProviderConfigService

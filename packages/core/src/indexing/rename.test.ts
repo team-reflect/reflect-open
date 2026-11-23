@@ -22,15 +22,18 @@ function fakeIo(
   const io = {
     sources: () => options?.sources ?? Object.keys(files).sort(),
     backlinks: () => options?.backlinks ?? [],
-    read: (path) => {
+    write: (path: string, content: string): MaybePromise<void> => {
+      writes[path] = content
+    },
+    edit: async (path, transform) => {
       const content = files[path]
       if (content === undefined) {
-        return Promise.reject(new Error(`unreadable: ${path}`))
+        throw new Error(`unreadable: ${path}`)
       }
-      return Promise.resolve(content)
-    },
-    write: (path, content) => {
-      writes[path] = content
+      const next = transform(content)
+      if (next !== content) {
+        await io.write(path, next)
+      }
     },
     resolve: (target) => {
       const mapped = options?.resolveByTarget?.[target]
@@ -42,6 +45,7 @@ function fakeIo(
       )
     },
   } satisfies RenameIo & {
+    write: (path: string, content: string) => MaybePromise<void>
     backlinks: () => MaybePromise<
       Array<{ sourcePath: string; targetRaw: string; alias: string | null }>
     >
@@ -233,7 +237,7 @@ describe('rewriteLinksForTitleChange stable-target displays', () => {
     let writeCount = 0
     io.write = (path, content) => {
       writeCount += 1
-      write(path, content)
+      return write(path, content)
     }
 
     await rewriteLinksForTitleChange({
@@ -458,8 +462,7 @@ describe('rewriteLinksForTitleChange write failures', () => {
       if (path === 'notes/fail.md') {
         return Promise.reject(new Error('write failed'))
       }
-      write(path, content)
-      return Promise.resolve()
+      return write(path, content)
     }
     const result = await rewriteLinksForTitleChange({
       path: 'notes/target.md',
@@ -703,15 +706,15 @@ describe('rewritePathLinksForMove', () => {
       writes,
       io: {
         pathLinkSources: () => sources,
-        read: (path: string) => {
+        edit: (path: string, transform: (content: string) => string) => {
           const content = files[path]
           if (content === undefined) {
-            return Promise.reject(new Error(`unreadable: ${path}`))
+            throw new Error(`unreadable: ${path}`)
           }
-          return Promise.resolve(content)
-        },
-        write: (path: string, content: string) => {
-          writes[path] = content
+          const next = transform(content)
+          if (next !== content) {
+            writes[path] = next
+          }
         },
       },
     }

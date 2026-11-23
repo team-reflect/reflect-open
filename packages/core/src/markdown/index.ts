@@ -49,31 +49,37 @@ export {
   type Resolution,
 } from './resolve.ts'
 export { renderInlineText } from './inline-text.ts'
-export { compareTaskPaths, decodeTaskPath, encodeTaskPath, isSameTaskPath } from './task-path.ts'
+export { compareTaskPaths, encodeTaskPath, isSameTaskPath } from './task-path.ts'
 export {
   appendListItem,
   linkSectionHeading,
   type ListItemInsert,
   type ListItemKind,
   type SectionTarget,
+} from './list-insert.ts'
+export {
   applyTaskEdits,
-  findTaskMove,
-  getFirstParagraphMarkdown,
-  getRoundTasks,
-  getTaskDueDate,
-  isRoundTask,
-  NoteNotSerializableError,
-  projectTasks,
-  renderTaskSnapshot,
-  TaskStaleError,
   type InsertPosition,
   type TaskEdit,
   type TaskEditInsert,
   type TaskEditItem,
   type TaskEditResult,
-  type TaskLogContext,
   type TaskMove,
+} from './task-edit.ts'
+export {
+  getFirstParagraphMarkdown,
+  getRoundTasks,
+  getTaskDueDate,
+  isRoundTask,
+  projectTasks,
+  renderTaskSnapshot,
   type TaskEntry,
   type TaskRow,
-} from './task-ast.ts'
-export type { ParsedTask, TaskLocator, TaskSnapshot } from './task-model.ts'
+} from './task-project.ts'
+export {
+  hasSameTaskContent,
+  toTaskLocator,
+  type ParsedTask,
+  type TaskLocator,
+  type TaskSnapshot,
+} from './task-model.ts'

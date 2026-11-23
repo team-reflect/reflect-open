@@ -6,20 +6,22 @@ use rusqlite::Connection;
 
 use reflect_types::{
     AppError, AppResult, Backlink, BacklinkPage, BacklinkSourceCursor, ChatConversation,
-    ChatMessageRow, ChunkHash, ChunkHit, DailyNoteRow, EmbeddedChunk, GraphStats, IndexTouch,
-    IndexedNote, MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry, NotePrivacy, NoteRow,
-    PinnedNoteRow, RecentNoteRow, SearchHitRow, SearchRequest, TagFacet, TaskRow, TemplateEntry,
-    VisitedNote, WikiCandidates, WikiClaimMatch, WikiKeyWinner, WikiTitleCandidate,
+    ChatMessageRow, ChunkHash, ChunkHit, DailyNoteRow, EmbeddedChunk, GraphStats, IndexCommit,
+    IndexTouch, IndexedNote, MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry, NotePrivacy,
+    NoteRow, PinnedNoteRow, RecentNoteRow, SearchHitRow, SearchRequest, TagFacet, TaskRead,
+    TemplateEntry, VisitedNote, WikiCandidates, WikiClaimMatch, WikiKeyWinner, WikiTitleCandidate,
     WikiWinningAlias,
 };
 
+use reflect_types::events::IndexCommitted;
+
 use crate::read;
-use crate::session::{Applied, IndexSession};
+use crate::session::IndexSession;
 
 /// Where a committed write is announced.
 pub trait IndexEvents {
-    /// Rows of the index changed.
-    fn index_written(&self);
+    /// Note rows of the index changed.
+    fn index_committed(&self, commit: &IndexCommitted);
 
     /// The rows of the note at `from` moved to `to`.
     fn note_moved(&self, from: &str, to: &str);
@@ -52,38 +54,29 @@ impl<'a> IndexCommands<'a> {
         self.session.read(self.read_generation, body)
     }
 
-    fn announce(&self, applied: Applied) {
-        if applied == Applied::Committed {
-            self.events.index_written();
-        }
-    }
-
     /// Applies one note's projection in one transaction. A stale generation
     /// writes nothing.
-    fn index_apply(&self, note: IndexedNote, generation: u64) -> AppResult<()> {
-        self.announce(
-            self.session
-                .apply(generation, std::slice::from_ref(&note))?,
-        );
-        Ok(())
+    fn index_apply(&self, note: IndexedNote, generation: u64) -> AppResult<IndexCommit> {
+        self.session.apply(generation, std::slice::from_ref(&note))
     }
 
     /// Applies many notes' projections in one transaction.
-    fn index_apply_batch(&self, notes: Vec<IndexedNote>, generation: u64) -> AppResult<()> {
-        self.announce(self.session.apply(generation, &notes)?);
-        Ok(())
+    fn index_apply_batch(
+        &self,
+        notes: Vec<IndexedNote>,
+        generation: u64,
+    ) -> AppResult<IndexCommit> {
+        self.session.apply(generation, &notes)
     }
 
     /// Removes a note and its embedding rows.
-    fn index_remove(&self, path: String, generation: u64) -> AppResult<()> {
-        self.announce(self.session.remove(generation, &path)?);
-        Ok(())
+    fn index_remove(&self, path: String, generation: u64) -> AppResult<IndexCommit> {
+        self.session.remove(generation, &path)
     }
 
     /// Wipes all derived tables. Chat history and note visits stay.
-    fn index_clear(&self, generation: u64) -> AppResult<()> {
-        self.announce(self.session.clear(generation)?);
-        Ok(())
+    fn index_clear(&self, generation: u64) -> AppResult<IndexCommit> {
+        self.session.clear(generation)
     }
 
     /// Moves a note's projection rows only.
@@ -93,21 +86,35 @@ impl<'a> IndexCommands<'a> {
         to: String,
         generation: u64,
         to_address: MovedNoteAddress,
-    ) -> AppResult<()> {
-        if self
+    ) -> AppResult<IndexCommit> {
+        let commit = self
             .session
-            .move_rows(generation, &from, &to, &to_address)?
-            == Applied::Committed
-        {
-            self.events.index_written();
+            .move_rows(generation, &from, &to, &to_address)?;
+        if commit.seq.is_some() {
             self.events.note_moved(&from, &to);
         }
-        Ok(())
+        Ok(commit)
     }
 
     /// Re-stamps stored mtimes for notes whose content already matches disk.
-    fn index_touch(&self, entries: Vec<IndexTouch>, generation: u64) -> AppResult<()> {
-        self.session.touch(generation, &entries).map(drop)
+    fn index_touch(&self, entries: Vec<IndexTouch>, generation: u64) -> AppResult<IndexCommit> {
+        self.session.touch(generation, &entries)
+    }
+
+    /// Announces committed note rows to every window. The index writer of
+    /// the frontend calls this once for the writes of one run, and once with
+    /// no `paths` after a pass over the whole graph. A stale generation
+    /// announces nothing.
+    fn index_announce(
+        &self,
+        seq: u64,
+        paths: Option<Vec<String>>,
+        generation: u64,
+    ) -> AppResult<()> {
+        if self.session.current_generation()? == Some(generation) {
+            self.events.index_committed(&IndexCommitted { seq, paths });
+        }
+        Ok(())
     }
 
     /// Upserts one `index_meta` key.
@@ -257,9 +264,17 @@ impl<'a> IndexCommands<'a> {
         self.read(read::lists::note_tags)
     }
 
-    /// The open or the completed tasks of every note but templates.
-    fn index_tasks(&self, checked: bool) -> AppResult<Vec<TaskRow>> {
-        self.read(|conn| read::tasks::tasks(conn, checked))
+    /// The tasks of every note but templates: all, or only the open or the
+    /// completed ones, or only those of the notes in `paths`.
+    fn index_tasks(
+        &self,
+        checked: Option<bool>,
+        paths: Option<Vec<String>>,
+    ) -> AppResult<TaskRead> {
+        // Taken before the query, so the rows are never older than `seq`.
+        let seq = self.session.commit_seq();
+        let notes = self.read(|conn| read::tasks::tasks(conn, checked, paths.as_deref()))?;
+        Ok(TaskRead { seq, notes })
     }
 
     /// The note that wins the wiki key `key`.

@@ -5,9 +5,9 @@
 use expect_test::{Expect, expect};
 use reflect_index_schema::LATEST_SCHEMA_VERSION;
 use reflect_types::{
-    ChatConversation, ChatMessageRow, EmbeddedChunk, IndexedAlias, IndexedClaim, IndexedEmail,
-    IndexedLink, IndexedNote, IndexedTag, IndexedTask, LinkKind, MovedNoteAddress, NoteKind,
-    TagFacet, VisitedNote,
+    ChatConversation, ChatMessageRow, EmbeddedChunk, IndexCommit, IndexTouch, IndexedAlias,
+    IndexedClaim, IndexedEmail, IndexedLink, IndexedNote, IndexedTag, IndexedTask, LinkKind,
+    MovedNoteAddress, NoteKind, TagFacet, VisitedNote,
 };
 use rusqlite::Connection;
 use sea_query::{QueryStatementWriter, SqliteQueryBuilder};
@@ -1160,9 +1160,8 @@ fn clear_resets_a_corrupt_index_file() {
 
         let session = IndexSession::new();
         let generation = session.open(root, &FileIndexConnections).unwrap();
-        assert_eq!(
-            session.clear(generation).unwrap(),
-            Applied::Committed,
+        assert!(
+            session.clear(generation).unwrap().seq.is_some(),
             "{damaged}"
         );
         session
@@ -2146,7 +2145,7 @@ fn stale_generation_writes_are_dropped_end_to_end() {
         session
             .apply(stale, &[note("notes/a.md", "A", vec![])])
             .unwrap(),
-        Applied::Committed
+        IndexCommit { seq: Some(1) }
     );
     assert_eq!(note_count(&session), Value::from(1));
 
@@ -2160,10 +2159,13 @@ fn stale_generation_writes_are_dropped_end_to_end() {
         session
             .apply(stale, &[note("notes/b.md", "B", vec![])])
             .unwrap(),
-        Applied::Stale
+        IndexCommit { seq: None }
     );
     assert_eq!(note_count(&session), Value::from(1));
-    assert_eq!(session.remove(stale, "notes/a.md").unwrap(), Applied::Stale);
+    assert_eq!(
+        session.remove(stale, "notes/a.md").unwrap(),
+        IndexCommit { seq: None }
+    );
     assert_eq!(note_count(&session), Value::from(1));
     assert_eq!(
         session.record_visit(stale, "notes/a.md", 1).unwrap(),
@@ -2173,7 +2175,7 @@ fn stale_generation_writes_are_dropped_end_to_end() {
         session
             .apply(fresh, &[note("notes/b.md", "B", vec![])])
             .unwrap(),
-        Applied::Committed
+        IndexCommit { seq: Some(2) }
     );
     assert_eq!(note_count(&session), Value::from(2));
 
@@ -2244,6 +2246,129 @@ fn a_single_connection_host_queries_on_the_writer() {
         .apply(generation, &[note("notes/a.md", "A", vec![])])
         .unwrap();
     assert_eq!(note_count(&session), Value::from(1));
+}
+
+#[test]
+fn each_committed_index_write_adds_one_to_the_commit_seq() {
+    let graph_dir = tempfile::tempdir().expect("tempdir");
+    let (session, generation) = file_session(graph_dir.path());
+    assert_eq!(session.commit_seq(), 0);
+
+    let applied = session
+        .apply(
+            generation,
+            &[
+                note("notes/a.md", "A", vec![]),
+                note("notes/b.md", "B", vec![]),
+            ],
+        )
+        .unwrap();
+    assert_eq!(applied, IndexCommit { seq: Some(1) });
+    let touch = IndexTouch {
+        path: "notes/a.md".to_string(),
+        mtime: 5,
+    };
+    let touched = session.touch(generation, &[touch]).unwrap();
+    assert_eq!(touched, IndexCommit { seq: Some(2) });
+    let moved = session
+        .move_rows(
+            generation,
+            "notes/a.md",
+            "notes/c.md",
+            &moved_address("notes/c.md"),
+        )
+        .unwrap();
+    assert_eq!(moved, IndexCommit { seq: Some(3) });
+    let removed = session.remove(generation, "notes/b.md").unwrap();
+    assert_eq!(removed, IndexCommit { seq: Some(4) });
+    let cleared = session.clear(generation).unwrap();
+    assert_eq!(cleared, IndexCommit { seq: Some(5) });
+    assert_eq!(session.commit_seq(), 5);
+    assert_eq!(note_count(&session), Value::from(0));
+}
+
+#[test]
+fn a_write_that_does_not_commit_keeps_the_commit_seq() {
+    let graph_dir = tempfile::tempdir().expect("tempdir");
+    let (session, generation) = file_session(graph_dir.path());
+    session
+        .apply(generation, &[note("notes/a.md", "A", vec![])])
+        .unwrap();
+
+    let mut invalid = daily_note("daily/2026-01-02.md", "2026-01-02");
+    invalid.daily_date = None;
+    session
+        .apply(generation, &[note("notes/b.md", "B", vec![]), invalid])
+        .expect_err("the daily-date check rejects the batch");
+    assert_eq!(
+        session
+            .apply(generation + 1, &[note("notes/b.md", "B", vec![])])
+            .unwrap(),
+        IndexCommit { seq: None }
+    );
+    assert_eq!(session.commit_seq(), 1);
+    assert_eq!(note_count(&session), Value::from(1));
+}
+
+#[test]
+fn the_commit_seq_grows_over_every_open_of_one_session() {
+    let graph_a = tempfile::tempdir().expect("tempdir");
+    let graph_b = tempfile::tempdir().expect("tempdir");
+    let (session, generation) = file_session(graph_a.path());
+    let first = session
+        .apply(generation, &[note("notes/a.md", "A", vec![])])
+        .unwrap();
+    assert_eq!(first, IndexCommit { seq: Some(1) });
+
+    let generation = session.open(graph_b.path(), &FileIndexConnections).unwrap();
+    assert_eq!(session.commit_seq(), 1);
+    let other_graph = session
+        .apply(generation, &[note("notes/b.md", "B", vec![])])
+        .unwrap();
+    assert_eq!(other_graph, IndexCommit { seq: Some(2) });
+
+    let generation = session.open(graph_a.path(), &FileIndexConnections).unwrap();
+    let reopened = session.touch(generation, &[]).unwrap();
+    assert_eq!(reopened, IndexCommit { seq: Some(3) });
+}
+
+#[test]
+fn the_commit_seq_grows_over_a_reset_of_a_corrupt_index_file() {
+    let graph_dir = tempfile::tempdir().expect("tempdir");
+    let other_dir = tempfile::tempdir().expect("tempdir");
+    let root = graph_dir.path();
+    let (session, generation) = file_session(root);
+    session
+        .apply(generation, &[note("notes/a.md", "A", vec![wiki("B")])])
+        .unwrap();
+    // Opening another root closes the file, so the damage reaches the next open.
+    session
+        .open(other_dir.path(), &FileIndexConnections)
+        .unwrap();
+    corrupt_root_page(root, "links_source");
+
+    let generation = session.open(root, &FileIndexConnections).unwrap();
+    let cleared = session.clear(generation).unwrap();
+    assert_eq!(cleared, IndexCommit { seq: Some(2) });
+    let applied = session
+        .apply(generation, &[note("notes/a.md", "A", vec![])])
+        .unwrap();
+    assert_eq!(applied, IndexCommit { seq: Some(3) });
+
+    session
+        .open(other_dir.path(), &FileIndexConnections)
+        .unwrap();
+    corrupt_root_page(root, "notes");
+    let generation = session.open(root, &FileIndexConnections).unwrap();
+    let reader = session.read_generation().unwrap();
+    let err = session
+        .read(reader, |conn| note_row(conn, "notes/a.md"))
+        .unwrap_err();
+    assert!(session.repair(generation, &err));
+    let repaired = session
+        .apply(generation, &[note("notes/a.md", "A", vec![])])
+        .unwrap();
+    assert_eq!(repaired, IndexCommit { seq: Some(4) });
 }
 
 /// The root the shell walks for a reconcile scan comes from the session, not
@@ -2695,14 +2820,77 @@ fn tasks_split_by_checked_and_skip_templates() {
     apply_note(&conn, &with_tasks).unwrap();
     apply_note(&conn, &template).unwrap();
 
-    let open = tasks(&conn, false).unwrap();
+    let open = tasks(&conn, Some(false), None).unwrap();
     assert_eq!(open.len(), 1);
-    assert_eq!(open[0].markdown, "open one");
-    assert_eq!(open[0].note_title, "A");
-    assert!(open[0].is_pinned && !open[0].checked);
-    let done = tasks(&conn, true).unwrap();
+    assert_eq!(
+        (open[0].path.as_str(), open[0].title.as_str()),
+        ("notes/a.md", "A")
+    );
+    assert_eq!(open[0].hash, "h");
+    assert!(open[0].is_pinned);
+    assert_eq!(open[0].tasks.len(), 1);
+    assert_eq!(open[0].tasks[0].markdown, "open one");
+    assert_eq!(open[0].tasks[0].ast_path, [0]);
+    assert!(!open[0].tasks[0].checked);
+    let done = tasks(&conn, Some(true), None).unwrap();
     assert_eq!(done.len(), 1);
-    assert_eq!(done[0].markdown, "done one");
+    assert_eq!(done[0].tasks[0].markdown, "done one");
+}
+
+#[test]
+fn a_tasks_read_groups_the_tasks_of_each_note() {
+    let conn = migrated();
+    for path in ["notes/b.md", "notes/a.md"] {
+        let mut with_tasks = note(path, path, vec![]);
+        with_tasks.tasks = vec![task(0, "first", false), task(1, "second", false)];
+        apply_note(&conn, &with_tasks).unwrap();
+    }
+
+    let counts: Vec<(String, usize)> = tasks(&conn, Some(false), None)
+        .unwrap()
+        .into_iter()
+        .map(|note| (note.path, note.tasks.len()))
+        .collect();
+    assert_eq!(
+        counts,
+        [("notes/a.md".to_string(), 2), ("notes/b.md".to_string(), 2)]
+    );
+}
+
+#[test]
+fn a_tasks_read_of_paths_returns_every_task_of_those_notes() {
+    let conn = migrated();
+    for path in ["notes/a.md", "notes/b.md"] {
+        let mut with_tasks = note(path, path, vec![]);
+        with_tasks.tasks = vec![task(0, "open", false), task(1, "done", true)];
+        apply_note(&conn, &with_tasks).unwrap();
+    }
+    apply_note(&conn, &note("notes/empty.md", "Empty", vec![])).unwrap();
+
+    let paths = ["notes/b.md", "notes/empty.md", "notes/absent.md"].map(String::from);
+    let read = tasks(&conn, None, Some(&paths)).unwrap();
+    assert_eq!(read.len(), 1);
+    assert_eq!(
+        (read[0].path.as_str(), read[0].tasks.len()),
+        ("notes/b.md", 2)
+    );
+    let open = tasks(&conn, Some(false), Some(&paths)).unwrap();
+    assert_eq!(open[0].tasks.len(), 1);
+}
+
+#[test]
+fn a_tasks_read_leaves_out_a_row_with_an_unreadable_address() {
+    let conn = migrated();
+    let mut with_tasks = note("notes/a.md", "A", vec![]);
+    with_tasks.tasks = vec![task(0, "kept", false), task(1, "dropped", false)];
+    with_tasks.tasks[0].breadcrumbs = vec!["Heading".to_string()];
+    with_tasks.tasks[1].ast_path = "[]".to_string();
+    apply_note(&conn, &with_tasks).unwrap();
+
+    let open = &tasks(&conn, Some(false), None).unwrap()[0].tasks;
+    assert_eq!(open.len(), 1);
+    assert_eq!(open[0].markdown, "kept");
+    assert_eq!(open[0].breadcrumbs, ["Heading"]);
 }
 
 #[test]

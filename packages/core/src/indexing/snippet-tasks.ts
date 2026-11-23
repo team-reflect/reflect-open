@@ -1,6 +1,6 @@
 import { parseMarkdownAst, type SyntaxNode } from '@meowdown/markdown'
 import { parseBody } from '../markdown/grammar.ts'
-import { getRoundTasks } from '../markdown/task-ast.ts'
+import { getRoundTasks } from '../markdown/task-project.ts'
 import type { TaskLocator } from '../markdown/task-model.ts'
 import type { BlockContextSource } from './block-context.ts'
 
@@ -40,15 +40,19 @@ export type SourceTaskLocate = (markerOffset: number) => TaskLocator | undefined
 /**
  * Map the whole-file offset of each round task's `[` to the task's AST
  * locator. meowdown positions every item at its line start, so the marker's
- * `[` is the first one after that position.
+ * `[` is the first one after that position. `revision` is the hash of the
+ * note text `source` was prepared from.
  */
-export function createSourceTaskLocator(source: BlockContextSource): SourceTaskLocate {
+export function createSourceTaskLocator(
+  source: BlockContextSource,
+  revision: string,
+): SourceTaskLocate {
   const locators = new Map<number, TaskLocator>()
   for (const { node, astPath, markdown, checked } of getRoundTasks(parseMarkdownAst(source.body))) {
     const from = node.position?.from
     if (from !== undefined) {
       const markerOffset = source.bodyOffset + source.body.indexOf('[', from)
-      locators.set(markerOffset, { astPath, markdown, checked })
+      locators.set(markerOffset, { revision, astPath, markdown, checked })
     }
   }
   return (markerOffset) => locators.get(markerOffset)

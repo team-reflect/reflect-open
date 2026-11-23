@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { makeOpenTask } from '../testing/tasks.ts'
 import type { OpenTask } from './open-task.ts'
 import { previousTaskKey } from './task-navigation.ts'
-import { getTaskKey } from './task-identity.ts'
 
 function task(over: Partial<OpenTask> = {}): OpenTask {
   return makeOpenTask({ text: 'x', ...over })
@@ -15,11 +14,11 @@ describe('previousTaskKey', () => {
   const ordered = [a, b, c]
 
   it('selects the row above a middle row', () => {
-    expect(previousTaskKey(ordered, b)).toBe(getTaskKey(a))
+    expect(previousTaskKey(ordered, b)).toBe(a.taskId)
   })
 
   it('selects the next row when deleting the first (it becomes the new first)', () => {
-    expect(previousTaskKey(ordered, a)).toBe(getTaskKey(b))
+    expect(previousTaskKey(ordered, a)).toBe(b.taskId)
   })
 
   it('returns null for the only row', () => {

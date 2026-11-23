@@ -3,6 +3,7 @@ import type { LoggerService } from '../ports/logger-service.ts'
 import { isAppError } from '../errors.ts'
 import type { GraphSessionService } from '../graph/graph-session-service.ts'
 import type { NoteCreationService } from '../graph/note-creation-service.ts'
+import type { NoteDocumentService } from '../documents/note-document-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { dailyPath, notePath } from '../graph/paths.ts'
 import { serializeWikiSuggestionAddress, type WikiSuggestion } from '../indexing/suggest.ts'
@@ -14,7 +15,7 @@ import { parseNote } from '../markdown/extract.ts'
 import { headingNamesSection, sectionEnd, topLevelHeadings } from '../markdown/heading-blocks.ts'
 import { foldKey } from '../markdown/keys.ts'
 import { slugForTitle } from '../markdown/slug.ts'
-import { appendListItem, type SectionTarget } from '../markdown/task-ast.ts'
+import { appendListItem, type SectionTarget } from '../markdown/list-insert.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
 import type { ContactsService } from './contacts-service.ts'
 import type { ContactMatch } from './commands.ts'
@@ -388,6 +389,7 @@ export interface MeetingService {
 
 export interface MeetingServiceDeps {
   readonly noteFile: NoteFileService
+  readonly noteDocuments: NoteDocumentService
   readonly noteCreation: NoteCreationService
   readonly wikiResolver: WikiResolverService
   readonly suggestions: SuggestionService
@@ -453,7 +455,7 @@ class MeetingServiceImpl implements MeetingService {
   }
 
   async addMeetingToDaily(input: AddMeetingInput): Promise<AddMeetingOutcome> {
-    const { noteFile, noteCreation, personNotes, graphSession } = this.#deps
+    const { noteDocuments, noteCreation, personNotes, graphSession } = this.#deps
     const { generation } = requireGraphSession(graphSession)
     const title = wikiLinkSafe(input.title)
     if (title === '') {
@@ -489,10 +491,16 @@ class MeetingServiceImpl implements MeetingService {
       backlinkMeeting: input.backlinkMeeting,
       startTime: input.startTime,
     })
-    await noteFile.write(
+    await noteDocuments.commitSourceEdit(
       daily,
-      appendListItem(source, { kind: 'bullet', markdown: line, section: MEETINGS_SECTION }),
-      generation,
+      (current) => {
+        return appendListItem(current, {
+          kind: 'bullet',
+          markdown: line,
+          section: MEETINGS_SECTION,
+        })
+      },
+      { generation, createIfMissing: true },
     )
 
     const createdNotes: string[] = []

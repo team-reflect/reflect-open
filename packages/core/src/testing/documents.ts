@@ -1,3 +1,4 @@
+import { sha256HexSync } from '@reflect/utils'
 import type { Unlisten } from '../unlisten.ts'
 import {
   createNoteMoveService,
@@ -9,14 +10,25 @@ import {
   frontmatterPatchToYaml,
   type FrontmatterPatch,
 } from '../documents/note-session-frontmatter.ts'
-import type { NoteSession, NoteSessionEditor } from '../documents/note-session-types.ts'
-import { appendBlock } from '../markdown/append-section.ts'
+import type {
+  NoteSession,
+  NoteSessionCommit,
+  NoteSourceTransform,
+  NoteSessionEditor,
+} from '../documents/note-session-types.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { createTestLoggerService } from './logger.ts'
 import { createTestIndexStoreService } from './index-store.ts'
 import { createTestIpcBridgeService } from './ipc.ts'
 import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
 import { createTestFileChangeService } from './file-change.ts'
+import {
+  createNoteDocumentService,
+  type NoteDocumentService,
+  type NoteDocumentServiceDeps,
+} from '../documents/note-document-service.ts'
+import { createTestNoteFileService } from './graph.ts'
+import { createTestIndexLifecycleService } from './index-lifecycle.ts'
 
 export interface TestNoteSessionOptions {
   /**
@@ -40,8 +52,8 @@ export interface TestNoteSessionOptions {
    */
   unpersisted?: boolean
   /**
-   * False makes `updateFrontmatter`, `commitFrontmatter`, `commitSourceEdit`
-   * and `commitBodyAppend` refuse. Defaults to true.
+   * False makes `updateFrontmatter`, `commitFrontmatter` and
+   * `commitSourceEdit` refuse. Defaults to true.
    */
   accepts?: boolean
 }
@@ -149,25 +161,14 @@ class TestNoteSessionImpl implements TestNoteSession {
     })
   }
 
-  commitBodyAppend(block: string): Promise<boolean> {
-    return Promise.try(() => {
-      this.#record('commitBodyAppend', block)
-      if (!this.#accepts || block.trim() === '') {
-        return false
-      }
-      this.#content = appendBlock(this.#content, block)
-      return true
-    })
-  }
-
-  commitSourceEdit(transform: (source: string) => string): Promise<boolean> {
+  commitSourceEdit(transform: NoteSourceTransform): Promise<NoteSessionCommit | null> {
     return Promise.try(() => {
       this.#record('commitSourceEdit', transform)
       if (!this.#accepts) {
-        return false
+        return null
       }
-      this.#content = transform(this.#content)
-      return true
+      this.#content = transform(this.#content, sha256HexSync(this.#content))
+      return { content: this.#content, revision: sha256HexSync(this.#content), merged: false }
     })
   }
 
@@ -259,4 +260,22 @@ export function createTestNoteMoveService(
       logger: options?.logger ?? createTestLoggerService(),
     }),
   )
+}
+
+/**
+ * The real {@link NoteDocumentService} over test doubles. Without a
+ * `graphSession` no graph is open, so commits write no index rows.
+ */
+export function createTestNoteDocumentService(
+  deps?: Partial<NoteDocumentServiceDeps>,
+): NoteDocumentService {
+  return createNoteDocumentService({
+    openDocuments:
+      deps?.openDocuments ??
+      createOpenDocumentsService({ fileChanges: createTestFileChangeService() }),
+    noteFile: deps?.noteFile ?? createTestNoteFileService(),
+    graphSession: deps?.graphSession ?? { get: () => ({ session: null }) },
+    indexLifecycle: deps?.indexLifecycle ?? createTestIndexLifecycleService(),
+    logger: deps?.logger ?? createTestLoggerService(),
+  })
 }
