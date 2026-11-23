@@ -1,4 +1,4 @@
-import { isIsoDate } from '@reflect/utils'
+import { isIsoDate, type MaybePromise } from '@reflect/utils'
 import { noteBasenameKey } from '../graph/note-reference.ts'
 import { dateFromDailyPath, foldGraphPath } from '../graph/paths.ts'
 import type { IndexedNote } from '../indexing/indexed-note.ts'
@@ -64,9 +64,10 @@ export interface TestIndexStoreServiceOptions {
    */
   generation?: number
   /**
-   * What `reconcileScan` resolves with. Defaults to an empty scan.
+   * What `reconcileScan` resolves with: a fixed scan, or a function called
+   * once per scan. Defaults to an empty scan.
    */
-  scan?: ReconcileScan
+  scan?: ReconcileScan | (() => MaybePromise<ReconcileScan>)
   /**
    * Initial `index_meta` entries.
    */
@@ -102,7 +103,7 @@ const EMPTY_SCAN: ReconcileScan = { total: 0, candidates: [], orphans: [], stale
 class TestIndexStoreServiceImpl implements TestIndexStoreService {
   readonly #database: TestDatabaseService | undefined
   readonly #generation: number
-  readonly #scan: ReconcileScan
+  readonly #scan: ReconcileScan | (() => MaybePromise<ReconcileScan>)
   readonly #fail: ((call: IndexStoreCall) => Error | undefined) | undefined
   readonly #meta: Map<string, string>
   readonly #log: IndexStoreCall[] = []
@@ -168,7 +169,7 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
   reconcileScan(scanGeneration: number): Promise<ReconcileScan> {
     return Promise.try(() => {
       this.#record({ method: 'reconcileScan', generation: scanGeneration })
-      return this.#scan
+      return typeof this.#scan === 'function' ? this.#scan() : this.#scan
     })
   }
 
