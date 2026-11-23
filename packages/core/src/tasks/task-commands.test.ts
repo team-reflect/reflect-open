@@ -123,8 +123,8 @@ describe('a task that changed under a command', () => {
   }
 
   it('reads the note again and writes once more', async () => {
-    const rows = await start({ [A]: '+ [ ] one\n' })
-    await changeBehindRows('+ [ ] one changed\n')
+    const rows = await start({ [A]: '+ [ ] one\n+ [ ] two\n' })
+    await changeBehindRows('+ [ ] one changed\n+ [ ] two\n')
 
     const toggling = commands.toggle(rows)
     await sleep(0)
@@ -132,7 +132,10 @@ describe('a task that changed under a command', () => {
     await harness.landRead()
     await toggling
 
-    expect(file(A)).toBe('+ [x] one changed\n')
+    expect(file(A)).toBe('+ [x] one changed\n+ [x] two\n')
+    expect(harness.tasks.get().struck.map((row) => row.taskId)).toEqual(
+      rows.map((row) => row.taskId),
+    )
     expect(harness.progress.get()).toEqual([])
   })
 
@@ -143,6 +146,18 @@ describe('a task that changed under a command', () => {
     await commands.complete(rows)
 
     expect(file(A)).toBe('intro\n\n+ [x] same\n+ [x] same\n')
+  })
+
+  it('keeps the ids of tasks that moved while the index is behind the file', async () => {
+    const rows = await start({ [A]: '+ [ ] one\n+ [ ] two\n' })
+    harness.editExternally(A, 'intro\n\n+ [ ] one\n+ [ ] two\n')
+
+    await commands.complete(rows)
+
+    expect(file(A)).toBe('intro\n\n+ [x] one\n+ [x] two\n')
+    expect(harness.tasks.get().struck.map((row) => row.taskId)).toEqual(
+      rows.map((row) => row.taskId),
+    )
   })
 
   it('keeps the typed text in the row while the index is behind the file', async () => {

@@ -36,6 +36,12 @@ describe('reconcileNoteTasks without moves', () => {
     ).toEqual(['t2', 't1'])
   })
 
+  it('follows a task with unique text that moved and was checked', () => {
+    expect(
+      reconcileSources('+ [ ] a\n+ [ ] b\n', ['t1', 't2'], 'Intro\n\n+ [x] a\n+ [x] b\n'),
+    ).toEqual(['t1', 't2'])
+  })
+
   it('keeps the id of a task that changed in place', () => {
     expect(reconcileSources('+ [ ] a\n+ [ ] b\n', ['t1', 't2'], '+ [ ] a\n+ [x] c\n')).toEqual([
       't1',

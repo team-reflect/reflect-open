@@ -196,6 +196,18 @@ describe('TaskStore struck tasks', () => {
     store.archive()
     expect(store.view().struck).toEqual([])
   })
+
+  it('keeps a struck task through a read of the unchecked tasks of the same text', () => {
+    const store = createStore()
+    const files = { [A]: '+ [ ] a\n+ [x] done\n' }
+    store.landAll(fullRead(1, files), false)
+    store.strike(['t1'])
+
+    const read = openRead(2, files)
+    read.notes[0]!.updatedAt = 9
+    expect(store.landAll(read, false)).toEqual([A])
+    expect(labels(store.view().struck)).toEqual(['t1:done'])
+  })
 })
 
 describe('TaskStore writes', () => {

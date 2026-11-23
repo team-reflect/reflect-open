@@ -15,14 +15,19 @@ export interface IdentifiedTask extends TaskShape {
   taskId: string
 }
 
+function hasSameMarkdown(left: TaskShape, right: TaskShape): boolean {
+  return left.markdown === right.markdown
+}
+
 /**
  * The task id of each task of `next`, in order. With `moves`, the moves of the
  * edit that turned the text of `previous` into the text of `next`, a task
  * keeps the id of the task it was before the edit. Without them, a task keeps
  * the id of the previous task with its path and content, else of the previous
  * task with its content when that content names one task on each side, else
- * of the previous task at its path that no other task took: a task that
- * changed in place. Every other task takes an id from `createTaskId`.
+ * of the previous task with its Markdown when that Markdown names one task
+ * on each side, else of the previous task at its path that no other task
+ * took: a task that changed in place. Every other task takes an id from `createTaskId`.
  */
 export function reconcileNoteTasks(
   previous: readonly IdentifiedTask[],
@@ -52,24 +57,25 @@ export function reconcileNoteTasks(
     }
     return match?.taskId
   })
-  const byContent = next.map((task, i) => {
-    if (inPlace[i] !== undefined) {
-      return inPlace[i]
+  const ids = [...inPlace]
+  for (const isSame of [hasSameTaskContent, hasSameMarkdown]) {
+    const open = next.filter((_, i) => ids[i] === undefined)
+    for (const [i, task] of next.entries()) {
+      if (ids[i] !== undefined) {
+        continue
+      }
+      const candidates = [...unclaimed].filter((candidate) => isSame(candidate, task))
+      const rivals = open.filter((other) => isSame(other, task))
+      if (candidates.length === 1 && rivals.length === 1) {
+        unclaimed.delete(candidates[0]!)
+        ids[i] = candidates[0]!.taskId
+      }
     }
-    const candidates = [...unclaimed].filter((candidate) => hasSameTaskContent(candidate, task))
-    const rivals = next.filter(
-      (other, j) => inPlace[j] === undefined && hasSameTaskContent(other, task),
-    )
-    if (candidates.length !== 1 || rivals.length !== 1) {
-      return
-    }
-    unclaimed.delete(candidates[0]!)
-    return candidates[0]!.taskId
-  })
+  }
   return next.map((task, i) => {
     const atPath = [...unclaimed].find((candidate) => {
       return isSameTaskPath(candidate.astPath, task.astPath)
     })
-    return byContent[i] ?? atPath?.taskId ?? createTaskId()
+    return ids[i] ?? atPath?.taskId ?? createTaskId()
   })
 }
