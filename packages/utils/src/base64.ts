@@ -11,7 +11,7 @@ export function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary)
 }
 
-/** Decode a standard Base64 string into bytes. */
+/** Decode a standard Base64 string into its bytes. */
 export function base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
   const binary = atob(base64)
   const bytes = new Uint8Array(binary.length)
