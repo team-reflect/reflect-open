@@ -1,4 +1,4 @@
-import { NoteBusyError } from '../tasks/task-errors.ts'
+import { NoteBusyError, NoteConflictError } from '../tasks/task-errors.ts'
 import { requireGraphSession, type GraphSessionSource } from '../graph/graph-session.ts'
 import { isAppError } from '../errors.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
@@ -55,7 +55,11 @@ export interface NoteDocumentService {
    * disk) only when it can't persist now (failed to load, protected/read-only,
    * or disposed); a session still loading waits for its load instead.
    * A decline is surfaced as {@link NoteBusyError}. When the note is **not**
-   * open, disk is the source of truth: read, transform, write.
+   * open, disk is the source of truth: read, transform, and write only while
+   * the file still holds the text that was read. A file that changed in
+   * between runs `transform` again on its new text, and
+   * {@link NoteConflictError} is thrown after {@link COMMIT_ATTEMPT_LIMIT}
+   * attempts. A `transform` that returns its input writes nothing.
    *
    * Edits to one path are serialized: the next only reads after the previous
    * has written, whether that one resolved or rejected. An error thrown by
@@ -71,6 +75,11 @@ export interface NoteDocumentService {
    */
   isOstensiblyEmpty(source: string): boolean
 }
+
+/**
+ * How many times a disk commit runs its transform against a file that keeps changing.
+ */
+export const COMMIT_ATTEMPT_LIMIT = 3
 
 /**
  * What {@link NoteDocumentService.commitSourceEdit} left on disk.
@@ -198,14 +207,23 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
         const revision = await sha256Hex(commit.content)
         return { ...commit, revision, indexSeq: null }
       }
-      const source = await this.#readForEdit(
+      let source = await this.#readForEdit(
         path,
         options.createIfMissing === true,
         options.generation,
       )
-      const content = transform(source)
-      const { hash } = await noteFile.write(path, content, options.generation)
-      return { content, revision: hash, merged: false, indexSeq: null }
+      for (let attempt = 0; attempt < COMMIT_ATTEMPT_LIMIT; attempt += 1) {
+        const content = transform(source ?? '')
+        if (content === source) {
+          return { content, revision: await sha256Hex(content), merged: false, indexSeq: null }
+        }
+        const written = await noteFile.write(path, content, options.generation, source, 'reject')
+        if (written.merged === null) {
+          return { content, revision: written.hash, merged: false, indexSeq: null }
+        }
+        source = written.merged
+      }
+      throw new NoteConflictError(`${path} kept changing on disk; the edit was not saved.`)
     })
   }
 
@@ -248,12 +266,19 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
     return result
   }
 
-  async #readForEdit(path: string, createIfMissing: boolean, generation: number): Promise<string> {
+  /**
+   * The note's text, or `null` for a missing note that the edit may create.
+   */
+  async #readForEdit(
+    path: string,
+    createIfMissing: boolean,
+    generation: number,
+  ): Promise<string | null> {
     try {
       return await this.#deps.noteFile.read(path, generation)
     } catch (cause) {
       if (createIfMissing && isAppError(cause) && cause.kind === 'notFound') {
-        return ''
+        return null
       }
       throw cause
     }

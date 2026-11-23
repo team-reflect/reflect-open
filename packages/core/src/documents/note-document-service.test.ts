@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { createTestNoteSession, type TestNoteSessionOptions } from '../testing/documents.ts'
 import { createTestFileChangeService } from '../testing/file-change.ts'
-import { createTestNoteFileService, type TestNoteFileServiceOptions } from '../testing/graph.ts'
-import { NoteBusyError } from '../tasks/task-errors.ts'
+import {
+  createTestNoteFileService,
+  overrideNoteFileService,
+  type TestNoteFileServiceOptions,
+} from '../testing/graph.ts'
+import { NoteBusyError, NoteConflictError } from '../tasks/task-errors.ts'
 import { createNoteDocumentService } from './note-document-service.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { sha256HexSync } from '../testing/sha256.ts'
@@ -17,6 +21,17 @@ function setup(options?: {
     files: options?.files,
     generation: options?.generation,
   })
+  // Each queued text lands in `notes/a.md` right before one write, like an external writer.
+  const externalWrites: string[] = []
+  const racedNoteFile = overrideNoteFileService(noteFile, {
+    write: (path, ...rest) => {
+      const external = externalWrites.shift()
+      if (external !== undefined) {
+        noteFile.set(path, external)
+      }
+      return noteFile.write(path, ...rest)
+    },
+  })
   const session =
     options?.session === undefined
       ? null
@@ -27,10 +42,10 @@ function setup(options?: {
   }
   const noteDocuments = createNoteDocumentService({
     openDocuments,
-    noteFile,
+    noteFile: racedNoteFile,
     graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
   })
-  return { noteDocuments, noteFile, session }
+  return { noteDocuments, noteFile, session, externalWrites }
 }
 
 describe('readSource', () => {
@@ -160,10 +175,32 @@ describe('commitSourceEdit', () => {
     expect(noteFile.writes()).toEqual([{ path: 'notes/a.md', contents: 'DISK\n', generation: 7 }])
   })
 
-  it('writes even when the transform changes nothing', async () => {
+  it('reruns the transform on a concurrent external write instead of overwriting it', async () => {
+    const { noteDocuments, noteFile, externalWrites } = setup({ files: { 'notes/a.md': 'disk\n' } })
+    externalWrites.push('disk\ntheirs\n')
+    await expect(
+      noteDocuments.commitSourceEdit('notes/a.md', shout, { generation: 7 }),
+    ).resolves.toMatchObject({ content: 'DISK\nTHEIRS\n', merged: false })
+    expect(noteFile.files().get('notes/a.md')).toBe('DISK\nTHEIRS\n')
+    expect(noteFile.getWrites('notes/a.md')).toEqual(['DISK\nTHEIRS\n'])
+  })
+
+  it('gives up with NoteConflictError when the file changes during every attempt', async () => {
+    const { noteDocuments, noteFile, externalWrites } = setup({ files: { 'notes/a.md': 'disk\n' } })
+    externalWrites.push('one\n', 'two\n', 'three\n')
+    await expect(
+      noteDocuments.commitSourceEdit('notes/a.md', shout, { generation: 7 }),
+    ).rejects.toBeInstanceOf(NoteConflictError)
+    expect(noteFile.files().get('notes/a.md')).toBe('three\n')
+    expect(noteFile.writes()).toEqual([])
+  })
+
+  it('writes nothing when the transform changes nothing', async () => {
     const { noteDocuments, noteFile } = setup({ files: { 'notes/a.md': 'disk\n' } })
-    await noteDocuments.commitSourceEdit('notes/a.md', (source) => source, { generation: 7 })
-    expect(noteFile.getWrites('notes/a.md')).toEqual(['disk\n'])
+    await expect(
+      noteDocuments.commitSourceEdit('notes/a.md', (source) => source, { generation: 7 }),
+    ).resolves.toMatchObject({ content: 'disk\n', revision: sha256HexSync('disk\n') })
+    expect(noteFile.writes()).toEqual([])
   })
 
   it('rejects a missing note unless createIfMissing is set', async () => {

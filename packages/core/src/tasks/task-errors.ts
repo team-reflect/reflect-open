@@ -27,3 +27,14 @@ export class NoteBusyError extends Error {
     this.name = 'NoteBusyError'
   }
 }
+
+/**
+ * A note changed on disk during every attempt to commit an edit to it.
+ * Nothing was written.
+ */
+export class NoteConflictError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'NoteConflictError'
+  }
+}
