@@ -67,7 +67,7 @@ describe('applyTaskOp', () => {
     [
       'setMarkdown',
       nested,
-      { kind: 'setMarkdown', taskId: 't0', markdown: ' due [[2026-06-20]] ' },
+      { kind: 'setMarkdown', taskId: 't0', markdown: ' due [[2026-06-20]] ', typed: true },
     ],
     ['remove with nested tasks', nested, { kind: 'remove', taskId: 't0' }],
     ['toBullet with nested tasks', nested, { kind: 'toBullet', taskId: 't0' }],
@@ -89,7 +89,12 @@ describe('applyTaskOp', () => {
 
   it('keeps the id and the address of a changed row', () => {
     const rows = rowsOf(nested)
-    const [edited] = applyTaskOp(rows, { kind: 'setMarkdown', taskId: 't0', markdown: 'a!' })
+    const [edited] = applyTaskOp(rows, {
+      kind: 'setMarkdown',
+      taskId: 't0',
+      markdown: 'a!',
+      typed: true,
+    })
 
     expect(edited).toEqual({ ...rows[0], markdown: 'a!', text: 'a!' })
   })

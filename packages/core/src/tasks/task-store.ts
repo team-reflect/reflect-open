@@ -298,10 +298,10 @@ export class TaskStore {
   }
 
   /**
-   * End a write that left nothing in its note: its ops leave the rows. Text
-   * that was not written stays in its row until {@link TaskStore.takeText}:
-   * a new task of the write shows again, unchecked, and the text of a task
-   * of the note shows as held text.
+   * End a write that left nothing in its note: its ops leave the rows. Typed
+   * text that was not written stays in its row until {@link TaskStore.takeText}:
+   * a new task of the write shows again, unchecked, and the typed text of a
+   * task of the note shows as held text.
    */
   fail(write: PendingWrite): void {
     this.batch(() => {
@@ -311,6 +311,7 @@ export class TaskStore {
           this.#showNewTask({ ...op, checked: false, bullet: false })
         } else if (
           op.kind === 'setMarkdown' &&
+          op.typed &&
           this.find(write.notePath, op.taskId) !== undefined
         ) {
           this.#takeUnwritten(op.taskId)

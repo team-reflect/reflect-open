@@ -67,7 +67,7 @@ function describeFailure(cause: unknown): string | null {
  *
  * A write that finds its task gone reads the note from the index again and
  * runs once more. A change to a new task whose write failed is written with
- * the new task. A write that still fails keeps the text of its tasks in
+ * the new task. A write that still fails keeps the typed text of its tasks in
  * their rows for the next command that names them, drops its other changes,
  * and shows a line only when the user can act on it. A command settles
  * when its writes ended, and never rejects.
@@ -154,7 +154,12 @@ export class TaskCommands {
    */
   schedule(tasks: readonly OpenTask[], isoDate: string | null): Promise<void> {
     return this.#apply(tasks, ({ taskId }, markdown) => [
-      { kind: 'setMarkdown', taskId, markdown: withDraftDueDate(markdown, isoDate) },
+      {
+        kind: 'setMarkdown',
+        taskId,
+        markdown: withDraftDueDate(markdown, isoDate),
+        typed: false,
+      },
     ])
   }
 
@@ -309,7 +314,10 @@ export class TaskCommands {
       return [{ kind: 'remove', taskId }]
     }
     return edit.type === 'commit'
-      ? [{ kind: 'setMarkdown', taskId, markdown: edit.content }, ...opsFor(task, edit.content)]
+      ? [
+          { kind: 'setMarkdown', taskId, markdown: edit.content, typed: true },
+          ...opsFor(task, edit.content),
+        ]
       : [...opsFor(task, text.base)]
   }
 
@@ -404,17 +412,24 @@ export class TaskCommands {
           },
         ]
       }
-      const { taskId, ...action } = op
-      const row = store.find(notePath, taskId)
+      const row = store.find(notePath, op.taskId)
       if (row === undefined) {
         return []
       }
       const task = toTaskLocator(row)
-      if (action.kind !== 'toggle') {
-        return [{ ...action, task }]
+      switch (op.kind) {
+        case 'setMarkdown': {
+          return [{ kind: 'setMarkdown', task, markdown: op.markdown }]
+        }
+        case 'toggle': {
+          // A task that already has the state is left as it is.
+          return row.checked === op.checked ? [] : [{ kind: 'toggle', task }]
+        }
+        case 'remove':
+        case 'toBullet': {
+          return [{ kind: op.kind, task }]
+        }
       }
-      // A task that already has the state is left as it is.
-      return row.checked === action.checked ? [] : [{ kind: 'toggle', task }]
     })
     return edits.length === 0 ? null : await this.write(session.generation, notePath, edits)
   }

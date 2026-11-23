@@ -283,6 +283,21 @@ describe('typed text', () => {
     expect(shown()).toEqual([[rows[0]!.taskId, 'one more']])
   })
 
+  it('keeps only the typed text of a failed schedule', async () => {
+    const rows = await start({ [A]: '+ [ ] one\n+ [ ] two\n' })
+    vi.spyOn(commands, 'write').mockRejectedValueOnce(new Error('disk full'))
+
+    commands.setDraft(rows[1]!, 'two more')
+    await commands.schedule(rows, '2026-06-20')
+    expect(shown()).toEqual([
+      [rows[0]!.taskId, 'one'],
+      [rows[1]!.taskId, 'two more'],
+    ])
+
+    await commands.commitDrafts()
+    expect(file(A)).toBe('+ [ ] one\n+ [ ] two more\n')
+  })
+
   it('saves every typed text when the app is about to stop', async () => {
     const rows = await start({ [A]: '+ [ ] one\n' })
     const filled = commands.add(TODAY)

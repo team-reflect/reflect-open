@@ -240,7 +240,7 @@ describe('TaskStore writes', () => {
 
   it('keeps the text of a failed write in its row until it is taken', () => {
     const { store, a } = loaded()
-    store.fail(store.begin(A, [{ kind: 'setMarkdown', taskId: 't0', markdown: 'a!' }]))
+    store.fail(store.begin(A, [{ kind: 'setMarkdown', taskId: 't0', markdown: 'a!', typed: true }]))
     expect(labels(store.view().open)).toEqual(['t0:a!', 't1:b'])
 
     expect(store.takeText(a)).toEqual({ base: 'a', markdown: 'a!' })
@@ -249,7 +249,7 @@ describe('TaskStore writes', () => {
 
   it('applies the ops over the rows a read lands during the write', () => {
     const { store } = loaded()
-    store.begin(A, [{ kind: 'setMarkdown', taskId: 't1', markdown: 'b!' }])
+    store.begin(A, [{ kind: 'setMarkdown', taskId: 't1', markdown: 'b!', typed: true }])
 
     store.landPaths(fullRead(2, { [A]: '+ [ ] above\n+ [ ] a\n+ [ ] b\n' }), [A])
     expect(labels(store.view().open)).toEqual(['t2:above', 't0:a', 't1:b!'])
