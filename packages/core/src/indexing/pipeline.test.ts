@@ -15,6 +15,7 @@ import {
 import { createTestLoggerService } from '../testing/logger.ts'
 import type { FileChange } from './file-change-service.ts'
 import { createIndexQueryService } from './index-query-service.ts'
+import type { IndexStoreService } from './index-store-service.ts'
 import { buildIndexedNote, PROJECTION_VERSION } from './indexed-note.ts'
 import { createDirtySet } from './dirty-set.ts'
 import { createIndexWriter, type ChangesAppliedEmitter, type IndexWriter } from './index-writer.ts'
@@ -44,6 +45,35 @@ afterEach(() => {
   }
 })
 
+const PROJECTION_WRITES: ReadonlySet<string | symbol> = new Set([
+  'apply',
+  'applyBatch',
+  'remove',
+  'move',
+  'touch',
+  'clear',
+])
+
+/**
+ * `store` without its projection writes: each one throws.
+ */
+function withoutProjectionWrites(store: IndexStoreService): IndexStoreService {
+  return new Proxy(store, {
+    get(target, key) {
+      if (PROJECTION_WRITES.has(key)) {
+        return () => {
+          throw new Error(`an index pass called \`${String(key)}\` on the index store`)
+        }
+      }
+      const value: unknown = Reflect.get(target, key, target)
+      if (typeof value !== 'function') {
+        return value
+      }
+      return (...args: unknown[]): unknown => Reflect.apply(value, target, args)
+    },
+  })
+}
+
 /**
  * A row as an earlier pass stored it, with the facts the next pass compares.
  */
@@ -55,7 +85,8 @@ interface StoredNote {
 }
 
 /**
- * The indexer over test doubles. `files` defaults to one
+ * The indexer over test doubles. Only the writers of `writerAt` can write
+ * the projection: the indexer's own store throws on a projection write. `files` defaults to one
  * note (`notes/a.md`, modified at 5); `read` runs before each note read and
  * may reject it.
  */
@@ -156,7 +187,7 @@ function setup(options?: {
     return writer
   }
   return {
-    indexer: createNoteIndexer(deps),
+    indexer: createNoteIndexer({ ...deps, indexStore: withoutProjectionWrites(store) }),
     writerAt,
     subscribeIndexApplied,
     moves,

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '../errors.ts'
 import { createGraphSession, type GraphRole, type GraphSession } from '../graph/graph-session.ts'
+import { parseNote } from '../markdown/index.ts'
 import type { AppPlatform } from '../ports/platform-facts.ts'
 import { createTestXArchiveService } from '../testing/capture.ts'
 import { createTestClockService } from '../testing/clock.ts'
@@ -16,6 +17,7 @@ import {
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createTestPlatformService } from '../testing/platform.ts'
 import { createTestProgressPort } from '../testing/ports.ts'
+import { sha256HexSync } from '../testing/sha256.ts'
 import { createTestActivityPort } from '../testing/shell.ts'
 import {
   createIndexLifecycleService,
@@ -25,7 +27,8 @@ import {
   type IndexReconciledEvent,
 } from './index-lifecycle-service.ts'
 import { createIndexQueryService } from './index-query-service.ts'
-import { PROJECTION_VERSION } from './indexed-note.ts'
+import type { IndexStoreService, ReconcileScan } from './index-store-service.ts'
+import { buildIndexedNote, PROJECTION_VERSION } from './indexed-note.ts'
 import { PROJECTION_VERSION_KEY } from './indexer.ts'
 import { sleep, noop } from '@ocavue/utils'
 
@@ -1149,5 +1152,140 @@ describe('followActivity', () => {
     context.index.sync(sessionAt(7))
     await settle(context.index)
     expect(context.passes()).toBe(1)
+  })
+})
+
+describe('index projection writes', () => {
+  const PROJECTION_WRITES: ReadonlySet<string> = new Set([
+    'apply',
+    'applyBatch',
+    'remove',
+    'move',
+    'touch',
+    'clear',
+  ])
+
+  /**
+   * `store`, with each projection write recorded as its method and whether
+   * `index-writer.ts` is on the stack of the call.
+   */
+  function traceProjectionWrites(store: IndexStoreService) {
+    const writes: Array<{ method: string; fromWriter: boolean }> = []
+    const traced = new Proxy(store, {
+      get(target, key) {
+        const value: unknown = Reflect.get(target, key, target)
+        if (typeof value !== 'function') {
+          return value
+        }
+        return (...args: unknown[]): unknown => {
+          if (typeof key === 'string' && PROJECTION_WRITES.has(key)) {
+            const stack = new Error('trace').stack ?? ''
+            writes.push({ method: key, fromWriter: /[/\\]index-writer\.ts/.test(stack) })
+          }
+          return Reflect.apply(value, target, args)
+        }
+      },
+    })
+    return { traced, writes }
+  }
+
+  it('come only from the index writer, for every source of index changes', async () => {
+    const OLD = 'notes/01arz3ndektsv4rrffq69g5fav.md'
+    const NEW = 'notes/meeting-notes.md'
+    const MOVED = '---\nid: 01abcdefghjkmnpqrstvwxyz00\n---\n# Meeting Notes\n'
+    const SAME = '# Same\n'
+    const REFERENCING = '# Pic\n\n![pic](assets/pic.png)\n'
+    const database = createTestDatabaseService()
+    databases.push(database)
+    const stored = [
+      { path: 'notes/changed.md', source: '# Before\n', fileHash: 'old' },
+      { path: 'notes/same.md', source: SAME, fileHash: sha256HexSync(SAME) },
+      { path: 'notes/gone.md', source: '# Gone\n', fileHash: 'gone' },
+      { path: 'notes/pic.md', source: REFERENCING, fileHash: sha256HexSync(REFERENCING) },
+      { path: OLD, source: MOVED, fileHash: sha256HexSync(MOVED) },
+    ]
+    for (const { path, source, fileHash } of stored) {
+      database.applyProjection(
+        buildIndexedNote(parseNote({ path, source }), { fileHash, mtime: 1_000, source }),
+      )
+    }
+    const scans: ReconcileScan[] = [
+      {
+        total: 3,
+        candidates: [
+          { path: 'notes/changed.md', modifiedMs: 2_000, storedMtime: 1_000, storedHash: 'old' },
+          {
+            path: 'notes/same.md',
+            modifiedMs: 2_000,
+            storedMtime: 1_000,
+            storedHash: sha256HexSync(SAME),
+          },
+        ],
+        orphans: [{ path: 'notes/gone.md', storedMtime: 1_000, storedHash: 'gone' }],
+        stalePlaceholders: [],
+      },
+    ]
+    const { traced, writes } = traceProjectionWrites(
+      createTestIndexStoreService({
+        database,
+        meta: { [PROJECTION_VERSION_KEY]: String(PROJECTION_VERSION) },
+        scan: () => {
+          return scans.shift() ?? { total: 0, candidates: [], orphans: [], stalePlaceholders: [] }
+        },
+      }),
+    )
+    const fileChanges = createTestFileChangeService()
+    const session = sessionAt(7)
+    const index = createTestIndexLifecycleService({
+      indexStore: traced,
+      noteFile: createTestNoteFileService({
+        files: {
+          'notes/changed.md': '# After\n',
+          'notes/same.md': SAME,
+          'notes/pic.md': REFERENCING,
+          'notes/pulled.md': '# Pulled\n',
+          'notes/own.md': '# Own\n',
+          [NEW]: MOVED,
+        },
+        generation: FILE_GENERATION,
+      }),
+      fileChanges,
+      database,
+      graphSession: { get: () => ({ session }), subscribe: () => noop },
+    })
+    const methods = (): string[] => [...new Set(writes.map((write) => write.method))].toSorted()
+
+    index.sync(session)
+    await index.settled()
+    expect(methods()).toEqual(['applyBatch', 'remove', 'touch'])
+
+    fileChanges.emit({
+      changes: [
+        { path: OLD, kind: 'remove' },
+        { path: NEW, kind: 'upsert' },
+      ],
+      source: 'external',
+    })
+    await index.drained()
+    expect(methods()).toEqual(['applyBatch', 'move', 'remove', 'touch'])
+
+    const applies = (): number => writes.filter((write) => write.method === 'applyBatch').length
+    const appliesBefore = applies()
+    index.markDirty([{ path: 'notes/pulled.md', kind: 'upsert' }], 7, FILE_GENERATION)
+    await index.drained()
+    await index.indexNote('notes/own.md', { generation: 7, fileGeneration: FILE_GENERATION })
+    await index.reindexNotesReferencing(['assets/pic.png'], {
+      generation: 7,
+      fileGeneration: FILE_GENERATION,
+    })
+    expect(applies() - appliesBefore).toBe(3)
+
+    await index.rebuildVisibly()
+    expect(methods()).toEqual(['applyBatch', 'clear', 'move', 'remove', 'touch'])
+
+    expect(writes.filter((write) => !write.fromWriter)).toEqual([])
+
+    await traced.remove('notes/own.md', 7)
+    expect(writes.at(-1)).toEqual({ method: 'remove', fromWriter: false })
   })
 })
