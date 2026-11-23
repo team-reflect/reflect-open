@@ -60,7 +60,7 @@ describe('applyTaskEdits: toggle', () => {
 
   it('keeps the marker gap and relocates a task whose path drifted', () => {
     const source = '+   [ ] a\n+   [ ] b\n'
-    const stale = { ...locate(source, 1), astPath: [5] }
+    const stale = { ...locate(source, 1), revision: 'older', astPath: [5] }
     expect(applyTaskEdits(ctx, source, [{ kind: 'toggle', task: stale }]).source).toBe(
       '+   [ ] a\n+   [x] b\n',
     )
@@ -68,7 +68,7 @@ describe('applyTaskEdits: toggle', () => {
 
   it('takes the first of several identical tasks when the path is stale, and says so', () => {
     const source = '+ [ ] same\n+ [ ] same\n'
-    const stale = { ...locate(source, 1), astPath: [7] }
+    const stale = { ...locate(source, 1), revision: 'older', astPath: [7] }
     expect(applyTaskEdits(ctx, source, [{ kind: 'toggle', task: stale }]).source).toBe(
       '+ [x] same\n+ [ ] same\n',
     )
@@ -77,9 +77,17 @@ describe('applyTaskEdits: toggle', () => {
     ])
   })
 
+  it('edits the task at the path of a locator read at the revision of the note', () => {
+    const source = '+ [ ] a\n+ [ ] b\n'
+    const unsaved = { ...locate(source, 1), markdown: 'b, edited in a row' }
+    expect(applyTaskEdits(ctx, source, [{ kind: 'toggle', task: unsaved }]).source).toBe(
+      '+ [ ] a\n+ [x] b\n',
+    )
+  })
+
   it('refuses a task that is gone', () => {
     const source = '+ [ ] dup\n+ [ ] dup\n'
-    const gone = { ...locate(source), markdown: 'zzz' }
+    const gone = { ...locate(source), revision: 'older', markdown: 'zzz' }
     expect(() => applyTaskEdits(ctx, source, [{ kind: 'toggle', task: gone }])).toThrow(
       expect.objectContaining({ kind: 'stale' }),
     )
@@ -417,10 +425,10 @@ describe('applyTaskEdits: batches', () => {
 
 describe('findTaskMove', () => {
   const source = 'Intro\n\n+ [ ] a\n+ [ ] b\n'
-  const { moved } = applyTaskEdits(ctx, source, [{ kind: 'toggle', task: locate(source, 0) }])
+  const edit = applyTaskEdits(ctx, source, [{ kind: 'toggle', task: locate(source, 0) }])
 
-  it('follows a locator by its path while the content still matches', () => {
-    expect(findTaskMove(ctx, moved, locate(source, 0))?.to).toMatchObject({
+  it('follows a locator read at the base revision by its path', () => {
+    expect(findTaskMove(ctx, edit, locate(source, 0))?.to).toMatchObject({
       astPath: [1],
       checked: true,
     })
@@ -429,7 +437,7 @@ describe('findTaskMove', () => {
   it('follows a stale locator by its content, not by whatever sits at its path', () => {
     // Indexed before the intro paragraph was added: `b` was at [1], where `a` is now.
     expect(
-      findTaskMove(ctx, moved, { revision: '', astPath: [1], markdown: 'b', checked: false })?.to,
+      findTaskMove(ctx, edit, { revision: '', astPath: [1], markdown: 'b', checked: false })?.to,
     ).toMatchObject({
       astPath: [2],
       markdown: 'b',
@@ -438,17 +446,17 @@ describe('findTaskMove', () => {
 
   it('returns undefined for a locator that names no task', () => {
     expect(
-      findTaskMove(ctx, moved, { revision: '', astPath: [1], markdown: 'c', checked: false }),
+      findTaskMove(ctx, edit, { revision: '', astPath: [1], markdown: 'c', checked: false }),
     ).toBeUndefined()
   })
 
   it('prefers the path match over identical content, else takes the first and warns', () => {
     const twins = '+ [ ] same\n+ [ ] same\n'
     const result = applyTaskEdits(ctx, twins, [{ kind: 'toggle', task: locate(twins, 1) }])
-    expect(findTaskMove(ctx, result.moved, locate(twins, 1))?.to).toMatchObject({ checked: true })
+    expect(findTaskMove(ctx, result, locate(twins, 1))?.to).toMatchObject({ checked: true })
     expect(logger.getWarnings()).toEqual([])
     expect(
-      findTaskMove(ctx, result.moved, {
+      findTaskMove(ctx, result, {
         revision: '',
         astPath: [5],
         markdown: 'same',

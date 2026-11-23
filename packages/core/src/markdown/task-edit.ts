@@ -80,10 +80,10 @@ export interface TaskEditResult {
  */
 export function findTaskMove(
   ctx: TaskLogContext,
-  moves: readonly TaskMove[],
+  edit: Pick<TaskEditResult, 'baseRevision' | 'moved'>,
   task: TaskLocator,
 ): TaskMove | undefined {
-  return resolveTaskLocator(ctx, moves, (move) => move.from, task)
+  return resolveTaskLocator(ctx, edit.moved, (move) => move.from, edit.baseRevision, task)
 }
 
 /**
@@ -98,19 +98,20 @@ export function applyTaskEdits(
   edits: readonly TaskEdit[],
 ): TaskEditResult {
   const { document, bodyOffset } = parseEditable(source)
+  const baseRevision = sha256HexSync(source)
 
   const before = getRoundTasks(document)
   const created: MarkdownListItem[] = []
   // Resolve every address first, then mutate in order.
   const mutations = edits.map((edit): (() => void) => {
     if (edit.kind === 'insert') {
-      const slot = resolveInsertPosition(ctx, document, before, edit.at)
+      const slot = resolveInsertPosition(ctx, document, before, baseRevision, edit.at)
       const markdown = requireParagraphMarkdown(edit.markdown)
       return () => {
         created.push(insertItem(document, slot, createListItem('task', '+', markdown)))
       }
     }
-    const { node } = locateTask(ctx, before, edit.task)
+    const { node } = locateTask(ctx, before, baseRevision, edit.task)
     return () => applyItemEdit(document, node, edit)
   })
   for (const mutate of mutations) {
@@ -138,7 +139,7 @@ export function applyTaskEdits(
   const nextSource = source.slice(0, bodyOffset) + nextBody
   return {
     source: nextSource,
-    baseRevision: sha256HexSync(source),
+    baseRevision,
     revision: sha256HexSync(nextSource),
     moved,
     inserted,
@@ -153,17 +154,22 @@ function hasSameContent(entry: TaskContent, locator: TaskContent): boolean {
 }
 
 /**
- * The entry a locator names: the one at its path while its content still
- * matches, else the first entry with that content (the task moved). Several
- * entries with that content are identical lines, so the first is taken and
- * the guess is logged.
+ * The entry a locator names. A locator read at `revision`, the hash of the
+ * text the entries come from, names the entry at its path. Any other locator
+ * names the entry at its path while its content still matches, else the first
+ * entry with that content (the task moved). Several entries with that content
+ * are identical lines, so the first is taken and the guess is logged.
  */
 function resolveTaskLocator<T>(
   ctx: TaskLogContext,
   entries: readonly T[],
   locatorOf: (entry: T) => TaskSnapshot,
+  revision: string,
   locator: TaskLocator,
 ): T | undefined {
+  if (locator.revision === revision) {
+    return entries.find((entry) => isSameTaskPath(locatorOf(entry).astPath, locator.astPath))
+  }
   const atPath = entries.find((entry) => {
     const candidate = locatorOf(entry)
     return isSameTaskPath(candidate.astPath, locator.astPath) && hasSameContent(candidate, locator)
@@ -183,9 +189,10 @@ function resolveTaskLocator<T>(
 function locateTask(
   ctx: TaskLogContext,
   before: readonly TaskEntry[],
+  revision: string,
   locator: TaskLocator,
 ): TaskEntry {
-  const match = resolveTaskLocator(ctx, before, (entry) => entry, locator)
+  const match = resolveTaskLocator(ctx, before, (entry) => entry, revision, locator)
   if (match === undefined) {
     throw new NoteEditError(
       'stale',
@@ -199,6 +206,7 @@ function resolveInsertPosition(
   ctx: TaskLogContext,
   document: MarkdownDocument,
   before: readonly TaskEntry[],
+  revision: string,
   at: InsertPosition,
 ): SlotTarget {
   switch (at.kind) {
@@ -206,7 +214,7 @@ function resolveInsertPosition(
       return bodyEndSlot(document)
     }
     case 'contextEnd': {
-      const { parent, index } = locateTask(ctx, before, at.task)
+      const { parent, index } = locateTask(ctx, before, revision, at.task)
       if (parent.type === 'listItem') {
         return { kind: 'end', container: parent }
       }

@@ -71,7 +71,7 @@ export function withRelocatedTasks(
   }
   let changed = false
   const relocated = rows.flatMap((task) => {
-    const move = task.notePath === notePath ? findTaskMove(ctx, edit.moved, task) : undefined
+    const move = task.notePath === notePath ? findTaskMove(ctx, edit, task) : undefined
     if (move === undefined) {
       return [task]
     }

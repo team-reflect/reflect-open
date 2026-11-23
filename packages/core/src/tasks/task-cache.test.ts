@@ -117,6 +117,24 @@ describe('withRelocatedTasks', () => {
     ])
   })
 
+  it('moves a row read at the base revision by its path and gives it the new revision', () => {
+    const rows = [
+      task({ notePath: 'a.md', revision: 'base', astPath: [1], markdown: 'unsaved text' }),
+    ]
+    expect(
+      withRelocatedTasks(ctx, rows, 'a.md', {
+        baseRevision: 'base',
+        revision: 'next',
+        moved: [
+          { from: snapshot([0], 'unsaved text'), to: null },
+          { from: snapshot([1], 'saved text'), to: snapshot([0], 'saved text') },
+        ],
+      }),
+    ).toEqual([
+      { ...rows[0], revision: 'next', astPath: [0], markdown: 'saved text', text: 'saved text' },
+    ])
+  })
+
   it('renders the breadcrumbs the write left the task under', () => {
     const rows = [task({ notePath: 'a.md', astPath: [0, 1], markdown: 'x', breadcrumbs: ['Old'] })]
     expect(

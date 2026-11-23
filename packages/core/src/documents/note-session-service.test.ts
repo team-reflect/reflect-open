@@ -1,6 +1,7 @@
 import { sha256HexSync } from '@reflect/utils'
 import type { RoundTripFidelity } from '@meowdown/markdown'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { splitFrontmatter } from '../markdown/frontmatter.ts'
 import { applyTaskEdits } from '../markdown/task-edit.ts'
 import { projectTasks } from '../markdown/task-project.ts'
 import type { TaskLocator } from '../markdown/task-model.ts'
@@ -17,7 +18,7 @@ import { createTitleRenameTracker, type TitleRename } from './title-rename-track
 
 /** The first task's locator as the index records it. */
 function firstTask(source: string): TaskLocator {
-  const [task] = projectTasks(source)
+  const [task] = projectTasks(splitFrontmatter(source).body)
   return {
     revision: sha256HexSync(source),
     astPath: task!.astPath,
