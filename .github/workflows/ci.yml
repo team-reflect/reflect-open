@@ -185,7 +185,6 @@ jobs:
     needs: [classify]
     if: needs.classify.outputs.test-chromium == 'true'
     runs-on: ubuntu-24.04
-    # Restores the mbx cache of another job and saves no caches.
     cache-mode: read
     strategy:
       fail-fast: false
@@ -228,7 +227,6 @@ jobs:
     needs: [classify, test-chromium]
     if: needs.classify.outputs.test-webkit == 'true'
     runs-on: xcode-27
-    # Restores the mbx cache of another job and saves no caches.
     cache-mode: read
     env:
       REFLECT_TEST_BROWSER: webkit

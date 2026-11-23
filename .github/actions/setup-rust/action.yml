@@ -56,19 +56,13 @@ runs:
         path: ${{ env.ORT_CACHE_DIR }}
         key: ort-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
 
-    # Uses the mbx that mise installed. The `objects` mode restores and saves
-    # the mbx object store; a successful push to master or workflow_dispatch
-    # saves.
-    # https://mr-boxington.jdx.dev/github-action
-    # A job with `cache-mode: read` restores the cache and skips the save.
-    # https://github.com/jdx/mr-boxington-action/blob/b3ef673bd77c5426927fe8836c6185cdae04c2dd/src/lib.ts#L489-L505
+    # Uses the mbx that mise installed. A push to master or a workflow_dispatch
+    # saves the cache. https://mr-boxington.jdx.dev/github-action
     - name: Set up mbx
       uses: jdx/mr-boxington-action@b3ef673bd77c5426927fe8836c6185cdae04c2dd # v1.7.4
       with:
         backend: ${{ inputs.cache == 'true' && 'github' || 'local' }}
         github-cache-mode: objects
-        # Restores the newest cache of this scope first, then the newest cache
-        # of any scope on this platform.
         cache-key: mbx-v2/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/${{ github.sha }}
         restore-keys: |
           mbx-v2/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/
