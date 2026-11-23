@@ -106,7 +106,6 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-scope: publish-macos-${{ matrix.name }}
-          # The linked binary changes with every commit.
           cache-links: 'false'
           s3-endpoint: ${{ secrets.S3_SCCACHE_ENDPOINT }}
           s3-bucket: ${{ secrets.S3_SCCACHE_BUCKET }}

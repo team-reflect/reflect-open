@@ -1,16 +1,13 @@
 name: Set up Rust
 description: Installs mise, the tools in `mise.toml` (Rust and mbx included), and the mbx build cache.
 
-# The mbx build cache is in the S3 bucket when the job has all four `s3-*`
-# inputs. Other jobs (a fork, Dependabot) use the GitHub Actions cache.
-
 inputs:
   cache:
     description: Whether to restore and save the caches.
     required: false
     default: 'true'
   cache-scope:
-    description: The name of the mbx cache that this job restores and saves in the GitHub Actions cache.
+    description: The name of the mbx cache that this job restores and saves.
     required: false
     default: ${{ github.workflow }}-${{ github.job }}
   cache-links:
@@ -89,7 +86,6 @@ runs:
       shell: bash
       run: echo "MBX_BUILD_SCRIPT_EXECUTION=0" >> "$GITHUB_ENV"
 
-    # mbx reads the bucket from MBX_REMOTE_* and the key from AWS_*.
     # https://github.com/jdx/mr-boxington/blob/v1.30.0/docs/remote-cache.md#cloudflare-r2-and-minio
     - name: Pick the mbx backend
       id: mbx
@@ -114,15 +110,12 @@ runs:
             echo "AWS_SECRET_ACCESS_KEY=$S3_SECRET_ACCESS_KEY"
           } >> "$GITHUB_ENV"
         else
-          echo "No S3 secrets: mbx uses the GitHub Actions cache."
           backend=github
         fi
         echo "backend=$backend" >> "$GITHUB_OUTPUT"
 
-    # Uses the mbx that mise installed. mbx writes to the bucket only on a push
-    # to master. The GitHub Actions cache has one entry for each `Cargo.lock`:
-    # a push to master or a workflow_dispatch saves it.
-    # https://mr-boxington.jdx.dev/github-action
+    # Uses the mbx that mise installed. A push to master or a workflow_dispatch
+    # saves the cache. https://mr-boxington.jdx.dev/github-action
     - name: Set up mbx
       uses: jdx/mr-boxington-action@b3ef673bd77c5426927fe8836c6185cdae04c2dd # v1.7.4
       with:
