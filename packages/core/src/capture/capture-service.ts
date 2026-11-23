@@ -336,7 +336,6 @@ class CaptureServiceImpl implements CaptureService {
       xArchive,
       backlinkTarget,
       clock: deps.clock,
-      logger: deps.logger,
     })
     this.#enrichment = createCaptureEnrichmentService({
       noteFile,

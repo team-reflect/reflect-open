@@ -18,7 +18,6 @@ import {
   createTestCaptureInboxService,
   createTestClockService,
   createTestIdService,
-  createTestLoggerService,
   createTestNoteDocumentService,
   createTestNoteFileService,
   createTestPageDescriberService,
@@ -193,7 +192,6 @@ class CaptureTestKitImpl implements CaptureTestKit {
       xArchive,
       backlinkTarget: { ensure: ensureBacklinkTargetMock },
       clock,
-      logger: createTestLoggerService(),
     })
   }
 

@@ -4,7 +4,6 @@ import {
   renderInlineText,
   renderTaskSnapshot,
   type TaskEditResult,
-  type TaskLogContext,
   type TaskSnapshot,
 } from '../markdown/index.ts'
 import type { OpenTask } from './open-task.ts'
@@ -61,7 +60,6 @@ function withSnapshot(task: OpenTask, to: TaskSnapshot, revision: string): OpenT
  * Returns the same array when nothing changed.
  */
 export function withRelocatedTasks(
-  ctx: TaskLogContext,
   rows: readonly OpenTask[] | undefined,
   notePath: string,
   edit: TaskMoves,
@@ -71,7 +69,7 @@ export function withRelocatedTasks(
   }
   let changed = false
   const relocated = rows.flatMap((task) => {
-    const move = task.notePath === notePath ? findTaskMove(ctx, edit, task) : undefined
+    const move = task.notePath === notePath ? findTaskMove(edit, task) : undefined
     if (move === undefined) {
       return [task]
     }

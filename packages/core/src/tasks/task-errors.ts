@@ -1,11 +1,17 @@
 /**
  * Why an edit of a note was refused. `stale`: the addressed task is not in
- * the note. `invalidContent`: the new text of a task cannot be saved as one
+ * the note. `ambiguous`: several tasks of the note match the address.
+ * `invalidContent`: the new text of a task cannot be saved as one
  * task. `notWritable`: the note cannot be rewritten faithfully, or its
  * open session cannot take an edit. `conflict`: the note changed on disk
  * during every attempt.
  */
-export type NoteEditErrorKind = 'stale' | 'invalidContent' | 'notWritable' | 'conflict'
+export type NoteEditErrorKind =
+  | 'stale'
+  | 'ambiguous'
+  | 'invalidContent'
+  | 'notWritable'
+  | 'conflict'
 
 /**
  * An edit of a note that was refused. Nothing was written.

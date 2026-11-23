@@ -5,7 +5,6 @@ import {
   type MarkdownNode,
 } from '@meowdown/markdown'
 import { sha256HexSync } from '@reflect/utils'
-import type { LoggerService } from '../ports/logger-service.ts'
 import { NoteEditError } from '../tasks/task-errors.ts'
 import {
   bodyEndSlot,
@@ -22,13 +21,6 @@ import {
 import type { TaskLocator, TaskSnapshot } from './task-model.ts'
 import { isSameTaskPath } from './task-path.ts'
 import { getRoundTasks, toTaskSnapshot, type TaskEntry } from './task-project.ts'
-
-/**
- * Where the task functions report a locator that names several identical tasks.
- */
-export interface TaskLogContext {
-  readonly logger: LoggerService
-}
 
 export type InsertPosition =
   | { kind: 'documentEnd' }
@@ -74,16 +66,14 @@ export interface TaskEditResult {
 
 /**
  * Where a write left the task a locator names, or undefined when the locator
- * names none. Resolved like the edit itself, so a locator from a stale index
- * follows its task by content instead of claiming whatever task now sits at
- * its path.
+ * names no task or several.
  */
 export function findTaskMove(
-  ctx: TaskLogContext,
   edit: Pick<TaskEditResult, 'baseRevision' | 'moved'>,
   task: TaskLocator,
 ): TaskMove | undefined {
-  return resolveTaskLocator(ctx, edit.moved, (move) => move.from, edit.baseRevision, task)
+  const moves = resolveTaskLocator(edit.moved, (move) => move.from, edit.baseRevision, task)
+  return moves.length === 1 ? moves[0] : undefined
 }
 
 /**
@@ -92,11 +82,7 @@ export function findTaskMove(
  * pre-edit tree before anything changes, so one batch can edit a task and then
  * toggle it, or resolve a task and insert next to it, with one locator each.
  */
-export function applyTaskEdits(
-  ctx: TaskLogContext,
-  source: string,
-  edits: readonly TaskEdit[],
-): TaskEditResult {
+export function applyTaskEdits(source: string, edits: readonly TaskEdit[]): TaskEditResult {
   const { document, bodyOffset } = parseEditable(source)
   const baseRevision = sha256HexSync(source)
 
@@ -105,13 +91,13 @@ export function applyTaskEdits(
   // Resolve every address first, then mutate in order.
   const mutations = edits.map((edit): (() => void) => {
     if (edit.kind === 'insert') {
-      const slot = resolveInsertPosition(ctx, document, before, baseRevision, edit.at)
+      const slot = resolveInsertPosition(document, before, baseRevision, edit.at)
       const markdown = requireParagraphMarkdown(edit.markdown)
       return () => {
         created.push(insertItem(document, slot, createListItem('task', '+', markdown)))
       }
     }
-    const { node } = locateTask(ctx, before, baseRevision, edit.task)
+    const { node } = locateTask(before, baseRevision, edit.task)
     return () => applyItemEdit(document, node, edit)
   })
   for (const mutate of mutations) {
@@ -154,56 +140,44 @@ function hasSameContent(entry: TaskContent, locator: TaskContent): boolean {
 }
 
 /**
- * The entry a locator names. A locator read at `revision`, the hash of the
+ * The entries a locator names. A locator read at `revision`, the hash of the
  * text the entries come from, names the entry at its path. Any other locator
- * names the entry at its path while its content still matches, else the first
- * entry with that content (the task moved). Several entries with that content
- * are identical lines, so the first is taken and the guess is logged.
+ * names every entry with its content.
  */
 function resolveTaskLocator<T>(
-  ctx: TaskLogContext,
   entries: readonly T[],
   locatorOf: (entry: T) => TaskSnapshot,
   revision: string,
   locator: TaskLocator,
-): T | undefined {
+): T[] {
   if (locator.revision === revision) {
-    return entries.find((entry) => isSameTaskPath(locatorOf(entry).astPath, locator.astPath))
+    return entries.filter((entry) => isSameTaskPath(locatorOf(entry).astPath, locator.astPath))
   }
-  const atPath = entries.find((entry) => {
-    const candidate = locatorOf(entry)
-    return isSameTaskPath(candidate.astPath, locator.astPath) && hasSameContent(candidate, locator)
-  })
-  if (atPath !== undefined) {
-    return atPath
-  }
-  const byContent = entries.filter((entry) => hasSameContent(locatorOf(entry), locator))
-  if (byContent.length > 1) {
-    ctx.logger.warn(
-      `task is ambiguous, taking the first of ${byContent.length}: ${JSON.stringify(locator.markdown)}`,
-    )
-  }
-  return byContent[0]
+  return entries.filter((entry) => hasSameContent(locatorOf(entry), locator))
 }
 
 function locateTask(
-  ctx: TaskLogContext,
   before: readonly TaskEntry[],
   revision: string,
   locator: TaskLocator,
 ): TaskEntry {
-  const match = resolveTaskLocator(ctx, before, (entry) => entry, revision, locator)
+  const [match, ...others] = resolveTaskLocator(before, (entry) => entry, revision, locator)
   if (match === undefined) {
     throw new NoteEditError(
       'stale',
       `task is no longer in the note: ${JSON.stringify(locator.markdown)}`,
     )
   }
+  if (others.length > 0) {
+    throw new NoteEditError(
+      'ambiguous',
+      `several tasks in the note match: ${JSON.stringify(locator.markdown)}`,
+    )
+  }
   return match
 }
 
 function resolveInsertPosition(
-  ctx: TaskLogContext,
   document: MarkdownDocument,
   before: readonly TaskEntry[],
   revision: string,
@@ -214,7 +188,7 @@ function resolveInsertPosition(
       return bodyEndSlot(document)
     }
     case 'contextEnd': {
-      const { parent, index } = locateTask(ctx, before, revision, at.task)
+      const { parent, index } = locateTask(before, revision, at.task)
       if (parent.type === 'listItem') {
         return { kind: 'end', container: parent }
       }

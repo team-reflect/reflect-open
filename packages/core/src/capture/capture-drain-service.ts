@@ -21,7 +21,6 @@ import {
 } from './capture-note.ts'
 import { notePrivate } from '../privacy/privacy-service.ts'
 import type { ClockService } from '../ports/clock-service.ts'
-import type { LoggerService } from '../ports/logger-service.ts'
 import type { ReconcileStop } from '../reconcile/reconcile.ts'
 import { errorMessage, isAppError, toAppError } from '../errors.ts'
 import type { CaptureInboxService } from '../graph/capture-inbox-service.ts'
@@ -115,7 +114,6 @@ export interface CaptureDrainServiceDeps {
   readonly xArchive: XArchiveService
   readonly backlinkTarget: BacklinkTargetService
   readonly clock: ClockService
-  readonly logger: LoggerService
 }
 
 /**
@@ -363,7 +361,7 @@ class CaptureDrainServiceImpl implements CaptureDrainService {
    * which re-appends one line once on retry.
    */
   async #drainTextCapture(envelope: TextCaptureEnvelope, generation: number): Promise<void> {
-    const { noteDocuments, logger } = this.#deps
+    const { noteDocuments } = this.#deps
     const daily = dailyPath(formatIsoDate(new Date(envelope.capturedAt)))
     // `task` is Reflect's round `+` checkbox, the only marker the Tasks
     // projection reads, and lands in the `## Tasks` section; `checkbox` is the
@@ -372,7 +370,7 @@ class CaptureDrainServiceImpl implements CaptureDrainService {
       daily,
       (source) => {
         return envelope.kind === 'task'
-          ? applyTaskEdits({ logger }, source, [
+          ? applyTaskEdits(source, [
               { kind: 'insert', at: { kind: 'tasksSection' }, markdown: envelope.text },
             ]).source
           : appendListItem(source, {

@@ -1,16 +1,7 @@
 import { parseMarkdownAst } from '@meowdown/markdown'
-import { beforeEach, describe, expect, it } from 'vitest'
-import { createTestLoggerService, type TestLoggerService } from '../testing/logger.ts'
-import { applyTaskEdits, type TaskLogContext } from './task-edit.ts'
+import { describe, expect, it } from 'vitest'
+import { applyTaskEdits } from './task-edit.ts'
 import { getRoundTasks, getTaskDueDate, projectTasks } from './task-project.ts'
-
-let logger: TestLoggerService = createTestLoggerService()
-let ctx: TaskLogContext = { logger }
-
-beforeEach(() => {
-  logger = createTestLoggerService()
-  ctx = { logger }
-})
 
 describe('projectTasks', () => {
   it('projects round tasks with their path, markdown, and state', () => {
@@ -181,6 +172,6 @@ describe('getRoundTasks', () => {
     const breadcrumbs = ['Home', 'Chores']
     expect(getRoundTasks(parseMarkdownAst(body))[0]?.breadcrumbs).toEqual(breadcrumbs)
     expect(projectTasks(body)[0]?.breadcrumbs).toEqual(breadcrumbs)
-    expect(applyTaskEdits(ctx, body, []).tasks[0]?.breadcrumbs).toEqual(breadcrumbs)
+    expect(applyTaskEdits(body, []).tasks[0]?.breadcrumbs).toEqual(breadcrumbs)
   })
 })

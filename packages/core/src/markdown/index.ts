@@ -65,7 +65,6 @@ export {
   type TaskEditInsert,
   type TaskEditItem,
   type TaskEditResult,
-  type TaskLogContext,
   type TaskMove,
 } from './task-edit.ts'
 export {

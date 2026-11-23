@@ -808,8 +808,7 @@ class TaskServiceImpl implements TaskService {
     if (root !== current.root || edit.moved.length === 0) {
       return
     }
-    const next =
-      withRelocatedTasks({ logger: this.#deps.logger }, current.tasks, notePath, edit) ?? []
+    const next = withRelocatedTasks(current.tasks, notePath, edit) ?? []
     this.#recentlyCompleted.set({ root, tasks: next })
   }
 
@@ -1054,8 +1053,7 @@ class TaskServiceImpl implements TaskService {
     if (sessionKey(session) !== this.#currentKey()) {
       return
     }
-    const { logger } = this.#deps
-    const relocate: TaskListPatch = (rows) => withRelocatedTasks({ logger }, rows, notePath, edit)
+    const relocate: TaskListPatch = (rows) => withRelocatedTasks(rows, notePath, edit)
     this.#patch(relocate, relocate)
     this.relocateRecentlyCompleted(session.root, notePath, edit)
   }
@@ -1078,7 +1076,7 @@ class TaskServiceImpl implements TaskService {
       const result = await this.writeTask(task, actionsFor(task))
       this.#relocate(session, task.notePath, result)
       const rest: readonly OpenTask[] = pending.slice(1)
-      pending = withRelocatedTasks({ logger: this.#deps.logger }, rest, task.notePath, result) ?? []
+      pending = withRelocatedTasks(rest, task.notePath, result) ?? []
     }
   }
 
@@ -1130,12 +1128,12 @@ class TaskServiceImpl implements TaskService {
     edits: readonly TaskEdit[],
     options: WriteTaskEditsOptions = {},
   ): Promise<TaskWriteResult> {
-    const { noteDocuments, clock, logger } = this.#deps
+    const { noteDocuments, clock } = this.#deps
     let result: TaskEditResult | undefined
     await noteDocuments.commitSourceEdit(
       notePath,
       (source) => {
-        result = applyTaskEdits({ logger }, source, edits)
+        result = applyTaskEdits(source, edits)
         return result.source
       },
       { generation, createIfMissing: options.createIfMissing === true },

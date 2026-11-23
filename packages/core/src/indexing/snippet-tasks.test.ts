@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { applyTaskEdits } from '../markdown/task-edit.ts'
-import { createTestLoggerService } from '../testing/logger.ts'
 import { blockContextLinesAt, prepareBlockContext } from './block-context.ts'
 import { createSourceTaskLocator, extractSnippetTasks, type SnippetTask } from './snippet-tasks.ts'
 import { noop } from '@ocavue/utils'
@@ -28,9 +27,7 @@ function toggled(content: string, task: SnippetTask | undefined): string {
   if (!task?.locator) {
     throw new Error('task has no locator')
   }
-  return applyTaskEdits({ logger: createTestLoggerService() }, content, [
-    { kind: 'toggle', task: task.locator },
-  ]).source
+  return applyTaskEdits(content, [{ kind: 'toggle', task: task.locator }]).source
 }
 
 describe('extractSnippetTasks', () => {

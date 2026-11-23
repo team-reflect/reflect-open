@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import type { TaskMove, TaskSnapshot } from '../markdown/index.ts'
-import { createTestLoggerService } from '../testing/logger.ts'
 import { makeOpenTask as task } from '../testing/tasks.ts'
 import {
   asCompleted,
@@ -11,8 +10,6 @@ import {
   withRelocatedTasks,
   type TaskMoves,
 } from './task-cache.ts'
-
-const ctx = { logger: createTestLoggerService() }
 
 const a = task({ astPath: [1], text: 'a' })
 const b = task({ astPath: [2], text: 'b' })
@@ -52,7 +49,6 @@ describe('withRelocatedTasks', () => {
 
     expect(
       withRelocatedTasks(
-        ctx,
         [moved, removed, unrelated],
         'a.md',
         edit([
@@ -67,7 +63,6 @@ describe('withRelocatedTasks', () => {
     const rows = [task({ notePath: 'a.md', astPath: [2], markdown: 'same' })]
     expect(
       withRelocatedTasks(
-        ctx,
         rows,
         'a.md',
         edit([{ from: snapshot([2], 'same'), to: snapshot([2], 'same') }]),
@@ -79,7 +74,6 @@ describe('withRelocatedTasks', () => {
     const rows = [task({ notePath: 'a.md', astPath: [2], markdown: 'old' })]
     expect(
       withRelocatedTasks(
-        ctx,
         rows,
         'a.md',
         edit([{ from: snapshot([2], 'old'), to: snapshot([2], 'edited [[2026-07-01]]', true) }]),
@@ -103,7 +97,6 @@ describe('withRelocatedTasks', () => {
     ]
     expect(
       withRelocatedTasks(
-        ctx,
         rows,
         'a.md',
         edit([
@@ -122,7 +115,7 @@ describe('withRelocatedTasks', () => {
       task({ notePath: 'a.md', revision: 'base', astPath: [1], markdown: 'unsaved text' }),
     ]
     expect(
-      withRelocatedTasks(ctx, rows, 'a.md', {
+      withRelocatedTasks(rows, 'a.md', {
         baseRevision: 'base',
         revision: 'next',
         moved: [
@@ -139,7 +132,6 @@ describe('withRelocatedTasks', () => {
     const rows = [task({ notePath: 'a.md', astPath: [0, 1], markdown: 'x', breadcrumbs: ['Old'] })]
     expect(
       withRelocatedTasks(
-        ctx,
         rows,
         'a.md',
         edit([
@@ -155,11 +147,11 @@ describe('withRelocatedTasks', () => {
   it('leaves rows the write did not know about alone', () => {
     const rows = [task({ notePath: 'a.md', astPath: [9], markdown: 'new' })]
     expect(
-      withRelocatedTasks(ctx, rows, 'a.md', edit([{ from: snapshot([0], 'other'), to: null }])),
+      withRelocatedTasks(rows, 'a.md', edit([{ from: snapshot([0], 'other'), to: null }])),
     ).toBe(rows)
-    expect(withRelocatedTasks(ctx, rows, 'a.md', edit([]))).toBe(rows)
+    expect(withRelocatedTasks(rows, 'a.md', edit([]))).toBe(rows)
     expect(
-      withRelocatedTasks(ctx, undefined, 'a.md', edit([{ from: snapshot([9], 'new'), to: null }])),
+      withRelocatedTasks(undefined, 'a.md', edit([{ from: snapshot([9], 'new'), to: null }])),
     ).toBeUndefined()
   })
 })

@@ -29,7 +29,7 @@ function firstTask(source: string): TaskLocator {
 
 /** The Tasks view's open-note write: toggle `task` through the live buffer. */
 function toggleTransform(task: TaskLocator): (source: string) => string {
-  return (source) => applyTaskEdits({ logger }, source, [{ kind: 'toggle', task }]).source
+  return (source) => applyTaskEdits(source, [{ kind: 'toggle', task }]).source
 }
 
 /**
