@@ -49,7 +49,9 @@ tables! {
     NoteKeys { NotePath, Key, ClaimCount }
     NoteVisits { Path, VisitedMs }
     Notes {
-        Path, Id, Title, TitleKey, DailyDate, IsPrivate, FileHash, Mtime, UpdatedAt, IsPinned,
+        Path, Id, Title, TitleKey, DailyDate, IsPrivate, FileHash,
+// TODO: it seems that Mtime and UpdatedAt store the same value, so we probably don't need both. Revalue this in the future because it needs to migrate the database.
+        Mtime, UpdatedAt, IsPinned,
         PinnedOrder, Preview, HasConflict, GistUrl, GistStale, Kind, PathKey, HasContent,
     }
     /// An FTS5 table. `Fts` is the hidden column with the name of the table,
