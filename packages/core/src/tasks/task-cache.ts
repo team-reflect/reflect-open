@@ -23,7 +23,12 @@ import { getTaskKey, isSameTask } from './task-identity.ts'
 /**
  * Where a note write left each of its tasks, and the note revisions before and after it.
  */
-export type TaskMoves = Pick<TaskEditResult, 'baseRevision' | 'revision' | 'moved'>
+export interface TaskMoves extends Pick<TaskEditResult, 'baseRevision' | 'moved'> {
+  /**
+   * The hash of the note text the write left.
+   */
+  revision: string
+}
 
 /**
  * Drop every row matching one of `tasks` from a cached list.

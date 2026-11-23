@@ -368,9 +368,9 @@ class CaptureDrainServiceImpl implements CaptureDrainService {
     // square `- [ ]`, an inert daily item appended at the end.
     await noteDocuments.commitSourceEdit(
       daily,
-      (source) => {
+      (source, revision) => {
         return envelope.kind === 'task'
-          ? applyTaskEdits(source, [
+          ? applyTaskEdits(source, revision, [
               { kind: 'insert', at: { kind: 'tasksSection' }, markdown: envelope.text },
             ]).source
           : appendListItem(source, {

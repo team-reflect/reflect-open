@@ -6,6 +6,7 @@ import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.
 import type { LoggerService } from '../ports/logger-service.ts'
 import { splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter.ts'
+import type { NoteSourceTransform } from './note-session-types.ts'
 import type { OpenDocumentsService } from './open-documents-service.ts'
 import { noop } from '@ocavue/utils'
 
@@ -48,7 +49,7 @@ export interface NoteDocumentService {
    */
   commitFrontmatter(path: string, patch: FrontmatterPatch, generation: number): Promise<void>
   /**
-   * Apply a synchronous full-source `transform` to the note and persist it,
+   * Apply a synchronous full-source `transform` ({@link NoteSourceTransform}) to the note and persist it,
    * routing the same way every time: when the note is **open**, through its
    * live session, which transforms its in-memory buffer synchronously, so
    * unsaved edits survive and there's no read-then-write gap for a concurrent
@@ -70,7 +71,7 @@ export interface NoteDocumentService {
    */
   commitSourceEdit(
     path: string,
-    transform: (source: string) => string,
+    transform: NoteSourceTransform,
     options: CommitSourceEditOptions,
   ): Promise<NoteCommitResult>
   /**
@@ -197,7 +198,7 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
 
   commitSourceEdit(
     path: string,
-    transform: (source: string) => string,
+    transform: NoteSourceTransform,
     options: CommitSourceEditOptions,
   ): Promise<NoteCommitResult> {
     const { openDocuments, noteFile } = this.#deps
@@ -228,7 +229,7 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
         options.generation,
       )
       for (let attempt = 0; attempt < COMMIT_ATTEMPT_LIMIT; attempt += 1) {
-        const content = transform(source?.content ?? '')
+        const content = transform(source?.content ?? '', source?.hash ?? null)
         if (content === (source?.content ?? '')) {
           return { content, revision: source?.hash ?? null, merged: false, indexSeq: null }
         }

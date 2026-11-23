@@ -74,7 +74,7 @@ describe('reconcileNoteTasks with moves', () => {
     taskIds: readonly string[],
     edits: readonly TaskEdit[],
   ): string[] {
-    const edit = applyTaskEdits(source, edits)
+    const edit = applyTaskEdits(source, null, edits)
     return reconcileNoteTasks(identify(source, taskIds), edit.tasks, edit.moved, createCounter())
   }
 

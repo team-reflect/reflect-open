@@ -1,4 +1,3 @@
-import { sha256Hex } from '@reflect/utils'
 import type { Backlink, BacklinkSourceCursor } from '@reflect/types'
 import { requireGraphSession, type GraphSessionSource } from '../graph/graph-session.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
@@ -143,10 +142,10 @@ class BacklinkServiceImpl implements BacklinkService {
     await Promise.all(
       pageSources.map(async ({ sourcePath }) => {
         try {
-          const content = await noteFile.read(sourcePath, generation)
+          const { content, hash } = await noteFile.readWithHash(sourcePath, generation)
           const source = prepareBlockContext(content)
           sources.set(sourcePath, source)
-          locators.set(sourcePath, createSourceTaskLocator(source, await sha256Hex(content)))
+          locators.set(sourcePath, createSourceTaskLocator(source, hash))
         } catch {
           sources.set(sourcePath, null)
         }

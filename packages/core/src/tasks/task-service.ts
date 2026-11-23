@@ -105,6 +105,10 @@ export interface TaskRef extends TaskLocator {
  */
 export interface TaskWriteResult extends TaskEditResult {
   /**
+   * The hash of the note text the write left.
+   */
+  readonly revision: string
+  /**
    * Epoch milliseconds read right after the write, to order optimistic rows.
    */
   readonly updatedAt: number
@@ -1130,21 +1134,21 @@ class TaskServiceImpl implements TaskService {
   ): Promise<TaskWriteResult> {
     const { noteDocuments, clock } = this.#deps
     let result: TaskEditResult | undefined
-    await noteDocuments.commitSourceEdit(
+    const { revision } = await noteDocuments.commitSourceEdit(
       notePath,
-      (source) => {
-        result = applyTaskEdits(source, edits)
+      (source, sourceRevision) => {
+        result = applyTaskEdits(source, sourceRevision, edits)
         return result.source
       },
       { generation, createIfMissing: options.createIfMissing === true },
     )
-    if (result === undefined) {
+    if (result === undefined || revision === null) {
       throw new NoteEditError(
         'notWritable',
         'This note can’t be updated right now — try again in a moment.',
       )
     }
-    return { ...result, updatedAt: clock.now() }
+    return { ...result, revision, updatedAt: clock.now() }
   }
 
   #writeOne(

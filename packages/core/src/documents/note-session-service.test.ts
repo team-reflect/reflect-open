@@ -13,7 +13,12 @@ import {
 } from '../testing/graph-session.ts'
 import { createTestLoggerService, type TestLoggerService } from '../testing/logger.ts'
 import { createNoteSessionService } from './note-session-service.ts'
-import type { NoteSession, NoteSessionCommit, NoteSessionSnapshot } from './note-session-types.ts'
+import type {
+  NoteSession,
+  NoteSessionCommit,
+  NoteSessionSnapshot,
+  NoteSourceTransform,
+} from './note-session-types.ts'
 import { createTitleRenameTracker, type TitleRename } from './title-rename-tracker.ts'
 
 /** The first task's locator as the index records it. */
@@ -28,8 +33,8 @@ function firstTask(source: string): TaskLocator {
 }
 
 /** The Tasks view's open-note write: toggle `task` through the live buffer. */
-function toggleTransform(task: TaskLocator): (source: string) => string {
-  return (source) => applyTaskEdits(source, [{ kind: 'toggle', task }]).source
+function toggleTransform(task: TaskLocator): NoteSourceTransform {
+  return (source, revision) => applyTaskEdits(source, revision, [{ kind: 'toggle', task }]).source
 }
 
 /**

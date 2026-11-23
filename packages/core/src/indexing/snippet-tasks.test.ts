@@ -27,7 +27,7 @@ function toggled(content: string, task: SnippetTask | undefined): string {
   if (!task?.locator) {
     throw new Error('task has no locator')
   }
-  return applyTaskEdits(content, [{ kind: 'toggle', task: task.locator }]).source
+  return applyTaskEdits(content, 'r1', [{ kind: 'toggle', task: task.locator }]).source
 }
 
 describe('extractSnippetTasks', () => {

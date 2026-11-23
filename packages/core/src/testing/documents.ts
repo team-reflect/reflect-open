@@ -13,6 +13,7 @@ import {
 import type {
   NoteSession,
   NoteSessionCommit,
+  NoteSourceTransform,
   NoteSessionEditor,
 } from '../documents/note-session-types.ts'
 import { appendBlock } from '../markdown/append-section.ts'
@@ -172,13 +173,13 @@ class TestNoteSessionImpl implements TestNoteSession {
     })
   }
 
-  commitSourceEdit(transform: (source: string) => string): Promise<NoteSessionCommit | null> {
+  commitSourceEdit(transform: NoteSourceTransform): Promise<NoteSessionCommit | null> {
     return Promise.try(() => {
       this.#record('commitSourceEdit', transform)
       if (!this.#accepts) {
         return null
       }
-      this.#content = transform(this.#content)
+      this.#content = transform(this.#content, sha256HexSync(this.#content))
       return { content: this.#content, revision: sha256HexSync(this.#content), merged: false }
     })
   }

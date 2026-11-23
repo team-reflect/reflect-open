@@ -12,6 +12,7 @@ import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-fr
 import type {
   NoteSession,
   NoteSessionCommit,
+  NoteSourceTransform,
   NoteSessionEditor,
   NoteSessionOptions,
   NoteSessionService,
@@ -627,7 +628,7 @@ class NoteSessionImpl implements NoteSession {
    * all-or-nothing: a failed flush reverts the in-memory edit so the editor and
    * the Tasks list can't diverge, then re-throws the failure.
    */
-  async commitSourceEdit(transform: (full: string) => string): Promise<NoteSessionCommit | null> {
+  async commitSourceEdit(transform: NoteSourceTransform): Promise<NoteSessionCommit | null> {
     // What the load can't change is refused at once; a stalled read must not
     // hold a session that could never write.
     if (this.#io.write === null || this.#disposed) {
@@ -646,7 +647,7 @@ class NoteSessionImpl implements NoteSession {
     const previousHeader = this.#header
     const previousBuffer = this.#buffer
     const previousInitialContent = this.#initialContent
-    const edited = transform(this.#header + this.#buffer)
+    const edited = transform(this.#header + this.#buffer, this.#dirty ? null : this.#diskHash)
     const doc = splitDoc(edited)
     this.#header = doc.header
     this.#buffer = doc.body

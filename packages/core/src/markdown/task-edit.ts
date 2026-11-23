@@ -4,7 +4,6 @@ import {
   type MarkdownListItem,
   type MarkdownNode,
 } from '@meowdown/markdown'
-import { sha256HexSync } from '@reflect/utils'
 import { NoteEditError } from '../tasks/task-errors.ts'
 import {
   bodyEndSlot,
@@ -52,10 +51,8 @@ export interface TaskMove {
 
 export interface TaskEditResult {
   source: string
-  /** The hash of the source the edits were applied to. */
-  baseRevision: string
-  /** The hash of `source`. */
-  revision: string
+  /** The hash of the source the edits were applied to, when the caller knew it. */
+  baseRevision: string | null
   /** Every pre-edit round task, in document order. */
   moved: readonly TaskMove[]
   /** The inserted tasks, in edit order. */
@@ -76,14 +73,19 @@ export function findTaskMove(
 }
 
 /**
- * Apply `edits` to a note and serialize its body once. Every locator describes
+ * Apply `edits` to a note and serialize its body once. `revision` is the hash
+ * of `source`, or `null` when no file holds that text. Every locator describes
  * the note as the caller last saw it: all addresses are resolved against the
  * pre-edit tree before anything changes, so one batch can edit a task and then
  * toggle it, or resolve a task and insert next to it, with one locator each.
  */
-export function applyTaskEdits(source: string, edits: readonly TaskEdit[]): TaskEditResult {
+export function applyTaskEdits(
+  source: string,
+  revision: string | null,
+  edits: readonly TaskEdit[],
+): TaskEditResult {
   const { document, bodyOffset } = parseEditable(source)
-  const baseRevision = sha256HexSync(source)
+  const baseRevision = revision
 
   const before = getRoundTasks(document)
   const created: MarkdownListItem[] = []
@@ -125,7 +127,6 @@ export function applyTaskEdits(source: string, edits: readonly TaskEdit[]): Task
   return {
     source: nextSource,
     baseRevision,
-    revision: sha256HexSync(nextSource),
     moved,
     inserted,
     tasks: after.map(toTaskSnapshot),
@@ -148,7 +149,7 @@ function hasSameContent(entry: TaskContent, locator: TaskContent): boolean {
 function resolveTaskLocator<T>(
   entries: readonly T[],
   locatorOf: (entry: T) => TaskSnapshot,
-  revision: string,
+  revision: string | null,
   locator: TaskLocator,
 ): T | undefined {
   const atPath = entries.find((entry) => {
@@ -177,7 +178,7 @@ function resolveTaskLocator<T>(
 
 function locateTask(
   before: readonly TaskEntry[],
-  revision: string,
+  revision: string | null,
   locator: TaskLocator,
 ): TaskEntry {
   const match = resolveTaskLocator(before, (entry) => entry, revision, locator)
@@ -193,7 +194,7 @@ function locateTask(
 function resolveInsertPosition(
   document: MarkdownDocument,
   before: readonly TaskEntry[],
-  revision: string,
+  revision: string | null,
   at: InsertPosition,
 ): SlotTarget {
   switch (at.kind) {

@@ -172,6 +172,6 @@ describe('getRoundTasks', () => {
     const breadcrumbs = ['Home', 'Chores']
     expect(getRoundTasks(parseMarkdownAst(body))[0]?.breadcrumbs).toEqual(breadcrumbs)
     expect(projectTasks(body)[0]?.breadcrumbs).toEqual(breadcrumbs)
-    expect(applyTaskEdits(body, []).tasks[0]?.breadcrumbs).toEqual(breadcrumbs)
+    expect(applyTaskEdits(body, null, []).tasks[0]?.breadcrumbs).toEqual(breadcrumbs)
   })
 })

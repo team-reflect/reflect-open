@@ -121,6 +121,13 @@ export interface NoteSessionOptions {
  * One open note's document lifecycle. Create via {@link NoteSessionService.create}.
  */
 /**
+ * Rewrites the full text of a note. `revision` is the hash of `source` as the
+ * note file holds it, or `null` when `source` holds unsaved edits or the note
+ * has no file.
+ */
+export type NoteSourceTransform = (source: string, revision: string | null) => string
+
+/**
  * What {@link NoteSession.commitSourceEdit} left on disk.
  */
 export interface NoteSessionCommit {
@@ -239,7 +246,7 @@ export interface NoteSession {
    * untouched, and a failed flush reverts the in-memory edit before
    * rethrowing.
    */
-  commitSourceEdit(transform: (source: string) => string): Promise<NoteSessionCommit | null>
+  commitSourceEdit(transform: NoteSourceTransform): Promise<NoteSessionCommit | null>
   /** Flush pending edits and detach: no further snapshots are emitted. */
   dispose(): void
   /**
