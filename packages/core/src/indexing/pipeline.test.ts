@@ -1,3 +1,4 @@
+import { noop, returnTrue } from '@ocavue/utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { sha256Hex } from '@reflect/utils'
 import { AppError } from '../errors.ts'
@@ -15,7 +16,8 @@ import { createTestLoggerService } from '../testing/logger.ts'
 import type { FileChange } from './file-change-service.ts'
 import { createIndexQueryService } from './index-query-service.ts'
 import { buildIndexedNote, PROJECTION_VERSION } from './indexed-note.ts'
-import type { ChangesAppliedEmitter } from './index-writer.ts'
+import { createDirtySet } from './dirty-set.ts'
+import { createIndexWriter, type ChangesAppliedEmitter, type IndexWriter } from './index-writer.ts'
 import { createNoteIndexer, PROJECTION_VERSION_KEY } from './indexer.ts'
 
 const NOW = 1_750_000_000_000
@@ -99,7 +101,7 @@ function setup(options?: {
   })
   const appliedListeners = new Set<ChangesAppliedEmitter>()
   /**
-   * Listen for the batches the indexer reports as applied.
+   * Listen for the changes the index writers report as applied.
    */
   function subscribeIndexApplied(listener: ChangesAppliedEmitter): () => void {
     appliedListeners.add(listener)
@@ -108,11 +110,6 @@ function setup(options?: {
     }
   }
   const deps = {
-    emitChangesApplied: (changes: readonly FileChange[], generation: number) => {
-      for (const listener of appliedListeners) {
-        listener(changes, generation)
-      }
-    },
     indexStore: store,
     noteFile: files,
     indexQuery: createIndexQueryService({ database }),
@@ -131,8 +128,33 @@ function setup(options?: {
       .calls()
       .find((call): call is Extract<IndexStoreCall, { method: Method }> => call.method === method)
   }
+  const writers = new Map<number, IndexWriter>()
+  /**
+   * The index writer at index generation `generation`.
+   */
+  function writerAt(generation: number): IndexWriter {
+    let writer = writers.get(generation)
+    if (writer === undefined) {
+      writer = createIndexWriter(
+        {
+          ...deps,
+          emitChangesApplied: (changes: readonly FileChange[], appliedGeneration: number) => {
+            for (const listener of appliedListeners) {
+              listener(changes, appliedGeneration)
+            }
+          },
+          emitMoved: noop,
+          canWrite: returnTrue,
+        },
+        { dirty: createDirtySet(), generation, fileGeneration: FILE_GENERATION },
+      )
+      writers.set(generation, writer)
+    }
+    return writer
+  }
   return {
     indexer: createNoteIndexer(deps),
+    writerAt,
     subscribeIndexApplied,
     store,
     clock,
@@ -152,36 +174,11 @@ function notes(...paths: string[]): Record<string, { contents: string; modifiedM
   )
 }
 
-describe('indexNote', () => {
-  it('reads, parses, and applies a built index payload with its generation', async () => {
-    const { indexer, findCall } = setup()
-    await indexer.indexNote('notes/a.md', {
-      generation: 7,
-      fileGeneration: FILE_GENERATION,
-      mtime: 5,
-    })
-    const apply = findCall('apply')
-    expect(apply).toBeDefined()
-    expect(apply!.generation).toBe(7)
-    expect(apply!.note.path).toBe('notes/a.md')
-    expect(apply!.note.title).toBe('Hello')
-    expect(apply!.note.mtime).toBe(5)
-    expect(apply!.note.fileHash).toMatch(/^[0-9a-f]{64}$/)
-    expect(apply!.note.links.map((link) => link.targetKey)).toContain('world')
-  })
-
-  it('stamps "now" when no mtime is given', async () => {
-    const { indexer, findCall } = setup()
-    await indexer.indexNote('notes/a.md', { generation: 7, fileGeneration: FILE_GENERATION })
-    expect(findCall('apply')!.note.mtime).toBe(NOW)
-  })
-})
-
 describe('reindexNotesReferencing', () => {
   const REFERENCING = '# Hello\n\n![pic](assets/pic.png)\n'
 
-  it('re-applies referencing notes and emits the post-apply signal', async () => {
-    const { indexer, findCall, subscribeIndexApplied } = setup({
+  it('re-applies referencing notes, and the writer reports them', async () => {
+    const { indexer, writerAt, findCall, subscribeIndexApplied } = setup({
       files: { 'notes/a.md': { contents: REFERENCING, modifiedMs: 5 } },
       indexed: [{ path: 'notes/a.md', markdown: REFERENCING }],
     })
@@ -190,25 +187,23 @@ describe('reindexNotesReferencing', () => {
       emitted.push([changes, generation])
     })
     try {
-      await indexer.reindexNotesReferencing(['assets/pic.png'], {
-        generation: 7,
-        fileGeneration: FILE_GENERATION,
-      })
+      await indexer.reindexNotesReferencing(['assets/pic.png'], writerAt(7))
+      await writerAt(7).drained()
     } finally {
       unsubscribe()
     }
 
-    const apply = findCall('apply')
+    const apply = findCall('applyBatch')
     expect(apply).toBeDefined()
     expect(apply!.generation).toBe(7)
 
-    // These writes bypass the watcher pipeline, so the emit is the only way
-    // followers (the embedding sync) hear about the refreshed notes.
+    // The note file did not change, so the report is the only way followers
+    // (the embedding sync) hear about the refreshed notes.
     expect(emitted).toEqual([[[{ path: 'notes/a.md', kind: 'upsert' }], 7]])
   })
 
-  it('still emits the applied prefix when a later note’s re-index throws', async () => {
-    const { indexer, subscribeIndexApplied } = setup({
+  it('throws a failed re-index after the other notes are written and reported', async () => {
+    const { indexer, writerAt, subscribeIndexApplied } = setup({
       files: {
         'notes/a.md': { contents: REFERENCING, modifiedMs: 5 },
         'notes/b.md': { contents: REFERENCING, modifiedMs: 5 },
@@ -229,31 +224,27 @@ describe('reindexNotesReferencing', () => {
     })
     try {
       await expect(
-        indexer.reindexNotesReferencing(['assets/pic.png'], {
-          generation: 7,
-          fileGeneration: FILE_GENERATION,
-        }),
+        indexer.reindexNotesReferencing(['assets/pic.png'], writerAt(7)),
       ).rejects.toMatchObject({
         kind: 'io',
       })
+      await writerAt(7).drained()
     } finally {
       unsubscribe()
     }
-    // notes/a.md was applied before the failure — followers must hear it.
+    // notes/a.md was applied although notes/b.md failed: followers must hear it.
     expect(emitted).toEqual([[{ path: 'notes/a.md', kind: 'upsert' }]])
   })
 
   it('emits nothing when no note references the assets', async () => {
-    const { indexer, subscribeIndexApplied } = setup()
+    const { indexer, writerAt, subscribeIndexApplied } = setup()
     const emitted: unknown[] = []
     const unsubscribe = subscribeIndexApplied((changes) => {
       emitted.push(changes)
     })
     try {
-      await indexer.reindexNotesReferencing(['assets/pic.png'], {
-        generation: 7,
-        fileGeneration: FILE_GENERATION,
-      })
+      await indexer.reindexNotesReferencing(['assets/pic.png'], writerAt(7))
+      await writerAt(7).drained()
     } finally {
       unsubscribe()
     }

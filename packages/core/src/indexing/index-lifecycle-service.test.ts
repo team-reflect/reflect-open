@@ -985,6 +985,66 @@ describe('applyChanges', () => {
   })
 })
 
+describe('indexNote', () => {
+  it('reads, parses, and writes the note at its generation', async () => {
+    const { index, store } = setup({ files: { 'notes/a.md': '# Hello\n\n[[World]]' } })
+
+    await index.indexNote('notes/a.md', {
+      generation: 7,
+      fileGeneration: FILE_GENERATION,
+      mtime: 5,
+    })
+
+    expect(store.calls()).toMatchObject([{ method: 'applyBatch', generation: 7 }])
+    const [note] = store.applied()
+    expect(note!.path).toBe('notes/a.md')
+    expect(note!.title).toBe('Hello')
+    expect(note!.mtime).toBe(5)
+    expect(note!.fileHash).toMatch(/^[0-9a-f]{64}$/)
+    expect(note!.links.map((link) => link.targetKey)).toContain('world')
+  })
+
+  it('writes the given content without a read, stamped with the current time', async () => {
+    let reads = 0
+    const { index, store } = setup({
+      files: { 'notes/a.md': '# On disk' },
+      onRead: () => {
+        reads += 1
+      },
+    })
+
+    await index.indexNote('notes/a.md', {
+      generation: 7,
+      fileGeneration: FILE_GENERATION,
+      content: '# Given',
+    })
+
+    expect(reads).toBe(0)
+    expect(store.applied().map((note) => [note.title, note.mtime])).toEqual([['Given', 0]])
+  })
+
+  it('rejects when the note cannot be read', async () => {
+    const { index, store } = setup()
+
+    await expect(
+      index.indexNote('notes/missing.md', { generation: 7, fileGeneration: FILE_GENERATION }),
+    ).rejects.toMatchObject({ kind: 'notFound' })
+    expect(store.calls()).toEqual([])
+  })
+
+  it('writes the note after resume when the index is suspended', async () => {
+    const { index, store } = setup({ files: { 'notes/a.md': '# Hello' } })
+    index.suspend()
+
+    await index.indexNote('notes/a.md', { generation: 7, fileGeneration: FILE_GENERATION })
+    expect(store.calls()).toEqual([])
+
+    index.resume(null)
+    await index.drained()
+    expect(store.applied().map((note) => note.path)).toEqual(['notes/a.md'])
+  })
+})
+
 describe('followActivity', () => {
   /**
    * Wait until every pass the lifecycle started has settled.

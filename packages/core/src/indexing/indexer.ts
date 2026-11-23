@@ -4,7 +4,7 @@ import { parseNote } from '../markdown/index.ts'
 import { createAssetDescriptionText, type AssetDescriptionText } from './asset-description-text.ts'
 import { createAssetReferences, type AssetReferences } from './asset-refs.ts'
 import type { SkippedIndexedNote } from './index-store-service.ts'
-import type { ChangesAppliedEmitter, IndexingDeps } from './index-writer.ts'
+import type { IndexingDeps, IndexWriter } from './index-writer.ts'
 import { buildIndexedNote, PROJECTION_VERSION, type IndexedNote } from './indexed-note.ts'
 import { createMoveHealing, type MoveHealing } from './move-healing.ts'
 import { INDEX_PASS_YIELD_EVERY, yieldToEventLoop } from './pacing.ts'
@@ -28,10 +28,6 @@ import { INDEX_PASS_YIELD_EVERY, yieldToEventLoop } from './pacing.ts'
  * `index_meta`, and the stamp is rewritten once the rebuild completes.
  */
 export const PROJECTION_VERSION_KEY = 'projection_version'
-
-export interface NoteIndexerDeps extends IndexingDeps {
-  readonly emitChangesApplied: ChangesAppliedEmitter
-}
 
 /**
  * Options for the long-running index passes.
@@ -92,23 +88,6 @@ export interface IndexPassOptions {
  */
 export interface NoteIndexer {
   /**
-   * Read, parse, and (re)index a single note: the read carries `fileGeneration`
-   * and the write carries the index `generation`.
-   * Without an explicit `mtime` the row is stamped "now": a watcher event
-   * means the file just changed, and a real timestamp beats epoch zero (which
-   * would sink the note to the bottom of every recency sort and, because
-   * reconcile is content-hash gated, never get repaired).
-   */
-  indexNote(
-    path: string,
-    options: {
-      generation: number
-      fileGeneration: number
-      content?: string | undefined
-      mtime?: number | undefined
-    },
-  ): Promise<void>
-  /**
    * Parse `content` and flatten it into the note's index projection: the one
    * home of the parse, asset-description-gather and build step that every
    * indexing path (single note, rebuild, reconcile, watcher batch) shares.
@@ -122,24 +101,19 @@ export interface NoteIndexer {
   ): Promise<IndexedNote>
   /**
    * Re-index every note referencing any of `assetPaths` (Plan 20 search
-   * integration). Asset descriptions are generated *after* their notes are
-   * indexed, so when one is written the referencing notes' search rows are
-   * stale; this folds the new description text into their FTS documents.
-   * `indexNote` is not hash-gated, so the unchanged note files re-index
-   * unconditionally. A note removed since it referenced the asset is
-   * skipped. Writes are pinned to `generation`, reads to `fileGeneration`.
+   * integration) through `writer`. Asset descriptions are generated *after*
+   * their notes are indexed, so when one is written the referencing notes'
+   * search rows are stale; this folds the new description text into their
+   * FTS documents. The note files are unchanged, so each path is marked dirty
+   * with `force`. A note removed since it referenced the asset is skipped.
+   * Any other failure is thrown after the writer settled every note.
    *
-   * The re-applied notes broadcast through `emitChangesApplied`, the same
-   * post-apply signal the live indexer emits, because these writes bypass the
-   * watcher pipeline entirely (`.reflect.md` files are untracked by design).
-   * Without it, subscribers that follow the index (the embedding sync above
-   * all, which must re-embed the notes so the new description text reaches
-   * the semantic leg too) would never hear about description-driven changes.
+   * The writer reports the re-applied notes like any other change, so
+   * subscribers that follow the index (the embedding sync above all, which
+   * must re-embed the notes so the new description text reaches the semantic
+   * leg too) hear about description-driven changes.
    */
-  reindexNotesReferencing(
-    assetPaths: readonly string[],
-    options: { generation: number; fileGeneration: number },
-  ): Promise<void>
+  reindexNotesReferencing(assetPaths: readonly string[], writer: IndexWriter): Promise<void>
   /**
    * Full rebuild: wipe derived tables and re-index every markdown file. Used
    * for explicit repair and schema-bump triggers, not the hot graph-switch
@@ -183,12 +157,12 @@ export interface NoteIndexer {
 }
 
 class NoteIndexerImpl implements NoteIndexer {
-  readonly #deps: NoteIndexerDeps
+  readonly #deps: IndexingDeps
   readonly #assetText: AssetDescriptionText
   readonly #assetReferences: AssetReferences
   readonly #moveHealing: MoveHealing
 
-  constructor(deps: NoteIndexerDeps) {
+  constructor(deps: IndexingDeps) {
     this.#deps = deps
     this.#assetText = createAssetDescriptionText(deps)
     this.#assetReferences = createAssetReferences(deps)
@@ -213,61 +187,25 @@ class NoteIndexerImpl implements NoteIndexer {
     })
   }
 
-  async indexNote(
-    path: string,
-    options: {
-      generation: number
-      fileGeneration: number
-      content?: string | undefined
-      mtime?: number | undefined
-    },
-  ): Promise<void> {
-    const { indexStore: store, noteFile, clock } = this.#deps
-    const content = options.content ?? (await noteFile.read(path, options.fileGeneration))
-    const fileHash = await sha256Hex(content)
-    const note = await this.buildNoteProjection(path, content, {
-      fileHash,
-      mtime: options.mtime ?? clock.now(),
-      fileGeneration: options.fileGeneration,
-    })
-    await store.apply(note, options.generation)
-  }
-
-  async reindexNotesReferencing(
-    assetPaths: readonly string[],
-    options: { generation: number; fileGeneration: number },
-  ): Promise<void> {
-    const { emitChangesApplied } = this.#deps
-    const { generation, fileGeneration } = options
+  async reindexNotesReferencing(assetPaths: readonly string[], writer: IndexWriter): Promise<void> {
     const notePaths = new Set<string>()
     for (const assetPath of assetPaths) {
       for (const notePath of await this.#assetReferences.notePaths(assetPath)) {
         notePaths.add(notePath)
       }
     }
-    const applied: string[] = []
-    try {
-      for (const notePath of notePaths) {
-        try {
-          await this.indexNote(notePath, { generation, fileGeneration })
-          applied.push(notePath)
-        } catch (cause) {
-          if (isAppError(cause) && cause.kind === 'notFound') {
-            continue // the note was removed since it referenced the asset
-          }
-          throw cause
-        }
+    for (const notePath of notePaths) {
+      writer.dirty.add(notePath, { force: true })
+    }
+    const outcomes = await Promise.all([...notePaths].map((path) => writer.settled(path)))
+    for (const outcome of outcomes) {
+      if (outcome.status !== 'failed') {
+        continue
       }
-    } finally {
-      // Emit even when a later note's re-index threw: whatever was applied is
-      // real, and unnotified followers would serve stale vectors until the
-      // next backfill.
-      if (applied.length > 0) {
-        emitChangesApplied(
-          applied.map((path) => ({ path, kind: 'upsert' as const })),
-          generation,
-        )
+      if (isAppError(outcome.error) && outcome.error.kind === 'notFound') {
+        continue // the note was removed since it referenced the asset
       }
+      throw outcome.error
     }
   }
 
@@ -521,6 +459,6 @@ class NoteIndexerImpl implements NoteIndexer {
   }
 }
 
-export function createNoteIndexer(deps: NoteIndexerDeps): NoteIndexer {
+export function createNoteIndexer(deps: IndexingDeps): NoteIndexer {
   return new NoteIndexerImpl(deps)
 }

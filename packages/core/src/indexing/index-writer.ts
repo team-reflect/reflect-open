@@ -96,8 +96,9 @@ export interface IndexWriter {
   readonly fileGeneration: number
   /**
    * Resolve with the outcome of `path` once the run that covers its current
-   * dirty entry settles it. A path that is neither dirty nor in a run
-   * resolves `unchanged` at once.
+   * dirty entry settles it. For a path the run reports, that is after the
+   * report. A path that is neither dirty nor in a run resolves `unchanged`
+   * at once.
    */
   settled(path: string): Promise<IndexWriteOutcome>
   /**
@@ -133,6 +134,10 @@ interface WriterRun {
    * The settled changes to report.
    */
   readonly reported: FileChange[]
+  /**
+   * Releases the waiters of the reported changes.
+   */
+  readonly afterReport: Array<() => void>
   /**
    * File content read while pairing moves, by path.
    */
@@ -276,6 +281,7 @@ class IndexWriterImpl implements IndexWriter {
       open: new Map(entries.map((entry) => [entry.path, entry])),
       waiters: new Map(),
       reported: [],
+      afterReport: [],
       content: new Map(),
     }
     for (const entry of entries) {
@@ -302,6 +308,9 @@ class IndexWriterImpl implements IndexWriter {
     }
     if (run.reported.length > 0 && !this.#disposed) {
       this.#deps.emitChangesApplied(run.reported, this.generation)
+    }
+    for (const release of run.afterReport) {
+      release()
     }
     this.#wake()
   }
@@ -538,10 +547,19 @@ class IndexWriterImpl implements IndexWriter {
       if (waiter === undefined) {
         this.#deps.logger.error(`failed to index change for ${entry.path}:`, outcome.error)
       }
-    } else if (!entry.bulk) {
-      run.reported.push(toFileChange(entry))
+      waiter?.resolve(outcome)
+      return
     }
-    waiter?.resolve(outcome)
+    if (entry.bulk) {
+      waiter?.resolve(outcome)
+      return
+    }
+    run.reported.push(toFileChange(entry))
+    if (waiter !== undefined) {
+      run.afterReport.push(() => {
+        waiter.resolve(outcome)
+      })
+    }
   }
 }
 

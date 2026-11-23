@@ -312,7 +312,7 @@ describe('createIndexWriter', () => {
     expect(writes()).toEqual(['apply:notes/a.md', 'remove:notes/gone.md'])
   })
 
-  it('reports the settled paths of a run after its writes, asset files included', async () => {
+  it('reports the settled paths of a run after its writes and before their waiters resume', async () => {
     const { writer, dirty, reports, writesAtReport, reads } = setup({
       files: { 'notes/a.md': '# a' },
     })
@@ -320,7 +320,7 @@ describe('createIndexWriter', () => {
     dirty.add('assets/x.png', { modifiedMs: 3 })
     dirty.add('notes/a.md')
     dirty.add('notes/gone.md', { kind: 'remove' })
-    await writer.drained()
+    await writer.settled('notes/a.md')
 
     expect(reports).toEqual([
       [

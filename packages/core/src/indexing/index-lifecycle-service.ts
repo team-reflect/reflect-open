@@ -258,9 +258,12 @@ export interface IndexLifecycleService {
    */
   rebuildVisibly(): Promise<void>
   /**
-   * Read, parse, and index one note now, without waiting for the watcher. For
-   * an in-app write whose row must be readable at once. The read carries
-   * `fileGeneration` and the write carries the index `generation`.
+   * Mark one note dirty and wait until the index writer wrote it, without
+   * waiting for the watcher. For an in-app write whose row must be readable
+   * at once. `content` saves the read, which otherwise carries
+   * `fileGeneration`; the write carries the index `generation`. Rejects when
+   * the read or the write failed. Resolves without a write while the index is
+   * suspended; the note stays dirty.
    */
   indexNote(
     path: string,
@@ -327,7 +330,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     const emitChangesApplied = (changes: readonly FileChange[], generation: number): void => {
       this.#emitApplied({ generation, changes })
     }
-    this.#indexer = createNoteIndexer({ ...deps, emitChangesApplied })
+    this.#indexer = createNoteIndexer(deps)
     this.#writerDeps = {
       ...deps,
       emitChangesApplied,
@@ -601,9 +604,8 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     for (const change of notes) {
       writer.dirty.add(change.path, { kind: change.kind, modifiedMs: change.modifiedMs })
     }
-    const outcomes = Promise.all(notes.map((change) => writer.settled(change.path)))
-    await writer.drained()
-    return (await outcomes).filter((outcome) => outcome.status === 'applied').length
+    const outcomes = await Promise.all(notes.map((change) => writer.settled(change.path)))
+    return outcomes.filter((outcome) => outcome.status === 'applied').length
   }
 
   async drained(): Promise<void> {
@@ -649,14 +651,25 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
       mtime?: number | undefined
     },
   ): Promise<void> {
-    await this.#indexer.indexNote(path, options)
+    const writer = this.#writerAt(options.generation, options.fileGeneration)
+    if (writer === null) {
+      return
+    }
+    writer.dirty.add(path, { content: options.content, modifiedMs: options.mtime })
+    const outcome = await writer.settled(path)
+    if (outcome.status === 'failed') {
+      throw outcome.error
+    }
   }
 
   async reindexNotesReferencing(
     assetPaths: readonly string[],
     options: { generation: number; fileGeneration: number },
   ): Promise<void> {
-    await this.#indexer.reindexNotesReferencing(assetPaths, options)
+    const writer = this.#writerAt(options.generation, options.fileGeneration)
+    if (writer !== null) {
+      await this.#indexer.reindexNotesReferencing(assetPaths, writer)
+    }
   }
 
   #emitApplied(event: IndexAppliedEvent): void {
