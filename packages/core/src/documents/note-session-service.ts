@@ -2,7 +2,11 @@ import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import { writeGenerationFor, type GraphSessionSource } from '../graph/graph-session.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { errorMessage, isAppError, AppError } from '../errors.ts'
-import type { NoteFileService, NoteRead, NoteWriteResult } from '../graph/note-file-service.ts'
+import type {
+  NoteRead,
+  NoteWriteResult,
+  WritableNoteFileService,
+} from '../graph/note-file-service.ts'
 import { hasAuthoredTitle, parseNote } from '../markdown/extract.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { notePrivate } from '../privacy/privacy-service.ts'
@@ -36,7 +40,7 @@ interface NoteSessionIo {
 const DEFAULT_SAVE_DEBOUNCE_MS = 800
 
 export interface NoteSessionServiceDeps {
-  readonly noteFile: NoteFileService
+  readonly noteFile: WritableNoteFileService
   readonly clock: ClockService
   readonly logger: LoggerService
   readonly graphSession: GraphSessionSource

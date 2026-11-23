@@ -1,7 +1,7 @@
 import { NoteEditError } from '../tasks/task-errors.ts'
 import { requireGraphSession, type GraphSessionSource } from '../graph/graph-session.ts'
 import { isAppError } from '../errors.ts'
-import type { NoteFileService, NoteRead } from '../graph/note-file-service.ts'
+import type { NoteRead, WritableNoteFileService } from '../graph/note-file-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter.ts'
@@ -144,7 +144,7 @@ export function isOstensiblyEmptyNoteSource(source: string): boolean {
 
 export interface NoteDocumentServiceDeps {
   readonly openDocuments: OpenDocumentsService
-  readonly noteFile: NoteFileService
+  readonly noteFile: WritableNoteFileService
   readonly graphSession: GraphSessionSource
   readonly indexLifecycle: IndexLifecycleService
   readonly logger: LoggerService

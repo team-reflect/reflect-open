@@ -9,6 +9,7 @@ import {
 import type {
   LocalNoteRead,
   NoteFileService,
+  WritableNoteFileService,
   NoteRead,
   NoteWriteResult,
   VaultScanStats,
@@ -73,7 +74,7 @@ export interface NoteFileRead {
   generation: number | undefined
 }
 
-export interface TestNoteFileService extends NoteFileService {
+export interface TestNoteFileService extends WritableNoteFileService {
   /**
    * Put a file into the graph without recording a write.
    */
@@ -320,11 +321,11 @@ export function createTestNoteFileService(
  * A {@link NoteFileService} that forwards each member to `inner`, except the
  * ones `overrides` replaces. The inner service keeps its own behavior.
  */
-class NoteFileOverrideService implements NoteFileService {
-  readonly #inner: NoteFileService
-  readonly #overrides: Partial<NoteFileService>
+class NoteFileOverrideService implements WritableNoteFileService {
+  readonly #inner: WritableNoteFileService
+  readonly #overrides: Partial<WritableNoteFileService>
 
-  constructor(inner: NoteFileService, overrides: Partial<NoteFileService>) {
+  constructor(inner: WritableNoteFileService, overrides: Partial<WritableNoteFileService>) {
     this.#inner = inner
     this.#overrides = overrides
   }
@@ -406,9 +407,9 @@ class NoteFileOverrideService implements NoteFileService {
  * service, which would drop its prototype methods.
  */
 export function overrideNoteFileService(
-  inner: NoteFileService,
-  overrides: Partial<NoteFileService>,
-): NoteFileService {
+  inner: WritableNoteFileService,
+  overrides: Partial<WritableNoteFileService>,
+): WritableNoteFileService {
   return new NoteFileOverrideService(inner, overrides)
 }
 

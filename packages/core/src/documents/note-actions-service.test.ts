@@ -1,7 +1,7 @@
 import type { NoteRow, PinnedNoteRow } from '@reflect/types'
 import { describe, expect, it, vi } from 'vitest'
 import { AppError } from '../errors.ts'
-import type { NoteFileService } from '../graph/note-file-service.ts'
+import type { WritableNoteFileService } from '../graph/note-file-service.ts'
 import { createTestClockService } from '../testing/clock.ts'
 import { createPathService, createPosixPathTransport } from '../ports/path-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
@@ -62,7 +62,7 @@ function indexLifecycleWith(indexNote: () => Promise<never>): IndexLifecycleServ
  * The real service; without `indexLifecycle`, an indexer that only records its calls.
  */
 function createNoteActions(deps: {
-  noteFile: NoteFileService
+  noteFile: WritableNoteFileService
   sessions: readonly NoteSession[]
   progress?: ReturnType<typeof createTestProgressPort>
   indexLifecycle?: IndexLifecycleService
@@ -105,7 +105,7 @@ function setup(options?: {
   /**
    * Wraps the in-memory files, e.g. to make a call fail.
    */
-  wrapNoteFile?: (files: NoteFileService) => NoteFileService
+  wrapNoteFile?: (files: WritableNoteFileService) => WritableNoteFileService
   indexNote?: () => Promise<never>
   /**
    * The pinned shelf the index lists.
@@ -162,7 +162,7 @@ function indexRow(path: string, overrides: Partial<NoteRow> = {}): NoteRow {
 }
 
 function failing(method: 'read' | 'write' | 'delete', error: unknown) {
-  return (files: NoteFileService): NoteFileService => {
+  return (files: WritableNoteFileService): WritableNoteFileService => {
     return overrideNoteFileService(files, {
       [method]: () => {
         return Promise.try(() => {
@@ -577,7 +577,7 @@ describe('togglePrivate', () => {
  * A session of a note with no file yet; `beforeWrite` runs before each write lands.
  */
 function lazySession(
-  files: NoteFileService,
+  files: WritableNoteFileService,
   beforeWrite: () => Promise<void>,
 ): { readonly session: NoteSession; readonly snapshots: NoteSessionSnapshot[] } {
   const snapshots: NoteSessionSnapshot[] = []
@@ -752,7 +752,7 @@ describe('trashOne', () => {
   })
 })
 
-function setupWith(files: NoteFileService, session: NoteSession) {
+function setupWith(files: WritableNoteFileService, session: NoteSession) {
   const { actions } = createNoteActions({ noteFile: files, sessions: [session] })
   return { actions }
 }

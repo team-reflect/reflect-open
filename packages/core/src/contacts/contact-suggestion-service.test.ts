@@ -28,7 +28,7 @@ import {
 } from './contact-suggestion-service.ts'
 import { contactsCanLookup, type ContactsService } from './contacts-service.ts'
 import type { GraphSessionService } from '../graph/graph-session-service.ts'
-import type { NoteFileService } from '../graph/note-file-service.ts'
+import type { WritableNoteFileService } from '../graph/note-file-service.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
 
 const PATH = 'notes/Ada Lovelace.md'
@@ -56,7 +56,7 @@ let service: ContactSuggestionService
 function contactSuggestionsOver(deps?: {
   contacts?: ContactsService
   openDocuments?: OpenDocumentsService
-  noteFile?: NoteFileService
+  noteFile?: WritableNoteFileService
   settings?: SettingsService
   graphSession?: GraphSessionService
 }): ContactSuggestionService {

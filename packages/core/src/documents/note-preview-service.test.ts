@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AppError } from '../errors.ts'
-import type { NoteFileService } from '../graph/note-file-service.ts'
+import type { WritableNoteFileService } from '../graph/note-file-service.ts'
 import type {
   ExistingWikiTargetResolution,
   NoteLinkResolverService,
@@ -66,7 +66,7 @@ function documentsWith(read: () => Promise<string>): NoteDocumentService {
  * The real service over a link resolver and note documents over `noteFile` (empty by default).
  */
 function notePreviewOver(
-  options?: Partial<NotePreviewServiceDeps> & { noteFile?: NoteFileService },
+  options?: Partial<NotePreviewServiceDeps> & { noteFile?: WritableNoteFileService },
 ) {
   const noteFile = options?.noteFile ?? createTestNoteFileService()
   return createNotePreviewService({
@@ -90,7 +90,7 @@ function notePreviewOver(
  */
 function attachmentsOver(listing: () => Promise<readonly { path: string; size: number }[]>) {
   const clock = createTestClockService()
-  const noteFile: NoteFileService = Object.assign(createTestNoteFileService(), {
+  const noteFile: WritableNoteFileService = Object.assign(createTestNoteFileService(), {
     async listAttachments(): Promise<FileMeta[]> {
       return (await listing()).map((entry) => ({ ...entry, modifiedMs: 0 }))
     },

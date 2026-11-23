@@ -768,7 +768,7 @@ export interface CoreInternalServices {
    */
   readonly assetStore: AssetStoreService
   /**
-   * Reads and writes Markdown notes by graph-relative path.
+   * Reads, creates and deletes Markdown notes by graph-relative path.
    */
   readonly noteFile: NoteFileService
   /**

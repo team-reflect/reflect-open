@@ -76,9 +76,9 @@ describe('createCoreServices', () => {
     expect(mobile.mobile?.mobileAudioMemo).toBeDefined()
   })
 
-  it('reports note writes to the composed file-change service', async () => {
+  it('reports note creates to the composed file-change service', async () => {
     const ipc = createTestIpcBridgeService({
-      commands: { note_write: () => ({ modifiedMs: null, merged: null, hash: '' }) },
+      commands: { note_create: () => ({ kind: 'created', modifiedMs: null }) },
     })
     const { services, internal } = composeCoreServices({
       ...requiredAdapters(),
@@ -91,10 +91,9 @@ describe('createCoreServices', () => {
     services.fileChanges.subscribe((batch) => {
       seen.push({ source: batch.source, paths: batch.changes.map((change) => change.path) })
     })
-    await expect(internal.noteFile.write('notes/a.md', 'a', 1)).resolves.toEqual({
-      merged: null,
-      hash: '',
-      modifiedMs: 5,
+    await expect(internal.noteFile.create('notes/a.md', 'a', 1)).resolves.toEqual({
+      kind: 'created',
+      modifiedMs: null,
     })
     expect(seen).toEqual([{ source: 'own-write', paths: ['notes/a.md'] }])
   })

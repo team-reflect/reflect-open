@@ -32,8 +32,9 @@ export interface NoteWriteResult {
 }
 
 /**
- * Markdown notes by graph-relative path. Every write, create and delete is
- * reported to {@link FileChangeService.reportOwnWrite} after it lands.
+ * Markdown notes by graph-relative path: reads, and the changes that cannot
+ * replace the text of a note. Every create and delete is reported to
+ * {@link FileChangeService.reportOwnWrite} after it lands.
  */
 export interface NoteFileService {
   /**
@@ -50,22 +51,6 @@ export interface NoteFileService {
    * rejects with `notFound`.
    */
   readLocal(path: string, generation: number): Promise<LocalNoteRead>
-  /**
-   * Write a note atomically, pinned to `generation`. With `expectedContents`
-   * the write is checked: `null` requires a missing file, and a note whose
-   * disk text moved past `expectedContents` is merged with it (see
-   * {@link NoteWriteResult.merged}). Omitting it writes unconditionally.
-   * With `onMismatch: 'reject'` a checked write whose disk text is neither
-   * `expectedContents` nor `contents` writes nothing and resolves with the
-   * disk text as `merged`.
-   */
-  write(
-    path: string,
-    contents: string,
-    generation: number,
-    expectedContents?: string | null,
-    onMismatch?: 'merge' | 'reject',
-  ): Promise<NoteWriteResult>
   /**
    * Create a note only when `path` is free. A collision is returned, never overwritten.
    */
@@ -96,13 +81,36 @@ export interface NoteFileService {
   vaultScanStats(generation: number): Promise<VaultScanStats>
 }
 
+/**
+ * A {@link NoteFileService} that can also replace the text of a file. Every
+ * write is reported to {@link FileChangeService.reportOwnWrite} after it lands.
+ */
+export interface WritableNoteFileService extends NoteFileService {
+  /**
+   * Write a note atomically, pinned to `generation`. With `expectedContents`
+   * the write is checked: `null` requires a missing file, and a note whose
+   * disk text moved past `expectedContents` is merged with it (see
+   * {@link NoteWriteResult.merged}). Omitting it writes unconditionally.
+   * With `onMismatch: 'reject'` a checked write whose disk text is neither
+   * `expectedContents` nor `contents` writes nothing and resolves with the
+   * disk text as `merged`.
+   */
+  write(
+    path: string,
+    contents: string,
+    generation: number,
+    expectedContents?: string | null,
+    onMismatch?: 'merge' | 'reject',
+  ): Promise<NoteWriteResult>
+}
+
 export interface NoteFileServiceDeps {
   readonly ipc: IpcBridgeService
   readonly clock: ClockService
   readonly fileChanges: FileChangeService
 }
 
-class NoteFileServiceImpl implements NoteFileService {
+class NoteFileServiceImpl implements WritableNoteFileService {
   readonly #deps: NoteFileServiceDeps
 
   constructor(deps: NoteFileServiceDeps) {
@@ -182,6 +190,6 @@ class NoteFileServiceImpl implements NoteFileService {
   }
 }
 
-export function createNoteFileService(deps: NoteFileServiceDeps): NoteFileService {
+export function createNoteFileService(deps: NoteFileServiceDeps): WritableNoteFileService {
   return new NoteFileServiceImpl(deps)
 }
