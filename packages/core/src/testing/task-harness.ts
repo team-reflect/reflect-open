@@ -184,6 +184,7 @@ export interface TaskHarness {
   close(): void
 }
 
+// FIXME: is there any other places that will use `interface TaskHarness` but not `class TaskHarnessImpl`? If not, we can remove the interface and just export the class (e.g. rename TaskHarnessImpl to TaskHarness, move comments from interface into class, remove "createTaskHarness" and just export the class directly)
 class TaskHarnessImpl implements TaskHarness {
   readonly files: TestNoteFileService
   readonly fileChanges: TestFileChangeService
