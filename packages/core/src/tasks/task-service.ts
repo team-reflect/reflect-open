@@ -237,8 +237,7 @@ class TaskServiceImpl implements TaskService {
 
   includeCompleted(): Unlisten {
     this.#completedHolds += 1
-    this.#syncSession()
-    if (this.#store.view().completed === undefined) {
+    if (this.#completedHolds === 1) {
       void this.refresh()
     }
     let held = true

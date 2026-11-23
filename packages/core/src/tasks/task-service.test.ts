@@ -532,6 +532,19 @@ describe('task list state', () => {
     expect(reads.filters()).toEqual([false, null, false])
   })
 
+  it('reads the completed tasks again when they are included after a return', async () => {
+    const { unsubscribe } = await subscribed({ [A]: '+ [ ] one\n+ [x] done\n' })
+    const release = tasks.includeCompleted()
+    await flushMicrotasks()
+    release()
+    unsubscribe()
+
+    tasks.subscribe(noop)
+    tasks.includeCompleted()
+    await flushMicrotasks()
+    expect(markdowns(tasks.get().completed)).toEqual(['done'])
+  })
+
   it('keeps the rows while a read fails, and takes the read that lands after it', async () => {
     await subscribed()
     seedNotes(database, [{ path: A, markdown: '+ [ ] one changed\n' }])
