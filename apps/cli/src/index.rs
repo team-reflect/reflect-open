@@ -15,7 +15,7 @@ use std::time::Duration;
 use rusqlite::{Connection, OpenFlags};
 
 use reflect_index_schema::{
-    INDEX_FILE, LATEST_SCHEMA_VERSION, REFLECT_DIR, is_compatible_schema, read_user_version,
+    INDEX_FILE, MIN_COMPATIBLE_SCHEMA_VERSION, REFLECT_DIR, is_compatible_schema, read_user_version,
 };
 
 use crate::error::CliError;
@@ -66,8 +66,8 @@ pub fn open_read_only(root: &Path) -> IndexOpen {
     if version == 0 {
         return IndexOpen::Unusable("the index exists but has no schema yet".to_string());
     }
-    if version < LATEST_SCHEMA_VERSION {
-        // The CLI never migrates, and its queries need the latest schema.
+    if version < MIN_COMPATIBLE_SCHEMA_VERSION {
+        // The CLI never migrates, and the tables it reads changed since.
         return IndexOpen::Unusable(
             "the index is older than this CLI — open the graph in Reflect to update it".to_string(),
         );

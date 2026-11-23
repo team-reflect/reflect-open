@@ -550,7 +550,7 @@ fn an_index_older_than_the_cli_is_not_queried() {
     fixture.write_note("notes/a.md", "# Alpha\nsearchable text\n");
     fixture.build_index();
     let index = fixture.root().join(".reflect/index.sqlite");
-    let older = (reflect_index_schema::LATEST_SCHEMA_VERSION - 1) as i64;
+    let older = (reflect_index_schema::MIN_COMPATIBLE_SCHEMA_VERSION - 1) as i64;
     rusqlite::Connection::open(index)
         .unwrap()
         .pragma_update(None, "user_version", older)
