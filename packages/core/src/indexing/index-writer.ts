@@ -1,6 +1,7 @@
 import type { NoteRead } from '@reflect/types'
 import { noop, returnFalse } from '@ocavue/utils'
 import type { MaybePromise } from '@reflect/utils'
+import { isAppError } from '../errors.ts'
 import type { XArchiveService } from '../embeds/x-archive-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { isNotePath } from '../graph/paths.ts'
@@ -90,7 +91,8 @@ export interface IndexWriterOptions {
  * The one writer of the index projection. It applies the dirty set in serial
  * runs: each run takes every dirty path, reads the files then (unless a hint
  * carries the content), and writes the rows that differ. The file decides
- * whether a note is removed: a `remove` hint for a file that exists is an upsert.
+ * whether a note is removed: a `remove` hint for a file that exists is an
+ * upsert, and an upsert of a file that is gone is a remove.
  */
 export interface IndexWriter {
   readonly dirty: DirtySet
@@ -394,7 +396,7 @@ class IndexWriterImpl implements IndexWriter {
    * Settle every entry of the run, or return early once the writer stops.
    */
   async #write(run: WriterRun, entries: readonly DirtyEntry[]): Promise<void> {
-    const { indexStore, noteFile, clock } = this.#deps
+    const { noteFile, clock } = this.#deps
     const notes = await this.#checkRemoves(
       run,
       entries.filter((entry) => isNotePath(entry.path)),
@@ -432,16 +434,9 @@ class IndexWriterImpl implements IndexWriter {
         }
       }
       if (entry.kind === 'remove') {
-        // An upsert queued earlier in this run must not land after the remove.
-        await this.#flushApplies(run, applies)
+        await this.#remove(run, entry, applies)
         if (this.#isStopped()) {
           return
-        }
-        try {
-          const { seq } = await this.#commit(indexStore.remove(path, this.generation))
-          this.#settle(run, entry, { status: 'applied', seq })
-        } catch (error) {
-          this.#settle(run, entry, { status: 'failed', stage: 'write', error })
         }
         continue
       }
@@ -455,10 +450,23 @@ class IndexWriterImpl implements IndexWriter {
         this.#settle(run, entry, { status: 'unchanged' })
         continue
       }
+      let note: NoteRead
+      try {
+        note = known ?? (await noteFile.readWithHash(path, this.fileGeneration))
+      } catch (error) {
+        if (isAppError(error) && error.kind === 'notFound') {
+          await this.#remove(run, entry, applies)
+          if (this.#isStopped()) {
+            return
+          }
+        } else {
+          this.#settle(run, entry, { status: 'failed', stage: 'read', error })
+        }
+        continue
+      }
+      const { content, hash: fileHash } = note
       let projection: IndexedNote
       try {
-        const { content, hash: fileHash } =
-          known ?? (await noteFile.readWithHash(path, this.fileGeneration))
         if (!entry.force && stored?.fileHash === fileHash) {
           if (entry.modifiedMs !== undefined && stored.mtime !== entry.modifiedMs) {
             touches.push({ entry, mtime: entry.modifiedMs })
@@ -495,6 +503,23 @@ class IndexWriterImpl implements IndexWriter {
     // so a reader of the report sees the notes of the same run.
     for (const entry of run.open.values()) {
       this.#settle(run, entry, { status: 'unchanged' })
+    }
+  }
+
+  /**
+   * Remove the rows of `entry`, after the applies queued before it. Leaves
+   * the entry open when the writer stopped.
+   */
+  async #remove(run: WriterRun, entry: DirtyEntry, applies: PendingApply[]): Promise<void> {
+    await this.#flushApplies(run, applies)
+    if (this.#isStopped()) {
+      return
+    }
+    try {
+      const { seq } = await this.#commit(this.#deps.indexStore.remove(entry.path, this.generation))
+      this.#settle(run, entry, { status: 'applied', seq })
+    } catch (error) {
+      this.#settle(run, entry, { status: 'failed', stage: 'write', error })
     }
   }
 

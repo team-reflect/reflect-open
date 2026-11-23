@@ -1,4 +1,4 @@
-import { errorMessage, isAppError } from '../errors.ts'
+import { errorMessage } from '../errors.ts'
 import { createAssetReferences, type AssetReferences } from './asset-refs.ts'
 import type { SkippedIndexedNote } from './index-store-service.ts'
 import type { IndexingDeps, IndexWriteOutcome, IndexWriter } from './index-writer.ts'
@@ -79,8 +79,7 @@ export interface NoteIndexer {
    * their notes are indexed, so when one is written the referencing notes'
    * search rows are stale; this folds the new description text into their
    * FTS documents. The note files are unchanged, so each path is marked dirty
-   * with `force`. A note removed since it referenced the asset is skipped.
-   * Any other failure is thrown after the writer settled every note.
+   * with `force`. A failure is thrown after the writer settled every note.
    *
    * The writer reports the re-applied notes like any other change, so
    * subscribers that follow the index (the embedding sync above all, which
@@ -148,13 +147,9 @@ class NoteIndexerImpl implements NoteIndexer {
     }
     const outcomes = await Promise.all([...notePaths].map((path) => writer.settled(path)))
     for (const outcome of outcomes) {
-      if (outcome.status !== 'failed') {
-        continue
+      if (outcome.status === 'failed') {
+        throw outcome.error
       }
-      if (isAppError(outcome.error) && outcome.error.kind === 'notFound') {
-        continue // the note was removed since it referenced the asset
-      }
-      throw outcome.error
     }
   }
 
@@ -245,43 +240,15 @@ class NoteIndexerImpl implements NoteIndexer {
     if (outcomes === null) {
       return false
     }
-    const indexed = new Set(
-      scan.candidates
-        .filter((candidate) => candidate.storedHash !== null)
-        .map((candidate) => candidate.path),
-    )
-    /**
-     * Rows whose file vanished between the scan and the read.
-     */
-    const ghosts: string[] = []
     for (const [path, outcome] of outcomes) {
-      if (outcome.status !== 'failed') {
-        continue
-      }
-      if (outcome.stage === 'read') {
-        // A file that is gone leaves a ghost row to remove in this pass. Any
-        // other read failure keeps the row for the next pass.
-        if (isAppError(outcome.error) && outcome.error.kind === 'notFound' && indexed.has(path)) {
-          ghosts.push(path)
-        }
+      // A read failure keeps the row for the next pass.
+      if (outcome.status !== 'failed' || outcome.stage === 'read') {
         continue
       }
       if (onSkippedNote === undefined) {
         throw outcome.error
       }
       onSkippedNote({ path, message: errorMessage(outcome.error) })
-    }
-    for (const path of ghosts) {
-      writer.dirty.add(path, { kind: 'remove', bulk: true })
-    }
-    const removals = await this.#settlePaths(writer, ghosts, signal, undefined)
-    if (removals === null) {
-      return false
-    }
-    for (const outcome of removals.values()) {
-      if (outcome.status === 'failed') {
-        throw outcome.error
-      }
     }
     onFileProgress?.(total, total, total)
     return true

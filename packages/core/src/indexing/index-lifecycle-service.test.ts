@@ -1138,11 +1138,16 @@ describe('indexNote', () => {
   })
 
   it('rejects when the note cannot be read', async () => {
-    const { index, store } = setup()
+    const { index, store } = setup({
+      files: { 'notes/a.md': '# Hello' },
+      onRead: () => {
+        throw new AppError('io', 'unreadable')
+      },
+    })
 
     await expect(
-      index.indexNote('notes/missing.md', { generation: 7, fileGeneration: FILE_GENERATION }),
-    ).rejects.toMatchObject({ kind: 'notFound' })
+      index.indexNote('notes/a.md', { generation: 7, fileGeneration: FILE_GENERATION }),
+    ).rejects.toMatchObject({ kind: 'io' })
     expect(store.calls()).toEqual([])
   })
 

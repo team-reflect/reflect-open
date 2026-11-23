@@ -323,13 +323,18 @@ describe('createIndexWriter', () => {
   })
 
   it('logs a failure nobody waits for', async () => {
-    const { writer, dirty, logger } = setup()
+    const { writer, dirty, logger } = setup({
+      files: { 'notes/bad.md': '# bad' },
+      read: () => {
+        throw new AppError('io', 'unreadable')
+      },
+    })
 
-    dirty.add('notes/missing.md')
+    dirty.add('notes/bad.md')
     await writer.drained()
 
     expect(logger.getErrors().map((entry) => entry.message)).toEqual([
-      'failed to index change for notes/missing.md:',
+      'failed to index change for notes/bad.md:',
     ])
   })
 
@@ -395,6 +400,18 @@ describe('createIndexWriter', () => {
     expect(reports).toEqual([[{ path: 'notes/x.md', kind: 'upsert' }]])
   })
 
+  it('removes the rows of an upsert whose file is gone', async () => {
+    const { writer, dirty, writes, reports } = setup()
+
+    dirty.add('notes/gone.md', { kind: 'remove' })
+    dirty.add('notes/gone.md')
+    const outcome = await writer.settled('notes/gone.md')
+
+    expect(outcome.status).toBe('applied')
+    expect(writes()).toEqual(['remove:notes/gone.md'])
+    expect(reports).toEqual([[{ path: 'notes/gone.md', kind: 'upsert' }]])
+  })
+
   it('writes a queued upsert before a later remove of the same run', async () => {
     const { writer, dirty, writes } = setup({ files: { 'notes/a.md': '# a' } })
 
@@ -448,11 +465,18 @@ describe('createIndexWriter', () => {
   })
 
   it('reports neither a `bulk` path nor a failed one', async () => {
-    const { writer, dirty, reports, writes } = setup({ files: { 'notes/pass.md': '# pass' } })
+    const { writer, dirty, reports, writes } = setup({
+      files: { 'notes/pass.md': '# pass', 'notes/bad.md': '# bad' },
+      read: (path) => {
+        if (path === 'notes/bad.md') {
+          throw new AppError('io', 'unreadable')
+        }
+      },
+    })
 
     dirty.add('notes/pass.md', { bulk: true })
-    dirty.add('notes/missing.md')
-    await writer.settled('notes/missing.md')
+    dirty.add('notes/bad.md')
+    await writer.settled('notes/bad.md')
     await writer.drained()
 
     expect(writes()).toEqual(['apply:notes/pass.md'])
