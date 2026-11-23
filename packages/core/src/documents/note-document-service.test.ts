@@ -172,10 +172,21 @@ describe('commitSourceEdit', () => {
     expect(noteFile.writes()).toEqual([])
   })
 
-  it('refuses as not writable when the session declines, without touching disk', async () => {
+  it('writes disk when a session without unsaved edits declines', async () => {
     const { noteDocuments, noteFile } = setup({
       files: { 'notes/a.md': 'disk\n' },
-      session: { content: 'live\n', accepts: false },
+      session: { content: 'disk\n', accepts: false },
+    })
+    await expect(
+      noteDocuments.commitSourceEdit('notes/a.md', shout, { generation: 7 }),
+    ).resolves.toMatchObject({ content: 'DISK\n', revision: sha256HexSync('DISK\n') })
+    expect(noteFile.writes()).toEqual([{ path: 'notes/a.md', contents: 'DISK\n', generation: 7 }])
+  })
+
+  it('refuses as not writable when a session with unsaved edits declines', async () => {
+    const { noteDocuments, noteFile } = setup({
+      files: { 'notes/a.md': 'disk\n' },
+      session: { content: 'live\n', accepts: false, dirty: true },
     })
     await expect(
       noteDocuments.commitSourceEdit('notes/a.md', shout, { generation: 7 }),

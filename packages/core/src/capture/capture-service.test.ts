@@ -607,10 +607,10 @@ describe('CaptureService (X posts)', () => {
     session.dispose()
   })
 
-  it('keeps the X post queued while the open daily document cannot take it', async () => {
+  it('keeps the X post queued while the open daily with unsaved edits cannot take it', async () => {
     const kit = setup()
     kit.openDocuments.register({
-      session: createTestNoteSession({ path: DAILY, accepts: false }),
+      session: createTestNoteSession({ path: DAILY, accepts: false, dirty: true }),
     })
     kit.captureInbox.add(`${X_POST.id}.json`, X_POST)
 

@@ -56,7 +56,8 @@ wants, so a task that already has that state when the write starts stays as it
 is.
 
 `commitSourceEdit` applies a transform to the note. For an open note the
-transform runs on the editor session buffer. For a closed note it runs on the
+transform runs on the editor session buffer. For a closed note, or an open
+note whose session cannot take the edit and has no unsaved text, it runs on the
 file text, and the write lands only while the file still holds that text; a
 file that changed runs the transform again.
 

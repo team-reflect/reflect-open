@@ -60,11 +60,12 @@ export interface NoteDocumentService {
    * routing the same way every time: when the note is **open**, through its
    * live session, which transforms its in-memory buffer synchronously, so
    * unsaved edits survive and there's no read-then-write gap for a concurrent
-   * keystroke. The session declines (and we refuse rather than clobber via
-   * disk) only when it can't persist now (failed to load, protected/read-only,
-   * or disposed); a session still loading waits for its load instead.
-   * A decline is surfaced as `notWritable` {@link NoteEditError}. When the note is **not**
-   * open, disk is the source of truth: read, transform, and write only while
+   * keystroke. The session declines only when it can't persist now (failed
+   * to load, protected/read-only, or disposed); a session still loading waits
+   * for its load instead. A decline of a session with unsaved edits is
+   * surfaced as `notWritable` {@link NoteEditError}. When the note is **not**
+   * open, or its session declined and holds no unsaved edits, disk is the
+   * source of truth: read, transform, and write only while
    * the file still holds the text that was read. A file that changed in
    * between runs `transform` again on its new text, and
    * `conflict` {@link NoteEditError} is thrown after three attempts. A `transform`
@@ -233,29 +234,31 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
     // pre-write source and clobber this one.
     return this.#serializeByPath(path, async (): Promise<NoteCommitResult> => {
       const owner = openDocuments.sessionFor(path)
-      if (owner === null) {
-        return await this.#commitToDisk(
-          path,
-          (source, revision) => transform(source ?? '', revision),
-          options.generation,
-          options.createIfMissing === true,
-        )
+      if (owner !== null) {
+        const commit = await owner.commitSourceEdit(transform)
+        if (commit !== null) {
+          const indexSeq =
+            commit.revision === null
+              ? null
+              : await this.#indexCommit(path, options.generation, {
+                  content: commit.content,
+                  hash: commit.revision,
+                })
+          return { ...commit, indexSeq }
+        }
+        if (owner.isDirty()) {
+          throw new NoteEditError(
+            'notWritable',
+            'This note can’t be updated right now — try again in a moment.',
+          )
+        }
       }
-      const commit = await owner.commitSourceEdit(transform)
-      if (commit === null) {
-        throw new NoteEditError(
-          'notWritable',
-          'This note can’t be updated right now — try again in a moment.',
-        )
-      }
-      const indexSeq =
-        commit.revision === null
-          ? null
-          : await this.#indexCommit(path, options.generation, {
-              content: commit.content,
-              hash: commit.revision,
-            })
-      return { ...commit, indexSeq }
+      return await this.#commitToDisk(
+        path,
+        (source, revision) => transform(source ?? '', revision),
+        options.generation,
+        options.createIfMissing === true,
+      )
     })
   }
 

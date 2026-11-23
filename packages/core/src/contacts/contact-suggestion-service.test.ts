@@ -84,8 +84,8 @@ function contactSuggestionsOver(deps?: {
  * Open the note in a pane: the session's buffer is then the note's live source.
 
  */
-function openNote(content: string, options: { accepts?: boolean } = {}): TestNoteSession {
-  const session = createTestNoteSession({ path: PATH, content, accepts: options.accepts ?? true })
+function openNote(content: string): TestNoteSession {
+  const session = createTestNoteSession({ path: PATH, content })
   openDocuments.register({ session })
   return session
 }
@@ -181,8 +181,15 @@ describe('addToNote', () => {
     expect(noteFile.writes()).toEqual([])
   })
 
-  it('refuses rather than clobber when the open session cannot take the append', async () => {
-    openNote('# Ada Lovelace\n', { accepts: false })
+  it('refuses rather than clobber when a session with unsaved edits cannot take the append', async () => {
+    openDocuments.register({
+      session: createTestNoteSession({
+        path: PATH,
+        content: '# Ada Lovelace\n',
+        accepts: false,
+        dirty: true,
+      }),
+    })
 
     await expect(service.addToNote(PATH, ADA)).rejects.toThrow(/can’t be updated right now/)
     expect(noteFile.writes()).toEqual([])

@@ -75,8 +75,8 @@ function movedFrom(
 /**
  * An open session of `notes/a.md` holding `source`.
  */
-function sessionOver(source: string, applied = true): TestNoteSession {
-  return createTestNoteSession({ path: 'notes/a.md', content: source, accepts: applied })
+function sessionOver(source: string): TestNoteSession {
+  return createTestNoteSession({ path: 'notes/a.md', content: source })
 }
 
 const task = ref('+ [ ] do it\n')
@@ -193,8 +193,15 @@ describe('writeTask', () => {
     expect(noteFile.writes()).toEqual([])
   })
 
-  it('refuses as not writable when the session declines, never clobbering via disk', async () => {
-    openSession(sessionOver('+ [ ] do it\n', false))
+  it('refuses as not writable when a session with unsaved edits declines', async () => {
+    openSession(
+      createTestNoteSession({
+        path: 'notes/a.md',
+        content: '+ [ ] do it\n',
+        accepts: false,
+        dirty: true,
+      }),
+    )
 
     await expect(tasks.writeTask(task, [{ kind: 'remove' }])).rejects.toMatchObject({
       kind: 'notWritable',

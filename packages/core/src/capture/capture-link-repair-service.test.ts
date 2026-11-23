@@ -210,11 +210,16 @@ describe('CaptureLinkRepairService', () => {
     expect(write).not.toHaveBeenCalled()
   })
 
-  it('skips an open daily that cannot take the edit', async () => {
+  it('skips an open daily with unsaved edits that cannot take the edit', async () => {
     await addCapture()
     const daily = `- ${PLACEHOLDER_LINK}\n`
     noteFile.set(DAILY, daily)
-    const session = createTestNoteSession({ path: DAILY, content: daily, accepts: false })
+    const session = createTestNoteSession({
+      path: DAILY,
+      content: daily,
+      accepts: false,
+      dirty: true,
+    })
     openDocuments.register({ session })
 
     await repair.sweep(3)
