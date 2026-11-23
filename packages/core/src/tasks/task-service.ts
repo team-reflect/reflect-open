@@ -103,7 +103,6 @@ class TaskServiceImpl implements TaskService {
   #store = this.#createStore()
   readonly #state = new WritableStore<TaskStoreView>(this.#store.view(), isShallowEqual)
   #sessionKey: string | null = null
-  #indexGeneration: number | null = null
   /**
    * Aborts the reads of the graph that `#store` belongs to.
    */
@@ -259,15 +258,10 @@ class TaskServiceImpl implements TaskService {
 
   /**
    * Start an empty store for a graph that replaced the open one, and show
-   * it; `true` when it did. An index that was opened again counts its seqs from zero.
+   * it; `true` when it did.
    */
   #adoptSession(): boolean {
     const { session } = this.#deps.graphSession.get()
-    const indexGeneration = session?.indexGeneration ?? null
-    if (indexGeneration !== this.#indexGeneration) {
-      this.#indexGeneration = indexGeneration
-      this.#store.forgetSeqs()
-    }
     const key = sessionKey(session)
     if (key === this.#sessionKey) {
       return false

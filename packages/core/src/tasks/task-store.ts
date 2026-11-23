@@ -485,13 +485,6 @@ export class TaskStore {
   }
 
   /**
-   * Forget the index seqs, for an index that counts from zero again.
-   */
-  forgetSeqs(): void {
-    this.#seqs.clear()
-  }
-
-  /**
    * The row of `taskId` in `notePath` as the base holds it, with the address
    * of the task in the note text at the row's revision.
    */

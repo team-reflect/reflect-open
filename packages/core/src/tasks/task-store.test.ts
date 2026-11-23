@@ -172,15 +172,6 @@ describe('TaskStore reads', () => {
     store.landAll(openRead(5, { [A]: '+ [ ] a2\n', [B]: '+ [ ] b3\n' }), false)
     expect(labels(store.view().open)).toEqual(['t0:a2', 't2:b3'])
   })
-
-  it('takes older reads again after the index seqs are forgotten', () => {
-    const store = createStore()
-    store.landAll(openRead(9, { [A]: '+ [ ] a\n' }), false)
-    store.forgetSeqs()
-
-    store.landAll(openRead(1, { [A]: '+ [ ] rebuilt\n' }), false)
-    expect(labels(store.view().open)).toEqual(['t0:rebuilt'])
-  })
 })
 
 describe('TaskStore struck tasks', () => {

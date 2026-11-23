@@ -9,7 +9,7 @@ code is in `packages/core/src/tasks/`, `packages/core/src/documents/` and
 | Term | Meaning |
 | --- | --- |
 | revision | The lowercase hex SHA-256 of the full text of a note file. Rust computes it; every note read and write returns it. |
-| index seq | The commit number of the index. Each committed write transaction adds one. A read returns the seq it saw. |
+| index seq | The count of index write transactions that the running app committed. It is kept in memory, not in the index file, and it only grows: over a reopen, another graph, a rebuild and a reset of a corrupt file. A write returns the seq after its commit. A read returns the seq from before its query, so its rows are never older than its seq. |
 | address | Where a task is in the note text at one revision: `{ notePath, revision, astPath, markdown, checked }`. Only writes use it. |
 | identity | The `taskId` that `TaskStore` gives a task. It is stable for one run of the app, and it is the React key and the key of selection, struck state and drafts. |
 | pending op | A change that a write in flight is about to make. The rows show it until the write ends. |
