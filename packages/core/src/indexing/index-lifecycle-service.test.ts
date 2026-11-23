@@ -65,9 +65,10 @@ afterEach(() => {
 /**
  * A lifecycle over test doubles, with every event recorded. The index is
  * stamped with the current projection version, so a sync pass is one
- * reconcile scan (`scan` in `steps`). The hooks run inside the matching call
- * of the pass: `onScan` may hold or reject the reconcile, `onSubscribe` runs
- * as the live subscription attaches, `onWatchStart` as the watcher starts.
+ * reconcile scan (`scan` in `steps`). The hooks run inside the matching
+ * call: `onScan` may hold or reject the reconcile, `onSubscribe` runs as the
+ * lifecycle subscribes to the file-change stream, `onWatchStart` as the
+ * watcher starts.
  */
 function setup(options?: {
   files?: Readonly<Record<string, string>>
@@ -219,7 +220,7 @@ function setup(options?: {
      */
     passes: () => steps.filter((step) => step === 'scan').length,
     /**
-     * Live subscriptions currently attached to the change stream.
+     * Subscriptions currently attached to the change stream.
      */
     subscriptions: () => fileChanges.listenerCount().changes,
   }
@@ -287,14 +288,13 @@ describe('createIndexLifecycleService', () => {
     expect(steps).toEqual(['watchStop'])
   })
 
-  it('sync(session) reconciles, then subscribes, then starts the watcher', async () => {
+  it('sync(session) subscribes, then reconciles, then starts the watcher', async () => {
     const { index, store, fileChanges, steps, applied, subscriptions } = setup()
     index.sync(sessionAt(5))
     await index.settled() // settle without aborting: `stop()` skips the tail
 
     expect(store.calls()).toContainEqual({ method: 'reconcileScan', generation: 5 })
-    // Sequenced: reconcile → subscribe → watchStart.
-    expect(steps).toEqual(['scan', 'subscribe', 'watchStart'])
+    expect(steps).toEqual(['subscribe', 'scan', 'watchStart'])
     // The initial reconcile is itself an index change: invalidate once there.
     expect(applied).toEqual([{ generation: 5, changes: null }])
     expect(fileChanges.watcherRunning()).toBe(true)
@@ -408,7 +408,7 @@ describe('createIndexLifecycleService', () => {
     expect(reconciled).toEqual([])
   })
 
-  it('an aborted pass runs no tail: no events, no subscribe, no watcher', async () => {
+  it('an aborted pass runs no tail: no events, no watcher', async () => {
     // `stop()` aborts without ending the session, so an interrupted pass
     // bails on its own signal. Whoever stopped it either starts a replacement
     // pass (`refresh`, a graph switch) or tears the lifecycle down (`close`),
@@ -418,7 +418,6 @@ describe('createIndexLifecycleService', () => {
     await index.stop()
     expect(applied).toEqual([])
     expect(reconciled).toEqual([])
-    expect(steps).not.toContain('subscribe')
     expect(steps).not.toContain('watchStart')
     expect(logger.getInfos()).toEqual([])
   })
@@ -442,16 +441,16 @@ describe('createIndexLifecycleService', () => {
     expect(progress).toEqual(['reconciling', 'idle'])
   })
 
-  it('bails after reconcile when superseded — no subscribe, no watcher', async () => {
-    const { index, steps } = setup()
+  it('bails after reconcile when superseded: no subscription, no watcher', async () => {
+    const { index, steps, subscriptions } = setup()
     index.sync(endedSessionAt(5)) // stale immediately after reconcile
     await index.settled()
-    expect(steps).toEqual(['scan'])
+    expect(steps).toEqual(['subscribe', 'scan'])
+    expect(subscriptions()).toBe(0)
   })
 
-  it('tears down a subscription created after supersession (no listener leak)', async () => {
+  it('drops the subscription of a session that ends while it subscribes', async () => {
     const opened = new AbortController()
-    // Fresh through the reconcile, stale by the time the subscription exists.
     const { index, steps, subscriptions } = setup({
       onSubscribe: () => {
         opened.abort()
@@ -459,23 +458,35 @@ describe('createIndexLifecycleService', () => {
     })
     index.sync(sessionAt(5, opened.signal))
     await index.settled()
-    expect(steps).toEqual(['scan', 'subscribe'])
-    expect(subscriptions()).toBe(0) // pending subscription cleaned up
+    expect(steps).toEqual(['subscribe', 'scan'])
+    expect(subscriptions()).toBe(0)
   })
 
-  it('an abort during the subscribe drops the pending subscription', async () => {
-    const harness = setup({
-      onSubscribe: () => {
-        void harness.index.stop()
-      },
-    })
-    harness.index.sync(sessionAt(5))
-    await harness.index.settled()
-    expect(harness.steps).toEqual(['scan', 'subscribe'])
-    expect(harness.subscriptions()).toBe(0) // pending subscription cleaned up
+  it('drops the subscription when its session ends', async () => {
+    const opened = new AbortController()
+    const { index, subscriptions } = setup()
+    index.sync(sessionAt(5, opened.signal))
+    await index.settled()
+    expect(subscriptions()).toBe(1)
+
+    opened.abort()
+    expect(subscriptions()).toBe(0)
   })
 
-  it('an abort during the watcher start leaves the subscription unadopted', async () => {
+  it('keeps one subscription across refresh passes', async () => {
+    const { index, steps, subscriptions } = setup()
+    const session = sessionAt(5)
+    index.sync(session)
+    await index.settled()
+    index.refresh(session)
+    await vi.waitFor(() => expect(steps.filter((step) => step === 'scan')).toHaveLength(2))
+    await index.settled()
+
+    expect(steps.filter((step) => step === 'subscribe')).toHaveLength(1)
+    expect(subscriptions()).toBe(1)
+  })
+
+  it('an abort during the watcher start keeps the subscription and never goes live', async () => {
     const harness = setup({
       onWatchStart: () => {
         void harness.index.stop()
@@ -483,9 +494,9 @@ describe('createIndexLifecycleService', () => {
     })
     harness.index.sync(sessionAt(5))
     await harness.index.settled()
-    // Dropped rather than adopted, and the pass never claims to be live. The
-    // watcher stays up for the replacement pass; only `close` stops it.
-    expect(harness.subscriptions()).toBe(0)
+    // The pass never claims to be live. The watcher stays up for the
+    // replacement pass; only `close` stops it.
+    expect(harness.subscriptions()).toBe(1)
     expect(harness.fileChanges.watcherRunning()).toBe(true)
     expect(harness.progress).toEqual(['reconciling'])
   })
@@ -517,7 +528,7 @@ describe('createIndexLifecycleService', () => {
     held.settles[0]!()
     await stopping
     // Aborted before the reconcile returned: the pass wrote nothing further.
-    expect(steps).toEqual(['scan'])
+    expect(steps).toEqual(['subscribe', 'scan'])
   })
 
   it('stop() before any sync resolves immediately', async () => {
@@ -536,7 +547,7 @@ describe('createIndexLifecycleService', () => {
     expect(fileChanges.watcherRunning()).toBe(false)
   })
 
-  it('sync() drops the previous live subscription before the next pass', async () => {
+  it('sync() at a newer generation drops the subscription of the previous one', async () => {
     const { index, subscriptions } = setup()
     index.sync(sessionAt(5))
     await index.settled()
@@ -567,7 +578,7 @@ describe('createIndexLifecycleService', () => {
     expect(passes()).toBe(2)
   })
 
-  it.fails('applies a change reported while a refresh pass runs', async () => {
+  it('applies a change reported while a refresh pass runs', async () => {
     const held = heldScans()
     const { index, store, files, fileChanges } = setup({
       files: { 'a.md': '+ [ ] a\n' },
@@ -614,7 +625,7 @@ describe('createIndexLifecycleService', () => {
     await vi.waitFor(() => expect(passes()).toBe(1))
     await index.settled()
 
-    expect(steps).toEqual(['scan', 'subscribe', 'watchStart'])
+    expect(steps).toEqual(['subscribe', 'scan', 'watchStart'])
   })
 
   it('resume(null) clears suspension without starting work before graph open', async () => {
@@ -627,7 +638,7 @@ describe('createIndexLifecycleService', () => {
 
     index.sync(sessionAt(5))
     await index.settled()
-    expect(steps).toEqual(['scan', 'subscribe', 'watchStart'])
+    expect(steps).toEqual(['subscribe', 'scan', 'watchStart'])
   })
 
   it('suspend() aborts bulk work, drops live work, and resume coalesces catch-up triggers', async () => {

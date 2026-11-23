@@ -115,11 +115,12 @@ export interface IndexLifecycleService {
    */
   open(): Promise<number | null>
   /**
-   * Background-sync the open index of `session`: sync the whole graph
-   * (hash reconcile, or a full rebuild when the stored projection version is
-   * stale), then subscribe to live file changes, then start the Rust watcher.
-   * The pass marks files dirty and the index writer of the session writes
-   * them, so index writes never run concurrently. The pass bails between
+   * Background-sync the open index of `session`: follow the file-change
+   * stream until the session ends, sync the whole graph (hash reconcile, or a
+   * full rebuild when the stored projection version is stale), then start the
+   * Rust watcher. The stream and the pass both mark files dirty and the index
+   * writer of the session writes them, so index writes never run concurrently
+   * and a change reported during a pass is written. The pass bails between
    * steps once `session.signal` aborts; a session without an index runs none.
    * Call only after the graph row is committed.
    */
@@ -142,21 +143,23 @@ export interface IndexLifecycleService {
    */
   settled(): Promise<void>
   /**
-   * Fully close the active index lifecycle: abort any reconcile, drop the live
-   * subscription, stop the file watcher, and report idle progress.
+   * Fully close the active index lifecycle: abort any reconcile, stop
+   * following the file-change stream, stop the file watcher, and report idle
+   * progress.
    */
   close(): Promise<void>
   /**
    * Suspend index writes for a backgrounded mobile app: abort the bulk pass,
-   * pause the index writer, and drop the live subscription synchronously. A later
-   * {@link IndexLifecycleService.resume} reconciles the whole graph, so file
-   * events missed while suspended converge.
+   * pause the index writer, and stop following the file-change stream
+   * synchronously. A later {@link IndexLifecycleService.resume} follows it
+   * again and reconciles the whole graph, so file events missed while
+   * suspended converge.
    */
   suspend(): void
   /**
    * Resume after {@link IndexLifecycleService.suspend} and run one coalesced
-   * full sync for anything that changed while the live subscription was
-   * absent. A null session, or one without an index, clears suspension
+   * full sync for anything that changed while the file-change stream was not
+   * followed. A null session, or one without an index, clears suspension
    * without starting work (foreground can precede graph open).
    */
   resume(session: GraphSession | null): void
@@ -315,7 +318,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
   #done: Promise<void> = Promise.resolve()
   #suspended = false
   #suspendGuard: (() => boolean) | null = null
-  #liveUnlisten: (() => void) | null = null
+  #following: { readonly writer: IndexWriter; readonly stop: Unlisten } | null = null
   #refreshRunning = false
   #refreshQueued = false
   #rebuildInFlight: { generation: number; promise: Promise<void> } | null = null
@@ -355,28 +358,29 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     const { clock, logger, fileChanges } = this.#deps
     const { indexGeneration: generation, generation: fileGeneration } = session
     const isStale = (): boolean => session.signal.aborted
-    // Tear down the previous graph's live subscription unconditionally, so a
-    // failed/absent open can't leave it bound to a different graph.
-    this.#liveUnlisten?.()
-    this.#liveUnlisten = null
-
-    if (generation === null || this.#isSuspended()) {
+    if (generation === null) {
+      // No index: a writer of the previous graph must not stay bound to the stream.
+      this.#dropWriter()
+      return
+    }
+    if (this.#isSuspended()) {
       return
     }
     const writer = this.#writerAt(generation, fileGeneration)
     if (writer === null) {
       return
     }
-    if (session.signal.aborted) {
-      writer.dispose()
-    }
     session.signal.addEventListener(
       'abort',
       () => {
-        writer.dispose()
+        this.#disposeWriter(writer)
       },
       { once: true },
     )
+    this.#follow(writer)
+    if (session.signal.aborted) {
+      this.#disposeWriter(writer)
+    }
 
     this.#emitProgress('reconciling')
     const controller = new AbortController()
@@ -388,9 +392,6 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     let passTotal = 0
     let passWorked = 0
     this.#done = (async () => {
-      // A subscription created but not yet adopted (superseded mid-flight, or a
-      // later step threw) is torn down in `finally` so listeners can't leak.
-      let pending: (() => void) | null = null
       try {
         if (this.#isSuspended()) {
           return
@@ -430,8 +431,8 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
         // Aborted counts as superseded at every step below: `stop()` aborts
         // without making `isStale()` true, and every caller that stops a pass
         // (`refresh`, `close`, a graph switch) either starts a replacement pass
-        // or tears the lifecycle down. Letting a stopped pass subscribe, start
-        // the watcher, and reload every open note is churn the replacement pass
+        // or tears the lifecycle down. Letting a stopped pass start the
+        // watcher and reload every open note is churn the replacement pass
         // immediately undoes and redoes. The watcher itself is left running:
         // only `close` wants it stopped, and it stops the watcher itself.
         if (controller.signal.aborted || isStale() || this.#isSuspended()) {
@@ -441,25 +442,16 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
         for (const listener of this.#reconciledListeners) {
           void listener({ generation, fileGeneration, source: 'sync' })
         }
-        pending = followFileChanges(fileChanges, writer.dirty)
-        if (controller.signal.aborted || isStale() || this.#isSuspended()) {
-          return
-        }
         await fileChanges.startWatcher()
         if (controller.signal.aborted || isStale() || this.#isSuspended()) {
           return
         }
-        this.#liveUnlisten?.()
-        this.#liveUnlisten = pending
-        pending = null // ownership transferred
         this.#emitProgress('live')
       } catch (error) {
         this.#reportError('sync', error)
         if (!isStale()) {
           this.#emitProgress('idle')
         }
-      } finally {
-        pending?.()
       }
     })()
   }
@@ -503,10 +495,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
 
   async close(): Promise<void> {
     await this.stop()
-    this.#liveUnlisten?.()
-    this.#liveUnlisten = null
-    this.#writer?.dispose()
-    this.#writer = null
+    this.#dropWriter()
     this.#suspended = false
     this.#emitProgress('idle')
     try {
@@ -521,8 +510,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     this.#suspended = true
     this.#abort?.abort()
     this.#writer?.pause()
-    this.#liveUnlisten?.()
-    this.#liveUnlisten = null
+    this.#unfollow()
     this.#emitProgress('idle')
   }
 
@@ -709,7 +697,9 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     if (current !== null && current.generation > generation) {
       return null
     }
-    current?.dispose()
+    if (current !== null) {
+      this.#disposeWriter(current)
+    }
     const writer = createIndexWriter(this.#writerDeps, {
       dirty: createDirtySet(),
       generation,
@@ -720,6 +710,37 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     }
     this.#writer = writer
     return writer
+  }
+
+  /**
+   * Mark the files that the file-change stream reports dirty in `writer`,
+   * until the writer is disposed.
+   */
+  #follow(writer: IndexWriter): void {
+    if (this.#following?.writer === writer) {
+      return
+    }
+    this.#unfollow()
+    this.#following = { writer, stop: followFileChanges(this.#deps.fileChanges, writer.dirty) }
+  }
+
+  #unfollow(): void {
+    this.#following?.stop()
+    this.#following = null
+  }
+
+  #disposeWriter(writer: IndexWriter): void {
+    writer.dispose()
+    if (this.#following?.writer === writer) {
+      this.#unfollow()
+    }
+  }
+
+  #dropWriter(): void {
+    if (this.#writer !== null) {
+      this.#disposeWriter(this.#writer)
+      this.#writer = null
+    }
   }
 
   async #runRebuild(generation: number, fileGeneration: number): Promise<void> {
@@ -774,7 +795,7 @@ function attach<Listener>(listeners: Set<Listener>, listener: Listener): Unliste
 
 /**
  * Create an {@link IndexLifecycleService}. Holds the in-flight sync's
- * `AbortController`, settlement promise, and the live-subscription unlisten
+ * `AbortController`, settlement promise, and the file-change subscription
  * internally; one instance lives across graph switches.
  */
 export function createIndexLifecycleService(deps: IndexLifecycleDeps): IndexLifecycleService {
