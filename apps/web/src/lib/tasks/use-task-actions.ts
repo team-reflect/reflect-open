@@ -6,8 +6,8 @@ import { useAppServices, useCoreServices } from '@/services/services-provider.ts
  * Task actions for the Tasks view's rows and keyboard shortcuts (Plan 18):
  * complete a selection (⌘↵), delete a selection (⌫/⌘⌫), edit one task from the
  * inline editor, and add a task (Return). Each calls a `TaskService` write,
- * which updates the rows optimistically and rolls back or re-reads them on
- * failure; a failure surfaces here once, as a failed operation.
+ * which shows the change on the rows before the write and puts the rows back
+ * on failure; a failure surfaces here once, as a failed operation.
  */
 export interface TaskActions {
   complete: (tasks: OpenTask[]) => void
@@ -29,7 +29,7 @@ export interface TaskActions {
   /**
    * Add a new empty task to the `## Tasks` section of `target`'s note
    * (Return-to-add, V1) and return the
-   * optimistic row to select — its inline editor opens focused. Resolves to
+   * new row to select — its inline editor opens focused. Resolves to
    * `null` when there's no graph or the write failed (the toast already fired).
    */
   insert: (target: InsertTaskTarget) => Promise<OpenTask | null>

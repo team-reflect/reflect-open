@@ -72,11 +72,9 @@ export function useNewTaskSheet(): NewTaskSheet {
     [taskService, open],
   )
   const rows = useSyncExternalStore(subscribe, taskService.get, taskService.get).open
-  // The sheet edits the task's live row, like the Tasks tab: a reindex can
-  // rewrite the row while the sheet is up, and acting on the stale copy would
-  // trip the write-back guard needlessly. Fall back to the created row while
-  // the rows don't have it (a read can land before the index catches up) —
-  // the guard then refuses any write that no longer applies.
+  // The sheet edits the task's live row, like the Tasks tab: another change of
+  // the note can rewrite the row while the sheet is up. Fall back to the
+  // created row when the rows no longer hold the task.
   const task = created === null ? null : (rows?.find((row) => isSameTask(row, created)) ?? created)
 
   // Straight to the service, not `actions.remove`: that skips while a delete

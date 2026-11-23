@@ -214,8 +214,8 @@ export interface TaskService extends Store<TaskListState> {
    */
   scheduleTasks(tasks: readonly OpenTask[], isoDate: string | null): Promise<void>
   /**
-   * Turn `tasks` into plain bullets one write at a time, with the optimistic
-   * rows and the failure handling of {@link TaskService.deleteTasks}.
+   * Turn `tasks` into plain bullets one write at a time, with the rows and
+   * the failure handling of {@link TaskService.deleteTasks}.
    */
   convertTasks(tasks: readonly OpenTask[]): Promise<void>
   /**
