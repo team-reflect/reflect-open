@@ -19,6 +19,9 @@ const MENUS_TITLE = 'Menus for code blocks, images, and embeds'
 const MENUS_BODY =
   'Code blocks, images, X posts, and YouTube videos now have a menu to copy, convert, or delete them.'
 
+const PRINT_TITLE = 'Print notes'
+const PRINT_BODY = 'to print the note you are looking at, or the day in focus in your daily notes.'
+
 /**
  * User-facing changes keyed by marketing version. A beta appends to its
  * marketing version's list, and each update shows only the items not seen yet.
@@ -26,10 +29,16 @@ const MENUS_BODY =
 export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
   '0.20.0': [
     {
-      id: 'print-note',
-      title: 'Print notes',
-      body: 'Press ⌘P (Ctrl+P on Windows and Linux) to print the note you are looking at, or the day in focus in your daily notes.',
-      platforms: ['darwin', 'windows', 'linux'],
+      id: 'print-note-macos',
+      title: PRINT_TITLE,
+      body: `Press ⌘P ${PRINT_BODY}`,
+      platforms: ['darwin'],
+    },
+    {
+      id: 'print-note-windows-linux',
+      title: PRINT_TITLE,
+      body: `Press Ctrl+P ${PRINT_BODY}`,
+      platforms: ['windows', 'linux'],
     },
   ],
   '0.19.1': [
