@@ -16,7 +16,8 @@ permissions:
 
 env:
   # On master, run every task instead of skipping it on a turbo cache hit.
-  TURBO_CACHE: ${{ github.event_name == 'push' && 'local:rw' || 'local:rw,remote:rw' }}
+  # TEMPORARY [mbx-exp]: run every task so cargo always runs. Revert.
+  TURBO_CACHE: local:rw
 
 jobs:
   classify:
