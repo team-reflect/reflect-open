@@ -14,7 +14,7 @@ use reflect_cli::{commands, graph};
 /// The graph resolves from --graph, then $REFLECT_GRAPH, then the nearest
 /// ancestor of the current directory containing .reflect/. Notes marked
 /// `private: true` are never returned. Exit codes: 0 ok, 1 error, 2 usage,
-/// 3 not found or private, 4 search index missing.
+/// 3 not found or private, 4 index missing.
 #[derive(Parser)]
 #[command(name = "reflect", version)]
 struct Cli {
@@ -51,6 +51,18 @@ enum Command {
         /// A YYYY-MM-DD date, graph-relative path, note title, or alias
         note: String,
     },
+    /// List the open tasks of the graph
+    Tasks {
+        /// List the completed tasks instead
+        #[arg(long, conflicts_with = "all")]
+        done: bool,
+        /// List the open and the completed tasks
+        #[arg(long)]
+        all: bool,
+        /// Only the tasks of this note (a date, path, title, or alias)
+        #[arg(long, value_name = "NOTE")]
+        note: Option<String>,
+    },
     /// Resolve a note to its absolute path (for piping into editors/tools)
     Path {
         /// A YYYY-MM-DD date, graph-relative path, note title, or alias
@@ -72,6 +84,10 @@ fn run(cli: &Cli) -> Result<(), CliError> {
         Command::Today { path } => commands::today::run(&graph, cli.json, *path),
         Command::Search { query, limit } => commands::search::run(&graph, cli.json, query, *limit),
         Command::Show { note } => commands::show::run(&graph, cli.json, note),
+        Command::Tasks { done, all, note } => {
+            let checked = if *all { None } else { Some(*done) };
+            commands::tasks::run(&graph, cli.json, checked, note.as_deref())
+        }
         Command::Path { note } => commands::path::run(&graph, cli.json, note),
         Command::Open { note, print } => commands::open::run(&graph, cli.json, note, *print),
     }

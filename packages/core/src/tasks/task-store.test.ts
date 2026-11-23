@@ -28,8 +28,8 @@ function noteOf(path: string, source: string, checked: boolean | null = null): N
     updatedAt: 1,
     tasks: projectTasks(source)
       .filter((task) => checked === null || task.checked === checked)
-      .map(({ astPath, markdown, breadcrumbs, checked }) => {
-        return { astPath: [...astPath], markdown, breadcrumbs: [...breadcrumbs], checked }
+      .map(({ astPath, markdown, breadcrumbs, checked, dueDate }) => {
+        return { astPath: [...astPath], markdown, breadcrumbs: [...breadcrumbs], checked, dueDate }
       }),
   }
 }

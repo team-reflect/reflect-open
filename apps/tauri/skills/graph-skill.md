@@ -51,6 +51,7 @@ or exposing its current or historical content unless the user explicitly asks.
     reflect show <note>        # print a note by date, path, title, or alias
     reflect path <note>        # resolve a note to its absolute path
     reflect open <note>        # open the note in the Reflect app
+    reflect tasks              # list the open tasks (--done, --all, --note <note>)
 
 - Add `--json` to any command for stable machine-readable output — the field
   names and exit codes are the supported automation contract.
@@ -66,7 +67,7 @@ or exposing its current or historical content unless the user explicitly asks.
 | 1 | runtime error (no graph, IO failure) |
 | 2 | usage error |
 | 3 | note not found, or note is private |
-| 4 | search index missing — open the graph in Reflect once to build it |
+| 4 | index missing (`search`, `tasks`) — open the graph in Reflect once to build it |
 
 ## Rules
 
@@ -78,4 +79,5 @@ or exposing its current or historical content unless the user explicitly asks.
    (`daily/YYYY-MM-DD.md`, `notes/*.md`). To change a note, edit the file the
    CLI resolves (`reflect path <note>`); the running app picks the edit up.
 3. **Prefer search over enumeration.** `reflect search` uses the app's own
-   ranked index; don't grep the whole graph when a search will do.
+   ranked index; don't grep the whole graph when a search will do. For tasks,
+   use `reflect tasks`; don't grep for `+ [ ]` or query the index file.

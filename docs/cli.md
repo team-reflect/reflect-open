@@ -11,6 +11,7 @@ reflect search <query>     # ranked full-text search over the index
 reflect show <note>        # print a note by date, path, title, or alias
 reflect path <note>        # resolve a note to its absolute path
 reflect open <note>        # open a note in the app (reflect:// deep link)
+reflect tasks              # list the open tasks of the graph
 ```
 
 `reflect --help` lists the flags, graph resolution order, and exit codes
@@ -31,9 +32,9 @@ local development: `cargo install --path apps/cli`.
   can't leak a just-flagged note.
 - **stdout carries only data** (content, paths, or JSON). Warnings and errors
   go to stderr.
-- **The CLI never runs the indexer.** `search` exits `4` without an index
-  (open the graph in Reflect to build it). When files diverge from the index,
-  results still return with a stderr warning and `"stale": true`.
+- **The CLI never runs the indexer.** `search` and `tasks` exit `4` without an
+  index (open the graph in Reflect to build it). When files diverge from the
+  index, results still return with a stderr warning and `"stale": true`.
 - **Search ranks like the app.** Terms match literally (FTS5 operators have no
   meaning) at word starts, so `car` finds `Car log`, never `Oscar party`.
 - **`today --path` and `path YYYY-MM-DD` print the would-be daily path** before
@@ -43,12 +44,18 @@ local development: `cargo install --path apps/cli`.
   frontmatter `id` when present (it survives renames), else the path
   ([docs/deep-links.md](deep-links.md)). The CLI does not mint ids; "Copy deep
   link" in the app does. `--print` prints the URL without launching the app.
+- **`tasks` lists the round (`+ [ ]`) tasks from the index**, by note path and
+  then in document order. `--done` lists the completed tasks, `--all` both,
+  and `--note <note>` the tasks of one note. Task text and breadcrumbs (the
+  headings above the task, then its parent list items) are Markdown. `dueDate`
+  is the first `[[YYYY-MM-DD]]` link of the task, and `date` the daily date of
+  its note.
 - Ambiguous `show`/`path` matches resolve to the first path alphabetically and
   list the others on stderr.
 
 ## For agents
 
-The five commands plus `--json` are the supported automation surface. The JSON
+The commands above plus `--json` are the supported automation surface. The JSON
 shapes are locked by `apps/cli/tests/cli.rs`. Field names and exit codes are
 stable: new fields may be added, existing ones won't change meaning. Reading a
 private note is not possible through this surface by design. Don't work around

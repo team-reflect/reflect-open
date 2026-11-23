@@ -190,6 +190,7 @@ function toTaskRead(rows: readonly OpenTask[], seq: number): TaskRead {
       markdown: row.markdown,
       breadcrumbs: [...row.breadcrumbs],
       checked: row.checked,
+      dueDate: row.dueDate,
     })
     notes.set(row.notePath, note)
   }

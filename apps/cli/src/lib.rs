@@ -9,7 +9,7 @@
 //! the CLI must never grow its own parser or indexer beyond it.
 //!
 //! Privacy contract: notes with `private: true` frontmatter are invisible
-//! through this CLI — excluded from `search`, refused by `show`/`today`/`path`
+//! through this CLI — excluded from `search`/`tasks`, refused by `show`/`today`/`path`
 //! — with no override flag. The resolved file's own frontmatter is checked,
 //! never just the index row, so a stale index can't leak a just-flagged note.
 

@@ -5143,19 +5143,22 @@ public struct TaskRow: Codable, Sendable, Equatable {
     public let markdown: String
     public let breadcrumbs: [String]
     public let checked: Bool
+    public let dueDate: String?
 
     private enum CodingKeys: String, CodingKey {
         case astPath = "astPath"
         case markdown = "markdown"
         case breadcrumbs = "breadcrumbs"
         case checked = "checked"
+        case dueDate = "dueDate"
     }
 
-    public init(astPath: [UInt32], markdown: String, breadcrumbs: [String], checked: Bool) {
+    public init(astPath: [UInt32], markdown: String, breadcrumbs: [String], checked: Bool, dueDate: String?) {
         self.astPath = astPath
         self.markdown = markdown
         self.breadcrumbs = breadcrumbs
         self.checked = checked
+        self.dueDate = dueDate
     }
 
     public init(from decoder: Decoder) throws {
@@ -5164,6 +5167,7 @@ public struct TaskRow: Codable, Sendable, Equatable {
         self.markdown = try container.decode(String.self, forKey: .markdown)
         self.breadcrumbs = try container.decode([String].self, forKey: .breadcrumbs)
         self.checked = try container.decode(Bool.self, forKey: .checked)
+        self.dueDate = try container.decodeIfPresent(String.self, forKey: .dueDate)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -5172,6 +5176,7 @@ public struct TaskRow: Codable, Sendable, Equatable {
         try container.encode(markdown, forKey: .markdown)
         try container.encode(breadcrumbs, forKey: .breadcrumbs)
         try container.encode(checked, forKey: .checked)
+        try container.encode(dueDate, forKey: .dueDate)
     }
 }
 

@@ -273,7 +273,7 @@ impl<'a> IndexCommands<'a> {
     ) -> AppResult<TaskRead> {
         // Taken before the query, so the rows are never older than `seq`.
         let seq = self.session.commit_seq();
-        let notes = self.read(|conn| read::tasks::tasks(conn, checked, paths.as_deref()))?;
+        let notes = self.read(|conn| read::tasks::tasks(conn, checked, paths.as_deref(), false))?;
         Ok(TaskRead { seq, notes })
     }
 
