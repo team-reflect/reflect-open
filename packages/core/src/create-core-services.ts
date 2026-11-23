@@ -1182,6 +1182,7 @@ export function composeCoreServices(
     }),
     meetings: create.meetings({
       noteFile,
+      noteDocuments,
       noteCreation,
       wikiResolver,
       suggestions,

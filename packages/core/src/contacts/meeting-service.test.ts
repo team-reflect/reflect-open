@@ -9,6 +9,7 @@ import {
   type MeetingService,
 } from './meeting-service.ts'
 import type { ContactMatch } from './commands.ts'
+import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
 import { createSuggestionService } from '../indexing/suggestion-service.ts'
 import { createWikiResolverService } from '../indexing/wiki-resolver-service.ts'
 import {
@@ -16,8 +17,11 @@ import {
   createTestDatabaseService,
   createTestGraphSessionService,
   createTestLoggerService,
+  createTestFileChangeService,
   createTestNoteCreationService,
+  createTestNoteDocumentService,
   createTestNoteFileService,
+  createTestNoteSession,
   createTestSettingsService,
   seedNotes,
   type NoteFileWrite,
@@ -91,6 +95,7 @@ function meetingService(
 ): MeetingService {
   return createMeetingService({
     noteFile,
+    noteDocuments: createTestNoteDocumentService({ noteFile }),
     noteCreation,
     wikiResolver: createWikiResolverService({ database }),
     suggestions: createSuggestionService({ database }),
@@ -363,6 +368,20 @@ describe('addMeetingToDaily', () => {
       appended: true,
       createdNotes: ['Ada Lovelace'],
     })
+  })
+
+  it('appends to the buffer of an open daily', async () => {
+    const openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
+    const daily = createTestNoteSession({ path: DAILY, content: 'Unsaved draft\n' })
+    openDocuments.register({ session: daily })
+    const service = meetingService({
+      noteDocuments: createTestNoteDocumentService({ noteFile, openDocuments }),
+    })
+
+    await service.addMeetingToDaily(input())
+
+    expect(daily.content()).toBe('Unsaved draft\n\n## Meetings\n\n- [[Standup]]\n')
+    expect(dailyWrites()).toEqual([])
   })
 
   it('appends to an existing Meetings section of a non-empty daily', async () => {
