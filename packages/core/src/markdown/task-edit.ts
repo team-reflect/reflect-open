@@ -1,5 +1,6 @@
 import {
   parseMarkdownAst,
+  type MarkdownBlock,
   type MarkdownDocument,
   type MarkdownListItem,
   type MarkdownNode,
@@ -68,9 +69,10 @@ export interface TaskEditResult {
 /**
  * Apply `edits` to a note and serialize its body once. `revision` is the hash
  * of `source`, or `null` when no file holds that text. Every locator describes
- * the note as the caller last saw it: all addresses are resolved against the
+ * the note as the caller last saw it: all locators are resolved against the
  * pre-edit tree before anything changes, so one batch can edit a task and then
  * toggle it, or resolve a task and insert next to it, with one locator each.
+ * Inserts that share a place land in the order of `edits`.
  */
 export function applyTaskEdits(
   source: string,
@@ -82,16 +84,35 @@ export function applyTaskEdits(
 
   const before = getRoundTasks(document)
   const created: MarkdownListItem[] = []
-  // Resolve every address first, then mutate in order.
+  // The item this batch inserted after each block.
+  const tails = new Map<MarkdownBlock, MarkdownListItem>()
+  // Resolve every locator first, then mutate in order.
   const mutations = edits.map((edit): (() => void) => {
     if (edit.kind === 'insert') {
-      const slot = resolveInsertPosition(document, before, baseRevision, edit.at)
+      const { at } = edit
+      const contextSlot =
+        at.kind === 'contextEnd' ? resolveContextEnd(before, baseRevision, at.task) : null
       const markdown = requireParagraphMarkdown(edit.markdown)
       const bullet = edit.bullet === true
       const item = createListItem(bullet ? 'bullet' : 'task', '+', markdown)
       item.checked = !bullet && edit.checked === true
       return () => {
+        let slot =
+          contextSlot ??
+          (at.kind === 'tasksSection'
+            ? sectionSlot(document, TASKS_SECTION, 'task')
+            : bodyEndSlot(document))
+        while (slot.kind === 'after') {
+          const tail = tails.get(slot.anchor)
+          if (tail === undefined) {
+            break
+          }
+          slot = { kind: 'after', anchor: tail }
+        }
         const inserted = insertItem(document, slot, item)
+        if (slot.kind === 'after') {
+          tails.set(slot.anchor, inserted)
+        }
         if (!bullet) {
           created.push(inserted)
         }
@@ -177,27 +198,20 @@ function locateTask(
   return nearest
 }
 
-function resolveInsertPosition(
-  document: MarkdownDocument,
+/**
+ * The end of the context of the task `locator` names: its parent list item,
+ * or at the root the end of its own list.
+ */
+function resolveContextEnd(
   before: readonly TaskEntry[],
   revision: string | null,
-  at: InsertPosition,
+  locator: TaskLocator,
 ): SlotTarget {
-  switch (at.kind) {
-    case 'documentEnd': {
-      return bodyEndSlot(document)
-    }
-    case 'contextEnd': {
-      const { parent, index } = locateTask(before, revision, at.task)
-      if (parent.type === 'listItem') {
-        return { kind: 'end', container: parent }
-      }
-      return { kind: 'after', anchor: parent.children[endOfListRun(parent.children, index)]! }
-    }
-    case 'tasksSection': {
-      return sectionSlot(document, TASKS_SECTION, 'task')
-    }
+  const { parent, index } = locateTask(before, revision, locator)
+  if (parent.type === 'listItem') {
+    return { kind: 'end', container: parent }
   }
+  return { kind: 'after', anchor: parent.children[endOfListRun(parent.children, index)]! }
 }
 
 function applyItemEdit(

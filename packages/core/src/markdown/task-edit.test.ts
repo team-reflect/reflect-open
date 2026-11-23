@@ -367,6 +367,24 @@ describe('applyTaskEdits: batches', () => {
     })
   })
 
+  it('lands inserts that share a place in the order of the edits', () => {
+    const first = { kind: 'insert', at: { kind: 'tasksSection' }, markdown: 'first' } as const
+    const second = { kind: 'insert', at: { kind: 'tasksSection' }, markdown: 'second' } as const
+    expect(applyEdits('', [first, second]).source).toBe('## Tasks\n\n+ [ ] first\n+ [ ] second\n')
+    expect(applyEdits('## Tasks\n\n+ [ ] old\n', [first, second]).source).toBe(
+      '## Tasks\n\n+ [ ] old\n+ [ ] first\n+ [ ] second\n',
+    )
+
+    const source = '+ [ ] a\n+ [ ] b\n\nprose\n'
+    const context = { kind: 'contextEnd', task: locate(source) } as const
+    const result = applyEdits(source, [
+      { kind: 'insert', at: context, markdown: 'first' },
+      { kind: 'insert', at: context, markdown: 'second' },
+    ])
+    expect(result.source).toBe('+ [ ] a\n+ [ ] b\n+ [ ] first\n+ [ ] second\n\nprose\n')
+    expect(result.inserted.map((task) => task.markdown)).toEqual(['first', 'second'])
+  })
+
   it('edits a task and toggles it in one write, addressing it as it was', () => {
     const source = '+ [ ] draft\n'
     const task = locate(source)
