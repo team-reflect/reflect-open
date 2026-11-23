@@ -4,7 +4,7 @@
 use std::fmt;
 
 /// Exit codes: `0` ok · `1` runtime error · `2` usage (clap) · `3` not found
-/// or private · `4` index missing/unusable (`search` only).
+/// or private · `4` index missing/unusable (`search` and `tasks`).
 #[derive(Debug)]
 pub enum CliError {
     /// IO/SQL/graph-resolution failures (exit 1).
@@ -14,7 +14,7 @@ pub enum CliError {
     /// The note exists but carries `private: true` (exit 3 — indistinguishable
     /// from not-found by exit code; the stderr message says why).
     Private(String),
-    /// `search` needs the index and it is missing or unusable (exit 4).
+    /// `search` or `tasks` needs the index and it is missing or unusable (exit 4).
     NoIndex(String),
 }
 

@@ -2814,13 +2814,14 @@ fn tasks_split_by_checked_and_skip_templates() {
     let mut with_tasks = note("notes/a.md", "A", vec![]);
     with_tasks.is_pinned = true;
     with_tasks.tasks = vec![task(0, "open one", false), task(1, "done one", true)];
+    with_tasks.tasks[0].due_date = Some("2026-07-01".to_string());
     let mut template = note("templates/t.md", "T", vec![]);
     template.kind = NoteKind::Template;
     template.tasks = vec![task(0, "template task", false)];
     apply_note(&conn, &with_tasks).unwrap();
     apply_note(&conn, &template).unwrap();
 
-    let open = tasks(&conn, Some(false), None).unwrap();
+    let open = tasks(&conn, Some(false), None, false).unwrap();
     assert_eq!(open.len(), 1);
     assert_eq!(
         (open[0].path.as_str(), open[0].title.as_str()),
@@ -2832,9 +2833,33 @@ fn tasks_split_by_checked_and_skip_templates() {
     assert_eq!(open[0].tasks[0].markdown, "open one");
     assert_eq!(open[0].tasks[0].ast_path, [0]);
     assert!(!open[0].tasks[0].checked);
-    let done = tasks(&conn, Some(true), None).unwrap();
+    assert_eq!(open[0].tasks[0].due_date.as_deref(), Some("2026-07-01"));
+    let done = tasks(&conn, Some(true), None, false).unwrap();
     assert_eq!(done.len(), 1);
     assert_eq!(done[0].tasks[0].markdown, "done one");
+    assert_eq!(done[0].tasks[0].due_date, None);
+}
+
+#[test]
+fn a_tasks_read_can_leave_out_private_notes() {
+    let conn = migrated();
+    let mut public = note("notes/public.md", "Public", vec![]);
+    public.tasks = vec![task(0, "shown", false)];
+    let mut private = note("notes/private.md", "Private", vec![]);
+    private.is_private = true;
+    private.tasks = vec![task(0, "hidden", false)];
+    apply_note(&conn, &public).unwrap();
+    apply_note(&conn, &private).unwrap();
+
+    let paths = |exclude_private| -> Vec<String> {
+        tasks(&conn, None, None, exclude_private)
+            .unwrap()
+            .into_iter()
+            .map(|note| note.path)
+            .collect()
+    };
+    assert_eq!(paths(false), ["notes/private.md", "notes/public.md"]);
+    assert_eq!(paths(true), ["notes/public.md"]);
 }
 
 #[test]
@@ -2846,7 +2871,7 @@ fn a_tasks_read_groups_the_tasks_of_each_note() {
         apply_note(&conn, &with_tasks).unwrap();
     }
 
-    let counts: Vec<(String, usize)> = tasks(&conn, Some(false), None)
+    let counts: Vec<(String, usize)> = tasks(&conn, Some(false), None, false)
         .unwrap()
         .into_iter()
         .map(|note| (note.path, note.tasks.len()))
@@ -2868,13 +2893,13 @@ fn a_tasks_read_of_paths_returns_every_task_of_those_notes() {
     apply_note(&conn, &note("notes/empty.md", "Empty", vec![])).unwrap();
 
     let paths = ["notes/b.md", "notes/empty.md", "notes/absent.md"].map(String::from);
-    let read = tasks(&conn, None, Some(&paths)).unwrap();
+    let read = tasks(&conn, None, Some(&paths), false).unwrap();
     assert_eq!(read.len(), 1);
     assert_eq!(
         (read[0].path.as_str(), read[0].tasks.len()),
         ("notes/b.md", 2)
     );
-    let open = tasks(&conn, Some(false), Some(&paths)).unwrap();
+    let open = tasks(&conn, Some(false), Some(&paths), false).unwrap();
     assert_eq!(open[0].tasks.len(), 1);
 }
 
@@ -2887,7 +2912,7 @@ fn a_tasks_read_leaves_out_a_row_with_an_unreadable_address() {
     with_tasks.tasks[1].ast_path = "[]".to_string();
     apply_note(&conn, &with_tasks).unwrap();
 
-    let open = &tasks(&conn, Some(false), None).unwrap()[0].tasks;
+    let open = &tasks(&conn, Some(false), None, false).unwrap()[0].tasks;
     assert_eq!(open.len(), 1);
     assert_eq!(open[0].markdown, "kept");
     assert_eq!(open[0].breadcrumbs, ["Heading"]);

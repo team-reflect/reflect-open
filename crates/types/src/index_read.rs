@@ -166,6 +166,8 @@ pub struct TaskRow {
     /// items, outermost first, as Markdown.
     pub breadcrumbs: Vec<String>,
     pub checked: bool,
+    /// The first `[[YYYY-MM-DD]]` link of the task, or `None`.
+    pub due_date: Option<String>,
 }
 
 /// One note with the tasks that a read selected from it.

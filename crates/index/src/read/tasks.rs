@@ -9,13 +9,15 @@ use crate::schema::{Notes, Tasks};
 use crate::sql::{self, lit};
 
 /// The tasks of every note but templates, grouped by note. `checked` keeps
-/// only the open (`false`) or the completed tasks, and `paths` only the tasks
-/// of those notes; a note with no such task is absent from the result. A task
+/// only the open (`false`) or the completed tasks, `paths` only the tasks
+/// of those notes, and `exclude_private` only the tasks of the notes that are
+/// not private; a note with no such task is absent from the result. A task
 /// whose address or breadcrumbs do not decode is logged and left out.
-pub(crate) fn tasks(
+pub fn tasks(
     conn: &Connection,
     checked: Option<bool>,
     paths: Option<&[String]>,
+    exclude_private: bool,
 ) -> AppResult<Vec<NoteTasks>> {
     let mut notes: Vec<NoteTasks> = Vec::new();
     let mut select = Query::select();
@@ -26,6 +28,7 @@ pub(crate) fn tasks(
             (Tasks::Table, Tasks::Markdown),
             (Tasks::Table, Tasks::Breadcrumbs),
             (Tasks::Table, Tasks::Checked),
+            (Tasks::Table, Tasks::DueDate),
         ])
         .columns([
             (Notes::Table, Notes::Title),
@@ -45,6 +48,9 @@ pub(crate) fn tasks(
     if let Some(checked) = checked {
         // In the text, so the partial indexes on `checked` apply.
         select.and_where(Expr::col((Tasks::Table, Tasks::Checked)).eq(lit(i32::from(checked))));
+    }
+    if exclude_private {
+        select.and_where(Expr::col((Notes::Table, Notes::IsPrivate)).eq(lit(0)));
     }
     if let Some(paths) = paths {
         select.and_where(
@@ -67,17 +73,18 @@ pub(crate) fn tasks(
             markdown: row.get(2)?,
             breadcrumbs,
             checked: row.get(4)?,
+            due_date: row.get(5)?,
         };
         match notes.last_mut() {
             Some(note) if note.path == path => note.tasks.push(task),
             _ => notes.push(NoteTasks {
                 path,
-                title: row.get(5)?,
-                daily_date: row.get(6)?,
-                is_pinned: row.get(7)?,
-                pinned_order: row.get(8)?,
-                updated_at: row.get(9)?,
-                hash: row.get(10)?,
+                title: row.get(6)?,
+                daily_date: row.get(7)?,
+                is_pinned: row.get(8)?,
+                pinned_order: row.get(9)?,
+                updated_at: row.get(10)?,
+                hash: row.get(11)?,
                 tasks: vec![task],
             }),
         }

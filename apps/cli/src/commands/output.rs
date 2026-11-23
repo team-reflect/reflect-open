@@ -78,3 +78,30 @@ pub fn print_content(content: &str) {
         println!("{content}");
     }
 }
+
+/// `tasks`: the tasks, by note path and then in document order, plus the
+/// staleness signal.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TasksJson<'a> {
+    /// True when files on disk diverge from the index — tasks may be stale.
+    pub stale: bool,
+    pub tasks: Vec<TaskJson<'a>>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskJson<'a> {
+    pub path: &'a str,
+    pub title: &'a str,
+    /// The daily date of the note, when the note is a daily.
+    pub date: Option<&'a str>,
+    /// The first paragraph of the task as Markdown, without its marker.
+    pub markdown: &'a str,
+    pub checked: bool,
+    /// The first `[[YYYY-MM-DD]]` link of the task.
+    pub due_date: Option<&'a str>,
+    /// The headings above the task, then its parent list items, outermost
+    /// first, as Markdown.
+    pub breadcrumbs: &'a [String],
+}

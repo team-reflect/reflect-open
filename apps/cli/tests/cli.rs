@@ -114,6 +114,17 @@ impl Fixture {
             .unwrap();
         }
     }
+
+    /// Add one row of the `tasks` projection, as the desktop's `apply_note`
+    /// writes it.
+    fn index_task(&self, rel_path: &str, ast_path: &str, markdown: &str, checked: bool) {
+        let conn = reflect_index_schema::open_index_at(self.root()).unwrap();
+        conn.execute(
+            "INSERT INTO tasks(note_path, ast_path, markdown, checked) VALUES(?1, ?2, ?3, ?4)",
+            params![rel_path, ast_path, markdown, i64::from(checked)],
+        )
+        .unwrap();
+    }
 }
 
 /// A graph with the standard layout but no index file.
@@ -636,6 +647,122 @@ fn search_drops_a_note_flagged_private_after_indexing() {
     let output = reflect(&fixture, &["search", "searchable"]);
     assert!(output.status.success());
     assert_eq!(stdout(&output), "", "a just-flagged note must not surface");
+}
+
+// ---- tasks ----------------------------------------------------------------------
+
+#[test]
+fn tasks_lists_open_tasks_in_document_order() {
+    let fixture = graph();
+    fixture.write_note("daily/2026-06-11.md", "## Work\n\n+ [ ] one\n");
+    fixture.write_note("notes/plan.md", "# Plan\n\n+ [ ] write\n  post\n");
+    fixture.build_index();
+    fixture.index_task("notes/plan.md", "[1,0]", "write\npost", false);
+    fixture.index_task("daily/2026-06-11.md", "[1,10]", "tenth", false);
+    fixture.index_task("daily/2026-06-11.md", "[1,2]", "second", false);
+    fixture.index_task("daily/2026-06-11.md", "[1,3]", "finished", true);
+
+    let open = reflect(&fixture, &["tasks"]);
+    assert!(open.status.success(), "stderr: {}", stderr(&open));
+    assert_eq!(
+        stdout(&open),
+        "daily/2026-06-11.md\t2026-06-11\n    [ ] second\n    [ ] tenth\n\
+         notes/plan.md\tPlan\n    [ ] write post\n"
+    );
+
+    let done = reflect(&fixture, &["tasks", "--done"]);
+    assert_eq!(
+        stdout(&done),
+        "daily/2026-06-11.md\t2026-06-11\n    [x] finished\n"
+    );
+
+    let all = reflect(&fixture, &["tasks", "--all", "--note", "2026-06-11"]);
+    assert_eq!(
+        stdout(&all),
+        "daily/2026-06-11.md\t2026-06-11\n    [ ] second\n    [x] finished\n    [ ] tenth\n"
+    );
+}
+
+#[test]
+fn tasks_json_shape() {
+    let fixture = graph();
+    fixture.write_note(
+        "daily/2026-06-11.md",
+        "## Work\n\n+ [ ] call [[2026-06-30]]\n",
+    );
+    fixture.build_index();
+    let conn = reflect_index_schema::open_index_at(fixture.root()).unwrap();
+    conn.execute(
+        "INSERT INTO tasks(note_path, ast_path, markdown, checked, due_date, breadcrumbs)
+         VALUES('daily/2026-06-11.md', '[1,0]', 'call [[2026-06-30]]', 0, '2026-06-30', '[\"Work\"]')",
+        [],
+    )
+    .unwrap();
+
+    let value = json(&reflect(&fixture, &["tasks", "--json"]));
+    assert_eq!(
+        value,
+        serde_json::json!({
+            "stale": false,
+            "tasks": [{
+                "path": "daily/2026-06-11.md",
+                "title": "2026-06-11",
+                "date": "2026-06-11",
+                "markdown": "call [[2026-06-30]]",
+                "checked": false,
+                "dueDate": "2026-06-30",
+                "breadcrumbs": ["Work"],
+            }],
+        })
+    );
+    let human = reflect(&fixture, &["tasks"]);
+    assert!(stdout(&human).contains("    [ ] Work > call [[2026-06-30]]\n"));
+}
+
+#[test]
+fn tasks_excludes_private_notes() {
+    let fixture = graph();
+    fixture.write_note("notes/open.md", "# Open\n\n+ [ ] shown\n");
+    fixture.write_note(
+        "notes/secret.md",
+        "---\nprivate: true\n---\n\n+ [ ] hidden\n",
+    );
+    let later = fixture.write_note("notes/later.md", "# Later\n\n+ [ ] flagged\n");
+    fixture.build_index();
+    for path in ["notes/open.md", "notes/secret.md", "notes/later.md"] {
+        fixture.index_task(path, "[1,0]", "task", false);
+    }
+    fs::write(
+        &later,
+        "---\nprivate: true\n---\n# Later\n\n+ [ ] flagged\n",
+    )
+    .unwrap();
+
+    let output = reflect(&fixture, &["tasks"]);
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    assert_eq!(stdout(&output), "notes/open.md\tOpen\n    [ ] task\n");
+
+    let refused = reflect(&fixture, &["tasks", "--note", "notes/secret.md"]);
+    assert_eq!(refused.status.code(), Some(3));
+    assert_eq!(stdout(&refused), "");
+}
+
+#[test]
+fn tasks_of_a_daily_note_that_does_not_exist_yet_is_empty() {
+    let fixture = graph();
+    fixture.write_note("notes/a.md", "anything\n");
+    fixture.build_index();
+    let output = reflect(&fixture, &["tasks", "--note", "2026-06-11"]);
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    assert_eq!(stdout(&output), "");
+}
+
+#[test]
+fn tasks_without_an_index_exits_4() {
+    let fixture = graph();
+    fixture.write_note("notes/a.md", "+ [ ] anything\n");
+    let output = reflect(&fixture, &["tasks"]);
+    assert_eq!(output.status.code(), Some(4));
 }
 
 // ---- show / path ----------------------------------------------------------------

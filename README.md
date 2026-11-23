@@ -35,8 +35,8 @@ another git remote are connected directly by the user.
   from Chrome.
 - **Sync choices:** use iCloud Drive for file sync, or git/GitHub for
   versioned backup.
-- **CLI:** `reflect today`, `reflect search`, and `reflect show` are available
-  for scripts and agents. See [docs/cli.md](docs/cli.md).
+- **CLI:** `reflect today`, `reflect search`, `reflect show`, and `reflect tasks`
+  are available for scripts and agents. See [docs/cli.md](docs/cli.md).
 
 ## Install
 

@@ -2645,6 +2645,8 @@ export type TaskRow = {
    */
   breadcrumbs: string[]
   checked: boolean
+  /**  The first `[[YYYY-MM-DD]]` link of the task, or `None`. */
+  dueDate: string | null
 }
 
 /**  One template. */
