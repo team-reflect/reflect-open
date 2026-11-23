@@ -855,6 +855,36 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
+  it('Return shows the new row while the Current filter is off', async () => {
+    storage.session.set('reflect.tasks.filter.current', 'false')
+    getOpenTasks.mockResolvedValue([])
+    const view = await renderScreen()
+
+    await view.findByText('No tasks to show.')
+    await userEvent.keyboard('{Enter}')
+
+    await view.findByTestId('task-editor')
+    await expect.element(view.getByRole('heading', { name: 'Current' })).toBeInTheDocument()
+    await view.unmount()
+  })
+
+  it('Enter in the editor of a row found by search clears the search', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/a.md', astPath: [2], markdown: 'first', text: 'first' }),
+      task({ notePath: 'notes/a.md', astPath: [3], markdown: 'second', text: 'second' }),
+    ])
+    const view = await renderScreen()
+
+    await userEvent.fill(view.getByRole('textbox', { name: 'Search tasks' }), 'first')
+    await userEvent.click(await view.findByRole('button', { name: 'first' }))
+    await userEvent.click(view.getByRole('button', { name: 'continue-edit' }))
+
+    await view.findByText('editing:')
+    await expect.element(view.getByRole('textbox', { name: 'Search tasks' })).toHaveValue('')
+    await expect.element(view.getByRole('button', { name: 'second' })).toBeInTheDocument()
+    await view.unmount()
+  })
+
   it.each(['cancel-edit', 'delete-edit', 'delete-empty-edit', 'complete-edit'])(
     'drops a new row left empty with %s and writes nothing',
     async (exit) => {

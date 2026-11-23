@@ -16,6 +16,8 @@ export interface TaskKeyboardOptions {
   setQuery: (value: string) => void
   /** Today's ISO date — Return with no selection adds a task to today's daily. */
   today: string
+  /** Show the "Current" group, which holds a new task of today's daily. */
+  showCurrent: () => void
   /** The Tasks surface; shortcuts back off when focus is outside it (another panel). */
   rootRef: RefObject<HTMLElement | null>
   /** Bring a row into view after a keyboard move (V1 scrolls the selection). */
@@ -65,6 +67,7 @@ export function useTaskKeyboard({
   query,
   setQuery,
   today,
+  showCurrent,
   rootRef,
   scrollToKey,
   onToggleFilters,
@@ -158,10 +161,14 @@ export function useTaskKeyboard({
         // above via OWNS_KEYS and continues the entry there), so this fires from the
         // list itself: continue the active row's list, or add to today's daily when
         // nothing is selected, then select the new row to open its editor focused.
-        // The search filter is dropped so the empty row shows.
+        // The search filter is dropped, and the "Current" group is shown for
+        // a task of today's daily, so the empty row shows.
         event.preventDefault()
         const active = activeTask()
         setQuery('')
+        if (active === undefined) {
+          showCurrent()
+        }
         const created =
           active === undefined
             ? commands.add(todaysDailyTarget(today))

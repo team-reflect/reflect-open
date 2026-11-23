@@ -344,6 +344,20 @@ export class TaskStore {
   }
 
   /**
+   * Stop showing every new task that holds no text.
+   */
+  dropEmptyNewTasks(): void {
+    this.batch(() => {
+      for (const taskId of [...this.#unwritten.keys()]) {
+        const text = this.#drafts.get(taskId)?.markdown ?? this.findNewTask(taskId)?.markdown
+        if (text?.trim() === '' && this.#takeNewTask(taskId) !== undefined) {
+          this.#drafts.delete(taskId)
+        }
+      }
+    })
+  }
+
+  /**
    * The new task of `taskId` that no write holds yet.
    */
   findNewTask(taskId: string): TaskInsertOp | undefined {

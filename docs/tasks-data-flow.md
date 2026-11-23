@@ -14,7 +14,7 @@ code is in `packages/core/src/tasks/`, `packages/core/src/documents/` and
 | identity | The `taskId` that `TaskStore` gives a task. It is stable for one run of the app, and it is the React key and the key of selection, struck state and drafts. |
 | pending op | A change that a write in flight is about to make. The rows show it until the write ends. |
 | draft | Text typed into the editor of a task that no write has taken yet. |
-| new task | A row with no file text. It is written when a command names it while it holds text. |
+| new task | A row with no file text. It is written when a command names it while it holds text. A new task with no text leaves the rows when another new task is added. |
 | dirty set | The paths whose file may differ from the index. `IndexWriter` owns it. |
 
 ## Invariants

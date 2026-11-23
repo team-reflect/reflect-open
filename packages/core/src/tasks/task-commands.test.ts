@@ -271,10 +271,10 @@ describe('typed text', () => {
   it('saves every typed text when the app is about to stop', async () => {
     const rows = await start({ [A]: '+ [ ] one\n' })
     const filled = commands.add(TODAY)
+    commands.setDraft(filled, 'buy milk')
     const empty = commands.add(TODAY)
 
     commands.setDraft(rows[0]!, 'one more')
-    commands.setDraft(filled, 'buy milk')
     await commands.commitDrafts()
 
     expect(file(A)).toBe('+ [ ] one more\n')
@@ -414,6 +414,27 @@ describe('a new task', () => {
       row.taskId,
       rows[1]!.taskId,
     ])
+  })
+
+  it('drops every other new task that holds no text', async () => {
+    const rows = await start({ [A]: '+ [ ] one\n' })
+
+    const filled = commands.add(TODAY)
+    commands.setDraft(filled, 'buy milk')
+    commands.add(TODAY)
+    const second = commands.add(TODAY)
+    expect(shown()).toEqual([
+      [filled.taskId, ''],
+      [second.taskId, ''],
+      [rows[0]!.taskId, 'one'],
+    ])
+    const third = commands.continueAfter(rows[0]!)
+    expect(shown()).toEqual([
+      [filled.taskId, ''],
+      [rows[0]!.taskId, 'one'],
+      [third.taskId, ''],
+    ])
+    expect(harness.files.writes()).toEqual([])
   })
 
   it('keeps its row and its text when its write fails', async () => {

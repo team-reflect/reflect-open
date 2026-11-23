@@ -168,7 +168,8 @@ export class TaskCommands {
   /**
    * Show a new empty task in the Tasks section of `target` and return its
    * row. Nothing is written, and a missing note is not created, until a
-   * command names the row while it holds text.
+   * command names the row while it holds text. Every other new task with no
+   * text stops showing.
    */
   add(target: InsertTaskTarget): OpenTask {
     return this.#addNewTask(target, null)
@@ -176,8 +177,8 @@ export class TaskCommands {
 
   /**
    * Save the text typed into `task`, then show a new empty task at the end
-   * of its list and return the row. A new task with no text is replaced by
-   * the new row.
+   * of its list and return the row. Every new task with no text is replaced
+   * by the new row.
    */
   continueAfter(task: OpenTask): OpenTask {
     const store = this.#deps.store()
@@ -242,7 +243,11 @@ export class TaskCommands {
   }
 
   #addNewTask(target: InsertTaskTarget, after: string | null): OpenTask {
-    return this.#deps.store().addNewTask(target, after, this.#deps.clock.now())
+    const store = this.#deps.store()
+    return store.batch(() => {
+      store.dropEmptyNewTasks()
+      return store.addNewTask(target, after, this.#deps.clock.now())
+    })
   }
 
   /**

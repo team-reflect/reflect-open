@@ -14,6 +14,10 @@ export interface TaskRowHandlerDeps {
    * Bring a row into view after a keyboard move (V1 scrolls the selection).
    */
   scrollToKey: (key: string | null) => void
+  /**
+   * Set the search text.
+   */
+  setQuery: (value: string) => void
 }
 
 /**
@@ -27,6 +31,7 @@ export function useTaskRowHandlers({
   selection,
   orderedTasks,
   scrollToKey,
+  setQuery,
 }: TaskRowHandlerDeps): (task: OpenTask) => TaskEditorHandlers {
   const { commands } = useCoreServices().tasks
   const selectExclusively = useCallback(
@@ -40,6 +45,8 @@ export function useTaskRowHandlers({
   return useCallback(
     (task: OpenTask): TaskEditorHandlers => ({
       onContinue: () => {
+        // The search filter is dropped so the empty row shows.
+        setQuery('')
         selectExclusively(commands.continueAfter(task).taskId)
       },
       onCancel: () => {
@@ -75,6 +82,6 @@ export function useTaskRowHandlers({
         scrollToKey(selection.activeKey())
       },
     }),
-    [commands, selection, orderedTasks, selectExclusively, scrollToKey],
+    [commands, selection, orderedTasks, selectExclusively, scrollToKey, setQuery],
   )
 }

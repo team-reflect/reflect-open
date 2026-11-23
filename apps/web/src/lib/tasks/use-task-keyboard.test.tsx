@@ -1,4 +1,4 @@
-import { returnFalse, returnNull } from '@ocavue/utils'
+import { noop, returnFalse, returnNull } from '@ocavue/utils'
 import { act } from '@/test-utils/act.ts'
 import { cleanup, renderHook } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -79,6 +79,7 @@ async function mount(options: {
       query: options.query ?? '',
       setQuery,
       today: options.today ?? '2026-06-15',
+      showCurrent: noop,
       rootRef: { current: root },
       scrollToKey,
       onToggleFilters,

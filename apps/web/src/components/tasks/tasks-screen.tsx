@@ -115,7 +115,7 @@ export function TasksScreen(): ReactElement {
       scrollTaskIntoView(rootRef.current, key)
     }
   }, [])
-  const editHandlers = useTaskRowHandlers({ selection, orderedTasks, scrollToKey })
+  const editHandlers = useTaskRowHandlers({ selection, orderedTasks, scrollToKey, setQuery })
   const selectedTaskKeys = selection.selected
   const activeTaskKey = selection.activeKey
   // Selection opens the focused task's inline editor, often after an async insert
@@ -199,6 +199,11 @@ export function TasksScreen(): ReactElement {
     query,
     setQuery,
     today,
+    showCurrent: () => {
+      if (!filters.current) {
+        toggle('current')
+      }
+    },
     rootRef,
     scrollToKey,
     onToggleFilters: () => setFiltersOpen((open) => !open),
