@@ -161,6 +161,9 @@ export class TaskHarness {
       logger,
       graphSession,
     })
+    this.fileChanges.subscribeReconcile(() => {
+      this.index.refresh(this.session)
+    })
     const steppedFiles = overrideNoteFileService(this.files, {
       write: async (path, contents, generation, expectedContents) => {
         await this.#writes.pass()
@@ -291,6 +294,27 @@ export class TaskHarness {
   }
 
   /**
+   * Fail the pass that waits at its scan with `error`. Later passes run freely.
+   */
+  async failPass(error: Error): Promise<void> {
+    await this.#scans.fail(error)
+    this.#scans.release()
+    await sleep(0)
+    await this.index.settled()
+  }
+
+  /**
+   * Lose every change not yet reported, as a watcher error does. The pass
+   * the watcher then demands stops once its scan has listed the files.
+   */
+  async failWatcher(): Promise<void> {
+    this.#unreported.clear()
+    this.#scans.hold()
+    this.fileChanges.emitReconcile()
+    await this.#scans.arrived()
+  }
+
+  /**
    * Suspend the index, as the app does when it hides.
    */
   suspend(): void {
@@ -321,6 +345,9 @@ export class TaskHarness {
         await this.deliverWatcherBatch()
       }
       await this.clock.advance(DRAIN_CLOCK_MS)
+      await sleep(0)
+      await this.index.settled()
+      await this.index.drained()
       await sleep(0)
     } while (this.#unreported.size > 0)
   }

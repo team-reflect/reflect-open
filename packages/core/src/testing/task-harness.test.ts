@@ -95,4 +95,35 @@ describe('drained task view', () => {
     ])
     expect(harness.view()).toEqual(harness.projectFiles())
   })
+
+  it('equals the open tasks of the files after a failed pass, a suspend, and a watcher error', async () => {
+    const harness = await start({
+      'notes/a.md': '+ [ ] one\n',
+      'notes/b.md': '+ [ ] two\n',
+      'notes/c.md': '+ [ ] three\n',
+    })
+
+    await harness.startPass()
+    harness.editExternally('notes/a.md', '+ [ ] one, during a failed pass\n')
+    await harness.deliverWatcherBatch()
+    await harness.failPass(new Error('scan failed'))
+
+    harness.suspend()
+    harness.editExternally('notes/b.md', '+ [ ] two, while suspended\n')
+    await harness.deliverWatcherBatch()
+    await harness.resume()
+
+    harness.editExternally('notes/c.md', '+ [ ] three, lost by the watcher\n')
+    await harness.failWatcher()
+    await harness.failPass(new Error('scan failed'))
+    expect(harness.view()).not.toEqual(harness.projectFiles())
+    await harness.drain()
+
+    expect(harness.view().map((task) => task.markdown)).toEqual([
+      'one, during a failed pass',
+      'two, while suspended',
+      'three, lost by the watcher',
+    ])
+    expect(harness.view()).toEqual(harness.projectFiles())
+  })
 })
