@@ -18,7 +18,7 @@ import type { OpenTask } from './open-task.ts'
 import { resolveTaskEdit } from './task-content.ts'
 import { NoteEditError } from './task-errors.ts'
 import type { InsertTaskTarget } from './task-insert-target.ts'
-import type { TaskOp } from './task-ops.ts'
+import type { TaskInsertOp, TaskOp } from './task-ops.ts'
 import { withDraftDueDate } from './task-schedule-content.ts'
 import type { TaskCommit, TaskStore } from './task-store.ts'
 
@@ -139,7 +139,8 @@ function describeFailure(cause: unknown): string | null {
  * written at the same time.
  *
  * A write that finds its task gone reads the note from the index again and
- * runs once more. A write that still fails keeps the text of its tasks in
+ * runs once more. A change to a new task whose write failed is written with
+ * the new task. A write that still fails keeps the text of its tasks in
  * their rows for the next command that names them, drops its other changes,
  * and shows a line only when the user can act on it. A command settles
  * when its writes ended, and never rejects.
@@ -395,13 +396,18 @@ export class TaskCommands {
     ops: readonly TaskOp[],
   ): Promise<void> {
     const { publish } = this.#deps
-    const pending = store.push(notePath, ops)
+    let pending = store.push(notePath, ops)
     publish()
     const run = async (): Promise<void> => {
+      const written = this.#foldNewTasks(store, ops)
+      if (written !== ops) {
+        store.drop(pending)
+        pending = store.push(notePath, written)
+      }
       try {
         const result = session.signal.aborted
           ? null
-          : await this.#writeOps(session, store, notePath, ops)
+          : await this.#writeOps(session, store, notePath, written)
         if (result === null) {
           store.drop(pending)
         } else {
@@ -413,7 +419,7 @@ export class TaskCommands {
           return
         }
         // Text that was not written stays in its row until a later write takes it.
-        for (const op of ops) {
+        for (const op of written) {
           if (op.kind === 'insert') {
             store.addNewTask({ ...op, checked: false, bullet: false })
           } else if (op.kind === 'setMarkdown' && store.find(notePath, op.taskId) !== undefined) {
@@ -432,6 +438,42 @@ export class TaskCommands {
       }
     })
     return queued
+  }
+
+  /**
+   * `ops` with each op that names a new task no write holds folded into the
+   * insert of that task: the write that held the new task failed.
+   */
+  #foldNewTasks(store: TaskStore, ops: readonly TaskOp[]): readonly TaskOp[] {
+    const kept: TaskOp[] = []
+    const inserts = new Map<string, TaskInsertOp>()
+    for (const op of ops) {
+      const insert =
+        op.kind === 'insert' ? undefined : (inserts.get(op.taskId) ?? store.takeNewTask(op.taskId))
+      if (op.kind === 'insert' || insert === undefined) {
+        kept.push(op)
+        continue
+      }
+      switch (op.kind) {
+        case 'setMarkdown': {
+          inserts.set(op.taskId, { ...insert, markdown: op.markdown })
+          break
+        }
+        case 'toggle': {
+          inserts.set(op.taskId, { ...insert, checked: op.checked })
+          break
+        }
+        case 'toBullet': {
+          inserts.set(op.taskId, { ...insert, bullet: true })
+          break
+        }
+        case 'remove': {
+          inserts.delete(op.taskId)
+          break
+        }
+      }
+    }
+    return kept.length === ops.length ? ops : [...kept, ...inserts.values()]
   }
 
   /**

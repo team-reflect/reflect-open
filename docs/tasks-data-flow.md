@@ -72,5 +72,6 @@ tries again with backoff. A write that finds its task gone reads the note again,
 in one try, and runs once more. A write that still fails, or whose read failed,
 ends and keeps the typed text in its row while the row exists;
 the next command that names the row, or the app going to the background, writes
-it again. The user sees a message only when their own text cannot be saved as
+it again. A change that waited behind the failed write of a new task is written
+with that new task. The user sees a message only when their own text cannot be saved as
 one task, or the note is not writable.

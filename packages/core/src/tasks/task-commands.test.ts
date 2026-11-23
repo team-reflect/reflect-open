@@ -411,4 +411,19 @@ describe('a new task', () => {
     expect(file(TODAY.notePath)).toBe('## Tasks\n\n+ [ ] buy milk\n')
     expect(shown()).toEqual([[row.taskId, 'buy milk']])
   })
+
+  it('is written with a change that was queued behind its failed write', async () => {
+    await start({})
+    vi.spyOn(commands, 'write').mockRejectedValueOnce(new Error('disk full'))
+
+    const row = commands.add(TODAY)
+    commands.setDraft(row, 'buy milk')
+    const failing = commands.commit(row)
+    const [written] = harness.tasks.get().open!
+    commands.setDraft(written!, 'buy oat milk')
+    await Promise.all([failing, commands.complete([written!])])
+
+    expect(file(TODAY.notePath)).toBe('## Tasks\n\n+ [x] buy oat milk\n')
+    expect(harness.tasks.get().struck).toMatchObject([{ taskId: row.taskId }])
+  })
 })
