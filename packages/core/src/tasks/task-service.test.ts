@@ -982,3 +982,123 @@ describe('task list state', () => {
     expect(getOpenTasks).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('reads racing writes', () => {
+  const NOTE = 'daily/2026-11-20.md'
+
+  /**
+   * Makes every database read wait until `release()`.
+   */
+  function holdTaskReads(): { release: () => void } {
+    const gate = Promise.withResolvers<void>()
+    const read = database.read.bind(database)
+    vi.spyOn(database, 'read').mockImplementation(async (command, args) => {
+      await gate.promise
+      return await read(command, args)
+    })
+    return { release: gate.resolve }
+  }
+
+  /**
+   * Makes the next disk write wait until `release()`.
+   */
+  function holdNextWrite(): { release: () => void } {
+    const gate = Promise.withResolvers<void>()
+    const write = noteFile.write.bind(noteFile)
+    vi.spyOn(noteFile, 'write').mockImplementationOnce(async (...args) => {
+      await gate.promise
+      return await write(...args)
+    })
+    return { release: gate.resolve }
+  }
+
+  /**
+   * Puts `source` on disk and in the index, subscribes, and waits for the first read to land.
+   */
+  async function indexed(source: string): Promise<readonly OpenTask[]> {
+    seedNotes(database, [{ path: NOTE, markdown: source }])
+    noteFile.set(NOTE, source)
+    tasks.subscribe(noop)
+    await flushMicrotasks()
+    return tasks.get().open!
+  }
+
+  it.fails('keeps an edit when a read that started during its write lands after it', async () => {
+    const [row] = await indexed('## Tasks\n\n+ [ ] \n')
+    const write = holdNextWrite()
+
+    const editing = tasks.editTask(row!, 'buy milk')
+    expect(tasks.get().open?.[0]?.markdown).toBe('buy milk')
+
+    const reads = holdTaskReads()
+    emitApplied()
+    write.release()
+    await editing
+    reads.release()
+    await flushMicrotasks()
+
+    expect(tasks.get().open?.[0]?.markdown).toBe('buy milk')
+  })
+
+  it.fails('keeps an added row when a read that started during its write lands after it', async () => {
+    const [row] = await indexed('## Tasks\n\n+ [ ] \n')
+    const write = holdNextWrite()
+
+    const adding = tasks.addTaskAfter(row!, 'buy milk')
+    const reads = holdTaskReads()
+    emitApplied()
+    write.release()
+    const created = await adding
+    reads.release()
+    await flushMicrotasks()
+
+    const open = tasks.get().open!
+    expect(open.map((row) => row.markdown)).toEqual(['buy milk', ''])
+    expect(open.some((row) => isSameTaskPath(row.astPath, created.astPath))).toBe(true)
+  })
+
+  it.fails('deletes an edited row after a read that started during the edit landed', async () => {
+    const [row] = await indexed('## Tasks\n\n+ [ ] \n')
+    const write = holdNextWrite()
+    const editing = tasks.editTask(row!, 'buy milk')
+    const reads = holdTaskReads()
+    emitApplied()
+    write.release()
+    await editing
+    reads.release()
+    await flushMicrotasks()
+
+    expect(noteFile.files().get(NOTE)).toBe('## Tasks\n\n+ [ ] buy milk\n')
+    await tasks.deleteTasks([tasks.get().open![0]!])
+    expect(noteFile.files().get(NOTE)).toBe('## Tasks\n')
+  })
+
+  it.fails('keeps an edit when the trailing throttled read lands before the index has it', async () => {
+    const [row] = await indexed('## Tasks\n\n+ [ ] \n')
+    emitApplied()
+    await flushMicrotasks()
+    await clock.advance(1_000)
+    emitApplied()
+
+    await clock.advance(1_900)
+    await tasks.editTask(row!, 'buy milk')
+    expect(tasks.get().open?.[0]?.markdown).toBe('buy milk')
+
+    await clock.advance(100)
+    await flushMicrotasks()
+    expect(tasks.get().open?.[0]?.markdown).toBe('buy milk')
+  })
+
+  it.fails('refuses an edit whose stale path matches two identical tasks', async () => {
+    const [, second] = projectTasks('+ [ ] \n+ [ ] \n')
+    const source = '## Tasks\n\n+ [ ] \n+ [ ] \n'
+    noteFile.set(NOTE, source)
+
+    await expect(
+      tasks.writeTask({ notePath: NOTE, ...second! }, [
+        { kind: 'setMarkdown', markdown: 'buy milk' },
+      ]),
+    ).rejects.toThrow()
+    expect(noteFile.files().get(NOTE)).toBe(source)
+  })
+})
