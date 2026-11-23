@@ -5,7 +5,7 @@ import { pairMovesById, type DetectedMove } from './move-detection.ts'
 
 /**
  * External-move detection (Plan 17), shared by the open-time reconcile
- * (`indexer.ts`) and the live watcher batch (`live.ts`). Both observe the
+ * (`indexer.ts`) and the index writer (`index-writer.ts`). Both observe the
  * same shape after a rename Reflect didn't perform: an indexed row whose file
  * vanished (an **orphan**) and an unindexed file that appeared (an
  * **arrival**). When an arrival carries an orphan's frontmatter id, the pair

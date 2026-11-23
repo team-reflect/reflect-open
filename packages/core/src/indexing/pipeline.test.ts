@@ -5,7 +5,6 @@ import { parseNote } from '../markdown/index.ts'
 import { createTestXArchiveService } from '../testing/capture.ts'
 import { createTestClockService } from '../testing/clock.ts'
 import { createTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
-import { createTestFileChangeService } from '../testing/file-change.ts'
 import { createTestNoteFileService } from '../testing/graph.ts'
 import {
   createTestIndexStoreService,
@@ -18,7 +17,6 @@ import { createIndexQueryService } from './index-query-service.ts'
 import { buildIndexedNote, PROJECTION_VERSION } from './indexed-note.ts'
 import type { ChangesAppliedEmitter } from './index-writer.ts'
 import { createNoteIndexer, PROJECTION_VERSION_KEY } from './indexer.ts'
-import { createLiveIndex } from './live.ts'
 
 const NOW = 1_750_000_000_000
 
@@ -55,7 +53,7 @@ interface StoredNote {
 }
 
 /**
- * The indexer and the live index over test doubles. `files` defaults to one
+ * The indexer over test doubles. `files` defaults to one
  * note (`notes/a.md`, modified at 5); `read` runs before each note read and
  * may reject it.
  */
@@ -101,7 +99,7 @@ function setup(options?: {
   })
   const appliedListeners = new Set<ChangesAppliedEmitter>()
   /**
-   * Listen for the batches the indexer and the live index report as applied.
+   * Listen for the batches the indexer reports as applied.
    */
   function subscribeIndexApplied(listener: ChangesAppliedEmitter): () => void {
     appliedListeners.add(listener)
@@ -117,7 +115,6 @@ function setup(options?: {
     },
     indexStore: store,
     noteFile: files,
-    fileChanges: createTestFileChangeService(),
     indexQuery: createIndexQueryService({ database }),
     database,
     xArchive: createTestXArchiveService(),
@@ -136,7 +133,6 @@ function setup(options?: {
   }
   return {
     indexer: createNoteIndexer(deps),
-    liveIndex: createLiveIndex(deps),
     subscribeIndexApplied,
     store,
     clock,
@@ -411,103 +407,6 @@ describe('sync', () => {
     expect(logger.getWarnings().map((entry) => entry.message)).toEqual([
       `index: stored projection version none ≠ ${PROJECTION_VERSION} — full rebuild`,
     ])
-  })
-})
-
-describe('LiveIndex.apply (watcher dispatch)', () => {
-  it('re-indexes upserts (batched) and removes deletes at the given generation', async () => {
-    const { liveIndex, findCall } = setup()
-    const mutations = await liveIndex.apply(
-      [
-        { path: 'notes/a.md', kind: 'upsert', modifiedMs: 4242 },
-        { path: 'notes/gone.md', kind: 'remove' },
-      ],
-      9,
-      FILE_GENERATION,
-    )
-    const apply = findCall('applyBatch')
-    expect(apply!.generation).toBe(9)
-    expect(apply!.notes.map((note) => note.path)).toEqual(['notes/a.md'])
-    expect(apply!.notes[0]!.mtime).toBe(4242)
-    expect(findCall('remove')).toMatchObject({ path: 'notes/gone.md', generation: 9 })
-    expect(mutations).toBe(2)
-  })
-
-  it('stamps "now" — never epoch zero — when an upsert carries no modifiedMs', async () => {
-    const { liveIndex, store } = setup()
-    await liveIndex.apply([{ path: 'notes/a.md', kind: 'upsert' }], 9, FILE_GENERATION)
-    expect(store.applied()[0]!.mtime).toBe(NOW)
-  })
-
-  it('skips upserts whose indexed row already matches an old mtime, without reading', async () => {
-    // The iCloud watch's initial gather re-reports every downloaded note; a
-    // row indexed at the same (settled) mtime must cost neither a read nor a
-    // write — and a zero-mutation batch reports 0 so no invalidation fires.
-    const { liveIndex, reads, methods } = setup({
-      stored: [{ path: 'notes/a.md', markdown: '# Hello', fileHash: 'stored', mtime: 1_000 }],
-    })
-
-    const mutations = await liveIndex.apply(
-      [{ path: 'notes/a.md', kind: 'upsert', modifiedMs: 1_000 }],
-      9,
-      FILE_GENERATION,
-    )
-
-    expect(mutations).toBe(0)
-    expect(reads).toEqual([])
-    expect(methods()).not.toContain('applyBatch')
-    expect(methods()).not.toContain('touch')
-  })
-
-  it('re-stamps the stored mtime when content is unchanged but the mtime moved', async () => {
-    const content = '# same content\n'
-    const { liveIndex, methods, findCall } = setup({
-      files: { 'notes/a.md': { contents: content, modifiedMs: 2_000 } },
-      stored: [
-        {
-          path: 'notes/a.md',
-          markdown: content,
-          fileHash: await sha256Hex(content),
-          mtime: 1_000,
-        },
-      ],
-    })
-
-    const mutations = await liveIndex.apply(
-      [{ path: 'notes/a.md', kind: 'upsert', modifiedMs: 2_000 }],
-      9,
-      FILE_GENERATION,
-    )
-
-    // The re-stamp counts as a mutation: `updated_at` moved, so
-    // recency-ordered queries must be invalidated.
-    expect(mutations).toBe(1)
-    expect(findCall('touch')).toEqual({
-      method: 'touch',
-      entries: [{ path: 'notes/a.md', mtime: 2_000 }],
-      generation: 9,
-    })
-    expect(methods()).not.toContain('applyBatch')
-  })
-
-  it('still reads when the reported mtime is too fresh to trust', async () => {
-    // Local write echoes stamp rows with the current time: two
-    // same-millisecond saves would look "unchanged" by mtime alone, so fresh
-    // mtimes always take the read-and-hash path.
-    const { liveIndex, reads, methods } = setup({
-      files: { 'notes/a.md': { contents: '# fresh content', modifiedMs: NOW - 10 } },
-      stored: [{ path: 'notes/a.md', markdown: '# Hello', fileHash: 'stale', mtime: NOW - 10 }],
-    })
-
-    const mutations = await liveIndex.apply(
-      [{ path: 'notes/a.md', kind: 'upsert', modifiedMs: NOW - 10 }],
-      9,
-      FILE_GENERATION,
-    )
-
-    expect(mutations).toBe(1)
-    expect(reads).toEqual(['notes/a.md'])
-    expect(methods()).toContain('applyBatch')
   })
 })
 

@@ -182,6 +182,10 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
     return this.#inner.onReconciled(listener)
   }
 
+  drained(): Promise<void> {
+    return this.#inner.drained()
+  }
+
   onMoved(listener: (from: string, to: string) => void): Unlisten {
     return this.#inner.onMoved(listener)
   }

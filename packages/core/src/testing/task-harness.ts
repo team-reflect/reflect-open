@@ -123,7 +123,6 @@ export class TaskHarness {
   readonly #scans = new StepGate()
   readonly #unreported = new Set<string>()
   #externalModifiedMs = EXTERNAL_MODIFIED_MS_START
-  #suspended = false
 
   constructor(options: TaskHarnessOptions) {
     this.files = createTestNoteFileService({
@@ -251,7 +250,7 @@ export class TaskHarness {
   }
 
   /**
-   * Report every file changed since the last batch as one watcher batch, and apply it.
+   * Report every file changed since the last batch as one watcher batch, and wait for the index writer.
    */
   async deliverWatcherBatch(): Promise<void> {
     const listed = new Map(
@@ -267,18 +266,8 @@ export class TaskHarness {
     if (changes.length === 0) {
       return
     }
-    const applied = Promise.withResolvers<void>()
-    const unlisten = this.index.onApplied((event) => {
-      if (event.changes === changes) {
-        applied.resolve()
-      }
-    })
-    const admitted = !this.#suspended && this.fileChanges.listenerCount().changes > 0
     this.fileChanges.emit({ changes, source: 'external' })
-    if (admitted) {
-      await applied.promise
-    }
-    unlisten()
+    await this.index.drained()
     await sleep(0)
   }
 
@@ -305,7 +294,6 @@ export class TaskHarness {
    * Suspend the index, as the app does when it hides.
    */
   suspend(): void {
-    this.#suspended = true
     this.index.suspend()
   }
 
@@ -313,7 +301,6 @@ export class TaskHarness {
    * Resume the index and run its catch-up pass.
    */
   async resume(): Promise<void> {
-    this.#suspended = false
     this.index.resume(this.session)
     await sleep(0)
     await this.index.settled()
