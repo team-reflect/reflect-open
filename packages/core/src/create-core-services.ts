@@ -1420,5 +1420,6 @@ export function composeCoreServices(
     assetPrivacy,
     captureInbox,
   }
+  persistenceFlush.registerFlusher('tasks', () => services.tasks.commands.commitDrafts())
   return { services, internal }
 }

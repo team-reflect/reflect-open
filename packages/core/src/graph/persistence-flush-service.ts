@@ -6,14 +6,14 @@ import type { LoggerService } from '../ports/logger-service.ts'
 /**
  * The dirty state a registered flusher lands. Settings is built in.
  */
-export type PersistenceFlusherKind = 'documents' | 'git-sync'
+export type PersistenceFlusherKind = 'tasks' | 'documents' | 'git-sync'
 
 export type PersistenceFlusher = () => Promise<void>
 
 /**
- * Lands dirty state before the app exits or the OS suspends it: note buffers
- * and settings first, then the local backup commit, so the commit captures
- * them. A backup flusher makes a local commit only, never a push, which
+ * Lands dirty state before the app exits or the OS suspends it: typed task
+ * text, then note buffers and settings, then the local backup commit, so the
+ * commit captures them. A backup flusher makes a local commit only, never a push, which
  * could stall the exit.
  */
 export interface PersistenceFlushService {
@@ -23,7 +23,7 @@ export interface PersistenceFlushService {
    */
   registerFlusher(kind: PersistenceFlusherKind, fn: PersistenceFlusher): Unlisten
   /**
-   * Documents and settings in parallel, then backup. Never rejects; failures are logged.
+   * Tasks, then documents and settings in parallel, then backup. Never rejects; failures are logged.
    */
   flushAll(): Promise<void>
   /**
@@ -61,6 +61,7 @@ class PersistenceFlushServiceImpl implements PersistenceFlushService {
 
   async flushAll(): Promise<void> {
     const { settings } = this.#deps
+    await this.#run('tasks', this.#flushers.get('tasks'))
     await Promise.allSettled([
       this.#run('documents', this.#flushers.get('documents')),
       this.#run('settings', () => settings.flush()),
@@ -70,6 +71,7 @@ class PersistenceFlushServiceImpl implements PersistenceFlushService {
 
   startFlushAll(): void {
     const { settings } = this.#deps
+    void this.#run('tasks', this.#flushers.get('tasks'))
     void this.#run('documents', this.#flushers.get('documents'))
     void this.#run('settings', () => settings.flush())
     void this.#run('git-sync', this.#flushers.get('git-sync'))

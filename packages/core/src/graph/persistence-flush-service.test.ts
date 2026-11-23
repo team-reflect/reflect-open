@@ -114,6 +114,21 @@ describe('flushAll', () => {
     expect(gitSync.calls()).toBe(1)
   })
 
+  it('flushes the tasks before the documents', async () => {
+    const { service, log } = setup()
+    const tasks = createStep('tasks', log)
+    disposers.push(service.registerFlusher('tasks', tasks.fn))
+    const release = tasks.hold()
+
+    const flushed = service.flushAll()
+    await settle()
+    expect(log).toEqual(['tasks'])
+
+    release()
+    await flushed
+    expect(log).toEqual(['tasks', 'documents', 'settings', 'git-sync'])
+  })
+
   it('never rejects and logs every failed step', async () => {
     const { service, documents, settings, gitSync, logger } = setup()
     documents.failNext('disk full')
