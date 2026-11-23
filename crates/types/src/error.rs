@@ -20,6 +20,9 @@ pub enum AppError {
         /// The libgit2 error code when the failure came from `git2`.
         #[serde(skip)]
         git_code: Option<i32>,
+        /// The SQLite extended result code when the failure came from SQLite.
+        #[serde(skip)]
+        sqlite_code: Option<i32>,
     },
     /// A requested note or file does not exist.
     NotFound { message: String },
@@ -44,6 +47,7 @@ impl AppError {
         Self::Io {
             message: message.into(),
             git_code: None,
+            sqlite_code: None,
         }
     }
 
@@ -77,6 +81,14 @@ impl AppError {
     pub fn git_code(&self) -> Option<i32> {
         match self {
             Self::Io { git_code, .. } => *git_code,
+            _ => None,
+        }
+    }
+
+    /// The SQLite extended result code, when this error came from SQLite.
+    pub fn sqlite_code(&self) -> Option<i32> {
+        match self {
+            Self::Io { sqlite_code, .. } => *sqlite_code,
             _ => None,
         }
     }
@@ -133,6 +145,7 @@ impl From<git2::Error> for AppError {
         Self::Io {
             message,
             git_code: Some(err.raw_code()),
+            sqlite_code: None,
         }
     }
 }
@@ -147,6 +160,7 @@ impl From<std::io::Error> for AppError {
             Self::Io {
                 message: err.to_string(),
                 git_code: None,
+                sqlite_code: None,
             }
         }
     }
@@ -158,6 +172,10 @@ impl From<rusqlite::Error> for AppError {
         Self::Io {
             message: err.to_string(),
             git_code: None,
+            sqlite_code: match &err {
+                rusqlite::Error::SqliteFailure(failure, _) => Some(failure.extended_code),
+                _ => None,
+            },
         }
     }
 }
