@@ -7,9 +7,9 @@ inputs:
     required: false
     default: 'true'
   cache-scope:
-    description: The job whose mbx cache this job restores and saves. Defaults to the current job.
+    description: The name of the mbx cache that this job restores and saves.
     required: false
-    default: ''
+    default: ${{ github.workflow }}-${{ github.job }}
   cache-save:
     description: Whether to save the mbx cache. With 'false', the job only restores it.
     required: false
@@ -60,23 +60,6 @@ runs:
         path: ${{ env.ORT_CACHE_DIR }}
         key: ort-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
 
-    # Restores the newest cache of this scope first, then the newest cache of
-    # any scope on this platform.
-    - name: Compute the mbx cache key
-      id: mbx-key
-      shell: bash
-      env:
-        SCOPE: ${{ inputs.cache-scope || github.job }}
-      run: |
-        prefix="mbx-v2-$RUNNER_OS-$RUNNER_ARCH-"
-        echo "key=$prefix$SCOPE-$GITHUB_SHA" >> "$GITHUB_OUTPUT"
-        {
-          echo "restore-keys<<EOF"
-          echo "$prefix$SCOPE-"
-          echo "$prefix"
-          echo "EOF"
-        } >> "$GITHUB_OUTPUT"
-
     # Uses the mbx that mise installed. The `objects` mode restores and saves
     # the mbx object store; a successful push to master or workflow_dispatch
     # saves.
@@ -90,6 +73,10 @@ runs:
       with:
         backend: ${{ inputs.cache == 'true' && 'github' || 'local' }}
         github-cache-mode: objects
-        cache-key: ${{ steps.mbx-key.outputs.key }}
-        restore-keys: ${{ steps.mbx-key.outputs.restore-keys }}
+        # Restores the newest cache of this scope first, then the newest cache
+        # of any scope on this platform.
+        cache-key: mbx-v2/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/${{ github.sha }}
+        restore-keys: |
+          mbx-v2/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/
+          mbx-v2/${{ runner.os }}/${{ runner.arch }}/
         save-on-workflow-dispatch: ${{ inputs.cache-save }}
