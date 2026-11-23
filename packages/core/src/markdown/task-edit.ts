@@ -5,7 +5,7 @@ import {
   type MarkdownListItem,
   type MarkdownNode,
 } from '@meowdown/markdown'
-import { NoteEditError } from '../tasks/task-errors.ts'
+import { NoteEditError } from '../documents/note-edit-error.ts'
 import {
   createListItem,
   endOfListRun,

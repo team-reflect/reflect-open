@@ -1,4 +1,4 @@
-import { NoteEditError } from '../tasks/task-errors.ts'
+import { NoteEditError } from './note-edit-error.ts'
 import { requireGraphSession, type GraphSessionSource } from '../graph/graph-session.ts'
 import { isAppError } from '../errors.ts'
 import type { NoteRead, WritableNoteFileService } from '../graph/note-file-service.ts'

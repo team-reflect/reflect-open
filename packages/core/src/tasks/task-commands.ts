@@ -15,7 +15,7 @@ import {
 } from '../markdown/index.ts'
 import type { OpenTask } from './open-task.ts'
 import { resolveTaskEdit } from './task-content.ts'
-import { NoteEditError } from './task-errors.ts'
+import { NoteEditError } from '../documents/note-edit-error.ts'
 import { toInsertTarget, type InsertTaskTarget } from './task-insert-target.ts'
 import type { TaskInsertOp, TaskOp } from './task-ops.ts'
 import { withDraftDueDate } from './task-schedule-content.ts'

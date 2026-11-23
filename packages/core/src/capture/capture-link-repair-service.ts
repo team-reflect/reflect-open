@@ -9,7 +9,7 @@ import { isWikiLinkSafeText } from '../indexing/suggest.ts'
 import { parseNote } from '../markdown/extract.ts'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
-import { NoteEditError } from '../tasks/task-errors.ts'
+import { NoteEditError } from '../documents/note-edit-error.ts'
 
 /**
  * One capture whose Daily link text is still the drain's placeholder.

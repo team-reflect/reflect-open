@@ -10,7 +10,7 @@ import {
 import { appendBlock } from './append-section.ts'
 import { splitFrontmatter } from './frontmatter.ts'
 import { renderInlineText } from './inline-text.ts'
-import { NoteEditError } from '../tasks/task-errors.ts'
+import { NoteEditError } from '../documents/note-edit-error.ts'
 import { foldKey } from './keys.ts'
 import { scanInlineWikiLinks } from './scan.ts'
 import { getFirstParagraphMarkdown, isBlockParent, type BlockParent } from './task-project.ts'
