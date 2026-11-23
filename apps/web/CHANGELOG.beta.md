@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.20.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.20.0-beta.1...v0.20.0-beta.2) (2026-11-23)
+
+
+### Features
+
+* print the current note ([#2297](https://github.com/team-reflect/reflect-open/issues/2297)) ([bd4d9fc](https://github.com/team-reflect/reflect-open/commit/bd4d9fcee3ec7b7d53d687c5ae6bfe152096f9d7))
+
+
+### Bug Fixes
+
+* repair a corrupt index file in place ([#2299](https://github.com/team-reflect/reflect-open/issues/2299)) ([a477b6d](https://github.com/team-reflect/reflect-open/commit/a477b6dbd76f0cf71a90054856d6ee05c1506aaf))
+
 ## [0.20.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.19.1...v0.20.0-beta.1) (2026-11-22)
 
 
