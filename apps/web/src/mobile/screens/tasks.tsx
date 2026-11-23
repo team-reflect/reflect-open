@@ -82,12 +82,11 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
     selectText: true,
   })
 
-  const { open, completed, openFailed, completedFailed } = useStore(taskService)
+  const { open, completed } = useStore(taskService)
   useEffect(
     () => (filters.archived ? taskService.includeCompleted() : undefined),
     [taskService, filters.archived],
   )
-  const isError = openFailed || (filters.archived && completedFailed)
   const ready = open !== undefined && (!filters.archived || completed !== undefined)
 
   const recentlyCompleted = useRecentlyCompleted(graph?.root ?? null, open)
@@ -106,7 +105,7 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
 
   // The task list scroller renders only while there are rows to show.
   const listRef = useRef<HTMLDivElement>(null)
-  const { onScroll } = useScrollRestoration(listRef, !isError && groups.length > 0)
+  const { onScroll } = useScrollRestoration(listRef, groups.length > 0)
 
   // The sheet edits the task's *live* row, not the snapshot taken when it
   // opened: a mutation or reindex can rewrite the row (raw, checked) while
@@ -183,11 +182,7 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
           }
         }}
       />
-      {isError ? (
-        <p role="alert" className="px-safe-offset-4 py-6 text-sm text-text-muted">
-          Couldn’t load tasks.
-        </p>
-      ) : enabled && !ready && groups.length === 0 ? (
+      {enabled && !ready && groups.length === 0 ? (
         // Loading only gates what would otherwise be a false empty state: with
         // archived flipping on, the open groups keep showing while the
         // completed history loads (desktop likewise gates only the message).

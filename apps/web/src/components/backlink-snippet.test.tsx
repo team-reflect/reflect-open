@@ -56,6 +56,8 @@ async function renderSnippet(
     moved: [],
     inserted: [],
     tasks: [],
+    merged: false,
+    indexSeq: null,
     updatedAt: 0,
   })
   return await renderInApp(

@@ -1,4 +1,3 @@
-import type { NoteTasks } from '@reflect/types'
 import { isShallowEqual } from '@ocavue/utils'
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import { requireGraphSession, type GraphRole, type GraphSession } from '../graph/graph-session.ts'
@@ -12,34 +11,30 @@ import { INDEX_COMMITTED_EVENT, listenNow, type IpcBridgeService } from '../ipc/
 import type { SnippetTask } from '../indexing/snippet-tasks.ts'
 import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
+import { splitFrontmatter } from '../markdown/frontmatter.ts'
 import {
   applyTaskEdits,
-  encodeTaskPath,
-  renderTaskSnapshot,
+  isSameTaskPath,
+  projectTasks,
   type TaskEdit,
   type TaskEditResult,
   type TaskLocator,
   type TaskSnapshot,
 } from '../markdown/index.ts'
-import { compareTasksByNote, type OpenTask } from './open-task.ts'
+import type { OpenTask } from './open-task.ts'
 import {
   resolveSnippetTask,
   toggleSnippetTask,
   type SnippetTaskClick,
 } from './snippet-task-toggle.ts'
-import {
-  asCompleted,
-  asOpen,
-  withChecked,
-  withEditedTask,
-  withoutTasks,
-  withRelocatedTasks,
-  type TaskMoves,
-} from './task-cache.ts'
+import { withChecked, withRelocatedTasks, type TaskMoves } from './task-cache.ts'
 import { NoteEditError } from './task-errors.ts'
-import { getTaskKey, isSameTask } from './task-identity.ts'
+import { getTaskKey } from './task-identity.ts'
 import { createInsertedTaskRow, type InsertTaskTarget } from './task-insert-target.ts'
+import { applyTaskOp, type TaskItemOp, type TaskOp } from './task-ops.ts'
+import { createTaskReader, type TaskReader } from './task-reader.ts'
 import { getScheduledMarkdown } from './task-schedule-content.ts'
+import { TaskStore, type PendingWrite, type TaskCommit, type TaskStoreView } from './task-store.ts'
 
 export interface TaskServiceDeps {
   readonly database: DatabaseService
@@ -57,8 +52,8 @@ export interface TaskServiceDeps {
 }
 
 /**
- * The Tasks view's rows: the open and completed tasks as last read, with the
- * pending optimistic writes applied.
+ * The Tasks view's rows: the tasks of the notes as last read or written, with
+ * the writes in flight applied.
  */
 export interface TaskListState {
   /**
@@ -70,14 +65,6 @@ export interface TaskListState {
    * {@link TaskService.includeCompleted} holds the list.
    */
   readonly completed: readonly OpenTask[] | undefined
-  /**
-   * The last read of the open tasks failed.
-   */
-  readonly openFailed: boolean
-  /**
-   * The last read of the completed tasks failed.
-   */
-  readonly completedFailed: boolean
 }
 
 /**
@@ -102,7 +89,7 @@ export interface TaskRef extends TaskLocator {
 }
 
 /**
- * A task write's {@link TaskEditResult} plus when the write landed.
+ * What a task write left in its note.
  */
 export interface TaskWriteResult extends TaskEditResult {
   /**
@@ -110,7 +97,20 @@ export interface TaskWriteResult extends TaskEditResult {
    */
   readonly revision: string
   /**
-   * Epoch milliseconds read right after the write, to order optimistic rows.
+   * Every round task of the note text the write left, in document order.
+   */
+  readonly tasks: readonly TaskSnapshot[]
+  /**
+   * Whether the note holds another text than `source`: the write merged with
+   * a newer text. `moved` and `inserted` then describe `source` only.
+   */
+  readonly merged: boolean
+  /**
+   * The seq of an index commit that holds the note text, when one is known.
+   */
+  readonly indexSeq: number | null
+  /**
+   * Epoch milliseconds read right after the write, to order the rows of the note.
    */
   readonly updatedAt: number
 }
@@ -118,22 +118,11 @@ export interface TaskWriteResult extends TaskEditResult {
 /**
  * A write that added one task.
  */
-export interface InsertedTask extends TaskMoves {
+export interface InsertedTask extends TaskWriteResult {
   /**
-   * The new empty task, as the written note addresses it.
+   * The new task, as the written note addresses it.
    */
   readonly created: TaskSnapshot
-  /**
-   * Epoch milliseconds read right after the write, to order the optimistic row.
-   */
-  readonly updatedAt: number
-}
-
-export interface WriteTaskEditsOptions {
-  /**
-   * Treat a missing note as empty: the first task creates it (today's daily).
-   */
-  readonly createIfMissing?: boolean
 }
 
 /**
@@ -164,18 +153,9 @@ export type TaskAction =
  */
 export interface TaskService extends Store<TaskListState> {
   /**
-   * Every open task across the graph, with note context, for the Tasks view.
-   * Private notes' tasks are included because this is a local-only surface.
-   */
-  getOpenTasks(): Promise<OpenTask[]>
-  /**
-   * Completed tasks across the graph, most-recently-edited note first — the
-   * Tasks view's "show archived" surface.
-   */
-  getCompletedTasks(): Promise<OpenTask[]>
-  /**
-   * The open graph's task rows. The same object is returned until the rows,
-   * a read failure, or the open graph change.
+   * The open graph's task rows. Private notes' tasks are included because
+   * this is a local-only surface. The same object is returned until the rows
+   * or the open graph change.
    */
   get: () => TaskListState
   /**
@@ -187,7 +167,9 @@ export interface TaskService extends Store<TaskListState> {
   subscribe: (listener: VoidFunction) => Unlisten
   /**
    * Re-read the open tasks, and the completed tasks while
-   * {@link TaskService.includeCompleted} holds them, through the database.
+   * {@link TaskService.includeCompleted} holds them, through the database. A
+   * failed read is tried again until it lands; the rows stay as they are
+   * meanwhile.
    */
   refresh(): Promise<void>
   /**
@@ -201,53 +183,55 @@ export interface TaskService extends Store<TaskListState> {
    * move up), or demote it to a plain bullet so it leaves the Tasks projection
    * but stays in the note. Several actions land together, so an inline edit
    * and the toggle or convert that ends it are one write; every action
-   * addresses the task as the index knew it.
+   * addresses the task as the index knew it. The rows of
+   * {@link TaskService.get} are not touched.
    */
   writeTask(task: TaskRef, actions: readonly TaskAction[]): Promise<TaskWriteResult>
   /**
    * Continue entry from a grouped task: resolve the current draft and add a new
    * empty task at the end of the same parent item, or of the task's own list
    * under a heading, in one write. Changed content replaces the anchor's
-   * Markdown; cleared content removes the anchor. The result addresses the new
-   * row and every moved row in the written note, so the Tasks view can select
-   * the new task and re-key cached rows before reindexing catches up.
+   * Markdown; cleared content removes the anchor. The result addresses the
+   * new task in the written note.
    */
   continueTaskInContext(task: TaskRef, content: string | null): Promise<InsertedTask>
   /**
    * Insert a new empty `+ [ ]` task into `notePath`'s `## Tasks` section
    * (Return-to-add), creating the section after the note's last content when
-   * it has none, and return the new row's address plus where the note's other
-   * tasks moved. A missing note (today's daily not yet created) starts empty.
+   * it has none, and return the new task's address. A missing note (today's
+   * daily not yet created) starts empty.
    */
   insertTask(notePath: string): Promise<InsertedTask>
   /**
    * Check `tasks` one write at a time. The rows leave the open list, join the
    * completed list as checked, and stay in the recently-completed set before
-   * the first write. A failure re-reads the rows, drops `tasks` from the
-   * recently-completed set, and rethrows.
+   * the first write. A failure leaves the rows of the writes that landed,
+   * puts the other rows back, drops `tasks` from the recently-completed set,
+   * and rethrows.
    */
   completeTasks(tasks: readonly OpenTask[]): Promise<void>
   /**
    * Uncheck `tasks` one write at a time. The rows return to the open list and
    * leave the completed list and the recently-completed set before the first
-   * write. A failure re-reads the rows and rethrows.
+   * write. A failure puts back the rows whose write did not land and rethrows.
    */
   reopenTasks(tasks: readonly OpenTask[]): Promise<void>
   /**
    * Remove `tasks` from their notes one write at a time. The rows leave both
    * lists and the recently-completed set before the first write. A failure
-   * re-reads the rows, keeps the checked ones struck again, and rethrows.
+   * puts back the rows whose write did not land, keeps the checked ones
+   * struck again, and rethrows.
    */
   deleteTasks(tasks: readonly OpenTask[]): Promise<void>
   /**
-   * Replace one task's Markdown. The rows show the new text before the write;
-   * a failure restores the rows as they were and rethrows.
+   * Replace one task's Markdown. The row shows the new text and its due date
+   * before the write; a failure puts the row back and rethrows.
    */
   editTask(task: OpenTask, content: string): Promise<void>
   /**
    * Set each task's due date to `isoDate`, or clear it for `null`, one write
-   * at a time. The rows show the new date link before the first write; a
-   * failure re-reads the rows and rethrows.
+   * at a time. The rows show the new date before the first write; a failure
+   * puts back the rows whose write did not land and rethrows.
    */
   scheduleTasks(tasks: readonly OpenTask[], isoDate: string | null): Promise<void>
   /**
@@ -258,28 +242,27 @@ export interface TaskService extends Store<TaskListState> {
   /**
    * Replace one task's Markdown and turn it into a plain bullet in one write.
    * The row leaves both lists and the recently-completed set before the
-   * write; a failure restores the rows, keeps a checked task struck again,
+   * write; a failure puts the row back, keeps a checked task struck again,
    * and rethrows.
    */
   editAndConvertTask(task: OpenTask, content: string): Promise<void>
   /**
    * Toggle one task's checkbox, first replacing its Markdown unless `content`
    * is `null`, in one write. The row moves between the lists and the
-   * recently-completed set before the write; a failure restores the rows and
-   * the set, and rethrows.
+   * recently-completed set before the write; a failure puts the row and the
+   * set back, and rethrows.
    */
   editAndToggleTask(task: OpenTask, content: string | null): Promise<void>
   /**
    * Add an empty task to `target`'s note ({@link TaskService.insertTask}) and
-   * return its row, already in the open list. A failure re-reads the rows and
-   * rethrows.
+   * return its row, already in the open list.
    */
   addTask(target: InsertTaskTarget): Promise<OpenTask>
   /**
    * Resolve `task`'s draft and add an empty task after it
    * ({@link TaskService.continueTaskInContext}), and return the new row,
    * already in the open list. The anchor row shows its draft before the
-   * write; a failure restores the rows and rethrows.
+   * write; a failure puts the anchor row back and rethrows.
    */
   addTaskAfter(task: OpenTask, content: string | null): Promise<OpenTask>
   /**
@@ -374,22 +357,6 @@ function isReopenedAfter(struck: OpenTask, live: OpenTask): boolean {
   return live.updatedAt > struck.updatedAt
 }
 
-function toOpenTasks(notes: readonly NoteTasks[]): OpenTask[] {
-  return notes.flatMap((note) => {
-    return note.tasks.map((task) => ({
-      taskId: `${note.path}:${encodeTaskPath(task.astPath)}`,
-      notePath: note.path,
-      revision: note.hash,
-      noteTitle: note.title,
-      dailyDate: note.dailyDate,
-      isPinned: note.isPinned,
-      pinnedOrder: note.pinnedOrder,
-      updatedAt: note.updatedAt,
-      ...renderTaskSnapshot(task),
-    }))
-  })
-}
-
 /**
  * Only the locator goes to the core edit: the note path merely picks the owner.
  */
@@ -410,57 +377,32 @@ function requireInserted(result: TaskEditResult): TaskSnapshot {
   return created
 }
 
-const EMPTY: readonly OpenTask[] = []
-
-const EMPTY_STATE: TaskListState = {
-  open: undefined,
-  completed: undefined,
-  openFailed: false,
-  completedFailed: false,
+/**
+ * The tasks `result` left in `notePath`, for the store.
+ */
+function toCommit(notePath: string, result: TaskWriteResult): TaskCommit {
+  return {
+    notePath,
+    revision: result.revision,
+    tasks: result.tasks,
+    baseRevision: result.baseRevision,
+    moves: result.merged ? null : result.moved,
+    inserted: result.inserted,
+    indexSeq: result.indexSeq,
+    updatedAt: result.updatedAt,
+  }
 }
+
+function toOps(taskId: string, actions: readonly TaskAction[]): TaskItemOp[] {
+  return actions.map((action) => ({ ...action, taskId }))
+}
+
+const EMPTY: readonly OpenTask[] = []
 
 /**
  * Spacing between index-change re-reads while the index applies batch after batch.
  */
 const REFRESH_THROTTLE_MS = 3_000
-
-/**
- * Updates a task list in place; returning `undefined` leaves the list as it is.
- */
-type TaskListPatch = (rows: readonly OpenTask[] | undefined) => readonly OpenTask[] | undefined
-
-/**
- * Both task lists as they were before an optimistic write.
- */
-interface TaskListSnapshot {
-  /**
-   * The session key of the graph the snapshot was taken in.
-   */
-  readonly key: string | null
-  readonly open: readonly OpenTask[] | undefined
-  readonly completed: readonly OpenTask[] | undefined
-}
-
-/**
- * One task list and the state of its reads.
- */
-interface TaskListSlot {
-  rows: readonly OpenTask[] | undefined
-  failed: boolean
-  /**
-   * The rows may be behind the index: the next subscriber reads them again.
-   */
-  stale: boolean
-  loading: boolean
-  /**
-   * Bumped by each read and each cancel; a read lands only while it holds the latest value.
-   */
-  read: number
-}
-
-function emptySlot(): TaskListSlot {
-  return { rows: undefined, failed: false, stale: true, loading: false, read: 0 }
-}
 
 function sessionKey(session: GraphSession | null): string | null {
   return session === null ? null : `${session.generation}:${session.root}`
@@ -470,17 +412,48 @@ function keysOf(tasks: readonly OpenTask[]): string[] {
   return tasks.map(getTaskKey)
 }
 
+function toState(view: TaskStoreView): TaskListState {
+  return { open: view.open, completed: view.completed }
+}
+
+/**
+ * One write of a batch: the task, its actions, and the ops its row shows meanwhile.
+ */
+interface BatchWrite {
+  readonly task: OpenTask
+  readonly actions: readonly TaskAction[]
+  readonly pending: PendingWrite
+}
+
 class TaskServiceImpl implements TaskService {
   readonly #deps: TaskServiceDeps
+  readonly #reader: TaskReader
   readonly #recentlyCompleted = new WritableStore<RecentlyCompleted>(
     { root: null, tasks: EMPTY },
     isShallowEqual,
   )
   readonly recentlyCompleted: Store<RecentlyCompleted> = this.#recentlyCompleted
-  readonly #state = new WritableStore<TaskListState>(EMPTY_STATE, isShallowEqual)
+  #nextTaskId = 0
+  #store = this.#createStore()
+  readonly #state = new WritableStore<TaskListState>(toState(this.#store.view()), isShallowEqual)
   #sessionKey: string | null = null
-  #open: TaskListSlot = emptySlot()
-  #completed: TaskListSlot = emptySlot()
+  #indexGeneration: number | null = null
+  /**
+   * Aborts the reads of the graph that `#store` belongs to.
+   */
+  #reads = new AbortController()
+  /**
+   * The read of every note in flight.
+   */
+  #reading: Promise<void> | null = null
+  /**
+   * The index changed since the read in flight started: read once more after it.
+   */
+  #readAgain = false
+  /**
+   * The rows may be behind the index: the next subscriber reads them again.
+   */
+  #stale = true
   #completedHolds = 0
   #sources: Unlisten | null = null
   #lastRefreshAt = -Infinity
@@ -488,18 +461,7 @@ class TaskServiceImpl implements TaskService {
 
   constructor(deps: TaskServiceDeps) {
     this.#deps = deps
-  }
-
-  async getOpenTasks(): Promise<OpenTask[]> {
-    const { notes } = await this.#deps.database.read('index_tasks', { checked: false, paths: null })
-    return toOpenTasks(notes).sort(compareTasksByNote)
-  }
-
-  async getCompletedTasks(): Promise<OpenTask[]> {
-    const { notes } = await this.#deps.database.read('index_tasks', { checked: true, paths: null })
-    return toOpenTasks(notes).sort(
-      (left, right) => right.updatedAt - left.updatedAt || compareTasksByNote(left, right),
-    )
+    this.#reader = createTaskReader(deps)
   }
 
   readonly get = this.#state.get
@@ -508,7 +470,9 @@ class TaskServiceImpl implements TaskService {
     const unlisten = this.#state.subscribe(listener)
     this.#sources ??= this.#startSources()
     this.#syncSession()
-    this.#loadStale()
+    if (this.#stale) {
+      void this.refresh()
+    }
     return () => {
       unlisten()
       if (!this.#state.subscribed()) {
@@ -518,21 +482,31 @@ class TaskServiceImpl implements TaskService {
     }
   }
 
-  async refresh(): Promise<void> {
+  refresh(): Promise<void> {
     this.#syncSession()
-    const reads = [this.#readOpen()]
-    if (this.#completedHolds > 0) {
-      reads.push(this.#readCompleted())
-    } else {
-      this.#completed.stale = true
+    if (this.#sessionKey === null) {
+      return Promise.resolve()
     }
-    await Promise.all(reads)
+    this.#stale = false
+    if (this.#reading !== null) {
+      this.#readAgain = true
+      return this.#reading
+    }
+    const reading = this.#readAll().finally(() => {
+      if (this.#reading === reading) {
+        this.#reading = null
+      }
+    })
+    this.#reading = reading
+    return reading
   }
 
   includeCompleted(): Unlisten {
     this.#completedHolds += 1
     this.#syncSession()
-    this.#loadStale()
+    if (this.#store.view().completed === undefined) {
+      void this.refresh()
+    }
     let held = true
     return () => {
       if (held) {
@@ -543,10 +517,13 @@ class TaskServiceImpl implements TaskService {
   }
 
   async writeTask(task: TaskRef, actions: readonly TaskAction[]): Promise<TaskWriteResult> {
-    return await this.#writeOne(
-      requireGraphSession(this.#deps.graphSession).generation,
-      task,
-      actions,
+    const { generation } = requireGraphSession(this.#deps.graphSession)
+    const locator = toLocator(task)
+    return await this.#writeEdits(
+      generation,
+      task.notePath,
+      actions.map((action) => ({ ...action, task: locator })),
+      false,
     )
   }
 
@@ -561,14 +538,8 @@ class TaskServiceImpl implements TaskService {
     } else if (content !== null) {
       edits.push({ kind: 'setMarkdown', task: locator, markdown: content })
     }
-    const result = await this.#writeEdits(generation, task.notePath, edits)
-    return {
-      created: requireInserted(result),
-      baseRevision: result.baseRevision,
-      revision: result.revision,
-      moved: result.moved,
-      updatedAt: result.updatedAt,
-    }
+    const result = await this.#writeEdits(generation, task.notePath, edits, false)
+    return { ...result, created: requireInserted(result) }
   }
 
   async insertTask(notePath: string): Promise<InsertedTask> {
@@ -577,31 +548,18 @@ class TaskServiceImpl implements TaskService {
       generation,
       notePath,
       [{ kind: 'insert', at: { kind: 'tasksSection' }, markdown: '' }],
-      { createIfMissing: true },
+      true,
     )
-    return {
-      created: requireInserted(result),
-      baseRevision: result.baseRevision,
-      revision: result.revision,
-      moved: result.moved,
-      updatedAt: result.updatedAt,
-    }
+    return { ...result, created: requireInserted(result) }
   }
 
   async completeTasks(tasks: readonly OpenTask[]): Promise<void> {
     const session = this.#begin()
     const { root } = session
-    this.#snapshot()
-    this.#patch(
-      (rows) => withoutTasks(rows, tasks),
-      (rows) => asCompleted(rows, tasks),
-    )
     this.markRecentlyCompleted(root, tasks)
     try {
       await this.#writeEach(session, tasks, () => [{ kind: 'toggle' }])
     } catch (cause) {
-      // Earlier writes of the batch may have landed: re-read rather than restore.
-      this.#invalidate()
       this.forgetRecentlyCompleted(root, keysOf(tasks))
       throw cause
     }
@@ -609,18 +567,8 @@ class TaskServiceImpl implements TaskService {
 
   async reopenTasks(tasks: readonly OpenTask[]): Promise<void> {
     const session = this.#begin()
-    this.#snapshot()
-    this.#patch(
-      (rows) => asOpen(rows, tasks),
-      (rows) => withoutTasks(rows, tasks),
-    )
     this.forgetRecentlyCompleted(session.root, keysOf(tasks))
-    try {
-      await this.#writeEach(session, tasks, () => [{ kind: 'toggle' }])
-    } catch (cause) {
-      this.#invalidate()
-      throw cause
-    }
+    await this.#writeEach(session, tasks, () => [{ kind: 'toggle' }])
   }
 
   async deleteTasks(tasks: readonly OpenTask[]): Promise<void> {
@@ -628,37 +576,13 @@ class TaskServiceImpl implements TaskService {
   }
 
   async editTask(task: OpenTask, content: string): Promise<void> {
-    this.#begin()
-    const snapshot = this.#snapshot()
-    const patch: TaskListPatch = (rows) => withEditedTask(rows, task, content)
-    this.#patch(patch, patch)
-    try {
-      await this.writeTask(task, [{ kind: 'setMarkdown', markdown: content }])
-    } catch (cause) {
-      this.#restore(snapshot)
-      throw cause
-    }
+    await this.#writeEach(this.#begin(), [task], () => [{ kind: 'setMarkdown', markdown: content }])
   }
 
   async scheduleTasks(tasks: readonly OpenTask[], isoDate: string | null): Promise<void> {
-    const session = this.#begin()
-    this.#snapshot()
-    // The row keeps its bucket until the reindex re-derives the due date.
-    const patch: TaskListPatch = (rows) => {
-      return tasks.reduce(
-        (acc, task) => withEditedTask(acc, task, getScheduledMarkdown(task, isoDate)),
-        rows,
-      )
-    }
-    this.#patch(patch, patch)
-    try {
-      await this.#writeEach(session, tasks, (task) => [
-        { kind: 'setMarkdown', markdown: getScheduledMarkdown(task, isoDate) },
-      ])
-    } catch (cause) {
-      this.#invalidate()
-      throw cause
-    }
+    await this.#writeEach(this.#begin(), tasks, (task) => [
+      { kind: 'setMarkdown', markdown: getScheduledMarkdown(task, isoDate) },
+    ])
   }
 
   async convertTasks(tasks: readonly OpenTask[]): Promise<void> {
@@ -668,20 +592,13 @@ class TaskServiceImpl implements TaskService {
   async editAndConvertTask(task: OpenTask, content: string): Promise<void> {
     const session = this.#begin()
     const { root } = session
-    const snapshot = this.#snapshot()
-    this.#patch(
-      (rows) => withoutTasks(rows, [task]),
-      (rows) => withoutTasks(rows, [task]),
-    )
     this.forgetRecentlyCompleted(root, [getTaskKey(task)])
     try {
-      const result = await this.writeTask(task, [
+      await this.#writeEach(session, [task], () => [
         { kind: 'setMarkdown', markdown: content },
         { kind: 'toBullet' },
       ])
-      this.#relocate(session, task.notePath, result)
     } catch (cause) {
-      this.#restore(snapshot)
       if (task.checked) {
         this.markRecentlyCompleted(root, [task])
       }
@@ -690,34 +607,22 @@ class TaskServiceImpl implements TaskService {
   }
 
   async editAndToggleTask(task: OpenTask, content: string | null): Promise<void> {
-    const { root } = this.#begin()
-    const snapshot = this.#snapshot()
-    const edited = content === null ? task : (withEditedTask([task], task, content)?.[0] ?? task)
+    const session = this.#begin()
+    const { root } = session
     const wasRecentlyCompleted = this.hasRecentlyCompleted(root, getTaskKey(task))
+    const actions: TaskAction[] =
+      content === null
+        ? [{ kind: 'toggle' }]
+        : [{ kind: 'setMarkdown', markdown: content }, { kind: 'toggle' }]
     if (task.checked) {
-      this.#patch(
-        (rows) => asOpen(rows, [edited]),
-        (rows) => withoutTasks(rows, [task]),
-      )
       this.forgetRecentlyCompleted(root, [getTaskKey(task)])
     } else {
-      // The struck row shows the edited text, in the completed list and the recently-completed set.
-      this.#patch(
-        (rows) => withoutTasks(rows, [task]),
-        (rows) => asCompleted(rows, [edited]),
-      )
-      this.markRecentlyCompleted(root, [edited])
+      // The struck row shows the edited text.
+      this.markRecentlyCompleted(root, toOps(task.taskId, actions).reduce(applyTaskOp, [task]))
     }
     try {
-      await this.writeTask(
-        task,
-        content === null
-          ? [{ kind: 'toggle' }]
-          : [{ kind: 'setMarkdown', markdown: content }, { kind: 'toggle' }],
-      )
+      await this.#writeEach(session, [task], () => actions)
     } catch (cause) {
-      // One write: nothing landed, so the rows before the write are the truth.
-      this.#restore(snapshot)
       if (task.checked && wasRecentlyCompleted) {
         this.markRecentlyCompleted(root, [task])
       } else if (!task.checked) {
@@ -729,36 +634,33 @@ class TaskServiceImpl implements TaskService {
 
   async addTask(target: InsertTaskTarget): Promise<OpenTask> {
     const session = this.#begin()
-    let result: InsertedTask
-    try {
-      result = await this.insertTask(target.notePath)
-    } catch (cause) {
-      this.#invalidate()
-      throw cause
-    }
-    return this.#addInserted(session, target, result)
+    const store = this.#store
+    const result = await this.insertTask(target.notePath)
+    return this.#landInserted(session, store, target, null, [], result)
   }
 
   async addTaskAfter(task: OpenTask, content: string | null): Promise<OpenTask> {
     const session = this.#begin()
-    const snapshot = this.#snapshot()
+    const store = this.#store
     // The anchor resolves in the same write: a cleared row leaves, an edited one shows its text.
-    const patch: TaskListPatch = (rows) => {
-      return content === ''
-        ? withoutTasks(rows, [task])
+    const ops: TaskItemOp[] =
+      content === ''
+        ? [{ kind: 'remove', taskId: task.taskId }]
         : content === null
-          ? rows
-          : withEditedTask(rows, task, content)
-    }
-    this.#patch(patch, patch)
+          ? []
+          : [{ kind: 'setMarkdown', taskId: task.taskId, markdown: content }]
+    const pending = store.push(task.notePath, ops)
+    this.#publish()
     let result: InsertedTask
     try {
-      result = await this.continueTaskInContext(task, content)
+      result = await this.continueTaskInContext(this.#refOf(store, task), content)
     } catch (cause) {
-      this.#restore(snapshot)
+      store.drop(pending)
+      this.#publish()
       throw cause
     }
-    return this.#addInserted(session, task, result)
+    store.drop(pending)
+    return this.#landInserted(session, store, task, task.taskId, ops, result)
   }
 
   resolveSnippetTask(tasks: readonly SnippetTask[], click: SnippetTaskClick): SnippetTask | null {
@@ -772,7 +674,12 @@ class TaskServiceImpl implements TaskService {
     await toggleSnippetTask(
       this.#deps.graphSession,
       this.#deps.progress,
-      (ref) => this.writeTask(ref, [{ kind: 'toggle' }]),
+      async (ref) => {
+        const store = this.#store
+        const result = await this.writeTask(ref, [{ kind: 'toggle' }])
+        store.landCommit(toCommit(notePath, result), null)
+        this.#publish()
+      },
       notePath,
       task,
     )
@@ -834,6 +741,13 @@ class TaskServiceImpl implements TaskService {
     }
   }
 
+  #createStore(): TaskStore {
+    return new TaskStore(() => {
+      this.#nextTaskId += 1
+      return `task-${this.#nextTaskId}`
+    })
+  }
+
   /**
    * Listen for index changes and graph switches. The returned function stops
    * listening and marks the rows stale, since later changes go unseen.
@@ -844,7 +758,7 @@ class TaskServiceImpl implements TaskService {
       graphSession.subscribe(() => {
         if (this.#adoptSession()) {
           this.#publish()
-          this.#loadStale()
+          void this.refresh()
         }
       }),
       indexLifecycle.onApplied(() => this.#throttledInvalidate()),
@@ -874,24 +788,32 @@ class TaskServiceImpl implements TaskService {
         clock.clearTimeout(this.#trailingRefresh)
         this.#trailingRefresh = null
       }
-      this.#open.stale = true
-      this.#completed.stale = true
+      this.#stale = true
     }
   }
 
   /**
-   * Drop the rows of a graph that is no longer open; `true` when they were dropped.
+   * Start an empty store for a graph that replaced the open one; `true` when
+   * it did. An index that was opened again counts its seqs from zero.
    */
   #adoptSession(): boolean {
-    const key = sessionKey(this.#deps.graphSession.get().session)
+    const { session } = this.#deps.graphSession.get()
+    const indexGeneration = session?.indexGeneration ?? null
+    if (indexGeneration !== this.#indexGeneration) {
+      this.#indexGeneration = indexGeneration
+      this.#store.forgetSeqs()
+    }
+    const key = sessionKey(session)
     if (key === this.#sessionKey) {
       return false
     }
     this.#sessionKey = key
-    this.#open.read += 1
-    this.#completed.read += 1
-    this.#open = emptySlot()
-    this.#completed = emptySlot()
+    this.#reads.abort()
+    this.#reads = new AbortController()
+    this.#reading = null
+    this.#readAgain = false
+    this.#stale = true
+    this.#store = this.#createStore()
     return true
   }
 
@@ -902,50 +824,22 @@ class TaskServiceImpl implements TaskService {
   }
 
   /**
-   * Read each held list whose rows may be behind the index.
+   * Read the tasks of every note into the store, again while the index
+   * changed during the read.
    */
-  #loadStale(): void {
-    if (this.#state.subscribed() && this.#open.stale) {
-      void this.#readOpen()
-    }
-    if (this.#completedHolds > 0 && this.#completed.stale) {
-      void this.#readCompleted()
-    }
-  }
-
-  #readOpen(): Promise<void> {
-    return this.#read(this.#open, () => this.getOpenTasks())
-  }
-
-  #readCompleted(): Promise<void> {
-    return this.#read(this.#completed, () => this.getCompletedTasks())
-  }
-
-  async #read(slot: TaskListSlot, read: () => Promise<OpenTask[]>): Promise<void> {
-    if (this.#sessionKey === null) {
-      return
-    }
-    slot.read += 1
-    const token = slot.read
-    slot.stale = false
-    slot.loading = true
-    let rows: OpenTask[] | undefined
-    try {
-      rows = await read()
-    } catch {
-      rows = undefined
-    }
-    if (slot.read !== token) {
-      return
-    }
-    slot.loading = false
-    if (rows === undefined) {
-      slot.failed = true
-    } else {
-      slot.rows = rows
-      slot.failed = false
-    }
-    this.#publish()
+  async #readAll(): Promise<void> {
+    const store = this.#store
+    const { signal } = this.#reads
+    do {
+      this.#readAgain = false
+      const completed = this.#completedHolds > 0
+      const read = await this.#reader.readAll(completed ? null : false, signal)
+      if (read === null) {
+        return
+      }
+      store.landAll(read, completed)
+      this.#publish()
+    } while (this.#readAgain && !signal.aborted)
   }
 
   /**
@@ -955,8 +849,7 @@ class TaskServiceImpl implements TaskService {
     if (this.#state.subscribed()) {
       void this.refresh()
     } else {
-      this.#open.stale = true
-      this.#completed.stale = true
+      this.#stale = true
     }
   }
 
@@ -983,16 +876,11 @@ class TaskServiceImpl implements TaskService {
   }
 
   #publish(): void {
-    this.#state.set({
-      open: this.#open.rows,
-      completed: this.#completed.rows,
-      openFailed: this.#open.failed,
-      completedFailed: this.#completed.failed,
-    })
+    this.#state.set(toState(this.#store.view()))
   }
 
   /**
-   * The open graph at the start of a write, with its rows adopted.
+   * The open graph at the start of a write, with its store adopted.
    */
   #begin(): GraphSession {
     const session = requireGraphSession(this.#deps.graphSession)
@@ -1001,88 +889,46 @@ class TaskServiceImpl implements TaskService {
   }
 
   /**
-   * Cancel the reads in flight, so they cannot overwrite an optimistic patch,
-   * and capture both lists for a rollback.
+   * The address of `task` as `store` holds it, else as the row itself gives it.
    */
-  #snapshot(): TaskListSnapshot {
-    for (const slot of [this.#open, this.#completed]) {
-      if (slot.loading) {
-        slot.read += 1
-        slot.loading = false
-        slot.stale = true
-      }
-    }
-    return { key: this.#sessionKey, open: this.#open.rows, completed: this.#completed.rows }
+  #refOf(store: TaskStore, task: OpenTask): TaskRef {
+    return store.find(task.notePath, task.taskId) ?? task
   }
 
   /**
-   * Put back the rows of `snapshot`, unless another graph opened since it was taken.
-   */
-  #restore(snapshot: TaskListSnapshot): void {
-    if (snapshot.key !== this.#currentKey()) {
-      return
-    }
-    this.#setRows(this.#open, snapshot.open)
-    this.#setRows(this.#completed, snapshot.completed)
-    this.#publish()
-  }
-
-  /**
-   * Rewrite both lists at once. A list that comes back `undefined` is left as it is.
-   */
-  #patch(open: TaskListPatch, completed: TaskListPatch): void {
-    this.#setRows(this.#open, open(this.#open.rows))
-    this.#setRows(this.#completed, completed(this.#completed.rows))
-    this.#publish()
-  }
-
-  #setRows(slot: TaskListSlot, rows: readonly OpenTask[] | undefined): void {
-    if (rows !== undefined) {
-      slot.rows = rows
-      slot.failed = false
-      slot.stale = false
-    }
-  }
-
-  /**
-   * The session key of the open graph.
-   */
-  #currentKey(): string | null {
-    return sessionKey(this.#deps.graphSession.get().session)
-  }
-
-  /**
-   * Re-key the rows and the recently-completed set from a write's `moved` map,
-   * unless another graph opened since `session` began the write.
-   */
-  #relocate(session: GraphSession, notePath: string, edit: TaskMoves): void {
-    if (sessionKey(session) !== this.#currentKey()) {
-      return
-    }
-    const relocate: TaskListPatch = (rows) => withRelocatedTasks(rows, notePath, edit)
-    this.#patch(relocate, relocate)
-    this.relocateRecentlyCompleted(session.root, notePath, edit)
-  }
-
-  /**
-   * Write `tasks` one at a time, re-keying the rows from each write before the next.
+   * Write `tasks` one at a time. Every row shows its actions before the
+   * first write; a write that lands replaces the rows of its note. After a
+   * failure the rows of that write and of the writes not yet made show their
+   * tasks as the store holds them.
    */
   async #writeEach(
     session: GraphSession,
     tasks: readonly OpenTask[],
     actionsFor: (task: OpenTask) => readonly TaskAction[],
   ): Promise<void> {
-    const { signal } = session
-    let pending: readonly OpenTask[] = tasks
-    for (let task = pending[0]; task !== undefined; task = pending[0]) {
-      // After the batch's graph closes or switches, a write would land in the next graph.
-      if (signal.aborted) {
-        throw new AppError('noGraph', 'No graph is open.')
+    const store = this.#store
+    const writes = tasks.map((task): BatchWrite => {
+      const actions = actionsFor(task)
+      return { task, actions, pending: store.push(task.notePath, toOps(task.taskId, actions)) }
+    })
+    this.#publish()
+    for (const [i, { task, actions, pending }] of writes.entries()) {
+      try {
+        // After the batch's graph closes or switches, a write would land in the next graph.
+        if (session.signal.aborted) {
+          throw new AppError('noGraph', 'No graph is open.')
+        }
+        const result = await this.writeTask(this.#refOf(store, task), actions)
+        store.landCommit(toCommit(task.notePath, result), pending)
+        this.relocateRecentlyCompleted(session.root, task.notePath, result)
+      } catch (cause) {
+        for (const write of writes.slice(i)) {
+          store.drop(write.pending)
+        }
+        this.#publish()
+        throw cause
       }
-      const result = await this.writeTask(task, actionsFor(task))
-      this.#relocate(session, task.notePath, result)
-      const rest: readonly OpenTask[] = pending.slice(1)
-      pending = withRelocatedTasks(rest, task.notePath, result) ?? []
+      this.#publish()
     }
   }
 
@@ -1092,16 +938,10 @@ class TaskServiceImpl implements TaskService {
   async #removeEach(tasks: readonly OpenTask[], kind: 'remove' | 'toBullet'): Promise<void> {
     const session = this.#begin()
     const { root } = session
-    this.#snapshot()
-    this.#patch(
-      (rows) => withoutTasks(rows, tasks),
-      (rows) => withoutTasks(rows, tasks),
-    )
     this.forgetRecentlyCompleted(root, keysOf(tasks))
     try {
       await this.#writeEach(session, tasks, () => [{ kind }])
     } catch (cause) {
-      this.#invalidate()
       // A checked task is still `[x]` on disk: keep it struck, or it would vanish from the list.
       this.markRecentlyCompleted(
         root,
@@ -1112,58 +952,70 @@ class TaskServiceImpl implements TaskService {
   }
 
   /**
-   * Re-key the rows a task insert moved, then add the new task's row to the open
-   * list; the rows stay as they are when another graph opened since `session`.
+   * Put the tasks an insert left into `store`, with a new id for the
+   * inserted task, and return that task's row. `after` and `ops` are the
+   * anchor of the insert and the changes the same write made to it.
    */
-  #addInserted(session: GraphSession, target: InsertTaskTarget, result: InsertedTask): OpenTask {
-    const created = createInsertedTaskRow(target, result.created, result.revision, result.updatedAt)
-    if (sessionKey(session) !== this.#currentKey()) {
-      return created
+  #landInserted(
+    session: GraphSession,
+    store: TaskStore,
+    target: InsertTaskTarget,
+    after: string | null,
+    ops: readonly TaskItemOp[],
+    result: InsertedTask,
+  ): OpenTask {
+    const { notePath, noteTitle, dailyDate, isPinned, pinnedOrder } = target
+    const taskId = store.createTaskId()
+    const insert: TaskOp = {
+      kind: 'insert',
+      taskId,
+      note: { notePath, noteTitle, dailyDate, isPinned, pinnedOrder },
+      after,
+      markdown: '',
+      updatedAt: result.updatedAt,
     }
-    this.#relocate(session, target.notePath, result)
-    this.#patch(
-      (rows) => [...(rows ?? []).filter((row) => !isSameTask(row, created)), created],
-      (rows) => rows?.filter((row) => !isSameTask(row, created)),
+    store.landCommit(toCommit(notePath, result), store.push(notePath, [insert, ...ops]))
+    this.relocateRecentlyCompleted(session.root, notePath, result)
+    this.#publish()
+    return (
+      store.find(notePath, taskId) ??
+      store.view().open?.find((row) => {
+        return row.notePath === notePath && isSameTaskPath(row.astPath, result.created.astPath)
+      }) ??
+      createInsertedTaskRow(target, result.created, result.revision, result.updatedAt)
     )
-    return created
   }
 
   async #writeEdits(
     generation: number,
     notePath: string,
     edits: readonly TaskEdit[],
-    options: WriteTaskEditsOptions = {},
+    createIfMissing: boolean,
   ): Promise<TaskWriteResult> {
     const { noteDocuments, clock } = this.#deps
     let result: TaskEditResult | undefined
-    const { revision } = await noteDocuments.commitSourceEdit(
+    const commit = await noteDocuments.commitSourceEdit(
       notePath,
-      (source, sourceRevision) => {
-        result = applyTaskEdits(source, sourceRevision, edits)
+      (source, revision) => {
+        result = applyTaskEdits(source, revision, edits)
         return result.source
       },
-      { generation, createIfMissing: options.createIfMissing === true },
+      { generation, createIfMissing },
     )
-    if (result === undefined || revision === null) {
+    if (result === undefined || commit.revision === null) {
       throw new NoteEditError(
         'notWritable',
         'This note can’t be updated right now — try again in a moment.',
       )
     }
-    return { ...result, revision, updatedAt: clock.now() }
-  }
-
-  #writeOne(
-    generation: number,
-    task: TaskRef,
-    actions: readonly TaskAction[],
-  ): Promise<TaskWriteResult> {
-    const locator = toLocator(task)
-    return this.#writeEdits(
-      generation,
-      task.notePath,
-      actions.map((action) => ({ ...action, task: locator })),
-    )
+    return {
+      ...result,
+      revision: commit.revision,
+      tasks: commit.merged ? projectTasks(splitFrontmatter(commit.content).body) : result.tasks,
+      merged: commit.merged,
+      indexSeq: commit.indexSeq,
+      updatedAt: clock.now(),
+    }
   }
 }
 

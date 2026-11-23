@@ -36,9 +36,10 @@ export interface TaskReaderDeps {
  */
 export interface TaskReader {
   /**
-   * Read the open (`checked: false`) or the completed tasks of every note.
+   * Read the open (`checked: false`) tasks, the completed tasks, or with
+   * `null` every task, of every note.
    */
-  readAll(checked: boolean, signal: AbortSignal): Promise<TaskRead | null>
+  readAll(checked: boolean | null, signal: AbortSignal): Promise<TaskRead | null>
   /**
    * Read every task of the notes at `paths`. A path that is absent from the
    * result has no task.
@@ -57,7 +58,7 @@ class TaskReaderImpl implements TaskReader {
     this.#deps = deps
   }
 
-  readAll(checked: boolean, signal: AbortSignal): Promise<TaskRead | null> {
+  readAll(checked: boolean | null, signal: AbortSignal): Promise<TaskRead | null> {
     return this.#read(checked, null, signal)
   }
 

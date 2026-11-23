@@ -1,11 +1,12 @@
 import { noop } from '@ocavue/utils'
 import type { ReactElement } from 'react'
 import { page, userEvent } from 'vitest/browser'
-import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock, type MockInstance } from 'vitest'
 import {
   createTestDatabaseService,
   createTestCoreServices,
   makeOpenTask,
+  TestTaskIndex,
   type TestCoreServices,
 } from '@reflect/core/testing'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
@@ -14,7 +15,10 @@ import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import {
   WritableStore,
   type MobileAudioMemoSessionState,
+  type InsertedTask,
+  type OpenTask,
   type TaskService,
+  type TaskSnapshot,
   type TaskWriteResult,
 } from '@reflect/core'
 import { MobileAudioMemoContext } from '@/mobile/audio-memo-provider.tsx'
@@ -46,34 +50,18 @@ function setMemo(patch: Partial<MobileAudioMemoSessionState>): void {
   state.set({ ...state.get(), ...patch })
 }
 
-/**
- * The result of a write that changed nothing the cache needs to re-address.
- */
-const WRITTEN: TaskWriteResult = {
-  source: '',
-  baseRevision: '',
-  revision: '',
-  moved: [],
-  inserted: [],
-  tasks: [],
-  updatedAt: 0,
-}
+const TODAY = 'daily/2026-06-14.md'
 
 /**
  * The empty task `insertTask` writes at the top of today's note.
  */
-const INSERTED: Awaited<ReturnType<TaskService['insertTask']>> = {
-  created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
-  baseRevision: '',
-  revision: '',
-  moved: [],
-  updatedAt: 0,
-}
+const CREATED: TaskSnapshot = { astPath: [0], markdown: '', breadcrumbs: [], checked: false }
 
 let core: TestCoreServices
-let getOpenTasks: MockInstance<TaskService['getOpenTasks']>
+let getOpenTasks: Mock<() => Promise<OpenTask[]>>
 let insertTask: MockInstance<TaskService['insertTask']>
 let writeTask: MockInstance<TaskService['writeTask']>
+let taskIndex: TestTaskIndex
 
 /**
  * The quick-edit sheet, which the drawer portals outside the menu.
@@ -131,9 +119,14 @@ beforeEach(() => {
   core = createTestCoreServices({ database: createTestDatabaseService() })
   // Today is 2026-06-14.
   core.clock.setNow(new Date(2026, 5, 14, 12).getTime())
-  getOpenTasks = vi.spyOn(core.tasks, 'getOpenTasks').mockResolvedValue([])
-  insertTask = vi.spyOn(core.tasks, 'insertTask').mockResolvedValue(INSERTED)
-  writeTask = vi.spyOn(core.tasks, 'writeTask').mockResolvedValue(WRITTEN)
+  getOpenTasks = vi.fn<() => Promise<OpenTask[]>>().mockResolvedValue([])
+  taskIndex = new TestTaskIndex(core.database, getOpenTasks, () => Promise.resolve([]))
+  insertTask = vi.spyOn(core.tasks, 'insertTask').mockImplementation((notePath) => {
+    return Promise.resolve(taskIndex.insert(notePath, CREATED))
+  })
+  writeTask = vi.spyOn(core.tasks, 'writeTask').mockImplementation((ref, actions) => {
+    return Promise.resolve(taskIndex.write(ref, actions))
+  })
 })
 
 describe('DailyCaptureMenu', () => {
@@ -281,7 +274,7 @@ describe('DailyCaptureMenu', () => {
   })
 
   it('adds one task when New task is tapped again before the first lands', async () => {
-    const pending = Promise.withResolvers<typeof INSERTED>()
+    const pending = Promise.withResolvers<InsertedTask>()
     insertTask.mockReturnValue(pending.promise)
     const view = await renderMenu()
     await view.getByRole('button', { name: 'Show capture actions' }).click()
@@ -289,21 +282,21 @@ describe('DailyCaptureMenu', () => {
     await view.getByRole('button', { name: 'Show capture actions' }).click()
     await view.getByRole('button', { name: 'New task' }).click()
 
-    pending.resolve(INSERTED)
+    pending.resolve(taskIndex.insert(TODAY, CREATED))
 
     await expect.element(sheet).toBeInTheDocument()
     expect(insertTask).toHaveBeenCalledTimes(1)
   })
 
   it('removes a task that lands after the menu has gone', async () => {
-    const pending = Promise.withResolvers<typeof INSERTED>()
+    const pending = Promise.withResolvers<InsertedTask>()
     insertTask.mockReturnValue(pending.promise)
     const view = await renderMenu()
     await view.getByRole('button', { name: 'Show capture actions' }).click()
     await view.getByRole('button', { name: 'New task' }).click()
 
     await view.unmount()
-    pending.resolve(INSERTED)
+    pending.resolve(taskIndex.insert(TODAY, CREATED))
 
     // No sheet will ever show it, so it must not stay behind as a bare `+ [ ]`.
     await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
@@ -322,18 +315,18 @@ describe('DailyCaptureMenu', () => {
     await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
     await expect.element(sheet).not.toBeInTheDocument()
 
-    const pending = Promise.withResolvers<typeof INSERTED>()
+    const pending = Promise.withResolvers<InsertedTask>()
     insertTask.mockReturnValueOnce(pending.promise)
     await view.getByRole('button', { name: 'Show capture actions' }).click()
     await view.getByRole('button', { name: 'New task' }).click()
     await view.unmount()
-    pending.resolve({ ...INSERTED, created: { ...INSERTED.created, astPath: [1] } })
+    pending.resolve(taskIndex.insert(TODAY, { ...CREATED, astPath: [1] }))
 
     await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(2))
     expect(writeTask).toHaveBeenLastCalledWith(expect.objectContaining({ astPath: [1] }), [
       { kind: 'remove' },
     ])
-    firstDelete.resolve(WRITTEN)
+    firstDelete.resolve(taskIndex.write({ ...CREATED, notePath: TODAY, revision: '' }, []))
   })
 
   it('opens no sheet when adding the task fails', async () => {

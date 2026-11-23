@@ -1,3 +1,4 @@
+import { sha256HexSync } from '@reflect/utils'
 import { describe, expect, it } from 'vitest'
 import {
   createTestDatabaseService,
@@ -87,7 +88,7 @@ describe('getIndexedFileFactsByPath', () => {
 
     await expect(
       createIndexQueryService({ database }).getIndexedFileFactsByPath(['notes/a.md', 'notes/b.md']),
-    ).resolves.toEqual(new Map([['notes/a.md', { fileHash: 'hash-notes/a.md', mtime: 42 }]]))
+    ).resolves.toEqual(new Map([['notes/a.md', { fileHash: sha256HexSync('# A\n'), mtime: 42 }]]))
   })
 })
 

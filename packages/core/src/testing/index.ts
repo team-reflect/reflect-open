@@ -231,7 +231,7 @@ export {
   type TestAttachmentService,
   type TestAttachmentServiceOptions,
 } from './attachments.ts'
-export { makeOpenTask } from './tasks.ts'
+export { makeOpenTask, TestTaskIndex } from './tasks.ts'
 export {
   createTestNoteSession,
   type NoteSessionCall,

@@ -83,17 +83,12 @@ export function TasksScreen(): ReactElement {
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
-  const { open, completed, openFailed, completedFailed } = useStore(taskService)
+  const { open, completed } = useStore(taskService)
   useEffect(
     () => (filters.archived ? taskService.includeCompleted() : undefined),
     [taskService, filters.archived],
   )
 
-  // Either read failing surfaces the alert — a failed completed read must not
-  // leave `ready` stuck (and the list blank) just because its data never arrived.
-  // The completed error only counts while archived is on: the service keeps the
-  // last error of a list it no longer reads, so turning archived off must clear it.
-  const isError = openFailed || (filters.archived && completedFailed)
   // When archived is on, the list merges open + completed, so the empty state
   // must wait for both — else a graph with only completed tasks flashes "No
   // tasks to show." while the completed query is still loading.
@@ -308,11 +303,7 @@ export function TasksScreen(): ReactElement {
         />
       </header>
       <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-auto pb-8">
-        {isError ? (
-          <p role="alert" className="px-4 py-6 text-sm text-text-muted lg:px-12">
-            Couldn’t load tasks.
-          </p>
-        ) : ready && groups.length === 0 ? (
+        {ready && groups.length === 0 ? (
           <p className="px-4 py-6 text-sm text-text-muted lg:px-12">
             {needle ? 'No matching tasks.' : 'No tasks to show.'}
           </p>

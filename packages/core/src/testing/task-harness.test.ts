@@ -27,15 +27,12 @@ describe('TaskHarness', () => {
     expect(indexed()).toEqual(['notes/a.md'])
 
     harness.holdWrites()
-    harness.holdReads()
     const editing = harness.tasks.editTask(harness.tasks.get().open![0]!, 'two')
     expect(harness.files.files().get('notes/a.md')).toBe('+ [ ] one\n')
     await harness.landWrite()
     await editing
     expect(harness.files.files().get('notes/a.md')).toBe('+ [ ] two\n')
     expect(indexed()).toEqual(['notes/a.md', 'notes/a.md'])
-    await harness.failRead(new Error('no index'))
-    expect(harness.tasks.get().openFailed).toBe(true)
 
     await harness.deliverWatcherBatch()
     expect(indexed()).toEqual(['notes/a.md', 'notes/a.md'])
@@ -54,7 +51,6 @@ describe('TaskHarness', () => {
     expect(indexed()).toHaveLength(4)
 
     await harness.drain()
-    expect(harness.tasks.get().openFailed).toBe(false)
     expect(harness.view().map((row) => row.markdown)).toEqual(['two', 'four'])
   })
 })

@@ -132,7 +132,10 @@ function compareByRecency(left: OpenTask, right: OpenTask): number {
  * applied. A task keeps its id while reads and writes replace its note.
  */
 export class TaskStore {
-  readonly #createTaskId: () => string
+  /**
+   * Make an id that no task of this store holds.
+   */
+  readonly createTaskId: () => string
   readonly #notes = new Map<string, NoteEntry>()
   /**
    * The index seq each path was last learned at, kept after the path has no task.
@@ -144,7 +147,7 @@ export class TaskStore {
   #view: TaskStoreView | null = null
 
   constructor(createTaskId: () => string) {
-    this.#createTaskId = createTaskId
+    this.createTaskId = createTaskId
   }
 
   /**
@@ -161,7 +164,7 @@ export class TaskStore {
         this.#seqs.set(note.path, read.seq)
       }
     }
-    for (const path of [...this.#notes.keys()]) {
+    for (const path of this.#notes.keys()) {
       if (!seen.has(path) && this.#isCurrent(path, read.seq)) {
         this.#clearNote(path, completed)
         this.#seqs.set(path, read.seq)
@@ -302,7 +305,7 @@ export class TaskStore {
       return
     }
     const ordered = tasks.toSorted((left, right) => compareTaskPaths(left.astPath, right.astPath))
-    const ids = reconcileNoteTasks(previous?.rows ?? [], ordered, moves, this.#createTaskId)
+    const ids = reconcileNoteTasks(previous?.rows ?? [], ordered, moves, this.createTaskId)
     const inserted = new Map(insertedIds)
     const rows = ordered.map((task, i): OpenTask => ({
       ...context,

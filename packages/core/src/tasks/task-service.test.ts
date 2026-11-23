@@ -1,6 +1,6 @@
 import { sha256HexSync } from '@reflect/utils'
 import type { MaybePromise } from '@reflect/utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createOpenDocumentsService,
   type OpenDocumentsService,
@@ -36,9 +36,11 @@ import { createTestNoteFileService, type TestNoteFileService } from '../testing/
 import { createTestIpcBridgeService, type TestIpcBridgeService } from '../testing/ipc.ts'
 import { createTestLoggerService, type TestLoggerService } from '../testing/logger.ts'
 import { createTestProgressPort, type TestProgressPort } from '../testing/ports.ts'
+import { TaskHarness } from '../testing/task-harness.ts'
 import { makeOpenTask } from '../testing/tasks.ts'
 import type { OpenTask } from './open-task.ts'
 import { getTaskKey } from './task-identity.ts'
+import { todaysDailyTarget } from './task-navigation.ts'
 import {
   createTaskService,
   type TaskRef,
@@ -300,11 +302,17 @@ describe('insertTask', () => {
 
     clock.setNow(1000)
 
+    const created = { astPath: [1], markdown: '', breadcrumbs: ['Tasks'], checked: false }
     await expect(tasks.insertTask('notes/a.md')).resolves.toEqual({
-      created: { astPath: [1], markdown: '', breadcrumbs: ['Tasks'], checked: false },
+      created,
+      source: '## Tasks\n\n+ [ ] \n',
       baseRevision: sha256HexSync(''),
       revision: sha256HexSync('## Tasks\n\n+ [ ] \n'),
       moved: [],
+      inserted: [created],
+      tasks: [created],
+      merged: false,
+      indexSeq: null,
       updatedAt: 1000,
     })
     expect(noteFile.getWrites('notes/a.md')).toContain('## Tasks\n\n+ [ ] \n')
@@ -426,7 +434,16 @@ describe('continueTaskInContext', () => {
   })
 })
 
-describe('getOpenTasks', () => {
+describe('rows read from the index', () => {
+  /**
+   * Subscribe and wait for the first read of the open tasks to land.
+   */
+  async function readOpen(): Promise<readonly OpenTask[]> {
+    tasks.subscribe(noop)
+    await flushMicrotasks()
+    return tasks.get().open!
+  }
+
   it('parses task breadcrumbs and normalizes boolean note context', async () => {
     seedNotes(database, [
       {
@@ -437,7 +454,8 @@ describe('getOpenTasks', () => {
       },
     ])
 
-    await expect(tasks.getOpenTasks()).resolves.toEqual([
+    const rows = await readOpen()
+    expect(rows).toEqual([
       expect.objectContaining({
         notePath: 'notes/project.md',
         markdown: 'ship [[it]] **now**',
@@ -451,7 +469,7 @@ describe('getOpenTasks', () => {
         updatedAt: 123,
       }),
     ])
-    const [row] = await tasks.getOpenTasks()
+    const [row] = rows
     expect(row!.breadcrumbs.at(-2)).toBe('StartupToolbox')
     expect(row!.breadcrumbs.at(-1)).toBe('Reflections')
   })
@@ -462,7 +480,7 @@ describe('getOpenTasks', () => {
       { path: 'notes/a.md', markdown: '+ [ ] a first\n  + [ ] a nested\n\npara\n\n+ [ ] a last\n' },
     ])
 
-    const rows = await tasks.getOpenTasks()
+    const rows = await readOpen()
     expect(rows.map((row) => [row.notePath, row.markdown])).toEqual([
       ['notes/a.md', 'a first'],
       ['notes/a.md', 'a nested'],
@@ -488,7 +506,7 @@ describe('getOpenTasks', () => {
       ],
     })
 
-    const rows = await tasks.getOpenTasks()
+    const rows = await readOpen()
     expect(rows.map((row) => row.astPath)).toEqual([[1]])
   })
 
@@ -498,19 +516,19 @@ describe('getOpenTasks', () => {
       { path: 'notes/a.md', markdown: '+ [ ] real task\n' },
     ])
 
-    const rows = await tasks.getOpenTasks()
+    const rows = await readOpen()
     expect(rows.map((row) => row.notePath)).toEqual(['notes/a.md'])
   })
-})
 
-describe('getCompletedTasks', () => {
   it('lists checked tasks, most recently edited note first', async () => {
     seedNotes(database, [
       { path: 'notes/old.md', markdown: '+ [x] old done\n+ [ ] old open\n', mtime: 1 },
       { path: 'notes/new.md', markdown: '+ [x] new done\n', mtime: 2 },
     ])
 
-    const completed = await tasks.getCompletedTasks()
+    tasks.includeCompleted()
+    await flushMicrotasks()
+    const completed = tasks.get().completed!
     expect(completed.map((row) => [row.notePath, row.markdown, row.checked])).toEqual([
       ['notes/new.md', 'new done', true],
       ['notes/old.md', 'old done', true],
@@ -717,38 +735,48 @@ describe('recently completed', () => {
 })
 
 describe('task list state', () => {
-  const one = makeOpenTask({ notePath: 'notes/a.md', astPath: [0], markdown: 'one', text: 'one' })
-  const two = makeOpenTask({ notePath: 'notes/b.md', astPath: [0], markdown: 'two', text: 'two' })
-  const written = {
-    source: '',
-    baseRevision: '',
-    revision: '',
-    moved: [],
-    inserted: [],
-    tasks: [],
-    updatedAt: 0,
+  const A = 'notes/a.md'
+  const B = 'notes/b.md'
+
+  /**
+   * Put `files` on disk and in the index, subscribe, and wait for the first read to land.
+   */
+  async function subscribed(
+    files: Record<string, string> = { [A]: '+ [ ] one\n', [B]: '+ [ ] two\n' },
+  ): Promise<{ rows: readonly OpenTask[]; unsubscribe: () => void }> {
+    seedNotes(
+      database,
+      Object.entries(files).map(([path, markdown]) => ({ path, markdown })),
+    )
+    for (const [path, markdown] of Object.entries(files)) {
+      noteFile.set(path, markdown)
+    }
+    const unsubscribe = tasks.subscribe(noop)
+    await flushMicrotasks()
+    return { rows: tasks.get().open!, unsubscribe }
   }
 
   /**
-   * Subscribe to `tasks` over `open` and wait for the first read to land.
+   * How many times the tasks were read from the index, and with which filter.
    */
-  async function subscribed(open: readonly OpenTask[] = [one, two]) {
-    const getOpenTasks = vi.spyOn(tasks, 'getOpenTasks').mockResolvedValue([...open])
-    const unsubscribe = tasks.subscribe(noop)
-    await flushMicrotasks()
-    return { getOpenTasks, unsubscribe }
+  function watchReads(): { count: () => number; filters: () => unknown[] } {
+    const read = vi.spyOn(database, 'read')
+    const calls = () => read.mock.calls.filter(([command]) => command === 'index_tasks')
+    return {
+      count: () => calls().length,
+      filters: () => calls().map(([, args]) => (args as { checked: boolean | null }).checked),
+    }
+  }
+
+  function markdowns(rows: readonly OpenTask[] | undefined): string[] | undefined {
+    return rows?.map((row) => row.markdown)
   }
 
   it('reads the open tasks on the first subscription, not before', async () => {
-    seedNotes(database, [{ path: 'notes/a.md', markdown: '+ [ ] one\n+ [x] done\n' }])
-    const getOpenTasks = vi.spyOn(tasks, 'getOpenTasks')
-    expect(tasks.get()).toEqual({
-      open: undefined,
-      completed: undefined,
-      openFailed: false,
-      completedFailed: false,
-    })
-    expect(getOpenTasks).not.toHaveBeenCalled()
+    seedNotes(database, [{ path: A, markdown: '+ [ ] one\n+ [x] done\n' }])
+    const reads = watchReads()
+    expect(tasks.get()).toEqual({ open: undefined, completed: undefined })
+    expect(reads.count()).toBe(0)
 
     let changes = 0
     tasks.subscribe(() => {
@@ -756,86 +784,110 @@ describe('task list state', () => {
     })
     await flushMicrotasks()
 
-    expect(tasks.get().open?.map((row) => row.markdown)).toEqual(['one'])
+    expect(markdowns(tasks.get().open)).toEqual(['one'])
     expect(tasks.get().completed).toBeUndefined()
     expect(tasks.get()).toBe(tasks.get())
     expect(changes).toBe(1)
   })
 
   it('reads the completed tasks only while they are included', async () => {
-    await subscribed()
-    const getCompletedTasks = vi.spyOn(tasks, 'getCompletedTasks').mockResolvedValue([one])
-    expect(getCompletedTasks).not.toHaveBeenCalled()
+    const reads = watchReads()
+    await subscribed({ [A]: '+ [ ] one\n+ [x] done\n' })
+    expect(reads.filters()).toEqual([false])
 
     const release = tasks.includeCompleted()
     await flushMicrotasks()
-    expect(tasks.get().completed).toEqual([one])
+    expect(markdowns(tasks.get().completed)).toEqual(['done'])
+    expect(reads.filters()).toEqual([false, null])
 
     release()
     await tasks.refresh()
-    expect(getCompletedTasks).toHaveBeenCalledTimes(1)
+    expect(reads.filters()).toEqual([false, null, false])
   })
 
-  it('reports a failed read and clears it once a read lands', async () => {
-    const getOpenTasks = vi.spyOn(tasks, 'getOpenTasks').mockRejectedValue(new Error('no index'))
-    tasks.subscribe(noop)
-    await flushMicrotasks()
-    expect(tasks.get()).toMatchObject({ open: undefined, openFailed: true })
-
-    getOpenTasks.mockResolvedValue([one])
-    await tasks.refresh()
-    expect(tasks.get()).toMatchObject({ open: [one], openFailed: false })
-  })
-
-  it('applies the optimistic patch before the write starts', async () => {
+  it('keeps the rows while a read fails, and takes the read that lands after it', async () => {
     await subscribed()
-    const write = Promise.withResolvers<typeof written>()
-    const writeTask = vi.spyOn(tasks, 'writeTask').mockReturnValue(write.promise)
-
-    const completing = tasks.completeTasks([one])
-
-    expect(tasks.get().open).toEqual([two])
-    expect(tasks.recentlyCompleted.get().tasks).toEqual([{ ...one, checked: true }])
-    expect(writeTask).toHaveBeenCalledWith(one, [{ kind: 'toggle' }])
-    write.resolve(written)
-    await completing
-    expect(tasks.get().open).toEqual([two])
-  })
-
-  it('drops a read in flight when a bulk action patches the rows', async () => {
-    const { getOpenTasks } = await subscribed()
-    const read = Promise.withResolvers<OpenTask[]>()
-    getOpenTasks.mockReturnValue(read.promise)
-    vi.spyOn(tasks, 'writeTask').mockResolvedValue(written)
+    seedNotes(database, [{ path: A, markdown: '+ [ ] one changed\n' }])
+    const read = vi.spyOn(database, 'read').mockRejectedValueOnce(new Error('no index'))
 
     const refreshing = tasks.refresh()
-    await tasks.completeTasks([one])
-    read.resolve([one, two])
-    await refreshing
     await flushMicrotasks()
+    expect(markdowns(tasks.get().open)).toEqual(['one', 'two'])
 
-    expect(tasks.get().open).toEqual([two])
+    await clock.advance(250)
+    await refreshing
+    expect(read).toHaveBeenCalledTimes(2)
+    expect(markdowns(tasks.get().open)).toEqual(['one changed', 'two'])
   })
 
-  it('restores the rows and rethrows when a single write fails', async () => {
-    await subscribed()
+  it('shows the change before the write starts', async () => {
+    const { rows } = await subscribed()
+    const write = Promise.withResolvers<void>()
+    const writeTask = tasks.writeTask.bind(tasks)
+    const spy = vi.spyOn(tasks, 'writeTask').mockImplementation(async (ref, actions) => {
+      await write.promise
+      return await writeTask(ref, actions)
+    })
+
+    const completing = tasks.completeTasks([rows[0]!])
+
+    expect(markdowns(tasks.get().open)).toEqual(['two'])
+    expect(tasks.recentlyCompleted.get().tasks).toEqual([{ ...rows[0]!, checked: true }])
+    expect(spy).toHaveBeenCalledWith(rows[0], [{ kind: 'toggle' }])
+    write.resolve()
+    await completing
+    expect(markdowns(tasks.get().open)).toEqual(['two'])
+    expect(noteFile.files().get(A)).toBe('+ [x] one\n')
+  })
+
+  it('puts the row back and rethrows when a single write fails', async () => {
+    const { rows } = await subscribed()
     vi.spyOn(tasks, 'writeTask').mockRejectedValue(new Error('disk full'))
 
-    const editing = tasks.editTask(one, 'edited')
-    expect(tasks.get().open?.[0]).toMatchObject({ markdown: 'edited', text: 'edited' })
+    const editing = tasks.editTask(rows[0]!, 'edited [[2026-06-20]]')
+    expect(tasks.get().open?.[0]).toMatchObject({
+      taskId: rows[0]!.taskId,
+      markdown: 'edited [[2026-06-20]]',
+      text: 'edited 2026-06-20',
+      dueDate: '2026-06-20',
+    })
 
     await expect(editing).rejects.toThrow('disk full')
-    expect(tasks.get().open).toEqual([one, two])
+    expect(tasks.get().open).toEqual(rows)
+  })
+
+  it('keeps the change of another write when one write fails', async () => {
+    const { rows } = await subscribed({ [A]: '+ [ ] one\n+ [ ] two\n' })
+    const writeTask = tasks.writeTask.bind(tasks)
+    const first = Promise.withResolvers<void>()
+    vi.spyOn(tasks, 'writeTask').mockImplementation(async (ref, actions) => {
+      if (ref.markdown === 'one') {
+        await first.promise
+        throw new Error('disk full')
+      }
+      return await writeTask(ref, actions)
+    })
+
+    const failing = tasks.editTask(rows[0]!, 'one!')
+    const landing = tasks.editTask(rows[1]!, 'two!')
+    expect(markdowns(tasks.get().open)).toEqual(['one!', 'two!'])
+
+    await landing
+    first.resolve()
+    await expect(failing).rejects.toThrow('disk full')
+    expect(markdowns(tasks.get().open)).toEqual(['one', 'two!'])
   })
 
   it('restores the struck row when an edit-and-reopen write fails', async () => {
-    await subscribed([])
-    tasks.markRecentlyCompleted('/g', [one])
-    const struck = { ...one, checked: true }
+    await subscribed({ [A]: '+ [x] one\n' })
+    tasks.includeCompleted()
+    await flushMicrotasks()
+    const struck = tasks.get().completed![0]!
+    tasks.markRecentlyCompleted('/g', [struck])
     vi.spyOn(tasks, 'writeTask').mockRejectedValue(new Error('disk full'))
 
     const reopening = tasks.editAndToggleTask(struck, 'edited')
-    expect(tasks.hasRecentlyCompleted('/g', getTaskKey(one))).toBe(false)
+    expect(tasks.hasRecentlyCompleted('/g', getTaskKey(struck))).toBe(false)
     expect(tasks.get().open).toEqual([
       { ...struck, checked: false, markdown: 'edited', text: 'edited' },
     ])
@@ -845,78 +897,104 @@ describe('task list state', () => {
     expect(tasks.recentlyCompleted.get().tasks).toEqual([struck])
   })
 
-  it('re-reads instead of restoring when a batch fails', async () => {
-    const { getOpenTasks } = await subscribed()
-    getOpenTasks.mockResolvedValue([one])
-    vi.spyOn(tasks, 'writeTask').mockRejectedValue(new Error('stale index'))
+  it('keeps the writes of a batch that landed and puts the other rows back', async () => {
+    const { rows } = await subscribed({ [A]: '+ [ ] one\n+ [ ] two\n+ [ ] three\n' })
+    const writeTask = tasks.writeTask.bind(tasks)
+    vi.spyOn(tasks, 'writeTask').mockImplementation(async (ref, actions) => {
+      if (ref.markdown === 'two') {
+        throw new Error('stale index')
+      }
+      return await writeTask(ref, actions)
+    })
 
-    await expect(tasks.completeTasks([one, two])).rejects.toThrow('stale index')
-    await flushMicrotasks()
+    const completing = tasks.completeTasks(rows)
+    expect(tasks.get().open).toEqual([])
 
-    expect(getOpenTasks).toHaveBeenCalledTimes(2)
-    expect(tasks.get().open).toEqual([one])
+    await expect(completing).rejects.toThrow('stale index')
+    expect(markdowns(tasks.get().open)).toEqual(['two', 'three'])
+    expect(noteFile.files().get(A)).toBe('+ [x] one\n+ [ ] two\n+ [ ] three\n')
     expect(tasks.recentlyCompleted.get().tasks).toEqual([])
   })
 
   it('keeps a checked task struck when its delete fails', async () => {
-    await subscribed([])
-    const struck = { ...one, checked: true }
-    tasks.markRecentlyCompleted('/g', [one])
+    await subscribed({ [A]: '+ [x] one\n' })
+    tasks.includeCompleted()
+    await flushMicrotasks()
+    const struck = tasks.get().completed![0]!
+    tasks.markRecentlyCompleted('/g', [struck])
     vi.spyOn(tasks, 'writeTask').mockRejectedValue(new Error('disk full'))
 
     const deleting = tasks.deleteTasks([struck])
     expect(tasks.recentlyCompleted.get().tasks).toEqual([])
+    expect(tasks.get().completed).toEqual([])
 
     await expect(deleting).rejects.toThrow('disk full')
     expect(tasks.recentlyCompleted.get().tasks).toEqual([struck])
+    expect(tasks.get().completed).toEqual([struck])
   })
 
-  it('re-keys the rows a write moved and adds the inserted row', async () => {
-    await subscribed()
-    const from = { astPath: [0], markdown: 'one', breadcrumbs: [], checked: false }
-    vi.spyOn(tasks, 'insertTask').mockResolvedValue({
-      created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
-      baseRevision: '',
-      revision: '',
-      moved: [{ from, to: { ...from, astPath: [1] } }],
-      updatedAt: 5,
+  it('adds the inserted row and keeps the ids of the rows the write moved', async () => {
+    const { rows } = await subscribed({
+      [A]: '+ [ ] loose\n\n## Tasks\n\n+ [ ] one\n\n## Later\n\n+ [ ] last\n',
     })
+    clock.setNow(5)
 
-    const created = await tasks.addTask(one)
+    const created = await tasks.addTask(rows[0]!)
 
-    expect(created).toMatchObject({ notePath: 'notes/a.md', astPath: [0], markdown: '' })
-    expect(tasks.get().open?.map((row) => [row.markdown, row.astPath])).toEqual([
-      ['one', [1]],
-      ['two', [0]],
-      ['', [0]],
+    expect(created).toMatchObject({ notePath: A, astPath: [3], markdown: '', updatedAt: 5 })
+    expect(tasks.get().open?.map((row) => [row.taskId, row.markdown, row.astPath])).toEqual([
+      [rows[0]!.taskId, 'loose', [0]],
+      [rows[1]!.taskId, 'one', [2]],
+      [created.taskId, '', [3]],
+      [rows[2]!.taskId, 'last', [5]],
     ])
   })
 
-  it('drops a read in flight that an optimistic write overtook', async () => {
-    const { getOpenTasks } = await subscribed()
-    const read = Promise.withResolvers<OpenTask[]>()
-    getOpenTasks.mockReturnValue(read.promise)
-    vi.spyOn(tasks, 'writeTask').mockResolvedValue(written)
+  it('adds the first task of a note that has no file', async () => {
+    await subscribed({})
+    const target = todaysDailyTarget('2026-06-14')
 
-    const refreshing = tasks.refresh()
-    await tasks.editTask(one, 'edited')
-    read.resolve([one, two])
-    await refreshing
+    const created = await tasks.addTask(target)
 
-    expect(tasks.get().open?.[0]).toMatchObject({ markdown: 'edited' })
+    expect(tasks.get().open).toEqual([created])
+    expect(created).toMatchObject({ ...target, markdown: '', breadcrumbs: ['Tasks'] })
+  })
+
+  it('resolves the anchor and adds the next row in one write', async () => {
+    const { rows } = await subscribed({ [A]: '+ [ ] one\n+ [ ] two\n' })
+
+    const adding = tasks.addTaskAfter(rows[0]!, 'one!')
+    expect(markdowns(tasks.get().open)).toEqual(['one!', 'two'])
+    const created = await adding
+
+    expect(noteFile.getWrites(A)).toEqual(['+ [ ] one!\n+ [ ] two\n+ [ ] \n'])
+    expect(tasks.get().open?.map((row) => [row.taskId, row.markdown])).toEqual([
+      [rows[0]!.taskId, 'one!'],
+      [rows[1]!.taskId, 'two'],
+      [created.taskId, ''],
+    ])
+  })
+
+  it('takes the rows a backlink snippet toggle left', async () => {
+    const { rows } = await subscribed({ [A]: '+ [ ] one\n+ [ ] two\n' })
+
+    await tasks.toggleSnippetTask(A, { locator: rows[0]!, checked: false })
+
+    expect(markdowns(tasks.get().open)).toEqual(['two'])
   })
 
   it('re-reads on index changes while subscribed, at most once per throttle window', async () => {
-    const { getOpenTasks, unsubscribe } = await subscribed()
+    const reads = watchReads()
+    const { unsubscribe } = await subscribed()
 
     emitApplied()
     emitApplied()
     emitApplied()
     await flushMicrotasks()
-    expect(getOpenTasks).toHaveBeenCalledTimes(2)
+    expect(reads.count()).toBe(2)
 
     await clock.advance(3_000)
-    expect(getOpenTasks).toHaveBeenCalledTimes(3)
+    expect(reads.count()).toBe(3)
 
     // Unsubscribed, the service stops listening and the next subscriber reads again.
     unsubscribe()
@@ -925,208 +1003,189 @@ describe('task list state', () => {
     await clock.advance(3_000)
     emitApplied()
     await flushMicrotasks()
-    expect(getOpenTasks).toHaveBeenCalledTimes(3)
+    expect(reads.count()).toBe(3)
     tasks.subscribe(noop)
     await flushMicrotasks()
-    expect(getOpenTasks).toHaveBeenCalledTimes(4)
+    expect(reads.count()).toBe(4)
   })
 
   it('keeps reading while one subscription is left, however often another unsubscribes', async () => {
-    const { getOpenTasks, unsubscribe } = await subscribed()
+    const reads = watchReads()
+    const { unsubscribe } = await subscribed()
     tasks.subscribe(vi.fn())
     unsubscribe()
     unsubscribe()
 
     emitApplied()
     await flushMicrotasks()
-    expect(getOpenTasks).toHaveBeenCalledTimes(2)
+    expect(reads.count()).toBe(2)
   })
 
   it('keeps the state on an equal read and apart from the recently-completed set', async () => {
-    await subscribed()
+    const { rows } = await subscribed()
     const state = tasks.get()
     const listener = vi.fn()
     tasks.subscribe(listener)
     const struckListener = vi.fn()
     tasks.recentlyCompleted.subscribe(struckListener)
 
-    // The spy answers with the same rows, so the read changes nothing.
     await tasks.refresh()
-    tasks.markRecentlyCompleted('/g', [one])
+    tasks.markRecentlyCompleted('/g', [rows[0]!])
     expect(tasks.get()).toBe(state)
     expect(listener).not.toHaveBeenCalled()
     expect(struckListener).toHaveBeenCalledTimes(1)
   })
 
   it('re-reads on an index:committed broadcast in a note window only', async () => {
-    for (const [role, reads] of [
+    for (const [role, count] of [
       ['main', 1],
       ['note-window', 2],
     ] as const) {
       tasks = createTasks(new WritableStore({ session: openGraph }), role)
-      const getOpenTasks = vi.spyOn(tasks, 'getOpenTasks').mockResolvedValue([one])
+      const reads = watchReads()
       tasks.subscribe(noop)
       await flushMicrotasks()
 
       ipc.emit('index:committed', { seq: 1, paths: null })
       await flushMicrotasks()
 
-      expect(getOpenTasks).toHaveBeenCalledTimes(reads)
+      expect(reads.count()).toBe(count)
+      vi.restoreAllMocks()
     }
   })
 
   it('re-reads after a requested rebuild but not after a sync pass', async () => {
-    const { getOpenTasks } = await subscribed()
+    const reads = watchReads()
+    await subscribed()
 
     for (const listener of reconciledListeners) {
       void listener({ generation: 1, fileGeneration: 1, source: 'sync' })
     }
     await flushMicrotasks()
-    expect(getOpenTasks).toHaveBeenCalledTimes(1)
+    expect(reads.count()).toBe(1)
 
     for (const listener of reconciledListeners) {
       void listener({ generation: 1, fileGeneration: 1, source: 'rebuild' })
     }
     await flushMicrotasks()
-    expect(getOpenTasks).toHaveBeenCalledTimes(2)
+    expect(reads.count()).toBe(2)
   })
 
   it('drops the rows on a graph switch and reads the new graph', async () => {
     const source = new WritableStore<{ session: GraphSession | null }>({ session: openGraph })
     const switching = createTasks(source)
-    const getOpenTasks = vi.spyOn(switching, 'getOpenTasks').mockResolvedValue([one])
+    seedNotes(database, [{ path: A, markdown: '+ [ ] one\n' }])
+    const reads = watchReads()
     switching.subscribe(noop)
     await flushMicrotasks()
-    expect(switching.get().open).toEqual([one])
+    expect(markdowns(switching.get().open)).toEqual(['one'])
 
-    getOpenTasks.mockResolvedValue([two])
+    seedNotes(database, [{ path: A, markdown: '+ [ ] two\n' }])
     source.set({
       session: createGraphSession({ root: '/h', name: 'h', generation: 8, indexGeneration: 1 }),
     })
     expect(switching.get().open).toBeUndefined()
     await flushMicrotasks()
-    expect(switching.get().open).toEqual([two])
+    expect(markdowns(switching.get().open)).toEqual(['two'])
 
     source.set({ session: null })
     expect(switching.get().open).toBeUndefined()
     await switching.refresh()
-    expect(getOpenTasks).toHaveBeenCalledTimes(2)
+    expect(reads.count()).toBe(2)
   })
 })
 
 describe('reads racing writes', () => {
   const NOTE = 'daily/2026-11-20.md'
+  let harness: TaskHarness
 
-  /**
-   * Makes every database read wait until `release()`.
-   */
-  function holdTaskReads(): { release: () => void } {
-    const gate = Promise.withResolvers<void>()
-    const read = database.read.bind(database)
-    vi.spyOn(database, 'read').mockImplementation(async (command, args) => {
-      await gate.promise
-      return await read(command, args)
-    })
-    return { release: gate.resolve }
-  }
-
-  /**
-   * Makes the next disk write wait until `release()`.
-   */
-  function holdNextWrite(): { release: () => void } {
-    const gate = Promise.withResolvers<void>()
-    const write = noteFile.write.bind(noteFile)
-    vi.spyOn(noteFile, 'write').mockImplementationOnce(async (...args) => {
-      await gate.promise
-      return await write(...args)
-    })
-    return { release: gate.resolve }
-  }
+  afterEach(() => {
+    harness.close()
+  })
 
   /**
    * Puts `source` on disk and in the index, subscribes, and waits for the first read to land.
    */
   async function indexed(source: string): Promise<readonly OpenTask[]> {
-    seedNotes(database, [{ path: NOTE, markdown: source }])
-    noteFile.set(NOTE, source)
-    tasks.subscribe(noop)
-    await flushMicrotasks()
-    return tasks.get().open!
+    harness = new TaskHarness({ files: { [NOTE]: source } })
+    await harness.start()
+    return harness.tasks.get().open!
   }
 
-  it.fails('keeps an edit when a read that started during its write lands after it', async () => {
+  it('keeps an edit when a read that started during its write lands after it', async () => {
     const [row] = await indexed('## Tasks\n\n+ [ ] \n')
-    const write = holdNextWrite()
+    harness.holdWrites()
 
-    const editing = tasks.editTask(row!, 'buy milk')
-    expect(tasks.get().open?.[0]?.markdown).toBe('buy milk')
+    const editing = harness.tasks.editTask(row!, 'buy milk')
+    expect(harness.tasks.get().open?.[0]?.markdown).toBe('buy milk')
 
-    const reads = holdTaskReads()
-    emitApplied()
-    write.release()
+    harness.holdReads()
+    void harness.tasks.refresh()
+    await harness.landWrite()
     await editing
-    reads.release()
-    await flushMicrotasks()
+    await harness.landRead()
 
-    expect(tasks.get().open?.[0]?.markdown).toBe('buy milk')
+    expect(harness.tasks.get().open?.[0]?.markdown).toBe('buy milk')
   })
 
-  it.fails('keeps an added row when a read that started during its write lands after it', async () => {
+  it('keeps an added row when a read that started during its write lands after it', async () => {
     const [row] = await indexed('## Tasks\n\n+ [ ] \n')
-    const write = holdNextWrite()
+    harness.holdWrites()
 
-    const adding = tasks.addTaskAfter(row!, 'buy milk')
-    const reads = holdTaskReads()
-    emitApplied()
-    write.release()
+    const adding = harness.tasks.addTaskAfter(row!, 'buy milk')
+    harness.holdReads()
+    void harness.tasks.refresh()
+    await harness.landWrite()
     const created = await adding
-    reads.release()
-    await flushMicrotasks()
+    await harness.landRead()
 
-    const open = tasks.get().open!
+    const open = harness.tasks.get().open!
     expect(open.map((row) => row.markdown)).toEqual(['buy milk', ''])
     expect(open.some((row) => isSameTaskPath(row.astPath, created.astPath))).toBe(true)
+    expect(open.some((row) => row.taskId === created.taskId)).toBe(true)
   })
 
-  it.fails('deletes an edited row after a read that started during the edit landed', async () => {
+  it('deletes an edited row after a read that started during the edit landed', async () => {
     const [row] = await indexed('## Tasks\n\n+ [ ] \n')
-    const write = holdNextWrite()
-    const editing = tasks.editTask(row!, 'buy milk')
-    const reads = holdTaskReads()
-    emitApplied()
-    write.release()
+    harness.holdWrites()
+    const editing = harness.tasks.editTask(row!, 'buy milk')
+    harness.holdReads()
+    void harness.tasks.refresh()
+    await harness.landWrite()
     await editing
-    reads.release()
-    await flushMicrotasks()
+    await harness.landRead()
+    await harness.drain()
 
-    expect(noteFile.files().get(NOTE)).toBe('## Tasks\n\n+ [ ] buy milk\n')
-    await tasks.deleteTasks([tasks.get().open![0]!])
-    expect(noteFile.files().get(NOTE)).toBe('## Tasks\n')
+    expect(harness.files.files().get(NOTE)).toBe('## Tasks\n\n+ [ ] buy milk\n')
+    await harness.tasks.deleteTasks([harness.tasks.get().open![0]!])
+    expect(harness.files.files().get(NOTE)).toBe('## Tasks\n')
   })
 
-  it.fails('keeps an edit when the trailing throttled read lands before the index has it', async () => {
+  it('keeps an edit when the trailing throttled read lands before the index has it', async () => {
+    const OTHER = 'notes/other.md'
     const [row] = await indexed('## Tasks\n\n+ [ ] \n')
-    emitApplied()
-    await flushMicrotasks()
-    await clock.advance(1_000)
-    emitApplied()
+    harness.editExternally(OTHER, 'one\n')
+    await harness.deliverWatcherBatch()
+    await harness.clock.advance(1_000)
+    harness.editExternally(OTHER, 'two\n')
+    await harness.deliverWatcherBatch()
 
-    await clock.advance(1_900)
-    await tasks.editTask(row!, 'buy milk')
-    expect(tasks.get().open?.[0]?.markdown).toBe('buy milk')
+    await harness.clock.advance(1_900)
+    await harness.tasks.editTask(row!, 'buy milk')
+    expect(harness.tasks.get().open?.[0]?.markdown).toBe('buy milk')
 
-    await clock.advance(100)
+    await harness.clock.advance(100)
     await flushMicrotasks()
-    expect(tasks.get().open?.[0]?.markdown).toBe('buy milk')
+    expect(harness.tasks.get().open?.[0]?.markdown).toBe('buy milk')
   })
 
   it('lands an edit whose stale path matches two identical tasks on one of them', async () => {
     const stale = '+ [ ] \n+ [ ] \n'
     const second = ref(stale, 1, NOTE)
     const source = '## Tasks\n\n+ [ ] \n+ [ ] \n'
-    noteFile.set(NOTE, source)
+    harness = new TaskHarness({ files: { [NOTE]: source } })
 
-    await tasks.writeTask(second, [{ kind: 'setMarkdown', markdown: 'buy milk' }])
-    expect(noteFile.files().get(NOTE)).toBe('## Tasks\n\n+ [ ] buy milk\n+ [ ] \n')
+    await harness.tasks.writeTask(second, [{ kind: 'setMarkdown', markdown: 'buy milk' }])
+    expect(harness.files.files().get(NOTE)).toBe('## Tasks\n\n+ [ ] buy milk\n+ [ ] \n')
   })
 })

@@ -1,15 +1,16 @@
 import { useState, type ReactNode } from 'react'
 import { page, userEvent, type Locator } from 'vitest/browser'
-import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock, type MockInstance } from 'vitest'
 import {
   createTestDatabaseService,
   createTestCoreServices,
   makeOpenTask as task,
+  TestTaskIndex,
   type TestCoreServices,
   type TestHapticsService,
   type TestStorageService,
 } from '@reflect/core/testing'
-import type { OpenTask, TaskAction, TaskService, TaskWriteResult } from '@reflect/core'
+import type { OpenTask, TaskAction, TaskService } from '@reflect/core'
 import { createTestSystemPreferencesService } from '@reflect/app/testing'
 import { useRouterState } from '@/routing/router.tsx'
 import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
@@ -110,25 +111,14 @@ vi.mock('@/editor/note-editor.tsx', async () => {
   }
 })
 
-// The screen runs on the real `TaskService` of the test app services; each
-// test steers its reads and writes through these spies.
-let getOpenTasks: MockInstance<TaskService['getOpenTasks']>
-let getCompletedTasks: MockInstance<TaskService['getCompletedTasks']>
+// The screen runs on the real `TaskService` of the test app services. Each
+// test supplies the rows the index returns through `getOpenTasks` and
+// `getCompletedTasks`, and steers the writes through the spies.
+let getOpenTasks: Mock<() => Promise<OpenTask[]>>
+let getCompletedTasks: Mock<() => Promise<OpenTask[]>>
 let writeTask: MockInstance<TaskService['writeTask']>
 let insertTask: MockInstance<TaskService['insertTask']>
-
-/**
- * The result of a write that changed nothing the cache needs to re-address.
- */
-const WRITTEN: TaskWriteResult = {
-  source: '',
-  baseRevision: '',
-  revision: '',
-  moved: [],
-  inserted: [],
-  tasks: [],
-  updatedAt: 0,
-}
+let taskIndex: TestTaskIndex
 
 type TaskActionKind = TaskAction['kind']
 
@@ -237,15 +227,15 @@ beforeEach(async () => {
     database: createTestDatabaseService(),
   })
   const { tasks } = core
-  getOpenTasks = vi.spyOn(tasks, 'getOpenTasks').mockResolvedValue([])
-  getCompletedTasks = vi.spyOn(tasks, 'getCompletedTasks').mockResolvedValue([])
-  writeTask = vi.spyOn(tasks, 'writeTask').mockResolvedValue(WRITTEN)
-  insertTask = vi.spyOn(tasks, 'insertTask').mockResolvedValue({
-    created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
-    baseRevision: '',
-    revision: '',
-    moved: [],
-    updatedAt: 0,
+  getOpenTasks = vi.fn<() => Promise<OpenTask[]>>().mockResolvedValue([])
+  getCompletedTasks = vi.fn<() => Promise<OpenTask[]>>().mockResolvedValue([])
+  taskIndex = new TestTaskIndex(core.database, getOpenTasks, getCompletedTasks)
+  writeTask = vi.spyOn(tasks, 'writeTask').mockImplementation((ref, actions) => {
+    return Promise.resolve(taskIndex.write(ref, actions))
+  })
+  insertTask = vi.spyOn(tasks, 'insertTask').mockImplementation((notePath) => {
+    const created = { astPath: [9], markdown: '', breadcrumbs: [], checked: false }
+    return Promise.resolve(taskIndex.insert(notePath, created))
   })
   storage = core.storage
   haptics = core.mobile.haptics
@@ -845,11 +835,16 @@ describe('MobileTasks', () => {
     await view.unmount()
   })
 
-  it('surfaces a failed open-tasks read', async () => {
-    getOpenTasks.mockRejectedValue(new Error('no index'))
+  it('shows no error for a failed read and lists the tasks once a read lands', async () => {
+    getOpenTasks
+      .mockRejectedValueOnce(new Error('no index'))
+      .mockResolvedValue([task({ text: 'buy milk' })])
     const view = await renderScreen()
+    await waitFor(() => expect(getOpenTasks).toHaveBeenCalledTimes(1))
+    expect(view.queryByRole('alert')).toBeNull()
 
-    await view.findByRole('alert')
+    await act(() => core.clock.advance(250))
+    await view.findByText('buy milk')
     await view.unmount()
   })
 

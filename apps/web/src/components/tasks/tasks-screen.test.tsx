@@ -1,13 +1,14 @@
 import { createTestWindowService, type TestWindowService } from '@reflect/app/testing'
 import { userEvent, type Locator } from 'vitest/browser'
-import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock, type MockInstance } from 'vitest'
 import {
   createTestDatabaseService,
   createTestCoreServices,
   makeOpenTask as task,
+  TestTaskIndex,
   type TestCoreServices,
 } from '@reflect/core/testing'
-import type { OpenTask, TaskAction, TaskService, TaskWriteResult } from '@reflect/core'
+import type { OpenTask, TaskAction, TaskService, TaskSnapshot } from '@reflect/core'
 import { useEffect, useState, type MutableRefObject, type ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
 import { useRouterState } from '@/routing/router.tsx'
@@ -18,26 +19,20 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { TasksScreen } from './tasks-screen.tsx'
 import { deepLinkForRoute } from '@reflect/app'
 
-// The screen runs on the real `TaskService` of the test app services; each
-// test steers its reads and writes through these spies.
-let getOpenTasks: MockInstance<TaskService['getOpenTasks']>
-let getCompletedTasks: MockInstance<TaskService['getCompletedTasks']>
+// The screen runs on the real `TaskService` of the test app services. Each
+// test supplies the rows the index returns through `getOpenTasks` and
+// `getCompletedTasks`, and steers the writes through the spies.
+let getOpenTasks: Mock<() => Promise<OpenTask[]>>
+let getCompletedTasks: Mock<() => Promise<OpenTask[]>>
 let writeTask: MockInstance<TaskService['writeTask']>
 let insertTask: MockInstance<TaskService['insertTask']>
 let continueTaskInContext: MockInstance<TaskService['continueTaskInContext']>
+let taskIndex: TestTaskIndex
 
 /**
- * The result of a write that changed nothing the cache needs to re-address.
+ * The new task of an insert into a note with no other task.
  */
-const WRITTEN: TaskWriteResult = {
-  source: '',
-  baseRevision: '',
-  revision: '',
-  moved: [],
-  inserted: [],
-  tasks: [],
-  updatedAt: 0,
-}
+const CREATED: TaskSnapshot = { astPath: [0], markdown: '', breadcrumbs: [], checked: false }
 
 type TaskActionKind = TaskAction['kind']
 
@@ -56,8 +51,10 @@ function writesOf(...kinds: TaskActionKind[]): unknown[][] {
  * Reject the writes whose actions are exactly `kinds`; every other write succeeds.
  */
 function failWrites(kinds: TaskActionKind[], cause: Error): void {
-  writeTask.mockImplementation((_task, actions) => {
-    return isWrite(actions, kinds) ? Promise.reject(cause) : Promise.resolve(WRITTEN)
+  writeTask.mockImplementation((ref, actions) => {
+    return isWrite(actions, kinds)
+      ? Promise.reject(cause)
+      : Promise.resolve(taskIndex.write(ref, actions))
   })
 }
 
@@ -239,23 +236,20 @@ beforeEach(() => {
   storage = core.storage
   core.clock.setNow(new Date(2026, 5, 14, 12, 0, 0).getTime())
   const tasks = core.tasks
-  getOpenTasks = vi.spyOn(tasks, 'getOpenTasks').mockResolvedValue([])
-  getCompletedTasks = vi.spyOn(tasks, 'getCompletedTasks').mockResolvedValue([])
-  writeTask = vi.spyOn(tasks, 'writeTask').mockResolvedValue(WRITTEN)
-  insertTask = vi.spyOn(tasks, 'insertTask').mockResolvedValue({
-    created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
-    baseRevision: '',
-    revision: '',
-    moved: [],
-    updatedAt: 0,
+  getOpenTasks = vi.fn<() => Promise<OpenTask[]>>().mockResolvedValue([])
+  getCompletedTasks = vi.fn<() => Promise<OpenTask[]>>().mockResolvedValue([])
+  taskIndex = new TestTaskIndex(core.database, getOpenTasks, getCompletedTasks)
+  writeTask = vi.spyOn(tasks, 'writeTask').mockImplementation((ref, actions) => {
+    return Promise.resolve(taskIndex.write(ref, actions))
   })
-  continueTaskInContext = vi.spyOn(tasks, 'continueTaskInContext').mockResolvedValue({
-    created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
-    baseRevision: '',
-    revision: '',
-    moved: [],
-    updatedAt: 0,
+  insertTask = vi.spyOn(tasks, 'insertTask').mockImplementation((notePath) => {
+    return Promise.resolve(taskIndex.insert(notePath, CREATED))
   })
+  continueTaskInContext = vi
+    .spyOn(tasks, 'continueTaskInContext')
+    .mockImplementation((ref, content) => {
+      return Promise.resolve(taskIndex.continue(ref, content, CREATED))
+    })
 })
 
 // Keep native browser navigation out of keyboard-handler tests in this suite.
@@ -287,39 +281,16 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
-  it('surfaces a failed query as an alert', async () => {
-    getOpenTasks.mockRejectedValue(new Error('index unavailable'))
+  it('shows no error for a failed read and lists the tasks once a read lands', async () => {
+    getOpenTasks
+      .mockRejectedValueOnce(new Error('index unavailable'))
+      .mockResolvedValue([task({ notePath: 'notes/p.md', text: 'open task', noteTitle: 'P' })])
     const view = await renderScreen()
-    const alert = await view.findByRole('alert')
-    expect(alert.textContent).toContain('Couldn’t load tasks.')
-    await view.unmount()
-  })
-
-  it('surfaces a failed archived query as an alert, not a blank list', async () => {
-    storage.session.set('reflect.tasks.filter.archived', 'true')
-    getOpenTasks.mockResolvedValue([])
-    getCompletedTasks.mockRejectedValue(new Error('index unavailable'))
-    const view = await renderScreen()
-    const alert = await view.findByRole('alert')
-    expect(alert.textContent).toContain('Couldn’t load tasks.')
-    await view.unmount()
-  })
-
-  it('clears the archived error when "show archived" is turned off', async () => {
-    storage.session.set('reflect.tasks.filter.archived', 'true')
-    getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/p.md', text: 'open task', noteTitle: 'P' }),
-    ])
-    getCompletedTasks.mockRejectedValue(new Error('index unavailable'))
-    const view = await renderScreen()
-    await view.findByRole('alert') // archived read failed → alert
-
-    await userEvent.click(view.getByRole('button', { name: 'Task filters' }))
-    await userEvent.click(await view.findByText('Show archived tasks'))
-
-    // The retained archived error no longer counts → open tasks render, no alert.
-    await view.findByText('open task')
+    await waitFor(() => expect(getOpenTasks).toHaveBeenCalledTimes(1))
     expect(view.queryByRole('alert')).toBeNull()
+
+    await act(() => core.clock.advance(250))
+    await view.findByText('open task')
     await view.unmount()
   })
 
@@ -333,7 +304,7 @@ describe('TasksScreen', () => {
       }),
       // Overdue needs an explicit past due date (V1 asymmetry) — a bare past
       // daily-note task would be Current.
-      task({ notePath: 'notes/d.md', dueDate: '2026-06-10', text: 'overdue task', noteTitle: 'D' }),
+      task({ notePath: 'notes/d.md', markdown: 'overdue task [[2026-06-10]]', noteTitle: 'D' }),
       task({ notePath: 'notes/p.md', text: 'project task', noteTitle: 'Project' }),
     ])
     const view = await renderScreen()
@@ -341,7 +312,7 @@ describe('TasksScreen', () => {
     await view.findByText('today task')
     const headers = view.getAllByRole('heading', { level: 2 }).map((node) => node.textContent)
     expect(headers).toEqual(['Current', 'Overdue', 'Project'])
-    expect(view.getByText('overdue task')).toBeDefined()
+    expect(view.getByText(/overdue task/)).toBeDefined()
     expect(view.getByText('project task')).toBeDefined()
     await view.unmount()
   })
@@ -860,12 +831,14 @@ describe('TasksScreen', () => {
   })
 
   it('a note group’s "+ Add" button inserts into that note and opens the editor', async () => {
-    insertTask.mockResolvedValue({
-      created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
-      baseRevision: '',
-      revision: '',
-      moved: [],
-      updatedAt: 0,
+    insertTask.mockImplementation((notePath) => {
+      return Promise.resolve(
+        taskIndex.insert(
+          notePath,
+          { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
+          [],
+        ),
+      )
     })
     getOpenTasks.mockResolvedValue([
       task({
@@ -895,17 +868,19 @@ describe('TasksScreen', () => {
       markdown: 'later',
     })
     getOpenTasks.mockResolvedValue([later])
-    insertTask.mockResolvedValue({
-      created: { astPath: [1], markdown: '', breadcrumbs: [], checked: false },
-      baseRevision: '',
-      revision: '',
-      moved: [
-        {
-          from: { astPath: [1], markdown: 'later', breadcrumbs: [], checked: false },
-          to: { astPath: [2], markdown: 'later', breadcrumbs: [], checked: false },
-        },
-      ],
-      updatedAt: 0,
+    insertTask.mockImplementation((notePath) => {
+      return Promise.resolve(
+        taskIndex.insert(
+          notePath,
+          { astPath: [1], markdown: '', breadcrumbs: [], checked: false },
+          [
+            {
+              from: { astPath: [1], markdown: 'later', breadcrumbs: [], checked: false },
+              to: { astPath: [2], markdown: 'later', breadcrumbs: [], checked: false },
+            },
+          ],
+        ),
+      )
     })
     const view = await renderScreen()
 
@@ -928,15 +903,13 @@ describe('TasksScreen', () => {
       task({
         notePath: 'notes/p.md',
         astPath: [2],
-        markdown: 'late',
-        text: 'late',
+        markdown: 'late [[2026-06-01]]',
         noteTitle: 'P',
-        dueDate: '2026-06-01',
       }),
     ])
     const view = await renderScreen()
 
-    await view.findByText('late')
+    await view.findByText(/late/)
     expect(view.queryByRole('button', { name: /Add a task/ })).toBeNull()
     await view.unmount()
   })
@@ -1049,12 +1022,15 @@ describe('TasksScreen', () => {
   })
 
   it('Enter in the editor saves the row and opens the next task (continuous entry)', async () => {
-    continueTaskInContext.mockResolvedValue({
-      created: { astPath: [3], markdown: '', breadcrumbs: [], checked: false },
-      baseRevision: '',
-      revision: '',
-      moved: [],
-      updatedAt: 0,
+    continueTaskInContext.mockImplementation((ref, content) => {
+      return Promise.resolve(
+        taskIndex.continue(
+          ref,
+          content,
+          { astPath: [3], markdown: '', breadcrumbs: [], checked: false },
+          [],
+        ),
+      )
     })
     getOpenTasks.mockResolvedValue([
       task({
@@ -1083,22 +1059,25 @@ describe('TasksScreen', () => {
   })
 
   it('Enter in a grouped task keeps the new row in that breadcrumb context', async () => {
-    continueTaskInContext.mockResolvedValue({
-      created: {
-        astPath: [40],
-        markdown: '',
-        breadcrumbs: ['StartupToolbox', 'Reflections'],
-        checked: false,
-      },
-      baseRevision: '',
-      revision: '',
-      moved: [
-        {
-          from: { astPath: [40], markdown: 'later', breadcrumbs: [], checked: false },
-          to: { astPath: [56], markdown: 'later', breadcrumbs: [], checked: false },
-        },
-      ],
-      updatedAt: 0,
+    continueTaskInContext.mockImplementation((ref, content) => {
+      return Promise.resolve(
+        taskIndex.continue(
+          ref,
+          content,
+          {
+            astPath: [40],
+            markdown: '',
+            breadcrumbs: ['StartupToolbox', 'Reflections'],
+            checked: false,
+          },
+          [
+            {
+              from: { astPath: [40], markdown: 'later', breadcrumbs: [], checked: false },
+              to: { astPath: [56], markdown: 'later', breadcrumbs: [], checked: false },
+            },
+          ],
+        ),
+      )
     })
     getOpenTasks.mockResolvedValue([
       task({
@@ -1720,9 +1699,9 @@ describe('TasksScreen', () => {
     let resolveWrite = (): void => {
       throw new Error('write promise was not created')
     }
-    writeTask.mockImplementation(() => {
-      return new Promise<typeof WRITTEN>((resolve) => {
-        resolveWrite = () => resolve(WRITTEN)
+    writeTask.mockImplementation((ref, actions) => {
+      return new Promise((resolve) => {
+        resolveWrite = () => resolve(taskIndex.write(ref, actions))
       })
     })
     getOpenTasks.mockResolvedValue([
@@ -1816,9 +1795,9 @@ describe('TasksScreen', () => {
     let resolveToggle = (): void => {
       throw new Error('toggle promise was not created')
     }
-    writeTask.mockImplementation(() => {
-      return new Promise<TaskWriteResult>((resolve) => {
-        resolveToggle = () => resolve(WRITTEN)
+    writeTask.mockImplementation((ref, actions) => {
+      return new Promise((resolve) => {
+        resolveToggle = () => resolve(taskIndex.write(ref, actions))
       })
     })
     getOpenTasks.mockResolvedValue([])
@@ -1846,7 +1825,9 @@ describe('TasksScreen', () => {
   })
 
   it('restores a struck task when an unchanged editor checkbox reopen fails', async () => {
-    writeTask.mockResolvedValueOnce(WRITTEN).mockRejectedValueOnce(new Error('stale index'))
+    writeTask
+      .mockImplementationOnce((ref, actions) => Promise.resolve(taskIndex.write(ref, actions)))
+      .mockRejectedValueOnce(new Error('stale index'))
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -2092,7 +2073,7 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
-  it('refetches (does not restore a stale snapshot) when a bulk complete fails', async () => {
+  it('shows the rows as open again when a bulk complete fails', async () => {
     failWrites(['toggle'], new Error('stale index'))
     getOpenTasks.mockResolvedValue([
       task({
@@ -2120,9 +2101,11 @@ describe('TasksScreen', () => {
         expect.objectContaining({ status: 'failed', message: 'stale index' }),
       )
     })
-    // A batch failure reconciles by refetching the index, not by restoring the
-    // pre-batch snapshot (which would un-do any write that already landed).
-    await waitFor(() => expect(getOpenTasks.mock.calls.length).toBeGreaterThan(1))
+    await waitFor(() => {
+      expect(view.container.querySelector('[aria-label="Complete: first"]')).not.toBeNull()
+      expect(view.container.querySelector('[aria-label="Complete: second"]')).not.toBeNull()
+    })
+    expect(getOpenTasks).toHaveBeenCalledTimes(1)
     await view.unmount()
   })
 })

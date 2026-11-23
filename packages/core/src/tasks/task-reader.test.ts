@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs'
+import { sha256HexSync } from '@reflect/utils'
 import { describe, expect, it, vi } from 'vitest'
 import { AppError } from '../errors.ts'
 import { INDEX_COMMITTED_EVENT } from '../ipc/ipc-service.ts'
@@ -37,7 +38,7 @@ describe('read', () => {
     const some = await reader.readPaths(['notes/a.md', 'notes/plain.md', 'notes/absent.md'], signal)
     expect(some!.seq).toBe(open!.seq)
     expect(some!.notes.map((note) => [note.path, note.hash, note.tasks.length])).toEqual([
-      ['notes/a.md', 'hash-notes/a.md', 2],
+      ['notes/a.md', sha256HexSync('+ [ ] open a\n+ [x] done a\n'), 2],
     ])
   })
 
@@ -105,11 +106,7 @@ describe('index_tasks reads', () => {
   /**
    * The modules that call `index_tasks` themselves, by path under `src/`.
    */
-  const TASK_READERS = [
-    'tasks/task-reader.ts',
-    // Reads on its own until its rows come from the reader.
-    'tasks/task-service.ts',
-  ]
+  const TASK_READERS = ['tasks/task-reader.ts']
 
   it('come only from the listed modules', () => {
     const root = new URL('../', import.meta.url)
