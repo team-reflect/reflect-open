@@ -26,53 +26,17 @@ fi
 keep=(
   # The Xcode that runs this build.
   DEVELOPER_DIR
-  # cargo and build script settings. A changed CARGO_INCREMENTAL rebuilds
-  # every crate.
-  CARGO_HTTP_MULTIPLEXING
-  CARGO_INCREMENTAL
-  CARGO_PROFILE_RELEASE_DEBUG
-  CARGO_PROFILE_DEV_DEBUG
   ORT_CACHE_DIR
-  # sccache
-  RUSTC_WRAPPER
-  SCCACHE_BUCKET
-  SCCACHE_CACHE_SIZE
-  SCCACHE_CACHE_ZSTD_LEVEL
-  SCCACHE_CONF
-  SCCACHE_DIR
-  SCCACHE_ENDPOINT
-  SCCACHE_ERROR_LOG
-  SCCACHE_GHA_ENABLED
-  SCCACHE_GHA_RW_MODE
-  SCCACHE_GHA_VERSION
-  SCCACHE_IDLE_TIMEOUT
-  SCCACHE_LOG
-  SCCACHE_MULTILEVEL_CHAIN
-  SCCACHE_MULTILEVEL_WRITE_ERROR_POLICY
-  SCCACHE_PATH
-  SCCACHE_REGION
-  SCCACHE_S3_KEY_PREFIX
-  SCCACHE_S3_RW_MODE
-  SCCACHE_SERVER_PORT
-  SCCACHE_SKIP_CACHE_CHECK
-  # The S3 bucket that sccache reads and writes.
-  AWS_ACCESS_KEY_ID
-  AWS_SECRET_ACCESS_KEY
-  # The GitHub Actions cache service that sccache writes to.
-  ACTIONS_CACHE_SERVICE_V2
-  ACTIONS_CACHE_URL
-  ACTIONS_RESULTS_URL
-  ACTIONS_RUNTIME_TOKEN
-  # The Rust toolchain that mise selects.
-  RUSTUP_HOME
-  RUSTUP_TOOLCHAIN
-  CARGO_HOME
 )
-# mise's `cargo` wrapper reads MISE_* (for example the trusted config paths
-# that mise-action sets), and mbx reads its settings from MBX_*.
-while IFS= read -r name; do
-  keep+=("$name")
-done < <(compgen -e | grep -E '^(MISE|MBX)_' || true)
+# cargo, rustc and rustup settings, mise's `cargo` wrapper (MISE_*), mbx
+# (MBX_*), and sccache with its S3 bucket and GitHub Actions cache.
+for name in $(compgen -e); do
+  case "$name" in
+    CARGO_* | RUSTC_* | RUSTUP_* | MISE_* | MBX_* | SCCACHE_* | AWS_* | ACTIONS_*)
+      keep+=("$name")
+      ;;
+  esac
+done
 env_args=()
 for name in "${keep[@]}"; do
   if [ -n "${!name:-}" ]; then
