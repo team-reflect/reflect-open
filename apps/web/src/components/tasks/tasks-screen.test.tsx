@@ -1,4 +1,5 @@
 import { createTestWindowService, type TestWindowService } from '@reflect/app/testing'
+import { sleep } from '@ocavue/utils'
 import { userEvent, type Locator } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import {
@@ -9,7 +10,7 @@ import {
   type TestCoreServices,
 } from '@reflect/core/testing'
 import type { OpenTask } from '@reflect/core'
-import type { ReactNode } from 'react'
+import { StrictMode, type ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
 import { useRouterState } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
@@ -796,6 +797,27 @@ describe('TasksScreen', () => {
     })
     await expect.element(view.getByRole('button', { name: 'edited content' })).toBeInTheDocument()
     expect(insertTask).toHaveBeenCalledTimes(1)
+    expect(writeTask).not.toHaveBeenCalled()
+    await view.unmount()
+  })
+
+  it('keeps the editor of a new row under StrictMode and writes nothing', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/proj.md', astPath: [2], markdown: 'a', noteTitle: 'Project' }),
+    ])
+    const view = await renderInApp(
+      <StrictMode>
+        <TasksScreen />
+      </StrictMode>,
+      { core, graph: { root: '/g', name: 'g', generation: 1 } },
+    )
+
+    await userEvent.click(view.getByRole('button', { name: 'Add a task to Project' }))
+    await expect.element(view.getByTestId('task-editor')).toBeInTheDocument()
+    await sleep(0)
+
+    expect(view.getByTestId('task-editor').query()).not.toBeNull()
+    expect(insertTask).not.toHaveBeenCalled()
     expect(writeTask).not.toHaveBeenCalled()
     await view.unmount()
   })
