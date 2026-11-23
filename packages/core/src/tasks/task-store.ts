@@ -186,7 +186,7 @@ export class TaskStore {
   /**
    * Take a read of every note: of the unchecked tasks, or with `completed` of
    * the checked tasks too. A note that the store learned at a later index seq
-   * keeps its rows. So does a changed note with a struck task when the read
+   * keeps its rows. So does a note with a struck task when the read
    * holds no checked task: the paths of these notes are returned, for a read
    * of every task of them.
    */
@@ -298,10 +298,10 @@ export class TaskStore {
   }
 
   /**
-   * End a write that left nothing in its note: its ops leave the rows. Text
-   * that was not written stays in its row until {@link TaskStore.takeText}:
-   * a new task of the write shows again, unchecked, and the text of a task
-   * of the note shows as held text.
+   * End a write that left nothing in its note: its ops leave the rows. Typed
+   * text that was not written stays in its row until {@link TaskStore.takeText}:
+   * a new task of the write shows again, unchecked, and the typed text of a
+   * task of the note shows as held text.
    */
   fail(write: PendingWrite): void {
     this.batch(() => {
@@ -311,6 +311,7 @@ export class TaskStore {
           this.#showNewTask({ ...op, checked: false, bullet: false })
         } else if (
           op.kind === 'setMarkdown' &&
+          op.typed &&
           this.find(write.notePath, op.taskId) !== undefined
         ) {
           this.#takeUnwritten(op.taskId)
@@ -584,13 +585,12 @@ export class TaskStore {
 
   /**
    * Whether the rows of the note hold a struck task that the tasks of
-   * `note`, read from another text without its checked tasks, would drop.
+   * `note`, read without its checked tasks, would drop.
    */
   #losesStruck(note: NoteTasks): boolean {
     const previous = this.#notes.get(note.path)
     return (
       previous !== undefined &&
-      previous.revision !== note.hash &&
       previous.rows.some((row) => row.checked && this.#struck.has(row.taskId))
     )
   }

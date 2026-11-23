@@ -187,6 +187,18 @@ describe('TaskStore struck tasks', () => {
     store.archive()
     expect(store.view().struck).toEqual([])
   })
+
+  it('keeps a struck task through a read of the unchecked tasks of the same text', () => {
+    const store = createStore()
+    const files = { [A]: '+ [ ] a\n+ [x] done\n' }
+    store.landAll(fullRead(1, files), false)
+    store.strike(['t1'])
+
+    const read = openRead(2, files)
+    read.notes[0]!.updatedAt = 9
+    expect(store.landAll(read, false)).toEqual([A])
+    expect(labels(store.view().struck)).toEqual(['t1:done'])
+  })
 })
 
 describe('TaskStore writes', () => {
@@ -219,7 +231,7 @@ describe('TaskStore writes', () => {
 
   it('keeps the text of a failed write in its row until it is taken', () => {
     const { store, a } = loaded()
-    store.fail(store.begin(A, [{ kind: 'setMarkdown', taskId: 't0', markdown: 'a!' }]))
+    store.fail(store.begin(A, [{ kind: 'setMarkdown', taskId: 't0', markdown: 'a!', typed: true }]))
     expect(labels(store.view().open)).toEqual(['t0:a!', 't1:b'])
 
     expect(store.takeText(a)).toEqual({ base: 'a', markdown: 'a!' })
@@ -228,7 +240,7 @@ describe('TaskStore writes', () => {
 
   it('applies the ops over the rows a read lands during the write', () => {
     const { store } = loaded()
-    store.begin(A, [{ kind: 'setMarkdown', taskId: 't1', markdown: 'b!' }])
+    store.begin(A, [{ kind: 'setMarkdown', taskId: 't1', markdown: 'b!', typed: true }])
 
     store.landPaths(fullRead(2, { [A]: '+ [ ] above\n+ [ ] a\n+ [ ] b\n' }), [A])
     expect(labels(store.view().open)).toEqual(['t2:above', 't0:a', 't1:b!'])

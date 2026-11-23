@@ -12,7 +12,10 @@ export type TaskItemOp =
    * Leave the task checked (`checked: true`) or open.
    */
   | { kind: 'toggle'; taskId: string; checked: boolean }
-  | { kind: 'setMarkdown'; taskId: string; markdown: string }
+  /**
+   * Replace the Markdown of the task. `typed` marks text the user typed.
+   */
+  | { kind: 'setMarkdown'; taskId: string; markdown: string; typed: boolean }
   | { kind: 'remove'; taskId: string }
   | { kind: 'toBullet'; taskId: string }
 

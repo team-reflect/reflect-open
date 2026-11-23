@@ -644,7 +644,7 @@ describe('MobileTasks', () => {
         ['daily/2026-06-14.md', { markdown: 'new thing', checked: false }],
       ])
     })
-    expect(view.getByText('new thing')).toBeDefined()
+    await expect.element(view.getByText('new thing')).toBeInTheDocument()
     expect(writeTask).not.toHaveBeenCalled()
     await view.unmount()
   })
@@ -729,7 +729,10 @@ describe('MobileTasks', () => {
 
     await user.click(await view.findByRole('button', { name: 'Add a task to today' }))
     await view.findByRole('textbox', { name: 'Task text' })
-    expect(view.getByRole('button', { name: 'Edit: Empty task' })).toBeDefined()
+    // The sheet hides the list behind it from the accessibility tree.
+    await expect
+      .element(view.getByRole('button', { name: 'Edit: Empty task', includeHidden: true }))
+      .toBeInTheDocument()
     await swipeDrawerClosed()
 
     await waitFor(() => expect(view.queryByRole('button', { name: 'Edit: Empty task' })).toBeNull())
@@ -842,7 +845,10 @@ describe('MobileTasks', () => {
     await user.click(view.getByRole('button', { name: 'Add a task' }))
 
     await view.findByRole('textbox', { name: 'Task text' })
-    expect(view.getByRole('heading', { name: /Current/ })).toBeDefined()
+    // The sheet hides the list behind it from the accessibility tree.
+    await expect
+      .element(view.getByRole('heading', { name: /Current/, includeHidden: true }))
+      .toBeInTheDocument()
     await view.unmount()
   })
 

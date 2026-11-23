@@ -123,8 +123,8 @@ describe('a task that changed under a command', () => {
   }
 
   it('reads the note again and writes once more', async () => {
-    const rows = await start({ [A]: '+ [ ] one\n' })
-    await changeBehindRows('+ [ ] one changed\n')
+    const rows = await start({ [A]: '+ [ ] one\n+ [ ] two\n' })
+    await changeBehindRows('+ [ ] one changed\n+ [ ] two\n')
 
     const toggling = commands.toggle(rows)
     await sleep(0)
@@ -132,7 +132,10 @@ describe('a task that changed under a command', () => {
     await harness.landRead()
     await toggling
 
-    expect(file(A)).toBe('+ [x] one changed\n')
+    expect(file(A)).toBe('+ [x] one changed\n+ [x] two\n')
+    expect(harness.tasks.get().struck.map((row) => row.taskId)).toEqual(
+      rows.map((row) => row.taskId),
+    )
     expect(harness.progress.get()).toEqual([])
   })
 
@@ -143,6 +146,18 @@ describe('a task that changed under a command', () => {
     await commands.complete(rows)
 
     expect(file(A)).toBe('intro\n\n+ [x] same\n+ [x] same\n')
+  })
+
+  it('keeps the ids of tasks that moved while the index is behind the file', async () => {
+    const rows = await start({ [A]: '+ [ ] one\n+ [ ] two\n' })
+    harness.editExternally(A, 'intro\n\n+ [ ] one\n+ [ ] two\n')
+
+    await commands.complete(rows)
+
+    expect(file(A)).toBe('intro\n\n+ [x] one\n+ [x] two\n')
+    expect(harness.tasks.get().struck.map((row) => row.taskId)).toEqual(
+      rows.map((row) => row.taskId),
+    )
   })
 
   it('keeps the typed text in the row while the index is behind the file', async () => {
@@ -253,6 +268,17 @@ describe('typed text', () => {
     )
   })
 
+  it('shows the line once while the app stops again with the same text', async () => {
+    const rows = await start({ [A]: '+ [ ] one\n' })
+
+    commands.setDraft(rows[0]!, 'one\n\ntwo')
+    await commands.commit(rows[0]!)
+    await commands.commitDrafts()
+
+    expect(harness.progress.get()).toHaveLength(1)
+    expect(shown()).toEqual([[rows[0]!.taskId, 'one\n\ntwo']])
+  })
+
   it('keeps the text in the row when its write fails, and writes it later', async () => {
     const rows = await start({ [A]: '+ [ ] one\n' })
     const write = vi.spyOn(commands, 'write').mockRejectedValueOnce(new Error('disk full'))
@@ -266,6 +292,21 @@ describe('typed text', () => {
     await commands.commitDrafts()
     expect(file(A)).toBe('+ [ ] one more\n')
     expect(shown()).toEqual([[rows[0]!.taskId, 'one more']])
+  })
+
+  it('keeps only the typed text of a failed schedule', async () => {
+    const rows = await start({ [A]: '+ [ ] one\n+ [ ] two\n' })
+    vi.spyOn(commands, 'write').mockRejectedValueOnce(new Error('disk full'))
+
+    commands.setDraft(rows[1]!, 'two more')
+    await commands.schedule(rows, '2026-06-20')
+    expect(shown()).toEqual([
+      [rows[0]!.taskId, 'one'],
+      [rows[1]!.taskId, 'two more'],
+    ])
+
+    await commands.commitDrafts()
+    expect(file(A)).toBe('+ [ ] one\n+ [ ] two more\n')
   })
 
   it('saves every typed text when the app is about to stop', async () => {
