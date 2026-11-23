@@ -26,6 +26,7 @@ runs:
         # https://github.com/actions/toolkit/blob/0c3a9c332b678ff1e776f93d728a4ad279803abe/packages/cache/src/internal/tar.ts#L239
         echo "ZSTD_CLEVEL=10" >> "$GITHUB_ENV"
 
+    # we use mise to install rust so we do not need this anymore. FIXME
     - name: Install Rust toolchain
       shell: bash
       run: rustup toolchain install --no-self-update
@@ -33,6 +34,10 @@ runs:
     - name: Print rustc version
       shell: bash
       run: rustc --version --verbose
+
+    - name: Print cargo path
+      shell: bash
+      run: command -v cargo
 
     # `ort-sys` downloads prebuilt ONNX Runtime binaries into ORT_CACHE_DIR.
     # ORT_CACHE_DIR is documented in the v2.0.0-rc.11 release notes:
@@ -48,6 +53,7 @@ runs:
         path: ${{ env.ORT_CACHE_DIR }}
         key: ort-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
 
+    # Delete Swatinem/rust-cache , use mbx
     - name: Cache cargo registry
       if: inputs.cache == 'true'
       uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
