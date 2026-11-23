@@ -6,6 +6,14 @@ inputs:
     description: Whether to restore and save the caches.
     required: false
     default: 'true'
+  cache-scope:
+    description: The job whose mbx cache this job restores and saves. Defaults to the current job.
+    required: false
+    default: ''
+  cache-save:
+    description: Whether to save the mbx cache. With 'false', the job only restores it.
+    required: false
+    default: 'true'
 
 runs:
   using: composite
@@ -52,14 +60,28 @@ runs:
         path: ${{ env.ORT_CACHE_DIR }}
         key: ort-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
 
-    # Uses the mbx that mise installed. The `github` backend restores and saves
-    # `target/` and the cargo registry and git downloads; only a successful push
-    # to master saves. https://mr-boxington.jdx.dev/github-action
+    - name: Compute the mbx cache key
+      id: mbx-key
+      shell: bash
+      env:
+        SCOPE: ${{ inputs.cache-scope || github.job }}
+        TOOLCHAIN: ${{ hashFiles('rust-toolchain.toml') }}
+      run: |
+        prefix="mbx-objects-v1-$RUNNER_OS-$RUNNER_ARCH-$SCOPE-$TOOLCHAIN-"
+        echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
+        echo "key=$prefix$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+    # Uses the mbx that mise installed. The `objects` mode restores and saves
+    # the mbx object store; only a successful push to master saves.
+    # https://mr-boxington.jdx.dev/github-action
+    # The action skips the save when ACTIONS_CACHE_MODE does not permit writes.
+    # https://github.com/jdx/mr-boxington-action/blob/b3ef673bd77c5426927fe8836c6185cdae04c2dd/src/lib.ts#L489-L505
     - name: Set up mbx
       uses: jdx/mr-boxington-action@b3ef673bd77c5426927fe8836c6185cdae04c2dd # v1.7.4
+      env:
+        ACTIONS_CACHE_MODE: ${{ inputs.cache-save == 'true' && 'write' || 'read' }}
       with:
         backend: ${{ inputs.cache == 'true' && 'github' || 'local' }}
-        # The generation is part of the restore key prefix, so each job
-        # restores only its own target cache.
-        # https://github.com/jdx/mr-boxington-action/blob/b3ef673bd77c5426927fe8836c6185cdae04c2dd/src/lib.ts#L322-L329
-        cache-generation: v1-${{ github.job }}
+        github-cache-mode: objects
+        cache-key: ${{ steps.mbx-key.outputs.key }}
+        restore-keys: ${{ steps.mbx-key.outputs.prefix }}

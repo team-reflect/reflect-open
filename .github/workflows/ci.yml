@@ -207,6 +207,9 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-scope: test-rust
+          cache-save: 'false'
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:chromium
@@ -240,6 +243,9 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-scope: test-rust
+          cache-save: 'false'
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:webkit
