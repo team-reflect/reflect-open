@@ -22,12 +22,20 @@ import { compareTaskPaths, isSameTaskPath } from './task-path.ts'
 import { getRoundTasks, toTaskSnapshot, type TaskEntry } from './task-project.ts'
 
 export type InsertPosition =
-  /** The end of the task's context: its parent list item, or at the root the end of its own list. */
+  /**
+   * The end of the task's context: its parent list item, or at the root the end
+   * of its own list.
+   */
   | { kind: 'contextEnd'; task: TaskLocator }
-  /** The end of the first `+` list in the top-level `## Tasks` section, created after the note's last content when missing. */
+  /**
+   * The end of the first `+` list in the top-level `## Tasks` section, created
+   * after the note's last content when missing.
+   */
   | { kind: 'tasksSection' }
 
-/** An edit of one existing round task. */
+/**
+ * An edit of one existing round task.
+ */
 export type TaskEditItem =
   | { kind: 'toggle'; task: TaskLocator }
   | { kind: 'setMarkdown'; task: TaskLocator; markdown: string }
@@ -38,15 +46,22 @@ export interface TaskEditInsert {
   kind: 'insert'
   at: InsertPosition
   markdown: string
-  /** The new task is written checked. */
+  /**
+   * The new task is written checked.
+   */
   checked?: boolean | undefined
-  /** The text is written as a plain bullet, which `inserted` leaves out. */
+  /**
+   * The text is written as a plain bullet, which `inserted` leaves out.
+   */
   bullet?: boolean | undefined
 }
 
 export type TaskEdit = TaskEditItem | TaskEditInsert
 
-/** One pre-edit round task and where the edit left it: null once removed or no longer a task. */
+/**
+ * One pre-edit round task and where the edit left it: null once removed or no
+ * longer a task.
+ */
 export interface TaskMove {
   from: TaskSnapshot
   to: TaskSnapshot | null
@@ -54,13 +69,21 @@ export interface TaskMove {
 
 export interface TaskEditResult {
   source: string
-  /** The hash of the source the edits were applied to, when the caller knew it. */
+  /**
+   * The hash of the source the edits were applied to, when the caller knew it.
+   */
   baseRevision: string | null
-  /** Every pre-edit round task, in document order. */
+  /**
+   * Every pre-edit round task, in document order.
+   */
   moved: readonly TaskMove[]
-  /** The inserted tasks, in edit order. */
+  /**
+   * The inserted tasks, in edit order.
+   */
   inserted: readonly TaskSnapshot[]
-  /** The round tasks of the new source, in document order. */
+  /**
+   * The round tasks of the new source, in document order.
+   */
   tasks: readonly TaskSnapshot[]
 }
 
@@ -256,7 +279,9 @@ function setFirstParagraph(item: MarkdownListItem, markdown: string): void {
   }
 }
 
-/** The written bytes must read back with the same tasks at the same paths. */
+/**
+ * The written bytes must read back with the same tasks at the same paths.
+ */
 function assertTasksSurvive(body: string, expected: readonly TaskEntry[]): void {
   const actual = getRoundTasks(parseMarkdownAst(body))
   const survives =

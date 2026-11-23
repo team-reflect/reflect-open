@@ -13,8 +13,7 @@ import { noop } from '@ocavue/utils'
 /**
  * The single safe way to read and write a note from an in-app action (pin,
  * private, gist publish): the open session when there is one, otherwise the
- * disk. Each action used to hand-roll the same session-or-disk dance; the two
- * sharp edges live here once:
+ * disk. It handles two sharp edges:
  *
  * - **Reads** prefer the open session's *loaded* buffer, never a still-loading
  *   one. A loading session reports `liveContent() === null` (its empty buffer

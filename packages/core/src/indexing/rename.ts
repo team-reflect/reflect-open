@@ -22,7 +22,10 @@ export interface RenameIo {
   sources: (targetKey: string) => MaybePromise<string[]>
   /** Links that currently resolve to the renamed note's subject path. */
   backlinks: (path: string) => MaybePromise<RenameBacklink[]>
-  /** Replace the text of the note at `path` with what `transform` returns for it. */
+  /**
+   * Replace the text of the note at `path` with what `transform` returns for
+   * it.
+   */
   edit: (path: string, transform: (content: string) => string) => MaybePromise<void>
   resolve: (target: string) => MaybePromise<Resolution>
 }
@@ -237,7 +240,10 @@ function aliasFamily(title: string): string[] {
 export interface PathLinkRewriteIo {
   /** Distinct source paths of links whose folded target path key matches. */
   pathLinkSources: (targetPathKey: string) => MaybePromise<string[]>
-  /** Replace the text of the note at `path` with what `transform` returns for it. */
+  /**
+   * Replace the text of the note at `path` with what `transform` returns for
+   * it.
+   */
   edit: (path: string, transform: (content: string) => string) => MaybePromise<void>
 }
 

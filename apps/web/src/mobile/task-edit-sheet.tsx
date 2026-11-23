@@ -30,11 +30,15 @@ interface MobileTaskEditSheetProps {
   /** The task being edited. Remount (key by task) to reseed the draft. */
   task: OpenTask
   open: boolean
-  /** Close the sheet. A user dismissal saves the typed text first (V1 mobile). */
+  /**
+   * Close the sheet. A user dismissal saves the typed text first (V1 mobile).
+   */
   onOpenChange: (open: boolean) => void
   /** Today's live ISO date, for the schedule shortcuts. */
   today: string
-  /** Navigate to the task's source note (the sheet saves the typed text first). */
+  /**
+   * Navigate to the task's source note (the sheet saves the typed text first).
+   */
   onOpenNote: (notePath: string) => void
   /**
    * Focus the editor (raising the keyboard) as soon as the sheet opens — the

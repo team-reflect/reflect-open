@@ -21,7 +21,9 @@ import type {
 } from './note-session-types.ts'
 import { createTitleRenameTracker, type TitleRename } from './title-rename-tracker.ts'
 
-/** The locator of the `index`th task as the index records it. */
+/**
+ * The locator of the `index`th task as the index records it.
+ */
 function taskAt(source: string, index: number): TaskLocator {
   const task = projectTasks(splitFrontmatter(source).body)[index]
   return {

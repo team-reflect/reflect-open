@@ -28,7 +28,9 @@ export function isBlockParent(node: MarkdownNode): node is BlockParent {
   )
 }
 
-/** A Reflect task: a round (`+`) checkbox item, wherever it sits in the body. */
+/**
+ * A Reflect task: a round (`+`) checkbox item, wherever it sits in the body.
+ */
 export function isRoundTask(node: MarkdownNode): node is MarkdownListItem {
   return node.type === 'listItem' && node.kind === 'task' && node.marker === '+'
 }
@@ -46,17 +48,24 @@ export function getFirstParagraphMarkdown(item: MarkdownListItem): string {
 export interface TaskEntry extends TaskSnapshot {
   node: MarkdownListItem
   parent: BlockParent
-  /** The item's index in `parent.children`, valid until the tree is edited. */
+  /**
+   * The item's index in `parent.children`, valid until the tree is edited.
+   */
   index: number
 }
 
-/** One heading a document-level block sits under. */
+/**
+ * One heading a document-level block sits under.
+ */
 interface Section {
   level: number
   label: string
 }
 
-/** The labels of the open sections, outermost first; an empty heading labels nothing. */
+/**
+ * The labels of the open sections, outermost first; an empty heading labels
+ * nothing.
+ */
 function sectionLabels(sections: readonly Section[]): string[] {
   return sections.map((section) => section.label).filter((label) => label !== '')
 }
@@ -95,7 +104,9 @@ export function getRoundTasks(document: MarkdownDocument): TaskEntry[] {
   return entries
 }
 
-/** The first calendar-valid `[[YYYY-MM-DD]]` link in a task's Markdown, or null. */
+/**
+ * The first calendar-valid `[[YYYY-MM-DD]]` link in a task's Markdown, or null.
+ */
 export function getTaskDueDate(markdown: string): string | null {
   for (const link of scanInlineWikiLinks(markdown)) {
     const { date } = normalizeWikiTarget(link.target)
@@ -106,7 +117,9 @@ export function getTaskDueDate(markdown: string): string | null {
   return null
 }
 
-/** The round tasks of a note body, in document order. */
+/**
+ * The round tasks of a note body, in document order.
+ */
 export function projectTasks(body: string): ParsedTask[] {
   return getRoundTasks(parseMarkdownAst(body)).map((entry) => ({
     ...toTaskSnapshot(entry),
@@ -114,19 +127,28 @@ export function projectTasks(body: string): ParsedTask[] {
   }))
 }
 
-/** A task row's own fields: its snapshot plus what the view derives from the Markdown. */
+/**
+ * A task row's own fields: its snapshot plus what the view derives from the
+ * Markdown.
+ */
 export interface TaskRow extends TaskSnapshot {
-  /** `markdown` rendered to plain text, for search and labels. */
+  /**
+   * `markdown` rendered to plain text, for search and labels.
+   */
   text: string
-  /** The headings above the task, then its ancestor list items' labels, outermost first, rendered to plain text. */
+  /**
+   * The headings above the task, then its ancestor list items' labels,
+   * outermost first, rendered to plain text.
+   */
   breadcrumbs: readonly string[]
-  /** The task's explicit `[[YYYY-MM-DD]]` due date, or null. */
+  /**
+   * The task's explicit `[[YYYY-MM-DD]]` due date, or null.
+   */
   dueDate: string | null
 }
 
 /**
- * Derive a row's display fields from a task snapshot: the one rendering the
- * index read, an optimistic insert, and a cache relocation all share.
+ * The row of a task snapshot: the snapshot with its display fields.
  */
 export function renderTaskSnapshot(snapshot: TaskSnapshot): TaskRow {
   return {

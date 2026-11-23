@@ -1,6 +1,9 @@
 import type { MarkdownAstPath } from '@meowdown/markdown'
 
-/** A task's stored address: its child indexes from the note body's AST root, as a JSON array. */
+/**
+ * A task's stored address: its child indexes from the note body's AST root, as
+ * a JSON array.
+ */
 export function encodeTaskPath(astPath: MarkdownAstPath): string {
   return JSON.stringify(astPath)
 }
@@ -9,7 +12,10 @@ export function isSameTaskPath(left: MarkdownAstPath, right: MarkdownAstPath): b
   return left.length === right.length && left.every((index, i) => index === right[i])
 }
 
-/** Orders paths as the document does: by the first differing index, with an ancestor before its descendants. */
+/**
+ * Orders paths as the document does: by the first differing index, with an
+ * ancestor before its descendants.
+ */
 export function compareTaskPaths(left: MarkdownAstPath, right: MarkdownAstPath): number {
   const shared = Math.min(left.length, right.length)
   for (let i = 0; i < shared; i++) {

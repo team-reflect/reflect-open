@@ -1,8 +1,7 @@
 import type { OpenTask } from './open-task.ts'
 
 /**
- * The note a new task is added to (Return-to-add, V1): its path plus the context
- * the optimistic row needs to render and bucket before the reindex.
+ * The note a new task joins: its path and the note fields a task row carries.
  */
 export type InsertTaskTarget = Pick<
   OpenTask,
