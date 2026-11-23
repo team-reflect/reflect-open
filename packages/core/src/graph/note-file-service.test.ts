@@ -58,6 +58,7 @@ describe('createNoteFileService', () => {
           generation: 7,
           checkContents: null,
           expectedContents: null,
+          rejectMismatch: null,
         },
       },
     ])
@@ -95,6 +96,7 @@ describe('createNoteFileService', () => {
       generation: 7,
       checkContents: true,
       expectedContents: null,
+      rejectMismatch: null,
     })
     expect(fileChanges.ownWrites()).toEqual([])
   })

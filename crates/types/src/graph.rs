@@ -58,7 +58,9 @@ pub struct NoteWriteOutcome {
     /// The note's on-disk mtime (epoch ms) after the call.
     pub modified_ms: Option<u64>,
     /// The full note text now on disk, when the note had moved past the
-    /// expected revision and the file holds something other than `contents`.
+    /// expected revision and the file holds something other than `contents`:
+    /// the merge of both, or the file's own text when the write rejects a
+    /// mismatch.
     pub merged: Option<String>,
     /// Lowercase hex SHA-256 of the note text now on disk, read with `\n`
     /// line endings.

@@ -114,6 +114,7 @@ class NoteFileServiceImpl implements NoteFileService {
       generation,
       checkContents: expectedContents === undefined ? null : true,
       expectedContents: expectedContents ?? null,
+      rejectMismatch: null,
     })
     const modifiedMs = outcome.modifiedMs ?? clock.now()
     fileChanges.reportOwnWrite([{ path, kind: 'upsert', modifiedMs }])

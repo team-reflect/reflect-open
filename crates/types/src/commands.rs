@@ -79,7 +79,7 @@ macro_rules! commands {
                 graph_delete(generation: u64) -> (),
                 note_read(path: String, generation: Option<u64>).await -> String,
                 note_read_local(path: String, generation: Option<u64>).await -> LocalNoteRead,
-                note_write(path: String, contents: String, generation: u64, check_contents: Option<bool>, expected_contents: Option<String>) -> NoteWriteOutcome,
+                note_write(path: String, contents: String, generation: u64, check_contents: Option<bool>, expected_contents: Option<String>, reject_mismatch: Option<bool>) -> NoteWriteOutcome,
                 note_create(path: String, contents: String, generation: u64) -> NoteCreateOutcome,
                 note_exists(path: String) -> bool,
                 note_delete(path: String, generation: u64) -> (),

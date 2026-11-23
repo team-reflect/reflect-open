@@ -204,7 +204,8 @@ impl Core {
     /// `expected_contents` is compared with the note as [`Core::note_read`]
     /// returns it, with `\n` line endings. When it matches, `contents` is
     /// written as given; when the file moved past it, the outcome's `merged`
-    /// holds the text the file holds now (see [`write_note_revision`]).
+    /// holds the text the file holds now (see [`write_note_revision`]). With
+    /// `reject_mismatch` a moved file is left as it is.
     pub fn note_write(
         &self,
         path: String,
@@ -212,6 +213,7 @@ impl Core {
         generation: u64,
         check_contents: Option<bool>,
         expected_contents: Option<String>,
+        reject_mismatch: Option<bool>,
     ) -> AppResult<NoteWriteOutcome> {
         let root = root_for_generation(&self.graph, generation)?;
         let outcome = write_note_revision(
@@ -220,6 +222,7 @@ impl Core {
             &contents,
             check_contents == Some(true),
             expected_contents.as_deref(),
+            reject_mismatch == Some(true),
             || root_for_generation(&self.graph, generation).map(drop),
         )?;
         invalidate_file_catalog(&self.graph, &root);
@@ -659,6 +662,7 @@ mod graph_delete_race_tests {
                     "notes/late.md".to_string(),
                     "# Late\n".to_string(),
                     1,
+                    None,
                     None,
                     None,
                 )

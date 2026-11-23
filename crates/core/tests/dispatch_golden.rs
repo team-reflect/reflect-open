@@ -190,6 +190,19 @@ fn commands_reply_their_pinned_json() {
         json!({"merged": null, "modifiedMs": 0, "hash": LF_NOTE_HASH}),
     );
     assert_eq!(std::fs::read(&crlf_note).unwrap(), b"a\r\nb\r\n");
+    ok(
+        "note_write",
+        json!({
+            "path": "notes/crlf.md",
+            "contents": "c\n",
+            "generation": 1,
+            "checkContents": true,
+            "expectedContents": "a\n",
+            "rejectMismatch": true,
+        }),
+        json!({"merged": "a\nb\n", "modifiedMs": 0, "hash": LF_NOTE_HASH}),
+    );
+    assert_eq!(std::fs::read(&crlf_note).unwrap(), b"a\r\nb\r\n");
     std::fs::remove_file(&crlf_note).unwrap();
 
     ok(

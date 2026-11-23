@@ -138,13 +138,17 @@ pub fn ensure_readable_attachment_path(path: &str) -> AppResult<()> {
 }
 
 /// A checked write whose file moved past `expected` merges through the
-/// conflict ladder. `still_current` runs under the graph lock before any write.
+/// conflict ladder, or with `reject_mismatch` writes nothing and reports the
+/// file's text as `merged`. With `reject_mismatch` a file that exists where
+/// none is expected is reported the same way. `still_current` runs under the graph lock before
+/// any write.
 pub fn write_note_revision(
     root: &Path,
     path: &str,
     contents: &str,
     checked: bool,
     expected: Option<&str>,
+    reject_mismatch: bool,
     still_current: impl FnOnce() -> AppResult<()>,
 ) -> AppResult<NoteWriteOutcome> {
     with_graph_lock(root, || {
@@ -156,10 +160,24 @@ pub fn write_note_revision(
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
                 Err(error) => return Err(error.into()),
             };
+            let moved = |text: String| MovedNote {
+                modified_ms: fs::metadata(&target).ok().as_ref().and_then(modified_ms),
+                text,
+            };
             match (expected, current) {
                 (None, None) => {}
+                (None, Some(current)) if reject_mismatch => {
+                    return Ok(moved(current).rejected());
+                }
                 (Some(base), Some(current)) if current != base => {
-                    return merge_into_moved_note(root, path, &target, contents, base, current);
+                    let moved = moved(current);
+                    if moved.text == contents {
+                        return Ok(moved.kept(None));
+                    }
+                    if reject_mismatch {
+                        return Ok(moved.rejected());
+                    }
+                    return merge_into_moved_note(root, path, &target, contents, base, moved);
                 }
                 (Some(_), Some(_)) => {}
                 _ => return Err(AppError::io("Note changed on disk; reload before retrying")),
@@ -186,27 +204,40 @@ fn write_own(root: &Path, rel: &str, target: &Path, contents: &str) -> AppResult
     })
 }
 
+/// A note file whose text moved past the revision a checked write expected.
+struct MovedNote {
+    text: String,
+    modified_ms: Option<u64>,
+}
+
+impl MovedNote {
+    /// The outcome of a write that left the file as it is.
+    fn kept(&self, merged: Option<String>) -> NoteWriteOutcome {
+        NoteWriteOutcome {
+            modified_ms: self.modified_ms,
+            merged,
+            hash: note_hash(&self.text),
+        }
+    }
+
+    /// The outcome of a write that rejected the mismatch.
+    fn rejected(&self) -> NoteWriteOutcome {
+        self.kept(Some(self.text.clone()))
+    }
+}
+
 fn merge_into_moved_note(
     root: &Path,
     rel: &str,
     target: &Path,
     contents: &str,
     base: &str,
-    current: String,
+    moved: MovedNote,
 ) -> AppResult<NoteWriteOutcome> {
     use crate::conflict::ladder::{self, ConflictInput};
     use crate::conflict::{ConflictSide, Resolution};
 
-    let disk_ms = fs::metadata(target).ok().as_ref().and_then(modified_ms);
-    let unchanged = |merged: Option<String>| NoteWriteOutcome {
-        modified_ms: disk_ms,
-        merged,
-        hash: note_hash(&current),
-    };
-    if current == contents {
-        return Ok(unchanged(None));
-    }
-    let disk_ms_value = disk_ms.unwrap_or(0);
+    let disk_ms_value = moved.modified_ms.unwrap_or(0);
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_millis() as u64)
@@ -219,18 +250,18 @@ fn merge_into_moved_note(
                 modified_ms: now_ms,
             },
             ConflictSide {
-                content: current.clone(),
+                content: moved.text.clone(),
                 modified_ms: disk_ms_value,
             },
         ),
         merge_loop_detected: false,
     })?;
     let content = match resolution {
-        Resolution::AlreadyResolved => return Ok(unchanged(None)),
+        Resolution::AlreadyResolved => return Ok(moved.kept(None)),
         Resolution::Merged { content } | Resolution::Reconciled { content } => content,
     };
-    if content == current {
-        return Ok(unchanged(Some(content)));
+    if content == moved.text {
+        return Ok(moved.kept(Some(content)));
     }
     let written = write_own(root, rel, target, &content)?;
     Ok(NoteWriteOutcome {
@@ -673,7 +704,16 @@ mod note_revision_tests {
             let _: AppResult<()> = with_graph_lock(&root, || panic!("simulated writer panic"));
         });
         let target = directory.path().join("note.md");
-        write_note_revision(directory.path(), "note.md", "saved", true, None, || Ok(())).unwrap();
+        write_note_revision(
+            directory.path(),
+            "note.md",
+            "saved",
+            true,
+            None,
+            false,
+            || Ok(()),
+        )
+        .unwrap();
         assert_eq!(fs::read_to_string(target).unwrap(), "saved");
     }
 
@@ -688,6 +728,7 @@ mod note_revision_tests {
             "a\nb!\n",
             true,
             Some("a\nb\n"),
+            false,
             || Ok(()),
         )
         .unwrap();
@@ -707,6 +748,7 @@ mod note_revision_tests {
             "bookmark",
             true,
             Some("old text"),
+            false,
             || Ok(()),
         )
         .unwrap();
@@ -721,6 +763,7 @@ mod note_revision_tests {
             "user edited this\nbookmark",
             true,
             Some(&fs::read_to_string(&target).unwrap()),
+            false,
             || Ok(()),
         )
         .unwrap();
@@ -741,6 +784,7 @@ mod note_revision_tests {
             "A\nb\nc\n",
             true,
             Some("a\nb\nc\n"),
+            false,
             || Ok(()),
         )
         .unwrap();
@@ -759,6 +803,43 @@ mod note_revision_tests {
     }
 
     #[test]
+    fn a_rejecting_write_against_a_moved_file_writes_nothing() {
+        let directory = tempfile::tempdir().unwrap();
+        let target = directory.path().join("note.md");
+        fs::write(&target, "a\nb\nc\nd\n").unwrap();
+        let outcome = write_note_revision(
+            directory.path(),
+            "note.md",
+            "A\nb\nc\n",
+            true,
+            Some("a\nb\nc\n"),
+            true,
+            || Ok(()),
+        )
+        .unwrap();
+        assert_eq!(
+            outcome,
+            NoteWriteOutcome {
+                modified_ms: fs::metadata(&target).ok().as_ref().and_then(modified_ms),
+                merged: Some("a\nb\nc\nd\n".to_string()),
+                hash: note_hash("a\nb\nc\nd\n"),
+            }
+        );
+        assert_eq!(fs::read_to_string(&target).unwrap(), "a\nb\nc\nd\n");
+        assert!(!own_writes::is_own(
+            directory.path(),
+            "note.md",
+            b"a\nb\nc\nd\n"
+        ));
+        let unexpected =
+            write_note_revision(directory.path(), "note.md", "new", true, None, true, || {
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(unexpected, outcome);
+    }
+
+    #[test]
     fn a_disk_file_with_marker_text_merges_as_plain_text() {
         let directory = tempfile::tempdir().unwrap();
         let root = directory.path();
@@ -769,7 +850,7 @@ mod note_revision_tests {
         fs::write(&target, disk).unwrap();
         let mine = "INTRO\n\nmiddle\n\noutro\n";
         let outcome =
-            write_note_revision(root, "note.md", mine, true, Some(base), || Ok(())).unwrap();
+            write_note_revision(root, "note.md", mine, true, Some(base), false, || Ok(())).unwrap();
         let merged = outcome.merged.unwrap();
         assert!(merged.starts_with("INTRO\n"), "{merged}");
         assert!(
@@ -791,6 +872,7 @@ mod note_revision_tests {
             "a\nb\n",
             true,
             Some("a\n"),
+            false,
             || Ok(()),
         )
         .unwrap();
@@ -822,7 +904,16 @@ mod note_revision_tests {
     fn missing_revision_never_clobbers_an_existing_daily() {
         let directory = tempfile::tempdir().unwrap();
         let target = directory.path().join("daily.md");
-        write_note_revision(directory.path(), "daily.md", "first", true, None, || Ok(())).unwrap();
+        write_note_revision(
+            directory.path(),
+            "daily.md",
+            "first",
+            true,
+            None,
+            false,
+            || Ok(()),
+        )
+        .unwrap();
         assert!(
             write_note_revision(
                 directory.path(),
@@ -830,6 +921,7 @@ mod note_revision_tests {
                 "second",
                 true,
                 None,
+                false,
                 || Ok(())
             )
             .is_err()
@@ -880,9 +972,15 @@ mod graph_delete_race_tests {
             });
             locked_rx.recv().unwrap();
             let writer = scope.spawn(move || {
-                write_note_revision(root, "notes/late.md", "# Late\n", false, None, || {
-                    root_for_generation(graph, 1).map(drop)
-                })
+                write_note_revision(
+                    root,
+                    "notes/late.md",
+                    "# Late\n",
+                    false,
+                    None,
+                    false,
+                    || root_for_generation(graph, 1).map(drop),
+                )
             });
             let deadline = Instant::now() + Duration::from_secs(10);
             while graph_lock::holders(root) < 2 {
