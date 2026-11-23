@@ -117,8 +117,9 @@ export interface IndexLifecycleService {
   /**
    * Background-sync the open index of `session`: sync the whole graph
    * (hash reconcile, or a full rebuild when the stored projection version is
-   * stale), then subscribe to live file changes, then start the Rust watcher,
-   * sequenced so the passes never write concurrently. The pass bails between
+   * stale), then subscribe to live file changes, then start the Rust watcher.
+   * The pass marks files dirty and the index writer of the session writes
+   * them, so index writes never run concurrently. The pass bails between
    * steps once `session.signal` aborts; a session without an index runs none.
    * Call only after the graph row is committed.
    */
@@ -189,8 +190,8 @@ export interface IndexLifecycleService {
   /**
    * Listen for whole-graph passes that ran to completion. A sync pass reports
    * right after its {@link IndexLifecycleService.onApplied}; one that was
-   * aborted, superseded, or suspended never reports. The pass reads changed
-   * files straight into the index but emits no per-file change events, so
+   * aborted, superseded, or suspended never reports. The pass has the index
+   * writer read the changed files but emits no per-file change events, so
    * holders of in-memory file content (open note sessions) must be told to
    * re-read here; on iOS the resume reconcile is the only signal a remote edit
    * ever produces for an already-open note.
@@ -239,8 +240,9 @@ export interface IndexLifecycleService {
    * projection from the markdown files, then report
    * {@link IndexLifecycleService.onReconciled} with `source: 'rebuild'`. The
    * index is a rebuildable cache: a full rebuild is always safe and never
-   * touches the notes themselves. A failed rebuild fails its operation and
-   * resolves without reporting.
+   * touches the notes themselves. A rebuild that failed, or that the index
+   * suspension interrupted, fails its operation and resolves without
+   * reporting.
    *
    * The rebuild is pinned to the index generation of the open graph, and does
    * nothing when no graph is open or its index failed to open. Requests
@@ -361,6 +363,20 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     if (generation === null || this.#isSuspended()) {
       return
     }
+    const writer = this.#writerAt(generation, fileGeneration)
+    if (writer === null) {
+      return
+    }
+    if (session.signal.aborted) {
+      writer.dispose()
+    }
+    session.signal.addEventListener(
+      'abort',
+      () => {
+        writer.dispose()
+      },
+      { once: true },
+    )
 
     this.#emitProgress('reconciling')
     const controller = new AbortController()
@@ -379,13 +395,9 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
         if (this.#isSuspended()) {
           return
         }
-        await this.#indexer.sync({
-          generation,
-          fileGeneration,
+        const completed = await this.#indexer.sync({
+          writer,
           signal: controller.signal,
-          onMoved: (from, to) => {
-            this.#emitMoved(from, to)
-          },
           // Guarded: opening a graph swaps the Rust root *before* this pass is
           // stopped, so a superseded pass could otherwise request its old
           // paths against the newly opened graph.
@@ -407,6 +419,9 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
         // Superseded passes (aborted, stale under a newer open, or suspended
         // mid-flight) resolve early with partial counters — logging them as
         // "finished" would misread as a fast healthy pass.
+        if (!completed) {
+          return
+        }
         if (!controller.signal.aborted && !isStale() && !this.#isSuspended()) {
           logger.info(
             `index: pass finished in ${Math.round(clock.monotonicNow() - passStarted)}ms — read ${passWorked} of ${passTotal} files`,
@@ -426,17 +441,6 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
         for (const listener of this.#reconciledListeners) {
           void listener({ generation, fileGeneration, source: 'sync' })
         }
-        const writer = this.#writerAt(generation, fileGeneration)
-        if (writer === null) {
-          return
-        }
-        session.signal.addEventListener(
-          'abort',
-          () => {
-            writer.dispose()
-          },
-          { once: true },
-        )
         pending = followFileChanges(fileChanges, writer.dirty)
         if (controller.signal.aborted || isStale() || this.#isSuspended()) {
           return
@@ -720,12 +724,15 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
 
   async #runRebuild(generation: number, fileGeneration: number): Promise<void> {
     const { progress, logger } = this.#deps
+    const writer = this.#writerAt(generation, fileGeneration)
+    if (writer === null) {
+      return
+    }
     const operation = progress.start('Rebuilding search index')
     const skippedNotes: string[] = []
     try {
-      await this.#indexer.rebuild({
-        generation,
-        fileGeneration,
+      const completed = await this.#indexer.rebuild({
+        writer,
         onSkippedNote: (note) => {
           // The status toast lingers only briefly and samples the first few, so
           // log every skip in full — this is the durable record of which notes
@@ -734,6 +741,10 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
           skippedNotes.push(`${note.path}: ${note.message}`)
         },
       })
+      if (!completed) {
+        operation.fail('The rebuild was interrupted.')
+        return
+      }
       if (skippedNotes.length === 0) {
         operation.done()
       } else {

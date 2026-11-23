@@ -691,7 +691,8 @@ describe('createIndexLifecycleService', () => {
 
 describe('file progress', () => {
   /**
-   * 32 changed candidates: the reconcile reports at file 16 and at the end.
+   * 32 changed candidates: the reconcile reports at file 16 and at the end,
+   * once the index writer wrote them.
    */
   function setupLargePass(onRead?: () => void) {
     const paths = Array.from({ length: 32 }, (_, position) => `notes/n${position}.md`)
@@ -728,20 +729,19 @@ describe('file progress', () => {
     await index.settled()
 
     expect(fileProgress).toEqual([
-      { done: 16, total: 32, worked: 15 },
-      { done: 32, total: 32, worked: 31 },
+      { done: 16, total: 32, worked: 16 },
       { done: 32, total: 32, worked: 32 },
       null, // the pass went live: the pill clears
     ])
     expect(atLive).toEqual([null])
     index.suspend()
-    expect(fileProgress).toHaveLength(4) // already clear: no notification
+    expect(fileProgress).toHaveLength(3) // already clear: no notification
   })
 
-  it('stops reporting file progress once the pass is superseded', async () => {
+  it('stops writing and reporting file progress once the pass is superseded', async () => {
     let reads = 0
     const opened = new AbortController()
-    const { index, fileProgress } = setupLargePass(() => {
+    const { index, store, fileProgress } = setupLargePass(() => {
       reads += 1
       if (reads === 20) {
         opened.abort() // a superseded pass must go quiet
@@ -750,7 +750,9 @@ describe('file progress', () => {
     index.sync(sessionAt(5, opened.signal))
     await index.settled()
 
-    expect(fileProgress).toEqual([{ done: 16, total: 32, worked: 15 }])
+    expect(reads).toBe(20)
+    expect(store.applied()).toEqual([])
+    expect(fileProgress).toEqual([])
   })
 
   it('a test lifecycle seeds file progress for its subscribers', () => {
@@ -810,6 +812,7 @@ describe('rebuildVisibly', () => {
     const second = index.rebuildVisibly()
 
     expect(second).toBe(first)
+    await vi.waitFor(() => expect(held.settles).toHaveLength(1))
     expect(clears(steps)).toBe(1)
 
     held.settles[0]!()
@@ -925,6 +928,24 @@ describe('rebuildVisibly', () => {
     expect(reconciled).toEqual([
       { generation: 7, fileGeneration: FILE_GENERATION, source: 'rebuild' },
     ])
+  })
+
+  it('fails the operation when the index is suspended during the rebuild', async () => {
+    const context = setup({
+      files: { 'notes/a.md': '# A' },
+      onRead: () => {
+        context.index.suspend()
+      },
+    })
+    const { index, store, operations, reconciled } = context
+
+    await index.rebuildVisibly()
+
+    expect(store.calls().map((call) => call.method)).toEqual(['clear'])
+    expect(operations.snapshot()).toMatchObject([
+      { status: 'failed', message: 'The rebuild was interrupted.' },
+    ])
+    expect(reconciled).toEqual([])
   })
 
   it('a test lifecycle records the requested generations', async () => {
