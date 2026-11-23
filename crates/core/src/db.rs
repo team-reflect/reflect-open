@@ -3,8 +3,9 @@
 //!
 //! The session owns the connections, the generation gate and every
 //! transaction. This module adds the iOS background assertion a write holds
-//! before it takes the SQLite lock, the thread a read runs on, and the
-//! `index:written` / `note:moved` broadcasts after a committed write.
+//! before it takes the SQLite lock, the thread a read runs on, the
+//! `index:written` / `note:moved` broadcasts after a committed write, and the
+//! repair of a corrupt index file after a failed command.
 
 use std::path::PathBuf;
 use std::sync::Arc;
