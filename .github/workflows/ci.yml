@@ -300,8 +300,6 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
 
-      - uses: ./.github/actions/setup-mise
-
       - name: Pick the simulator cache key
         id: simulator
         env:
@@ -401,9 +399,6 @@ jobs:
 
       - name: Format check
         run: pnpm turbo run format:check --filter=reflect-workspace
-
-      - if: matrix.name == 'Linux'
-        uses: ./.github/actions/setup-mise
 
       # Fails on a dependency that no code uses, in a member or in the root
       # `[workspace.dependencies]`.

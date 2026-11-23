@@ -63,7 +63,16 @@ keep=(
   ACTIONS_CACHE_URL
   ACTIONS_RESULTS_URL
   ACTIONS_RUNTIME_TOKEN
+  # The Rust toolchain that mise selects.
+  RUSTUP_HOME
+  RUSTUP_TOOLCHAIN
+  CARGO_HOME
 )
+# mise's `cargo` wrapper reads MISE_* (for example the trusted config paths
+# that mise-action sets), and mbx reads its settings from MBX_*.
+while IFS= read -r name; do
+  keep+=("$name")
+done < <(compgen -e | grep -E '^(MISE|MBX)_' || true)
 env_args=()
 for name in "${keep[@]}"; do
   if [ -n "${!name:-}" ]; then

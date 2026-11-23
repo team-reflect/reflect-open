@@ -1,13 +1,9 @@
 name: Set up Rust
-description: Installs the Rust toolchain and the cargo build cache.
+description: Installs mise, the tools in `mise.toml` (Rust and mbx included), and the mbx build cache.
 
 inputs:
   cache:
-    description: Whether to restore and save the cache.
-    required: false
-    default: 'true'
-  cache-targets:
-    description: Whether to cache the target directory.
+    description: Whether to restore and save the caches.
     required: false
     default: 'true'
 
@@ -26,10 +22,13 @@ runs:
         # https://github.com/actions/toolkit/blob/0c3a9c332b678ff1e776f93d728a4ad279803abe/packages/cache/src/internal/tar.ts#L239
         echo "ZSTD_CLEVEL=10" >> "$GITHUB_ENV"
 
-    # we use mise to install rust so we do not need this anymore. FIXME
-    - name: Install Rust toolchain
-      shell: bash
-      run: rustup toolchain install --no-self-update
+    # Installs the Rust toolchain through rustup, mbx and the other tools, and
+    # puts mise's `cargo` wrapper first on PATH, so `cargo` runs through mbx.
+    - name: Install mise and tools
+      uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      with:
+        version: 2026.11.5
+        cache: ${{ inputs.cache }}
 
     - name: Print rustc version
       shell: bash
@@ -53,10 +52,11 @@ runs:
         path: ${{ env.ORT_CACHE_DIR }}
         key: ort-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
 
-    # Delete Swatinem/rust-cache , use mbx FIXME
-    - name: Cache cargo registry
-      if: inputs.cache == 'true'
-      uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+    # Uses the mbx that mise installed. The `github` backend restores and saves
+    # `target/` and the cargo registry and git downloads; only a successful push
+    # to master saves. https://mr-boxington.jdx.dev/github-action
+    - name: Set up mbx
+      uses: jdx/mr-boxington-action@b3ef673bd77c5426927fe8836c6185cdae04c2dd # v1.7.4
       with:
-        cache-targets: ${{ inputs.cache-targets }}
-        save-if: ${{ github.ref == 'refs/heads/master' }}
+        backend: ${{ inputs.cache == 'true' && 'github' || 'local' }}
+        cache-key-suffix: ${{ github.job }}

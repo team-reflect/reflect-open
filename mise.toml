@@ -1,5 +1,8 @@
 [tools]
-rust = { version = "1.100.0", mr_boxington = true } # keep sync with rust-toolchain.toml
+# Keep in sync with rust-toolchain.toml. mise sets RUSTUP_TOOLCHAIN, which
+# rustup ranks above rust-toolchain.toml, so the components and targets come
+# from here. `mr_boxington` runs cargo through mbx.
+rust = { version = "1.100.0", profile = "minimal", components = ["clippy", "rustfmt", "llvm-tools"], targets = ["aarch64-apple-ios", "aarch64-apple-ios-sim", "wasm32-unknown-unknown"], mr_boxington = true }
 mr-boxington = "1.30.0"
 "github:Boshen/cargo-shear" = "1.14.0"
 "github:EmbarkStudios/cargo-about" = "0.9.3"
