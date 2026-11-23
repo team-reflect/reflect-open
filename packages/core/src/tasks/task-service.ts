@@ -374,8 +374,8 @@ function isReopenedAfter(struck: OpenTask, live: OpenTask): boolean {
 }
 
 function toOpenTasks(notes: readonly NoteTasks[]): OpenTask[] {
-  return notes.flatMap((note) =>
-    note.tasks.map((task) => ({
+  return notes.flatMap((note) => {
+    return note.tasks.map((task) => ({
       notePath: note.path,
       noteTitle: note.title,
       dailyDate: note.dailyDate,
@@ -383,8 +383,8 @@ function toOpenTasks(notes: readonly NoteTasks[]): OpenTask[] {
       pinnedOrder: note.pinnedOrder,
       updatedAt: note.updatedAt,
       ...renderTaskSnapshot(task),
-    })),
-  )
+    }))
+  })
 }
 
 /**
