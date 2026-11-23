@@ -72,7 +72,9 @@ describe('note commit', () => {
     const read = await harness.database.read('index_tasks', { checked: false })
     expect(indexSeq).not.toBeNull()
     expect(read.seq).toBeGreaterThanOrEqual(indexSeq!)
-    expect(read.rows.map((row) => [row.markdown, row.noteHash])).toEqual([['two', revision]])
+    expect(read.notes.map((note) => [note.hash, note.tasks.map((task) => task.markdown)])).toEqual([
+      [revision, ['two']],
+    ])
   })
 })
 

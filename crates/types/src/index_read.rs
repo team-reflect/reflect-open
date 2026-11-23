@@ -153,12 +153,11 @@ pub struct VisitedNote {
     pub title: String,
 }
 
-/// One task row with the fields of its note that the task list shows.
+/// One task of a note.
 #[derive(Debug, PartialEq, Serialize)]
 #[cfg_attr(feature = "codegen", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct TaskRow {
-    pub note_path: String,
     /// The address of the task: the child indexes from the root of the note's
     /// Markdown tree down to the task's list item.
     pub ast_path: Vec<u32>,
@@ -167,26 +166,37 @@ pub struct TaskRow {
     /// items, outermost first, as Markdown.
     pub breadcrumbs: Vec<String>,
     pub checked: bool,
-    pub note_title: String,
+}
+
+/// One note with the tasks that a read selected from it.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct NoteTasks {
+    pub path: String,
+    /// Lowercase hex SHA-256 of the note text that the tasks were projected
+    /// from, read with `\n` line endings.
+    pub hash: String,
+    pub title: String,
     pub daily_date: Option<String>,
     pub is_pinned: bool,
     /// The explicit `pinned: <n>` order of the note.
     pub pinned_order: Option<f64>,
     /// When the note's row last changed (epoch ms).
     pub updated_at: i64,
-    /// Lowercase hex SHA-256 of the note text that the task was projected
-    /// from, read with `\n` line endings.
-    pub note_hash: String,
+    /// In no fixed order.
+    pub tasks: Vec<TaskRow>,
 }
 
-/// The result of one read of the task rows.
+/// The result of one read of the tasks.
 #[derive(Debug, PartialEq, Serialize)]
 #[cfg_attr(feature = "codegen", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
-pub struct TaskRows {
-    /// The commit sequence of the index state that `rows` was read from.
+pub struct TaskRead {
+    /// The commit sequence of the index state that `notes` was read from.
     pub seq: u64,
-    pub rows: Vec<TaskRow>,
+    /// The notes with a selected task, by path.
+    pub notes: Vec<NoteTasks>,
 }
 
 /// The notes that claim a wiki key in its strongest tier.

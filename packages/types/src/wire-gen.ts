@@ -1173,7 +1173,7 @@ export type Commands = {
     args: {
       checked: boolean
     }
-    result: TaskRows
+    result: TaskRead
   }
   index_resolve_wiki: {
     args: {
@@ -2160,6 +2160,25 @@ export type NoteRow = {
   gistStale: boolean
 }
 
+/**  One note with the tasks that a read selected from it. */
+export type NoteTasks = {
+  path: string
+  /**
+   *  Lowercase hex SHA-256 of the note text that the tasks were projected
+   *  from, read with `\n` line endings.
+   */
+  hash: string
+  title: string
+  dailyDate: string | null
+  isPinned: boolean
+  /**  The explicit `pinned: <n>` order of the note. */
+  pinnedOrder: number | null
+  /**  When the note's row last changed (epoch ms). */
+  updatedAt: number
+  /**  In no fixed order. */
+  tasks: TaskRow[]
+}
+
 /**  What a note write left on disk. */
 export type NoteWriteOutcome = {
   /**  The note's on-disk mtime (epoch ms) after the call. */
@@ -2577,9 +2596,16 @@ export type TagFacet = {
   count: number
 }
 
-/**  One task row with the fields of its note that the task list shows. */
+/**  The result of one read of the tasks. */
+export type TaskRead = {
+  /**  The commit sequence of the index state that `notes` was read from. */
+  seq: number
+  /**  The notes with a selected task, by path. */
+  notes: NoteTasks[]
+}
+
+/**  One task of a note. */
 export type TaskRow = {
-  notePath: string
   /**
    *  The address of the task: the child indexes from the root of the note's
    *  Markdown tree down to the task's list item.
@@ -2592,25 +2618,6 @@ export type TaskRow = {
    */
   breadcrumbs: string[]
   checked: boolean
-  noteTitle: string
-  dailyDate: string | null
-  isPinned: boolean
-  /**  The explicit `pinned: <n>` order of the note. */
-  pinnedOrder: number | null
-  /**  When the note's row last changed (epoch ms). */
-  updatedAt: number
-  /**
-   *  Lowercase hex SHA-256 of the note text that the task was projected
-   *  from, read with `\n` line endings.
-   */
-  noteHash: string
-}
-
-/**  The result of one read of the task rows. */
-export type TaskRows = {
-  /**  The commit sequence of the index state that `rows` was read from. */
-  seq: number
-  rows: TaskRow[]
 }
 
 /**  One template. */

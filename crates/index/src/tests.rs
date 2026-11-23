@@ -2657,16 +2657,42 @@ fn tasks_split_by_checked_and_skip_templates() {
     apply_note(&conn, &with_tasks).unwrap();
     apply_note(&conn, &template).unwrap();
 
-    let open = tasks(&conn, false).unwrap().rows;
+    let open = tasks(&conn, false).unwrap().notes;
     assert_eq!(open.len(), 1);
-    assert_eq!(open[0].markdown, "open one");
-    assert_eq!(open[0].ast_path, [0]);
-    assert_eq!(open[0].note_title, "A");
-    assert!(open[0].is_pinned && !open[0].checked);
-    assert_eq!(open[0].note_hash, "h");
-    let done = tasks(&conn, true).unwrap().rows;
+    assert_eq!(
+        (open[0].path.as_str(), open[0].title.as_str()),
+        ("notes/a.md", "A")
+    );
+    assert_eq!(open[0].hash, "h");
+    assert!(open[0].is_pinned);
+    assert_eq!(open[0].tasks.len(), 1);
+    assert_eq!(open[0].tasks[0].markdown, "open one");
+    assert_eq!(open[0].tasks[0].ast_path, [0]);
+    assert!(!open[0].tasks[0].checked);
+    let done = tasks(&conn, true).unwrap().notes;
     assert_eq!(done.len(), 1);
-    assert_eq!(done[0].markdown, "done one");
+    assert_eq!(done[0].tasks[0].markdown, "done one");
+}
+
+#[test]
+fn a_tasks_read_groups_the_tasks_of_each_note() {
+    let conn = migrated();
+    for path in ["notes/b.md", "notes/a.md"] {
+        let mut with_tasks = note(path, path, vec![]);
+        with_tasks.tasks = vec![task(0, "first", false), task(1, "second", false)];
+        apply_note(&conn, &with_tasks).unwrap();
+    }
+
+    let counts: Vec<(String, usize)> = tasks(&conn, false)
+        .unwrap()
+        .notes
+        .into_iter()
+        .map(|note| (note.path, note.tasks.len()))
+        .collect();
+    assert_eq!(
+        counts,
+        [("notes/a.md".to_string(), 2), ("notes/b.md".to_string(), 2)]
+    );
 }
 
 #[test]
@@ -2678,7 +2704,7 @@ fn a_tasks_read_leaves_out_a_row_with_an_unreadable_address() {
     with_tasks.tasks[1].ast_path = "[]".to_string();
     apply_note(&conn, &with_tasks).unwrap();
 
-    let open = tasks(&conn, false).unwrap().rows;
+    let open = &tasks(&conn, false).unwrap().notes[0].tasks;
     assert_eq!(open.len(), 1);
     assert_eq!(open[0].markdown, "kept");
     assert_eq!(open[0].breadcrumbs, ["Heading"]);
@@ -2689,14 +2715,14 @@ fn a_tasks_read_carries_the_commit_seq_of_its_rows() {
     let graph_dir = tempfile::tempdir().expect("tempdir");
     let (session, generation) = file_session(graph_dir.path());
     let read = || session.read(generation, |conn| tasks(conn, false)).unwrap();
-    assert_eq!((read().seq, read().rows.len()), (0, 0));
+    assert_eq!((read().seq, read().notes.len()), (0, 0));
 
     let mut with_task = note("notes/a.md", "A", vec![]);
     with_task.tasks = vec![task(0, "open one", false)];
     let applied = session.apply(generation, &[with_task]).unwrap();
 
     assert_eq!(Some(read().seq), applied.seq);
-    assert_eq!(read().rows.len(), 1);
+    assert_eq!(read().notes.len(), 1);
 }
 
 #[test]

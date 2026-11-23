@@ -1,3 +1,4 @@
+import type { NoteTasks } from '@reflect/types'
 import { isShallowEqual } from '@ocavue/utils'
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import { requireGraphSession, type GraphRole, type GraphSession } from '../graph/graph-session.ts'
@@ -372,17 +373,18 @@ function isReopenedAfter(struck: OpenTask, live: OpenTask): boolean {
   return live.updatedAt > struck.updatedAt
 }
 
-interface TaskRecord {
-  notePath: string
-  astPath: number[]
-  markdown: string
-  breadcrumbs: string[]
-  checked: boolean
-  noteTitle: string
-  dailyDate: string | null
-  isPinned: boolean
-  pinnedOrder: number | null
-  updatedAt: number
+function toOpenTasks(notes: readonly NoteTasks[]): OpenTask[] {
+  return notes.flatMap((note) =>
+    note.tasks.map((task) => ({
+      notePath: note.path,
+      noteTitle: note.title,
+      dailyDate: note.dailyDate,
+      isPinned: note.isPinned,
+      pinnedOrder: note.pinnedOrder,
+      updatedAt: note.updatedAt,
+      ...renderTaskSnapshot(task),
+    })),
+  )
 }
 
 /**
@@ -481,13 +483,13 @@ class TaskServiceImpl implements TaskService {
   }
 
   async getOpenTasks(): Promise<OpenTask[]> {
-    const { rows } = await this.#deps.database.read('index_tasks', { checked: false })
-    return this.#toTaskRows(rows).sort(compareTasksByNote)
+    const { notes } = await this.#deps.database.read('index_tasks', { checked: false })
+    return toOpenTasks(notes).sort(compareTasksByNote)
   }
 
   async getCompletedTasks(): Promise<OpenTask[]> {
-    const { rows } = await this.#deps.database.read('index_tasks', { checked: true })
-    return this.#toTaskRows(rows).sort(
+    const { notes } = await this.#deps.database.read('index_tasks', { checked: true })
+    return toOpenTasks(notes).sort(
       (left, right) => right.updatedAt - left.updatedAt || compareTasksByNote(left, right),
     )
   }
@@ -819,23 +821,6 @@ class TaskServiceImpl implements TaskService {
       // Also switches the active graph, discarding any other graph's set.
       this.#recentlyCompleted.set({ root, tasks: EMPTY })
     }
-  }
-
-  #toTaskRows(rows: readonly TaskRecord[]): OpenTask[] {
-    return rows.map((row) => ({
-      notePath: row.notePath,
-      noteTitle: row.noteTitle,
-      dailyDate: row.dailyDate,
-      isPinned: row.isPinned,
-      pinnedOrder: row.pinnedOrder,
-      updatedAt: row.updatedAt,
-      ...renderTaskSnapshot({
-        astPath: row.astPath,
-        markdown: row.markdown,
-        breadcrumbs: row.breadcrumbs,
-        checked: row.checked,
-      }),
-    }))
   }
 
   /**

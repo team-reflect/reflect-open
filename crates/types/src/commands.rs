@@ -137,7 +137,7 @@ macro_rules! commands {
                 index_list_notes(tag_key: Option<String>) -> Vec<NoteListEntry>,
                 index_recent_notes(limit: u32, tag_key: Option<String>) -> Vec<RecentNoteRow>,
                 index_note_tags() -> Vec<TagFacet>,
-                index_tasks(checked: bool) -> TaskRows,
+                index_tasks(checked: bool) -> TaskRead,
                 index_resolve_wiki(key: String) -> Option<String>,
                 index_wiki_target_match(key: String) -> Option<WikiClaimMatch>,
                 index_notes_by_path_key(path_key: String) -> Vec<String>,
