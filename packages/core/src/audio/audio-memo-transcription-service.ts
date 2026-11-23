@@ -388,7 +388,6 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
   async reconcile(input: ReconcileAudioMemosInput): Promise<ReconcileAudioMemosOutcome> {
     const {
       backlinkTarget,
-      noteFile,
       transcription,
       transcriptEnrichment,
       aiProviderConfig,
@@ -491,7 +490,7 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
             sessionTranscript,
             recordingLinks(session),
           )
-          await noteFile.write(memo.notePath, note, input.generation)
+          await this.#writeNote(memo.notePath, note, input.generation)
           await this.#ensureDailyBacklink(memo, memo.title, memosNoteTitle, input.generation)
           transcribed += 1
           continue
@@ -541,7 +540,7 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
         if (stale()) {
           return stalled()
         }
-        await noteFile.write(
+        await this.#writeNote(
           memo.notePath,
           transcriptionNote(memo, title, body, recordingLinks(session)),
           input.generation,
@@ -654,6 +653,16 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
       }
     }
     return pending
+  }
+
+  /**
+   * Make `source` the text of the note at `path`, creating the note when it is missing.
+   */
+  async #writeNote(path: string, source: string, generation: number): Promise<void> {
+    await this.#deps.noteDocuments.commitSourceEdit(path, () => source, {
+      generation,
+      createIfMissing: true,
+    })
   }
 
   /**

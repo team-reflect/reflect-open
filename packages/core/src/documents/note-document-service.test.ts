@@ -298,6 +298,18 @@ describe('commitSourceEdit', () => {
     expect(noteFile.getWrites('notes/a.md')).toEqual(['new\n'])
   })
 
+  it('keeps both texts when another writer creates the note first', async () => {
+    const { noteDocuments, noteFile, externalWrites } = setup()
+    externalWrites.push('theirs\n')
+
+    await noteDocuments.commitSourceEdit('notes/a.md', (source) => `${source}mine\n`, {
+      generation: 7,
+      createIfMissing: true,
+    })
+
+    expect(noteFile.files().get('notes/a.md')).toBe('theirs\nmine\n')
+  })
+
   it('propagates a transform error and writes nothing', async () => {
     const { noteDocuments, noteFile } = setup({ files: { 'notes/a.md': 'disk\n' } })
     const fail = (): string => {
@@ -340,13 +352,8 @@ describe('direct note file writes', () => {
     // The commit protocol and the editor session save.
     'documents/note-document-service.ts',
     'documents/note-session-service.ts',
-    // Writes of a whole note that the module creates.
+    // The description file beside an asset, which is not a note.
     'assets/asset-description-service.ts',
-    'audio/audio-memo-transcription-service.ts',
-    'capture/capture-drain-service.ts',
-    'graph/onboarding.ts',
-    // Edits of an existing note with a read and a write of their own.
-    'documents/template-service.ts',
   ]
 
   it('come only from the listed modules', () => {

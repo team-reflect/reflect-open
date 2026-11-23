@@ -244,15 +244,15 @@ class CaptureDrainServiceImpl implements CaptureDrainService {
           }
         }
 
-        await noteFile.write(
-          identity.notePath,
-          await captureNoteSource(envelope, identity, {
-            hasScreenshot,
-            status,
-            selectionHash,
-          }),
-          input.generation,
-        )
+        const captureSource = await captureNoteSource(envelope, identity, {
+          hasScreenshot,
+          status,
+          selectionHash,
+        })
+        await noteDocuments.commitSourceEdit(identity.notePath, () => captureSource, {
+          generation: input.generation,
+          createIfMissing: true,
+        })
         const freshTitle = displayTitle(envelope)
         const section: SectionTarget = { titles: [linksNoteTitle, LINKS_NOTE_TITLE], linked: true }
         await noteDocuments.commitSourceEdit(

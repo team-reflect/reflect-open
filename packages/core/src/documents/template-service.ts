@@ -144,11 +144,14 @@ class TemplateServiceImpl implements TemplateService {
   }
 
   async createTemplate(name: string): Promise<string> {
-    const { noteFile, notePath, graphSession } = this.#deps
+    const { noteDocuments, notePath, graphSession } = this.#deps
     const { generation } = requireGraphSession(graphSession)
     const title = name.trim()
     const path = await notePath.availableTemplatePath(slugForTitle(title))
-    await noteFile.write(path, upsertFrontmatter('', { title }), generation)
+    await noteDocuments.commitSourceEdit(path, () => upsertFrontmatter('', { title }), {
+      generation,
+      createIfMissing: true,
+    })
     return path
   }
 
