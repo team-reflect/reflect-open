@@ -49,13 +49,23 @@ function setMemo(patch: Partial<MobileAudioMemoSessionState>): void {
 /**
  * The result of a write that changed nothing the cache needs to re-address.
  */
-const WRITTEN: TaskWriteResult = { source: '', moved: [], inserted: [], tasks: [], updatedAt: 0 }
+const WRITTEN: TaskWriteResult = {
+  source: '',
+  baseRevision: '',
+  revision: '',
+  moved: [],
+  inserted: [],
+  tasks: [],
+  updatedAt: 0,
+}
 
 /**
  * The empty task `insertTask` writes at the top of today's note.
  */
 const INSERTED: Awaited<ReturnType<TaskService['insertTask']>> = {
   created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
+  baseRevision: '',
+  revision: '',
   moved: [],
   updatedAt: 0,
 }

@@ -111,17 +111,13 @@ export interface TaskWriteResult extends TaskEditResult {
 }
 
 /**
- * A write that added one task: the new row's address and where the note's other tasks went.
+ * A write that added one task.
  */
-export interface InsertedTask {
+export interface InsertedTask extends TaskMoves {
   /**
    * The new empty task, as the written note addresses it.
    */
   readonly created: TaskSnapshot
-  /**
-   * Where every pre-existing task of the note ended up after the write.
-   */
-  readonly moved: TaskEditResult['moved']
   /**
    * Epoch milliseconds read right after the write, to order the optimistic row.
    */
@@ -319,7 +315,7 @@ export interface TaskService extends Store<TaskListState> {
    * query caches, this set is not rebuilt by an open-task refetch, so moved
    * completed rows must be re-keyed explicitly.
    */
-  relocateRecentlyCompleted(root: string | null, notePath: string, moved: TaskMoves): void
+  relocateRecentlyCompleted(root: string | null, notePath: string, edit: TaskMoves): void
   /**
    * Reconcile the struck set against a fresh open-tasks read, dropping every
    * struck copy whose task was reopened at its source note ({@link
@@ -377,6 +373,7 @@ function toOpenTasks(notes: readonly NoteTasks[]): OpenTask[] {
   return notes.flatMap((note) => {
     return note.tasks.map((task) => ({
       notePath: note.path,
+      revision: note.hash,
       noteTitle: note.title,
       dailyDate: note.dailyDate,
       isPinned: note.isPinned,
@@ -391,7 +388,12 @@ function toOpenTasks(notes: readonly NoteTasks[]): OpenTask[] {
  * Only the locator goes to the core edit: the note path merely picks the owner.
  */
 function toLocator(task: TaskRef): TaskLocator {
-  return { astPath: task.astPath, markdown: task.markdown, checked: task.checked }
+  return {
+    revision: task.revision,
+    astPath: task.astPath,
+    markdown: task.markdown,
+    checked: task.checked,
+  }
 }
 
 function requireInserted(result: TaskEditResult): TaskSnapshot {
@@ -556,6 +558,8 @@ class TaskServiceImpl implements TaskService {
     const result = await this.#writeEdits(generation, task.notePath, edits)
     return {
       created: requireInserted(result),
+      baseRevision: result.baseRevision,
+      revision: result.revision,
       moved: result.moved,
       updatedAt: result.updatedAt,
     }
@@ -571,6 +575,8 @@ class TaskServiceImpl implements TaskService {
     )
     return {
       created: requireInserted(result),
+      baseRevision: result.baseRevision,
+      revision: result.revision,
       moved: result.moved,
       updatedAt: result.updatedAt,
     }
@@ -667,7 +673,7 @@ class TaskServiceImpl implements TaskService {
         { kind: 'setMarkdown', markdown: content },
         { kind: 'toBullet' },
       ])
-      this.#relocate(session, task.notePath, result.moved)
+      this.#relocate(session, task.notePath, result)
     } catch (cause) {
       this.#restore(snapshot)
       if (task.checked) {
@@ -797,13 +803,13 @@ class TaskServiceImpl implements TaskService {
     return root === current.root && current.tasks.some((task) => getTaskKey(task) === key)
   }
 
-  relocateRecentlyCompleted(root: string | null, notePath: string, moved: TaskMoves): void {
+  relocateRecentlyCompleted(root: string | null, notePath: string, edit: TaskMoves): void {
     const current = this.#recentlyCompleted.get()
-    if (root !== current.root || moved.length === 0) {
+    if (root !== current.root || edit.moved.length === 0) {
       return
     }
     const next =
-      withRelocatedTasks({ logger: this.#deps.logger }, current.tasks, notePath, moved) ?? []
+      withRelocatedTasks({ logger: this.#deps.logger }, current.tasks, notePath, edit) ?? []
     this.#recentlyCompleted.set({ root, tasks: next })
   }
 
@@ -1044,14 +1050,14 @@ class TaskServiceImpl implements TaskService {
    * Re-key the rows and the recently-completed set from a write's `moved` map,
    * unless another graph opened since `session` began the write.
    */
-  #relocate(session: GraphSession, notePath: string, moved: TaskMoves): void {
+  #relocate(session: GraphSession, notePath: string, edit: TaskMoves): void {
     if (sessionKey(session) !== this.#currentKey()) {
       return
     }
     const { logger } = this.#deps
-    const relocate: TaskListPatch = (rows) => withRelocatedTasks({ logger }, rows, notePath, moved)
+    const relocate: TaskListPatch = (rows) => withRelocatedTasks({ logger }, rows, notePath, edit)
     this.#patch(relocate, relocate)
-    this.relocateRecentlyCompleted(session.root, notePath, moved)
+    this.relocateRecentlyCompleted(session.root, notePath, edit)
   }
 
   /**
@@ -1070,10 +1076,9 @@ class TaskServiceImpl implements TaskService {
         throw new AppError('noGraph', 'No graph is open.')
       }
       const result = await this.writeTask(task, actionsFor(task))
-      this.#relocate(session, task.notePath, result.moved)
+      this.#relocate(session, task.notePath, result)
       const rest: readonly OpenTask[] = pending.slice(1)
-      pending =
-        withRelocatedTasks({ logger: this.#deps.logger }, rest, task.notePath, result.moved) ?? []
+      pending = withRelocatedTasks({ logger: this.#deps.logger }, rest, task.notePath, result) ?? []
     }
   }
 
@@ -1107,11 +1112,11 @@ class TaskServiceImpl implements TaskService {
    * list; the rows stay as they are when another graph opened since `session`.
    */
   #addInserted(session: GraphSession, target: InsertTaskTarget, result: InsertedTask): OpenTask {
-    const created = createInsertedTaskRow(target, result.created, result.updatedAt)
+    const created = createInsertedTaskRow(target, result.created, result.revision, result.updatedAt)
     if (sessionKey(session) !== this.#currentKey()) {
       return created
     }
-    this.#relocate(session, target.notePath, result.moved)
+    this.#relocate(session, target.notePath, result)
     this.#patch(
       (rows) => [...(rows ?? []).filter((row) => !isSameTask(row, created)), created],
       (rows) => rows?.filter((row) => !isSameTask(row, created)),

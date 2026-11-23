@@ -4,6 +4,7 @@ import {
   type MarkdownListItem,
   type MarkdownNode,
 } from '@meowdown/markdown'
+import { sha256HexSync } from '@reflect/utils'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { NoteEditError } from '../tasks/task-errors.ts'
 import {
@@ -59,6 +60,10 @@ export interface TaskMove {
 
 export interface TaskEditResult {
   source: string
+  /** The hash of the source the edits were applied to. */
+  baseRevision: string
+  /** The hash of `source`. */
+  revision: string
   /** Every pre-edit round task, in document order. */
   moved: readonly TaskMove[]
   /** The inserted tasks, in edit order. */
@@ -130,15 +135,20 @@ export function applyTaskEdits(
 
   const nextBody = serializeBody(document)
   assertTasksSurvive(nextBody, after)
+  const nextSource = source.slice(0, bodyOffset) + nextBody
   return {
-    source: source.slice(0, bodyOffset) + nextBody,
+    source: nextSource,
+    baseRevision: sha256HexSync(source),
+    revision: sha256HexSync(nextSource),
     moved,
     inserted,
     tasks: after.map(toTaskSnapshot),
   }
 }
 
-function hasSameContent(entry: TaskLocator, locator: TaskLocator): boolean {
+type TaskContent = Pick<TaskSnapshot, 'markdown' | 'checked'>
+
+function hasSameContent(entry: TaskContent, locator: TaskContent): boolean {
   return entry.checked === locator.checked && entry.markdown === locator.markdown
 }
 
@@ -151,7 +161,7 @@ function hasSameContent(entry: TaskLocator, locator: TaskLocator): boolean {
 function resolveTaskLocator<T>(
   ctx: TaskLogContext,
   entries: readonly T[],
-  locatorOf: (entry: T) => TaskLocator,
+  locatorOf: (entry: T) => TaskSnapshot,
   locator: TaskLocator,
 ): T | undefined {
   const atPath = entries.find((entry) => {

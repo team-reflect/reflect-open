@@ -1,3 +1,4 @@
+import { sha256HexSync } from '@reflect/utils'
 import type { MaybePromise } from '@reflect/utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -54,7 +55,13 @@ function ref(source: string, index = 0, notePath = 'notes/a.md'): TaskRef {
   if (task === undefined) {
     throw new Error(`no task #${index} in ${JSON.stringify(source)}`)
   }
-  return { notePath, astPath: task.astPath, markdown: task.markdown, checked: task.checked }
+  return {
+    notePath,
+    revision: sha256HexSync(source),
+    astPath: task.astPath,
+    markdown: task.markdown,
+    checked: task.checked,
+  }
 }
 
 /**
@@ -295,6 +302,8 @@ describe('insertTask', () => {
 
     await expect(tasks.insertTask('notes/a.md')).resolves.toEqual({
       created: { astPath: [1], markdown: '', breadcrumbs: ['Tasks'], checked: false },
+      baseRevision: sha256HexSync(''),
+      revision: sha256HexSync('## Tasks\n\n+ [ ] \n'),
       moved: [],
       updatedAt: 1000,
     })
@@ -551,7 +560,11 @@ describe('batch writes', () => {
 describe('snippet tasks', () => {
   const source = '+ [ ] do it\n'
   const anchors: SnippetTask[] = [
-    { locator: { astPath: [0], markdown: 'do it', checked: false }, checked: false, text: 'do it' },
+    {
+      locator: { revision: '', astPath: [0], markdown: 'do it', checked: false },
+      checked: false,
+      text: 'do it',
+    },
     { locator: null, checked: false, text: 'square box' },
   ]
 
@@ -585,7 +598,7 @@ describe('snippet tasks', () => {
   it('toggles the source task', async () => {
     noteFile.set('notes/a.md', source)
     await tasks.toggleSnippetTask('notes/a.md', {
-      locator: { astPath: [0], markdown: 'do it', checked: false },
+      locator: { revision: '', astPath: [0], markdown: 'do it', checked: false },
       checked: false,
     })
     expect(noteFile.getWrites('notes/a.md')).toEqual(['+ [x] do it\n'])
@@ -596,7 +609,7 @@ describe('snippet tasks', () => {
     noteFile.set('notes/a.md', '+ [x] something else\n')
     await expect(
       tasks.toggleSnippetTask('notes/a.md', {
-        locator: { astPath: [0], markdown: 'do it', checked: true },
+        locator: { revision: '', astPath: [0], markdown: 'do it', checked: true },
         checked: true,
       }),
     ).rejects.toMatchObject({ kind: 'stale' })
@@ -688,7 +701,11 @@ describe('recently completed', () => {
   it('re-keys struck rows a note write moved', () => {
     tasks.markRecentlyCompleted('/g', [a])
     const from = { astPath: [0], markdown: 'a', breadcrumbs: [], checked: true }
-    tasks.relocateRecentlyCompleted('/g', 'notes/a.md', [{ from, to: { ...from, astPath: [2] } }])
+    tasks.relocateRecentlyCompleted('/g', 'notes/a.md', {
+      baseRevision: '',
+      revision: '',
+      moved: [{ from, to: { ...from, astPath: [2] } }],
+    })
     expect(tasks.recentlyCompleted.get().tasks.map((row) => row.astPath)).toEqual([[2]])
   })
 
@@ -702,7 +719,15 @@ describe('recently completed', () => {
 describe('task list state', () => {
   const one = makeOpenTask({ notePath: 'notes/a.md', astPath: [0], markdown: 'one', text: 'one' })
   const two = makeOpenTask({ notePath: 'notes/b.md', astPath: [0], markdown: 'two', text: 'two' })
-  const written = { source: '', moved: [], inserted: [], tasks: [], updatedAt: 0 }
+  const written = {
+    source: '',
+    baseRevision: '',
+    revision: '',
+    moved: [],
+    inserted: [],
+    tasks: [],
+    updatedAt: 0,
+  }
 
   /**
    * Subscribe to `tasks` over `open` and wait for the first read to land.
@@ -851,6 +876,8 @@ describe('task list state', () => {
     const from = { astPath: [0], markdown: 'one', breadcrumbs: [], checked: false }
     vi.spyOn(tasks, 'insertTask').mockResolvedValue({
       created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
+      baseRevision: '',
+      revision: '',
       moved: [{ from, to: { ...from, astPath: [1] } }],
       updatedAt: 5,
     })
@@ -1094,14 +1121,13 @@ describe('reads racing writes', () => {
   })
 
   it.fails('refuses an edit whose stale path matches two identical tasks', async () => {
-    const [, second] = projectTasks('+ [ ] \n+ [ ] \n')
+    const stale = '+ [ ] \n+ [ ] \n'
+    const second = ref(stale, 1, NOTE)
     const source = '## Tasks\n\n+ [ ] \n+ [ ] \n'
     noteFile.set(NOTE, source)
 
     await expect(
-      tasks.writeTask({ notePath: NOTE, ...second! }, [
-        { kind: 'setMarkdown', markdown: 'buy milk' },
-      ]),
+      tasks.writeTask(second, [{ kind: 'setMarkdown', markdown: 'buy milk' }]),
     ).rejects.toThrow()
     expect(noteFile.files().get(NOTE)).toBe(source)
   })

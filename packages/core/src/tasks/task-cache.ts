@@ -3,8 +3,8 @@ import {
   isSameTaskPath,
   renderInlineText,
   renderTaskSnapshot,
+  type TaskEditResult,
   type TaskLogContext,
-  type TaskMove,
   type TaskSnapshot,
 } from '../markdown/index.ts'
 import type { OpenTask } from './open-task.ts'
@@ -22,9 +22,9 @@ import { getTaskKey, isSameTask } from './task-identity.ts'
  */
 
 /**
- * Where a note write left each of its tasks: `applyTaskEdits`'s `moved`.
+ * Where a note write left each of its tasks, and the note revisions before and after it.
  */
-export type TaskMoves = readonly TaskMove[]
+export type TaskMoves = Pick<TaskEditResult, 'baseRevision' | 'revision' | 'moved'>
 
 /**
  * Drop every row matching one of `tasks` from a cached list.
@@ -43,9 +43,10 @@ function isSameLabels(left: readonly string[], right: readonly string[]): boolea
 /**
  * The row as the write left its task; the row itself when nothing differs.
  */
-function withSnapshot(task: OpenTask, to: TaskSnapshot): OpenTask {
-  const next = { ...task, ...renderTaskSnapshot(to) }
+function withSnapshot(task: OpenTask, to: TaskSnapshot, revision: string): OpenTask {
+  const next = { ...task, ...renderTaskSnapshot(to), revision }
   const same =
+    next.revision === task.revision &&
     isSameTaskPath(next.astPath, task.astPath) &&
     next.checked === task.checked &&
     next.markdown === task.markdown &&
@@ -63,14 +64,14 @@ export function withRelocatedTasks(
   ctx: TaskLogContext,
   rows: readonly OpenTask[] | undefined,
   notePath: string,
-  moved: TaskMoves,
+  edit: TaskMoves,
 ): readonly OpenTask[] | undefined {
-  if (rows === undefined || moved.length === 0) {
+  if (rows === undefined || edit.moved.length === 0) {
     return rows
   }
   let changed = false
   const relocated = rows.flatMap((task) => {
-    const move = task.notePath === notePath ? findTaskMove(ctx, moved, task) : undefined
+    const move = task.notePath === notePath ? findTaskMove(ctx, edit.moved, task) : undefined
     if (move === undefined) {
       return [task]
     }
@@ -78,7 +79,7 @@ export function withRelocatedTasks(
       changed = true
       return []
     }
-    const next = withSnapshot(task, move.to)
+    const next = withSnapshot(task, move.to, edit.revision)
     if (next !== task) {
       changed = true
     }

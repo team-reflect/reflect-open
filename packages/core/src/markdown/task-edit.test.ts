@@ -1,3 +1,4 @@
+import { sha256HexSync } from '@reflect/utils'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createTestLoggerService, type TestLoggerService } from '../testing/logger.ts'
 import { splitFrontmatter } from './frontmatter.ts'
@@ -27,7 +28,12 @@ function locate(source: string, index = 0): TaskLocator {
   if (task === undefined) {
     throw new Error(`no task #${index} in ${JSON.stringify(source)}`)
   }
-  return { astPath: task.astPath, markdown: task.markdown, checked: task.checked }
+  return {
+    revision: sha256HexSync(source),
+    astPath: task.astPath,
+    markdown: task.markdown,
+    checked: task.checked,
+  }
 }
 
 /**
@@ -81,7 +87,7 @@ describe('applyTaskEdits: toggle', () => {
 
   it('never reaches a checkbox inside a code block', () => {
     const source = '+ [ ] real\n\n```\n+ [ ] fake\n```\n'
-    const fake: TaskLocator = { astPath: [2], markdown: 'fake', checked: false }
+    const fake: TaskLocator = { revision: '', astPath: [2], markdown: 'fake', checked: false }
     expect(() => applyTaskEdits(ctx, source, [{ kind: 'toggle', task: fake }])).toThrow(
       expect.objectContaining({ kind: 'stale' }),
     )
@@ -423,7 +429,7 @@ describe('findTaskMove', () => {
   it('follows a stale locator by its content, not by whatever sits at its path', () => {
     // Indexed before the intro paragraph was added: `b` was at [1], where `a` is now.
     expect(
-      findTaskMove(ctx, moved, { astPath: [1], markdown: 'b', checked: false })?.to,
+      findTaskMove(ctx, moved, { revision: '', astPath: [1], markdown: 'b', checked: false })?.to,
     ).toMatchObject({
       astPath: [2],
       markdown: 'b',
@@ -432,7 +438,7 @@ describe('findTaskMove', () => {
 
   it('returns undefined for a locator that names no task', () => {
     expect(
-      findTaskMove(ctx, moved, { astPath: [1], markdown: 'c', checked: false }),
+      findTaskMove(ctx, moved, { revision: '', astPath: [1], markdown: 'c', checked: false }),
     ).toBeUndefined()
   })
 
@@ -442,7 +448,12 @@ describe('findTaskMove', () => {
     expect(findTaskMove(ctx, result.moved, locate(twins, 1))?.to).toMatchObject({ checked: true })
     expect(logger.getWarnings()).toEqual([])
     expect(
-      findTaskMove(ctx, result.moved, { astPath: [5], markdown: 'same', checked: false })?.from,
+      findTaskMove(ctx, result.moved, {
+        revision: '',
+        astPath: [5],
+        markdown: 'same',
+        checked: false,
+      })?.from,
     ).toMatchObject({ astPath: [0] })
     expect(logger.getWarnings()).toHaveLength(1)
   })

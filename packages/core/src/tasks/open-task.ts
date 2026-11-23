@@ -6,6 +6,10 @@ import { compareTaskPaths, type TaskRow } from '../markdown/index.ts'
  */
 export interface OpenTask extends TaskRow {
   notePath: string
+  /**
+   * The hash of the note text the row describes.
+   */
+  revision: string
   noteTitle: string
   /**
    * ISO date for daily-note tasks; null for tasks in regular notes.

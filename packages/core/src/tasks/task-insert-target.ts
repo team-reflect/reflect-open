@@ -12,17 +12,19 @@ export type InsertTaskTarget = Pick<
 
 /**
  * Build the optimistic open row for a just-written task from its persisted
- * address and the write's `updatedAt`.
+ * address, the written note's `revision`, and the write's `updatedAt`.
  */
 export function createInsertedTaskRow(
   target: InsertTaskTarget,
   created: TaskSnapshot,
+  revision: string,
   updatedAt: number,
 ): OpenTask {
   const { notePath, noteTitle, dailyDate, isPinned, pinnedOrder } = target
   return {
     ...renderTaskSnapshot(created),
     notePath,
+    revision,
     noteTitle,
     dailyDate,
     isPinned,

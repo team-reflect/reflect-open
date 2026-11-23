@@ -17,6 +17,15 @@ function snapshot(astPath: number[], markdown: string, checked = true): TaskSnap
   return { astPath, markdown, breadcrumbs: [], checked }
 }
 
+/**
+ * A write that left the note at the revision the test rows carry.
+ */
+function edit(
+  moved: { from: TaskSnapshot; to: TaskSnapshot | null }[],
+): Parameters<TaskService['relocateRecentlyCompleted']>[2] {
+  return { baseRevision: 'base', revision: '', moved }
+}
+
 let core: TestCoreServices
 let tasks: TaskService
 
@@ -71,9 +80,11 @@ describe('recently-completed', () => {
     })
 
     await act(() => {
-      tasks.relocateRecentlyCompleted('/g', 'a.md', [
-        { from: snapshot([4], 'done'), to: snapshot([5], 'done') },
-      ])
+      tasks.relocateRecentlyCompleted(
+        '/g',
+        'a.md',
+        edit([{ from: snapshot([4], 'done'), to: snapshot([5], 'done') }]),
+      )
     })
 
     expect(result.current.map((row) => getTaskKey(row))).toEqual(['a.md:[5]', 'b.md:[4]'])
@@ -85,7 +96,11 @@ describe('recently-completed', () => {
     await act(() => tasks.markRecentlyCompleted('/g', [task({ notePath: 'a.md', astPath: [1] })]))
 
     await act(() => {
-      tasks.relocateRecentlyCompleted('/g', 'a.md', [{ from: snapshot([1], 'do it'), to: null }])
+      tasks.relocateRecentlyCompleted(
+        '/g',
+        'a.md',
+        edit([{ from: snapshot([1], 'do it'), to: null }]),
+      )
     })
 
     expect(result.current).toEqual([])
@@ -98,9 +113,11 @@ describe('recently-completed', () => {
     })
 
     await act(() => {
-      tasks.relocateRecentlyCompleted('/g', 'a.md', [
-        { from: snapshot([2], 'old'), to: snapshot([2], 'edited [[2026-07-01]]') },
-      ])
+      tasks.relocateRecentlyCompleted(
+        '/g',
+        'a.md',
+        edit([{ from: snapshot([2], 'old'), to: snapshot([2], 'edited [[2026-07-01]]') }]),
+      )
     })
 
     expect(result.current[0]).toMatchObject({
@@ -117,9 +134,11 @@ describe('recently-completed', () => {
     })
 
     await act(() => {
-      tasks.relocateRecentlyCompleted('/g', 'a.md', [
-        { from: snapshot([2], 'other'), to: snapshot([3], 'other') },
-      ])
+      tasks.relocateRecentlyCompleted(
+        '/g',
+        'a.md',
+        edit([{ from: snapshot([2], 'other'), to: snapshot([3], 'other') }]),
+      )
     })
 
     expect(result.current.map((row) => getTaskKey(row))).toEqual(['a.md:[1]'])

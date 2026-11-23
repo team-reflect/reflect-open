@@ -9,6 +9,7 @@ export function makeOpenTask(overrides: Partial<OpenTask> = {}): OpenTask {
   const markdown = overrides.markdown ?? overrides.text ?? 'do it'
   return {
     notePath: 'notes/n.md',
+    revision: '',
     astPath: [0],
     markdown,
     checked: false,

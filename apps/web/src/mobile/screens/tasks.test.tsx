@@ -120,7 +120,15 @@ let insertTask: MockInstance<TaskService['insertTask']>
 /**
  * The result of a write that changed nothing the cache needs to re-address.
  */
-const WRITTEN: TaskWriteResult = { source: '', moved: [], inserted: [], tasks: [], updatedAt: 0 }
+const WRITTEN: TaskWriteResult = {
+  source: '',
+  baseRevision: '',
+  revision: '',
+  moved: [],
+  inserted: [],
+  tasks: [],
+  updatedAt: 0,
+}
 
 type TaskActionKind = TaskAction['kind']
 
@@ -234,6 +242,8 @@ beforeEach(async () => {
   writeTask = vi.spyOn(tasks, 'writeTask').mockResolvedValue(WRITTEN)
   insertTask = vi.spyOn(tasks, 'insertTask').mockResolvedValue({
     created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
+    baseRevision: '',
+    revision: '',
     moved: [],
     updatedAt: 0,
   })

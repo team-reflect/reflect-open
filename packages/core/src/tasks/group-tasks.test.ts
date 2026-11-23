@@ -16,6 +16,7 @@ const FUTURE = '2026-06-20'
 function task(overrides: Partial<OpenTask> = {}): OpenTask {
   return {
     notePath: 'notes/n.md',
+    revision: '',
     astPath: [0],
     markdown: 'do it',
     checked: false,

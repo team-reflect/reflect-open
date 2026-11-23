@@ -1,3 +1,4 @@
+import { sha256HexSync } from '@reflect/utils'
 import type { RoundTripFidelity } from '@meowdown/markdown'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { applyTaskEdits } from '../markdown/task-edit.ts'
@@ -17,7 +18,12 @@ import { createTitleRenameTracker, type TitleRename } from './title-rename-track
 /** The first task's locator as the index records it. */
 function firstTask(source: string): TaskLocator {
   const [task] = projectTasks(source)
-  return { astPath: task!.astPath, markdown: task!.markdown, checked: task!.checked }
+  return {
+    revision: sha256HexSync(source),
+    astPath: task!.astPath,
+    markdown: task!.markdown,
+    checked: task!.checked,
+  }
 }
 
 /** The Tasks view's open-note write: toggle `task` through the live buffer. */

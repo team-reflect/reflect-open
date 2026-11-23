@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TaskSnapshot } from '../markdown/index.ts'
+import type { TaskMove, TaskSnapshot } from '../markdown/index.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { makeOpenTask as task } from '../testing/tasks.ts'
 import {
@@ -9,6 +9,7 @@ import {
   withEditedTask,
   withoutTasks,
   withRelocatedTasks,
+  type TaskMoves,
 } from './task-cache.ts'
 
 const ctx = { logger: createTestLoggerService() }
@@ -24,6 +25,13 @@ function snapshot(
   breadcrumbs: string[] = [],
 ): TaskSnapshot {
   return { astPath, markdown, breadcrumbs, checked }
+}
+
+/**
+ * A write that left the note at the revision the test rows carry.
+ */
+function edit(moved: TaskMove[]): TaskMoves {
+  return { baseRevision: 'base', revision: '', moved }
 }
 
 describe('withoutTasks', () => {
@@ -43,28 +51,39 @@ describe('withRelocatedTasks', () => {
     const unrelated = task({ notePath: 'b.md', astPath: [0, 2], markdown: 'other' })
 
     expect(
-      withRelocatedTasks(ctx, [moved, removed, unrelated], 'a.md', [
-        { from: snapshot([0, 2], 'moved'), to: snapshot([0, 3], 'moved') },
-        { from: snapshot([0, 4], 'removed'), to: null },
-      ]),
+      withRelocatedTasks(
+        ctx,
+        [moved, removed, unrelated],
+        'a.md',
+        edit([
+          { from: snapshot([0, 2], 'moved'), to: snapshot([0, 3], 'moved') },
+          { from: snapshot([0, 4], 'removed'), to: null },
+        ]),
+      ),
     ).toEqual([{ ...moved, astPath: [0, 3] }, unrelated])
   })
 
   it('returns the same list when every matched task is unchanged', () => {
     const rows = [task({ notePath: 'a.md', astPath: [2], markdown: 'same' })]
     expect(
-      withRelocatedTasks(ctx, rows, 'a.md', [
-        { from: snapshot([2], 'same'), to: snapshot([2], 'same') },
-      ]),
+      withRelocatedTasks(
+        ctx,
+        rows,
+        'a.md',
+        edit([{ from: snapshot([2], 'same'), to: snapshot([2], 'same') }]),
+      ),
     ).toBe(rows)
   })
 
   it('refreshes text and due date when the persisted Markdown changed', () => {
     const rows = [task({ notePath: 'a.md', astPath: [2], markdown: 'old' })]
     expect(
-      withRelocatedTasks(ctx, rows, 'a.md', [
-        { from: snapshot([2], 'old'), to: snapshot([2], 'edited [[2026-07-01]]', true) },
-      ]),
+      withRelocatedTasks(
+        ctx,
+        rows,
+        'a.md',
+        edit([{ from: snapshot([2], 'old'), to: snapshot([2], 'edited [[2026-07-01]]', true) }]),
+      ),
     ).toEqual([
       {
         ...rows[0],
@@ -83,10 +102,15 @@ describe('withRelocatedTasks', () => {
       task({ notePath: 'a.md', astPath: [1], markdown: 'b' }),
     ]
     expect(
-      withRelocatedTasks(ctx, rows, 'a.md', [
-        { from: snapshot([1], 'a'), to: snapshot([1], 'a', true) },
-        { from: snapshot([2], 'b'), to: snapshot([2], 'b') },
-      ]),
+      withRelocatedTasks(
+        ctx,
+        rows,
+        'a.md',
+        edit([
+          { from: snapshot([1], 'a'), to: snapshot([1], 'a', true) },
+          { from: snapshot([2], 'b'), to: snapshot([2], 'b') },
+        ]),
+      ),
     ).toEqual([
       { ...rows[0], astPath: [1], checked: true },
       { ...rows[1], astPath: [2] },
@@ -96,20 +120,28 @@ describe('withRelocatedTasks', () => {
   it('renders the breadcrumbs the write left the task under', () => {
     const rows = [task({ notePath: 'a.md', astPath: [0, 1], markdown: 'x', breadcrumbs: ['Old'] })]
     expect(
-      withRelocatedTasks(ctx, rows, 'a.md', [
-        { from: snapshot([0, 1], 'x', false, ['Old']), to: snapshot([1], 'x', false, ['[[New]]']) },
-      ]),
+      withRelocatedTasks(
+        ctx,
+        rows,
+        'a.md',
+        edit([
+          {
+            from: snapshot([0, 1], 'x', false, ['Old']),
+            to: snapshot([1], 'x', false, ['[[New]]']),
+          },
+        ]),
+      ),
     ).toEqual([{ ...rows[0], astPath: [1], breadcrumbs: ['New'] }])
   })
 
   it('leaves rows the write did not know about alone', () => {
     const rows = [task({ notePath: 'a.md', astPath: [9], markdown: 'new' })]
     expect(
-      withRelocatedTasks(ctx, rows, 'a.md', [{ from: snapshot([0], 'other'), to: null }]),
+      withRelocatedTasks(ctx, rows, 'a.md', edit([{ from: snapshot([0], 'other'), to: null }])),
     ).toBe(rows)
-    expect(withRelocatedTasks(ctx, rows, 'a.md', [])).toBe(rows)
+    expect(withRelocatedTasks(ctx, rows, 'a.md', edit([]))).toBe(rows)
     expect(
-      withRelocatedTasks(ctx, undefined, 'a.md', [{ from: snapshot([9], 'new'), to: null }]),
+      withRelocatedTasks(ctx, undefined, 'a.md', edit([{ from: snapshot([9], 'new'), to: null }])),
     ).toBeUndefined()
   })
 })

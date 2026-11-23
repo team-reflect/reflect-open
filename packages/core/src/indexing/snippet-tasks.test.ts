@@ -20,7 +20,7 @@ function tasksFor(content: string, link = '[[Target]]'): SnippetTask[] {
   return extractSnippetTasks(
     text,
     lineOrigins,
-    createSourceTaskLocator(prepareBlockContext(content)),
+    createSourceTaskLocator(prepareBlockContext(content), 'r1'),
   )
 }
 
@@ -38,12 +38,12 @@ describe('extractSnippetTasks', () => {
     const content = '- [[Target]] kickoff\n  + [ ] prep agenda\n  + [x] send invite\n'
     expect(tasksFor(content)).toEqual([
       {
-        locator: { astPath: [0, 1], markdown: 'prep agenda', checked: false },
+        locator: { revision: 'r1', astPath: [0, 1], markdown: 'prep agenda', checked: false },
         checked: false,
         text: 'prep agenda',
       },
       {
-        locator: { astPath: [0, 2], markdown: 'send invite', checked: true },
+        locator: { revision: 'r1', astPath: [0, 2], markdown: 'send invite', checked: true },
         checked: true,
         text: 'send invite',
       },
@@ -70,7 +70,12 @@ describe('extractSnippetTasks', () => {
   it('locates a task whose marker is followed by extra whitespace', () => {
     const content = '- [[Target]] kickoff\n  + [ ]   prep agenda\n'
     const [task] = tasksFor(content)
-    expect(task?.locator).toEqual({ astPath: [0, 1], markdown: 'prep agenda', checked: false })
+    expect(task?.locator).toEqual({
+      revision: 'r1',
+      astPath: [0, 1],
+      markdown: 'prep agenda',
+      checked: false,
+    })
     expect(toggled(content, task)).toContain('+ [x]')
   })
 
@@ -144,6 +149,7 @@ describe('extractSnippetTasks', () => {
     const content = '---\ntitle: Note\n---\n\n- [[Target]] plan\n  + [ ] after frontmatter\n'
     const [task] = tasksFor(content)
     expect(task?.locator).toEqual({
+      revision: 'r1',
       astPath: [0, 1],
       markdown: 'after frontmatter',
       checked: false,
@@ -155,13 +161,15 @@ describe('extractSnippetTasks', () => {
 describe('createSourceTaskLocator', () => {
   it('locates every round task of a note, including inside a blockquote', () => {
     const content = '+ [ ] top\n\n> + [x] quoted\n'
-    const locate = createSourceTaskLocator(prepareBlockContext(content))
+    const locate = createSourceTaskLocator(prepareBlockContext(content), 'r1')
     expect(locate(content.indexOf('[ ]'))).toEqual({
+      revision: 'r1',
       astPath: [0],
       markdown: 'top',
       checked: false,
     })
     expect(locate(content.indexOf('[x]'))).toEqual({
+      revision: 'r1',
       astPath: [1, 0],
       markdown: 'quoted',
       checked: true,
@@ -170,7 +178,7 @@ describe('createSourceTaskLocator', () => {
 
   it('returns nothing for an offset that is not a round task marker', () => {
     const content = '+ [ ] top\n- [ ] square\n'
-    const locate = createSourceTaskLocator(prepareBlockContext(content))
+    const locate = createSourceTaskLocator(prepareBlockContext(content), 'r1')
     expect(locate(content.indexOf('[ ] square'))).toBeUndefined()
     expect(locate(0)).toBeUndefined()
   })

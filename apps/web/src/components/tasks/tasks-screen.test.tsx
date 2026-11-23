@@ -29,7 +29,15 @@ let continueTaskInContext: MockInstance<TaskService['continueTaskInContext']>
 /**
  * The result of a write that changed nothing the cache needs to re-address.
  */
-const WRITTEN: TaskWriteResult = { source: '', moved: [], inserted: [], tasks: [], updatedAt: 0 }
+const WRITTEN: TaskWriteResult = {
+  source: '',
+  baseRevision: '',
+  revision: '',
+  moved: [],
+  inserted: [],
+  tasks: [],
+  updatedAt: 0,
+}
 
 type TaskActionKind = TaskAction['kind']
 
@@ -236,11 +244,15 @@ beforeEach(() => {
   writeTask = vi.spyOn(tasks, 'writeTask').mockResolvedValue(WRITTEN)
   insertTask = vi.spyOn(tasks, 'insertTask').mockResolvedValue({
     created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
+    baseRevision: '',
+    revision: '',
     moved: [],
     updatedAt: 0,
   })
   continueTaskInContext = vi.spyOn(tasks, 'continueTaskInContext').mockResolvedValue({
     created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
+    baseRevision: '',
+    revision: '',
     moved: [],
     updatedAt: 0,
   })
@@ -850,6 +862,8 @@ describe('TasksScreen', () => {
   it('a note group’s "+ Add" button inserts into that note and opens the editor', async () => {
     insertTask.mockResolvedValue({
       created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
+      baseRevision: '',
+      revision: '',
       moved: [],
       updatedAt: 0,
     })
@@ -883,6 +897,8 @@ describe('TasksScreen', () => {
     getOpenTasks.mockResolvedValue([later])
     insertTask.mockResolvedValue({
       created: { astPath: [1], markdown: '', breadcrumbs: [], checked: false },
+      baseRevision: '',
+      revision: '',
       moved: [
         {
           from: { astPath: [1], markdown: 'later', breadcrumbs: [], checked: false },
@@ -1035,6 +1051,8 @@ describe('TasksScreen', () => {
   it('Enter in the editor saves the row and opens the next task (continuous entry)', async () => {
     continueTaskInContext.mockResolvedValue({
       created: { astPath: [3], markdown: '', breadcrumbs: [], checked: false },
+      baseRevision: '',
+      revision: '',
       moved: [],
       updatedAt: 0,
     })
@@ -1072,6 +1090,8 @@ describe('TasksScreen', () => {
         breadcrumbs: ['StartupToolbox', 'Reflections'],
         checked: false,
       },
+      baseRevision: '',
+      revision: '',
       moved: [
         {
           from: { astPath: [40], markdown: 'later', breadcrumbs: [], checked: false },

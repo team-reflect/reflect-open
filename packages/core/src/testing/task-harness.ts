@@ -1,3 +1,4 @@
+import { sha256HexSync } from '@reflect/utils'
 import { noop, sleep } from '@ocavue/utils'
 import {
   createNoteDocumentService,
@@ -369,9 +370,11 @@ export class TaskHarness {
    * The open tasks the task list shows.
    */
   view(): TaskRef[] {
-    return (this.tasks.get().open ?? []).map(({ notePath, astPath, markdown, checked }) => {
-      return { notePath, astPath, markdown, checked }
-    })
+    return (this.tasks.get().open ?? []).map(
+      ({ notePath, revision, astPath, markdown, checked }) => {
+        return { notePath, revision, astPath, markdown, checked }
+      },
+    )
   }
 
   /**
@@ -381,9 +384,12 @@ export class TaskHarness {
     return [...this.files.files()]
       .toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .flatMap(([notePath, source]) => {
+        const revision = sha256HexSync(source)
         return projectTasks(source)
           .filter((task) => !task.checked)
-          .map(({ astPath, markdown, checked }) => ({ notePath, astPath, markdown, checked }))
+          .map(({ astPath, markdown, checked }) => {
+            return { notePath, revision, astPath, markdown, checked }
+          })
       })
   }
 

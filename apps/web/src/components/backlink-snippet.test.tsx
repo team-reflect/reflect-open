@@ -26,13 +26,13 @@ const SNIPPET = [
 function anchors(): SnippetTask[] {
   return [
     {
-      locator: { astPath: [0, 1], markdown: 'prep agenda', checked: false },
+      locator: { revision: 'r1', astPath: [0, 1], markdown: 'prep agenda', checked: false },
       checked: false,
       text: 'prep agenda',
     },
     { locator: null, checked: true, text: 'square box' },
     {
-      locator: { astPath: [0, 3], markdown: 'send invite', checked: true },
+      locator: { revision: 'r1', astPath: [0, 3], markdown: 'send invite', checked: true },
       checked: true,
       text: 'send invite',
     },
@@ -49,9 +49,15 @@ async function renderSnippet(
 ) {
   const core = createTestCoreServices({ database: createTestDatabaseService() })
   operations = core.progress
-  writeTask = vi
-    .spyOn(core.tasks, 'writeTask')
-    .mockResolvedValue({ source: '', moved: [], inserted: [], tasks: [], updatedAt: 0 })
+  writeTask = vi.spyOn(core.tasks, 'writeTask').mockResolvedValue({
+    source: '',
+    baseRevision: '',
+    revision: '',
+    moved: [],
+    inserted: [],
+    tasks: [],
+    updatedAt: 0,
+  })
   return await renderInApp(
     <BacklinkSnippet
       text={text}
@@ -71,7 +77,13 @@ describe('BacklinkSnippet task checkboxes', () => {
     await userEvent.click(boxes[0]!)
     await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
     expect(writeTask).toHaveBeenCalledWith(
-      { notePath: 'notes/meeting.md', astPath: [0, 1], markdown: 'prep agenda', checked: false },
+      {
+        notePath: 'notes/meeting.md',
+        revision: 'r1',
+        astPath: [0, 1],
+        markdown: 'prep agenda',
+        checked: false,
+      },
       [{ kind: 'toggle' }],
     )
     await view.unmount()
@@ -83,7 +95,13 @@ describe('BacklinkSnippet task checkboxes', () => {
     await userEvent.click(boxes[2]!)
     await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
     expect(writeTask).toHaveBeenCalledWith(
-      { notePath: 'notes/meeting.md', astPath: [0, 3], markdown: 'send invite', checked: true },
+      {
+        notePath: 'notes/meeting.md',
+        revision: 'r1',
+        astPath: [0, 3],
+        markdown: 'send invite',
+        checked: true,
+      },
       [{ kind: 'toggle' }],
     )
     await view.unmount()
