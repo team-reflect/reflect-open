@@ -380,8 +380,6 @@ jobs:
         uses: ./.github/actions/setup-xcode
 
       - uses: ./.github/actions/setup-rust
-        with:
-          cache-scope: rust
 
       - uses: ./.github/actions/setup-node
 
