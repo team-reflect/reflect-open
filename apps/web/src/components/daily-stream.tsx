@@ -300,6 +300,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
             <section
               key={date}
               data-index={index}
+              data-print-path={dailyPath(date)}
               className="border-b border-border py-6"
               // Focus entering this row (clicking its editor, tabbing in) makes
               // it the day the sidebar describes.

@@ -109,37 +109,40 @@
 
 /* ============================================================
    DARK app theme — opt in with .dark on a wrapper
-   Deep navy, indigo-500 brand, near-white text.
+   Deep navy, indigo-500 brand, near-white text. Screen only:
+   printing always uses the light tokens.
    ============================================================ */
-.dark {
-  --surface: #161d30; /* hsl(224 37% 14%)            */
-  --surface-canvas: #0a0f1e; /* hsl(224 49% 8%)             */
-  --surface-sunken: rgba(31, 41, 55, 0.3);
-  --surface-app: #0a0f1e; /* hsl(224 49% 8%)             */
-  --surface-hover: rgba(255, 255, 255, 0.03);
-  --surface-active: rgba(55, 65, 81, 0.5); /* gray-700/50                 */
-  --surface-inverse: var(--indigo-500);
+@media screen {
+  .dark {
+    --surface: #161d30; /* hsl(224 37% 14%)            */
+    --surface-canvas: #0a0f1e; /* hsl(224 49% 8%)             */
+    --surface-sunken: rgba(31, 41, 55, 0.3);
+    --surface-app: #0a0f1e; /* hsl(224 49% 8%)             */
+    --surface-hover: rgba(255, 255, 255, 0.03);
+    --surface-active: rgba(55, 65, 81, 0.5); /* gray-700/50                 */
+    --surface-inverse: var(--indigo-500);
 
-  --text: var(--near-white);
-  --text-secondary: var(--coolgray-400);
-  --text-muted: var(--coolgray-500);
-  --text-on-inverse: hsl(210 40% 98%);
+    --text: var(--near-white);
+    --text-secondary: var(--coolgray-400);
+    --text-muted: var(--coolgray-500);
+    --text-on-inverse: hsl(210 40% 98%);
 
-  --border: rgba(255, 255, 255, 0.06);
-  --border-strong: rgba(255, 255, 255, 0.05);
-  --input-bg: rgba(255, 255, 255, 0.05);
+    --border: rgba(255, 255, 255, 0.06);
+    --border-strong: rgba(255, 255, 255, 0.05);
+    --input-bg: rgba(255, 255, 255, 0.05);
 
-  --accent: var(--indigo-500);
-  --accent-hover: var(--indigo-400);
-  --accent-soft: var(--indigo-900);
-  --accent-soft-text: #ffffff;
+    --accent: var(--indigo-500);
+    --accent-hover: var(--indigo-400);
+    --accent-soft: var(--indigo-900);
+    --accent-soft-text: #ffffff;
 
-  --focus-ring: var(--indigo-500);
-  --border-hairline: 0 1px 0 rgba(255, 255, 255, 0.05);
-  --shadow-app-input:
-    0 1px 0 -1px rgba(0, 0, 0, 0.1), 0 1px 1px -1px rgba(0, 0, 0, 0.1),
-    0 1px 2px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1),
-    0 3px 6px -3px rgba(0, 0, 0, 0.1);
+    --focus-ring: var(--indigo-500);
+    --border-hairline: 0 1px 0 rgba(255, 255, 255, 0.05);
+    --shadow-app-input:
+      0 1px 0 -1px rgba(0, 0, 0, 0.1), 0 1px 1px -1px rgba(0, 0, 0, 0.1),
+      0 1px 2px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1),
+      0 3px 6px -3px rgba(0, 0, 0, 0.1);
+  }
 }
 
 /* ============================================================
