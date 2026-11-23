@@ -120,6 +120,21 @@ export interface NoteSessionOptions {
 /**
  * One open note's document lifecycle. Create via {@link NoteSessionService.create}.
  */
+/**
+ * What {@link NoteSession.commitSourceEdit} left on disk.
+ */
+export interface NoteSessionCommit {
+  /**
+   * The full note text on disk after the flush.
+   */
+  readonly content: string
+  /**
+   * Whether `content` differs from the text the transform returned: the write
+   * merged with a newer disk text, or keystrokes landed during the flush.
+   */
+  readonly merged: boolean
+}
+
 export interface NoteSession {
   /** The graph-relative path this session is bound to (mutable via {@link NoteSession.retarget}). */
   readonly path: string
@@ -214,13 +229,13 @@ export interface NoteSession {
    * view routes its edits here whenever the note is open: the buffer is read
    * synchronously, so there is no read/write race with the editor. A session
    * still loading waits for the load, then applies the edit to the loaded
-   * buffer. Returns false when the session can't take it (failed to load,
+   * buffer. Returns `null` when the session can't take it (failed to load,
    * protected, or disposed) so the caller refuses rather than clobber the
    * buffer; an error thrown by `transform` (a stale task locator) propagates
    * untouched, and a failed flush reverts the in-memory edit before
    * rethrowing.
    */
-  commitSourceEdit(transform: (source: string) => string): Promise<boolean>
+  commitSourceEdit(transform: (source: string) => string): Promise<NoteSessionCommit | null>
   /** Flush pending edits and detach: no further snapshots are emitted. */
   dispose(): void
   /**

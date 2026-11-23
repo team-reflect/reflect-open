@@ -11,6 +11,7 @@ import { splitDoc } from './note-session-doc.ts'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter.ts'
 import type {
   NoteSession,
+  NoteSessionCommit,
   NoteSessionEditor,
   NoteSessionOptions,
   NoteSessionService,
@@ -606,7 +607,7 @@ class NoteSessionImpl implements NoteSession {
    * refreshes promptly. A session still loading waits for the load first:
    * navigating to a note (⌘D to today) opens its session in the same tick the
    * Tasks view's unmount flush writes to it, and the pending read is a moment,
-   * not a reason to refuse. Returns false when the session can't safely take a
+   * not a reason to refuse. Returns `null` when the session can't safely take a
    * body edit (no write channel, disposed, protected/read-only, or failed to
    * load) so the caller refuses rather than clobber the buffer
    * via disk. `transform` runs before any mutation, so a `TaskStaleError` (the
@@ -614,11 +615,11 @@ class NoteSessionImpl implements NoteSession {
    * all-or-nothing: a failed flush reverts the in-memory edit so the editor and
    * the Tasks list can't diverge, then re-throws the failure.
    */
-  async commitSourceEdit(transform: (full: string) => string): Promise<boolean> {
+  async commitSourceEdit(transform: (full: string) => string): Promise<NoteSessionCommit | null> {
     // What the load can't change is refused at once; a stalled read must not
     // hold a session that could never write.
     if (this.#io.write === null || this.#disposed) {
-      return false
+      return null
     }
     if (this.#status === 'loading') {
       // Never rejects: a failed load settles as `status === 'error'`, which the
@@ -627,13 +628,14 @@ class NoteSessionImpl implements NoteSession {
     }
     // Protection is decided by the load, so this gate runs after the wait.
     if (this.#disposed || this.#isProtected || this.#status !== 'ready') {
-      return false
+      return null
     }
     this.#reconcilePendingEditorInput()
     const previousHeader = this.#header
     const previousBuffer = this.#buffer
     const previousInitialContent = this.#initialContent
-    const doc = splitDoc(transform(this.#header + this.#buffer))
+    const edited = transform(this.#header + this.#buffer)
+    const doc = splitDoc(edited)
     this.#header = doc.header
     this.#buffer = doc.body
     // The pane seeds a mounting editor from `initialContent`; after a wait on
@@ -661,14 +663,16 @@ class NoteSessionImpl implements NoteSession {
       this.#emit()
       throw new Error(message)
     }
-    return true
+    return { content: this.#disk, merged: this.#disk !== edited }
   }
 
   commitBodyAppend(block: string): Promise<boolean> {
     if (block.trim() === '') {
       return Promise.resolve(false)
     }
-    return this.commitSourceEdit((full) => appendBlock(full, block))
+    return this.commitSourceEdit((full) => appendBlock(full, block)).then(
+      (commit) => commit !== null,
+    )
   }
 
   dispose(): void {

@@ -9,7 +9,11 @@ import {
   frontmatterPatchToYaml,
   type FrontmatterPatch,
 } from '../documents/note-session-frontmatter.ts'
-import type { NoteSession, NoteSessionEditor } from '../documents/note-session-types.ts'
+import type {
+  NoteSession,
+  NoteSessionCommit,
+  NoteSessionEditor,
+} from '../documents/note-session-types.ts'
 import { appendBlock } from '../markdown/append-section.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { createTestLoggerService } from './logger.ts'
@@ -160,14 +164,14 @@ class TestNoteSessionImpl implements TestNoteSession {
     })
   }
 
-  commitSourceEdit(transform: (source: string) => string): Promise<boolean> {
+  commitSourceEdit(transform: (source: string) => string): Promise<NoteSessionCommit | null> {
     return Promise.try(() => {
       this.#record('commitSourceEdit', transform)
       if (!this.#accepts) {
-        return false
+        return null
       }
       this.#content = transform(this.#content)
-      return true
+      return { content: this.#content, merged: false }
     })
   }
 
