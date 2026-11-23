@@ -678,13 +678,14 @@ class IndexWriterImpl implements IndexWriter {
   }
 
   /**
-   * Mark `entry` dirty again after a wait. Its next write is reported.
+   * Mark the path of `entry` dirty again after a wait. Its next write reads
+   * the file and is reported.
    */
   #retryLater(entry: DirtyEntry): void {
     if (this.#disposed) {
       return
     }
-    this.#failed.push({ ...entry, bulk: false })
+    this.#failed.push({ ...entry, modifiedMs: undefined, note: undefined, bulk: false })
     if (this.#retryTimer !== null) {
       return
     }

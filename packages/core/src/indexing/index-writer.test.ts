@@ -383,6 +383,29 @@ describe('createIndexWriter', () => {
     expect(clock.pendingTimers()).toBe(0)
   })
 
+  it('reads the file for the retry of a write that had a content hint', async () => {
+    let failures = 1
+    const { writer, clock, store, files } = setup({
+      files: { 'notes/a.md': '# old' },
+      failStore: (call) => {
+        const failed = call.method === 'applyBatch' && failures > 0
+        failures -= failed ? 1 : 0
+        return failed ? new AppError('io', 'busy') : undefined
+      },
+    })
+
+    await writer.write('notes/a.md', { note: noteOf('# old'), modifiedMs: 1 })
+    files.set('notes/a.md', '# new')
+    await writer.write('notes/a.md', { note: noteOf('# new'), modifiedMs: 2 })
+    await clock.advance(INDEX_RETRY_MIN_MS)
+    await writer.drained()
+
+    expect(store.applied().map((note) => note.fileHash)).toEqual([
+      sha256HexSync('# new'),
+      sha256HexSync('# new'),
+    ])
+  })
+
   it('writes at most `INDEX_APPLY_BATCH_SIZE` notes in one transaction', async () => {
     const paths = Array.from(
       { length: INDEX_APPLY_BATCH_SIZE + 1 },
