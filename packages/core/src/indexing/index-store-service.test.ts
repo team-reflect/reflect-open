@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { AppError } from '../errors.ts'
 import { parseNote } from '../markdown/index.ts'
 import { createTestDatabaseService } from '../testing/database.ts'
 import { createTestIndexStoreService } from '../testing/index-store.ts'
 import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { buildIndexedNote, type IndexedNote } from './indexed-note.ts'
-import { createIndexStoreService, INDEX_APPLY_BATCH_SIZE } from './index-store-service.ts'
+import { createIndexStoreService } from './index-store-service.ts'
 import { returnNull } from '@ocavue/utils'
 
 function note(path: string): IndexedNote {
@@ -134,100 +133,6 @@ describe('createIndexStoreService', () => {
   })
 })
 
-describe('createApplyBatch', () => {
-  it('splits a refused batch until the failing note stands alone', async () => {
-    const batches: string[][] = []
-    const ipc = createTestIpcBridgeService({
-      commands: {
-        index_apply_batch: (args) => {
-          const paths = (args['notes'] as IndexedNote[]).map((indexed) => indexed.path)
-          batches.push(paths)
-          if (paths.includes('notes/bad.md')) {
-            throw new AppError('parse', 'bad projection')
-          }
-          return null
-        },
-      },
-    })
-    const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
-    const skipped: { path: string; message: string }[] = []
-    const batch = store.createApplyBatch(2, (skip) => {
-      skipped.push(skip)
-    })
-
-    for (const path of ['notes/a.md', 'notes/bad.md', 'notes/c.md']) {
-      await batch.add(note(path))
-    }
-    await batch.flush()
-
-    expect(batches).toEqual([
-      ['notes/a.md', 'notes/bad.md', 'notes/c.md'],
-      ['notes/a.md', 'notes/bad.md'],
-      ['notes/a.md'],
-      ['notes/bad.md'],
-      ['notes/c.md'],
-    ])
-    expect(skipped).toEqual([{ path: 'notes/bad.md', message: 'bad projection' }])
-    expect(batch.applied()).toBe(2)
-  })
-
-  it('throws a lone failure without a skip callback', async () => {
-    const ipc = createTestIpcBridgeService({
-      commands: {
-        index_apply_batch: () => {
-          throw new AppError('parse', 'refused')
-        },
-      },
-    })
-    const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
-    const batch = store.createApplyBatch(1)
-
-    await batch.add(note('notes/a.md'))
-
-    await expect(batch.flush()).rejects.toMatchObject({ message: 'refused' })
-  })
-
-  it('flushes on its own at the transaction cap', async () => {
-    const ipc = createTestIpcBridgeService({ commands: writeCommands() })
-    const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
-    const batch = store.createApplyBatch(1)
-    const projection = note('notes/a.md')
-
-    for (let i = 0; i < INDEX_APPLY_BATCH_SIZE; i++) {
-      await batch.add(projection)
-    }
-
-    expect(ipc.calls()).toHaveLength(1)
-    expect(batch.applied()).toBe(INDEX_APPLY_BATCH_SIZE)
-  })
-})
-
-describe('createTouchBatch', () => {
-  it('applies queued re-stamps in one `index_touch`', async () => {
-    const ipc = createTestIpcBridgeService({ commands: writeCommands() })
-    const store = createIndexStoreService({ ipc, database: createTestDatabaseService() })
-    const touches = store.createTouchBatch(6)
-
-    await touches.add({ path: 'notes/a.md', mtime: 1 })
-    await touches.add({ path: 'notes/b.md', mtime: 2 })
-    await touches.flush()
-    await touches.flush()
-
-    expect(ipc.calls()).toEqual([
-      {
-        command: 'index_touch',
-        args: {
-          entries: [
-            { path: 'notes/a.md', mtime: 1 },
-            { path: 'notes/b.md', mtime: 2 },
-          ],
-          generation: 6,
-        },
-      },
-    ])
-    expect(touches.applied()).toBe(2)
-  })
-})
 describe('createTestIndexStoreService', () => {
   it('records calls and mirrors applies into its database', async () => {
     const database = createTestDatabaseService()

@@ -11,6 +11,7 @@ import { createTestLoggerService } from '../testing/logger.ts'
 import { createDirtySet } from './dirty-set.ts'
 import type { FileChange } from './file-change-service.ts'
 import { createIndexQueryService } from './index-query-service.ts'
+import { INDEX_APPLY_BATCH_SIZE } from './index-store-service.ts'
 import { createIndexWriter } from './index-writer.ts'
 import { buildIndexedNote } from './indexed-note.ts'
 
@@ -290,6 +291,25 @@ describe('createIndexWriter', () => {
     expect(outcomes.map((outcome) => outcome.status)).toEqual(['applied', 'failed', 'applied'])
     expect(outcomes[1]).toMatchObject({ stage: 'write' })
     expect(store.applied().map((note) => note.path)).toEqual(['notes/a.md', 'notes/c.md'])
+  })
+
+  it('writes at most `INDEX_APPLY_BATCH_SIZE` notes in one transaction', async () => {
+    const paths = Array.from(
+      { length: INDEX_APPLY_BATCH_SIZE + 1 },
+      (_, position) => `notes/n${position}.md`,
+    )
+    const { writer, dirty, store } = setup({
+      files: Object.fromEntries(paths.map((path) => [path, `# ${path}`])),
+    })
+
+    for (const path of paths) {
+      dirty.add(path)
+    }
+    await writer.drained()
+
+    expect(
+      store.calls().map((call) => (call.method === 'applyBatch' ? call.notes.length : call.method)),
+    ).toEqual([INDEX_APPLY_BATCH_SIZE, 1])
   })
 
   it('lets the last kind of a path win: an upsert then a remove only removes', async () => {

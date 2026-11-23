@@ -2,16 +2,11 @@ import { isIsoDate, type MaybePromise } from '@reflect/utils'
 import { noteBasenameKey } from '../graph/note-reference.ts'
 import { dateFromDailyPath, foldGraphPath } from '../graph/paths.ts'
 import type { IndexedNote } from '../indexing/indexed-note.ts'
-import {
-  createIndexApplyBatchWriter,
-  createMtimeTouchBatchWriter,
-  type IndexApplyBatch,
-  type IndexCommit,
-  type IndexTouch,
-  type IndexStoreService,
-  type MtimeTouchBatch,
-  type SkippedIndexedNote,
-  type ReconcileScan,
+import type {
+  IndexCommit,
+  IndexTouch,
+  IndexStoreService,
+  ReconcileScan,
 } from '../indexing/index-store-service.ts'
 import type { TestDatabaseService } from './database.ts'
 
@@ -217,24 +212,6 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
       this.#seedMeta()
       this.#writeMeta(key, value)
     })
-  }
-
-  createApplyBatch(
-    writeGeneration: number,
-    onSkippedNote?: (note: SkippedIndexedNote) => void,
-  ): IndexApplyBatch {
-    return createIndexApplyBatchWriter(
-      (notes, generation) => this.applyBatch(notes, generation),
-      writeGeneration,
-      onSkippedNote,
-    )
-  }
-
-  createTouchBatch(writeGeneration: number): MtimeTouchBatch {
-    return createMtimeTouchBatchWriter(
-      (entries, generation) => this.touch(entries, generation),
-      writeGeneration,
-    )
   }
 
   calls(): readonly IndexStoreCall[] {

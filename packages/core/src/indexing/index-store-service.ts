@@ -1,5 +1,4 @@
 import { isIsoDate, type MaybePromise } from '@reflect/utils'
-import { errorMessage } from '../errors.ts'
 import { noteBasenameKey } from '../graph/note-reference.ts'
 import { dateFromDailyPath, foldGraphPath } from '../graph/paths.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
@@ -17,15 +16,15 @@ import type { IndexedNote } from './indexed-note.ts'
 export type { IndexCommit, IndexTouch, ReconcileScan, ScanCandidate, ScanOrphan }
 
 /**
- * Notes per `index_apply_batch` transaction in the bulk passes (rebuild,
- * reconcile, and large watcher batches). Bounds the IPC payload and
- * transaction size on large graphs while keeping the transaction/round-trip
- * count far below one-per-note.
+ * Notes per `index_apply_batch` transaction, and re-stamps per `index_touch`
+ * transaction, of the index writer. Bounds the IPC payload and transaction
+ * size on large graphs while keeping the transaction/round-trip count far
+ * below one-per-note.
  */
 export const INDEX_APPLY_BATCH_SIZE = 256
 
 /**
- * One note omitted from a bulk write because its projection could not be written.
+ * One note omitted from an index pass because its projection could not be written.
  */
 export interface SkippedIndexedNote {
   /**
@@ -36,42 +35,6 @@ export interface SkippedIndexedNote {
    * Displayable reason from the failed write.
    */
   message: string
-}
-
-/**
- * A shared accumulator for bulk index writes; see {@link IndexStoreService.createApplyBatch}.
- */
-export interface IndexApplyBatch {
-  /**
-   * Queue a projection; flushes automatically at the transaction cap.
-   */
-  add: (note: IndexedNote) => Promise<void>
-  /**
-   * Apply everything still queued. Safe to call repeatedly.
-   */
-  flush: () => Promise<void>
-  /**
-   * Projections actually written so far (skipped notes excluded).
-   */
-  applied: () => number
-}
-
-/**
- * A shared accumulator for mtime re-stamps; see {@link IndexStoreService.createTouchBatch}.
- */
-export interface MtimeTouchBatch {
-  /**
-   * Queue a re-stamp; flushes automatically at the transaction cap.
-   */
-  add: (entry: IndexTouch) => Promise<void>
-  /**
-   * Apply everything still queued. Safe to call repeatedly.
-   */
-  flush: () => Promise<void>
-  /**
-   * Re-stamps actually written so far.
-   */
-  applied: () => number
 }
 
 /**
@@ -135,20 +98,6 @@ export interface IndexStoreService {
    * Upsert one `index_meta` key; a stale generation drops the write.
    */
   setMeta(key: string, value: string, generation: number): Promise<void>
-  /**
-   * Accumulate projections and apply them in shared `index_apply_batch`
-   * transactions of {@link INDEX_APPLY_BATCH_SIZE}. A refused batch splits in
-   * half until the failing note stands alone; that note reports through
-   * `onSkippedNote`, or its error is thrown without one.
-   */
-  createApplyBatch(
-    generation: number,
-    onSkippedNote?: (note: SkippedIndexedNote) => void,
-  ): IndexApplyBatch
-  /**
-   * Accumulate mtime re-stamps and apply them in shared `index_touch` transactions.
-   */
-  createTouchBatch(generation: number): MtimeTouchBatch
 }
 
 /**
@@ -163,95 +112,6 @@ function movedNoteAddress(path: string) {
     basenameKey: noteBasenameKey(path),
     dailyDate: date !== null && isIsoDate(date) ? date : null,
   }
-}
-
-async function applySplitBatch(
-  applyBatch: IndexStoreService['applyBatch'],
-  notes: IndexedNote[],
-  generation: number,
-  onSkippedNote: ((note: SkippedIndexedNote) => void) | undefined,
-): Promise<number> {
-  if (notes.length === 0) {
-    return 0
-  }
-  try {
-    await applyBatch(notes, generation)
-    return notes.length
-  } catch (cause) {
-    if (notes.length === 1) {
-      if (onSkippedNote === undefined) {
-        throw cause
-      }
-      onSkippedNote({ path: notes[0]!.path, message: errorMessage(cause) })
-      return 0
-    }
-    const midpoint = Math.ceil(notes.length / 2)
-    const first = await applySplitBatch(
-      applyBatch,
-      notes.slice(0, midpoint),
-      generation,
-      onSkippedNote,
-    )
-    return (
-      first + (await applySplitBatch(applyBatch, notes.slice(midpoint), generation, onSkippedNote))
-    )
-  }
-}
-
-class BatchWriter<Item> {
-  readonly #write: (items: Item[]) => Promise<number>
-  #batch: Item[] = []
-  #appliedCount = 0
-
-  constructor(write: (items: Item[]) => Promise<number>) {
-    this.#write = write
-  }
-
-  async add(item: Item): Promise<void> {
-    this.#batch.push(item)
-    if (this.#batch.length >= INDEX_APPLY_BATCH_SIZE) {
-      await this.flush()
-    }
-  }
-
-  async flush(): Promise<void> {
-    if (this.#batch.length === 0) {
-      return
-    }
-    const items = this.#batch
-    this.#batch = []
-    this.#appliedCount += await this.#write(items)
-  }
-
-  applied(): number {
-    return this.#appliedCount
-  }
-}
-
-/**
- * {@link IndexStoreService.createApplyBatch} over any `applyBatch`.
- */
-export function createIndexApplyBatchWriter(
-  applyBatch: IndexStoreService['applyBatch'],
-  generation: number,
-  onSkippedNote?: (note: SkippedIndexedNote) => void,
-): IndexApplyBatch {
-  return new BatchWriter((notes: IndexedNote[]) => {
-    return applySplitBatch(applyBatch, notes, generation, onSkippedNote)
-  })
-}
-
-/**
- * {@link IndexStoreService.createTouchBatch} over any `touch`.
- */
-export function createMtimeTouchBatchWriter(
-  touch: IndexStoreService['touch'],
-  generation: number,
-): MtimeTouchBatch {
-  return new BatchWriter(async (entries: IndexTouch[]) => {
-    await touch(entries, generation)
-    return entries.length
-  })
 }
 
 export interface IndexStoreServiceDeps {
@@ -327,21 +187,6 @@ class IndexStoreServiceImpl implements IndexStoreService {
 
   async setMeta(key: string, value: string, generation: number): Promise<void> {
     await this.#deps.ipc.call('index_meta_set', { key, value, generation })
-  }
-
-  createApplyBatch(
-    generation: number,
-    onSkippedNote?: (note: SkippedIndexedNote) => void,
-  ): IndexApplyBatch {
-    return createIndexApplyBatchWriter(
-      (notes, gen) => this.applyBatch(notes, gen),
-      generation,
-      onSkippedNote,
-    )
-  }
-
-  createTouchBatch(generation: number): MtimeTouchBatch {
-    return createMtimeTouchBatchWriter((entries, gen) => this.touch(entries, gen), generation)
   }
 }
 
