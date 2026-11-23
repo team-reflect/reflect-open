@@ -1,4 +1,3 @@
-import { returnTrue } from '@ocavue/utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { sha256Hex } from '@reflect/utils'
 import { AppError } from '../errors.ts'
@@ -159,6 +158,7 @@ function setup(options?: {
       .find((call): call is Extract<IndexStoreCall, { method: Method }> => call.method === method)
   }
   const moves: Array<[string, string]> = []
+  const gate = { canWrite: true }
   const writers = new Map<number, IndexWriter>()
   /**
    * The index writer at index generation `generation`.
@@ -177,7 +177,7 @@ function setup(options?: {
           emitMoved: (from: string, to: string) => {
             moves.push([from, to])
           },
-          canWrite: returnTrue,
+          canWrite: () => gate.canWrite,
         },
         { dirty: createDirtySet(), generation, fileGeneration: FILE_GENERATION },
       )
@@ -188,6 +188,7 @@ function setup(options?: {
   return {
     indexer: createNoteIndexer({ ...deps, indexStore: withoutProjectionWrites(store) }),
     writerAt,
+    gate,
     subscribeIndexApplied,
     moves,
     store,
@@ -403,11 +404,11 @@ describe('rebuild', () => {
 
   it('stops before the next SQLite write when suspended after the rebuild wipe', async () => {
     const controller = new AbortController()
-    const { indexer, writerAt, methods } = setup({
+    const { indexer, writerAt, gate, methods } = setup({
       // Models iOS becoming hidden while filesystem work is in flight.
       read: () => {
         controller.abort()
-        writerAt(1).pause()
+        gate.canWrite = false
       },
     })
 

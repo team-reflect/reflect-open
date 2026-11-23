@@ -156,7 +156,7 @@ export interface IndexLifecycleService {
   close(): Promise<void>
   /**
    * Suspend index writes for a backgrounded mobile app: abort the bulk pass
-   * and pause the index writer synchronously. Files reported meanwhile stay
+   * and stop the index writer synchronously. Files reported meanwhile stay
    * dirty. A later {@link IndexLifecycleService.resume} writes them and
    * reconciles the whole graph, so changes nobody reported converge too.
    */
@@ -538,7 +538,6 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     this.#suspended = true
     this.#cancelRetry()
     this.#abort?.abort()
-    this.#writer?.pause()
     this.#emitProgress('idle')
   }
 
@@ -765,9 +764,6 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
       generation,
       fileGeneration,
     })
-    if (this.#suspended) {
-      writer.pause()
-    }
     this.#writer = writer
     return writer
   }

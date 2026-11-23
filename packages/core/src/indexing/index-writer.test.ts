@@ -576,9 +576,9 @@ describe('createIndexWriter', () => {
     expect(writes()).toEqual(['apply:notes/a.md'])
   })
 
-  it('stops a run before its write once paused, and writes the path after resume', async () => {
+  it('stops a run before its write once it may not write, and writes the path after resume', async () => {
     const pendingRead = Promise.withResolvers<void>()
-    const { writer, dirty, reads, writes } = setup({
+    const { writer, dirty, gate, reads, writes } = setup({
       files: { 'notes/a.md': '# a' },
       read: () => pendingRead.promise,
     })
@@ -586,7 +586,7 @@ describe('createIndexWriter', () => {
     dirty.add('notes/a.md')
     const outcome = writer.settled('notes/a.md')
     await vi.waitFor(() => expect(reads).toEqual(['notes/a.md']))
-    writer.pause()
+    gate.canWrite = false
     pendingRead.resolve()
 
     await expect(outcome).resolves.toEqual({ status: 'deferred' })
@@ -594,32 +594,22 @@ describe('createIndexWriter', () => {
     expect(writes()).toEqual([])
     expect(dirty.has('notes/a.md')).toBe(true)
 
+    gate.canWrite = true
     writer.resume()
     await writer.drained()
     expect(writes()).toEqual(['apply:notes/a.md'])
   })
 
-  it('keeps collecting paths while paused, and defers their waiters', async () => {
-    const { writer, dirty, writes } = setup({ files: { 'notes/a.md': '# a', 'notes/b.md': '# b' } })
+  it('keeps collecting paths while `canWrite` says no, and defers their waiters', async () => {
+    const { writer, dirty, gate, reads, writes } = setup({
+      files: { 'notes/a.md': '# a', 'notes/b.md': '# b' },
+    })
 
-    writer.pause()
+    gate.canWrite = false
     dirty.add('notes/a.md')
     dirty.add('notes/b.md')
 
     await expect(writer.settled('notes/a.md')).resolves.toEqual({ status: 'deferred' })
-    await writer.drained()
-    expect(writes()).toEqual([])
-
-    writer.resume()
-    await writer.drained()
-    expect(writes()).toEqual(['apply:notes/a.md', 'apply:notes/b.md'])
-  })
-
-  it('writes nothing while `canWrite` says no, until resumed', async () => {
-    const { writer, dirty, gate, reads, writes } = setup({ files: { 'notes/a.md': '# a' } })
-
-    gate.canWrite = false
-    dirty.add('notes/a.md')
     await writer.drained()
     expect(reads).toEqual([])
     expect(writes()).toEqual([])
@@ -627,7 +617,7 @@ describe('createIndexWriter', () => {
     gate.canWrite = true
     writer.resume()
     await writer.drained()
-    expect(writes()).toEqual(['apply:notes/a.md'])
+    expect(writes()).toEqual(['apply:notes/a.md', 'apply:notes/b.md'])
   })
 
   it('wipes the tables in order with its runs', async () => {

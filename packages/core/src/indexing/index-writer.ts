@@ -60,7 +60,7 @@ export type ChangesAppliedEmitter = (changes: readonly FileChange[], generation:
  * - `failed`: the file read (`read`) or the index write (`write`) failed. The
  *   path is no longer dirty. The writer tries a failed write again after a
  *   wait that doubles with each failure.
- * - `deferred`: the writer is paused or disposed. The path stays dirty.
+ * - `deferred`: the writer may not write, or is disposed. The path stays dirty.
  */
 export type IndexWriteOutcome =
   | { readonly status: 'applied'; readonly seq: number | null }
@@ -78,7 +78,8 @@ export interface IndexWriterDeps extends IndexingDeps {
    */
   readonly emitMoved: (from: string, to: string) => void
   /**
-   * Whether index writes may run now. The writer asks before every write.
+   * Whether index writes may run now. The writer asks before every write:
+   * after a no, the run in flight stops and the paths stay dirty.
    */
   readonly canWrite: () => boolean
 }
@@ -127,7 +128,7 @@ export interface IndexWriter {
   seq(): number | null
   /**
    * Resolve once no run is queued or in flight: every dirty path is settled,
-   * or the writer is paused.
+   * or the writer may not write.
    */
   drained(): Promise<void>
   /**
@@ -135,11 +136,7 @@ export interface IndexWriter {
    */
   clear(): Promise<IndexCommit>
   /**
-   * Stop writing. The run in flight stops before its next write. Paths stay dirty.
-   */
-  pause(): void
-  /**
-   * Write again after {@link IndexWriter.pause}, or after `canWrite` turned true.
+   * Write the dirty paths after `canWrite` turned true.
    */
   resume(): void
   /**
@@ -204,7 +201,6 @@ class IndexWriterImpl implements IndexWriter {
   #retryTimer: TimerHandle | null = null
   #retryDelayMs = INDEX_RETRY_MIN_MS
   #runQueued = false
-  #paused = false
   #disposed = false
 
   constructor(deps: IndexWriterDeps, options: IndexWriterOptions) {
@@ -262,13 +258,7 @@ class IndexWriterImpl implements IndexWriter {
     return commit
   }
 
-  pause(): void {
-    this.#paused = true
-    this.#deferWaiters()
-  }
-
   resume(): void {
-    this.#paused = false
     this.#wake()
   }
 
@@ -283,7 +273,7 @@ class IndexWriterImpl implements IndexWriter {
   }
 
   #isStopped(): boolean {
-    return this.#disposed || this.#paused || !this.#deps.canWrite()
+    return this.#disposed || !this.#deps.canWrite()
   }
 
   #waiterIn(
