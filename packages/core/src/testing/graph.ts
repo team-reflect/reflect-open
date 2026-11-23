@@ -23,10 +23,9 @@ import {
   createWikiResolverService,
   type WikiResolverService,
 } from '../indexing/wiki-resolver-service.ts'
-import { bytesToBase64, base64ToBytes } from '@reflect/utils'
+import { bytesToBase64, base64ToBytes, sha256HexSync } from '@reflect/utils'
 import { createTestDatabaseService } from './database.ts'
 import { createTestIdService } from './id.ts'
-import { sha256HexSync } from './sha256.ts'
 
 function notFound(what: string): AppError {
   return new AppError('notFound', `${what} not found`)

@@ -1,3 +1,4 @@
+import { sha256HexSync } from '@reflect/utils'
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { createTestNoteSession, type TestNoteSessionOptions } from '../testing/documents.ts'
@@ -10,7 +11,6 @@ import {
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createNoteDocumentService } from './note-document-service.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
-import { sha256HexSync } from '../testing/sha256.ts'
 import { createOpenDocumentsService } from './open-documents-service.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 

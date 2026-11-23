@@ -1,3 +1,4 @@
+import { sha256HexSync } from '@reflect/utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '../errors.ts'
 import { createGraphSession, type GraphRole, type GraphSession } from '../graph/graph-session.ts'
@@ -17,7 +18,6 @@ import {
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createTestPlatformService } from '../testing/platform.ts'
 import { createTestProgressPort } from '../testing/ports.ts'
-import { sha256HexSync } from '../testing/sha256.ts'
 import { createTestActivityPort } from '../testing/shell.ts'
 import {
   createIndexLifecycleService,
