@@ -137,7 +137,7 @@ class NativeChromeRenderer implements ChromeRenderer {
 
   // The native bars sit in the safe area, so the page clears it in every form.
   shellStyle(): CSSProperties {
-    return { '--chrome-safe-bottom': 'var(--twsa-safe-area-inset-bottom)' } as CSSProperties
+    return { '--chrome-safe-bottom': 'var(--twsa-inset-bottom)' } as CSSProperties
   }
 
   /**

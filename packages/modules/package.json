@@ -1,6 +1,6 @@
 {
   "name": "@reflect/modules",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -12,15 +12,15 @@
     "./ai-sdk/openai-compatible": "./src/ai-sdk/openai-compatible.ts"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.105",
-    "@ai-sdk/google": "^4.0.121",
-    "@ai-sdk/openai": "^4.0.118",
-    "@ai-sdk/openai-compatible": "^3.0.92",
-    "ai": "^7.0.173"
+    "@ai-sdk/anthropic": "^4.0.107",
+    "@ai-sdk/google": "^4.0.124",
+    "@ai-sdk/openai": "^4.0.122",
+    "@ai-sdk/openai-compatible": "^3.0.94",
+    "ai": "^7.0.179"
   },
   "devDependencies": {
     "@ocavue/tsconfig": "^0.7.1",
     "typescript": "~6.0.3",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   }
 }

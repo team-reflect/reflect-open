@@ -44,14 +44,14 @@ describe('ChromeTopBar with the web renderer', () => {
   })
 
   it('keeps the corners clear of an uneven side inset', async () => {
-    document.documentElement.style.setProperty('--twsa-safe-area-inset-right', '84px')
+    document.documentElement.style.setProperty('--twsa-inset-right', '84px')
     try {
       const view = await renderInApp(bar())
       const header = rectOf(view.container.querySelector('header'))
       const more = rectOf(view.container.querySelector('[aria-label="More actions"]'))
       expect(more.right).toBeLessThanOrEqual(header.right - 84)
     } finally {
-      document.documentElement.style.removeProperty('--twsa-safe-area-inset-right')
+      document.documentElement.style.removeProperty('--twsa-inset-right')
     }
   })
 })
