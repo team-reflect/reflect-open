@@ -273,8 +273,8 @@ export class TaskCommands {
         byNote.set(task.notePath, [...(byNote.get(task.notePath) ?? []), ...ops])
       }
     }
-    this.#deps.publish()
     const writes = [...byNote].map(([notePath, ops]) => this.#queue(session, store, notePath, ops))
+    this.#deps.publish()
     return Promise.all(writes).then(noop)
   }
 
@@ -339,7 +339,6 @@ export class TaskCommands {
   ): Promise<void> {
     const { publish } = this.#deps
     let pending = store.push(notePath, ops)
-    publish()
     const run = async (): Promise<void> => {
       const written = this.#foldNewTasks(store, ops)
       if (written !== ops) {

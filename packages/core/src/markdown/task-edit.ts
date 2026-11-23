@@ -78,7 +78,6 @@ export function applyTaskEdits(
   edits: readonly TaskEdit[],
 ): TaskEditResult {
   const { document, bodyOffset } = parseEditable(source)
-  const baseRevision = revision
 
   const before = getRoundTasks(document)
   const created: MarkdownListItem[] = []
@@ -89,7 +88,7 @@ export function applyTaskEdits(
     if (edit.kind === 'insert') {
       const { at } = edit
       const contextSlot =
-        at.kind === 'contextEnd' ? resolveContextEnd(before, baseRevision, at.task) : null
+        at.kind === 'contextEnd' ? resolveContextEnd(before, revision, at.task) : null
       const markdown = requireParagraphMarkdown(edit.markdown)
       const bullet = edit.bullet === true
       const item = createListItem(bullet ? 'bullet' : 'task', '+', markdown)
@@ -112,7 +111,7 @@ export function applyTaskEdits(
         }
       }
     }
-    const { node } = locateTask(before, baseRevision, edit.task)
+    const { node } = locateTask(before, revision, edit.task)
     return () => applyItemEdit(document, node, edit)
   })
   for (const mutate of mutations) {
@@ -140,7 +139,7 @@ export function applyTaskEdits(
   const nextSource = source.slice(0, bodyOffset) + nextBody
   return {
     source: nextSource,
-    baseRevision,
+    baseRevision: revision,
     moved,
     inserted,
     tasks: after.map(toTaskSnapshot),
