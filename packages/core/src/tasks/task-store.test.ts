@@ -179,7 +179,7 @@ describe('TaskStore struck tasks', () => {
     store.strike(['t0', 't1'])
     expect(labels(store.view().struck)).toEqual(['t1:done'])
 
-    store.push(A, [{ kind: 'toggle', taskId: 't0' }])
+    store.push(A, [{ kind: 'toggle', taskId: 't0', checked: true }])
     expect(labels(store.view().struck)).toEqual(['t0:a', 't1:done'])
 
     store.archive()
@@ -209,7 +209,7 @@ describe('TaskStore writes', () => {
   it('keeps the ops of another write when one write is dropped', () => {
     const { store } = loaded()
     const first = store.push(A, [{ kind: 'setMarkdown', taskId: 't0', markdown: 'a!' }])
-    store.push(A, [{ kind: 'toggle', taskId: 't1' }])
+    store.push(A, [{ kind: 'toggle', taskId: 't1', checked: true }])
 
     store.drop(first)
     expect(labels(store.view().open)).toEqual(['t0:a'])

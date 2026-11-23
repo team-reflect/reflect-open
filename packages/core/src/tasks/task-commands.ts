@@ -192,7 +192,9 @@ export class TaskCommands {
   }
 
   /**
-   * Check the open tasks of `tasks`, or uncheck `tasks` when every one is checked.
+   * Check the open tasks of `tasks`, or uncheck `tasks` when every one is
+   * checked. A task that has the wanted state when its write starts is left
+   * as it is.
    */
   toggle(tasks: readonly OpenTask[]): Promise<void> {
     return tasks.some((task) => !task.checked)
@@ -373,7 +375,12 @@ export class TaskCommands {
     const saved: TaskOp[] =
       edit.type === 'commit' ? [{ kind: 'setMarkdown', taskId, markdown: edit.content }] : []
     const markdown = edit.type === 'commit' ? edit.content : base
-    return [...saved, ...actionsFor(markdown).map((action): TaskOp => ({ ...action, taskId }))]
+    const ops = actionsFor(markdown).map((action): TaskOp => {
+      return action.kind === 'toggle'
+        ? { kind: 'toggle', taskId, checked: !task.checked }
+        : { ...action, taskId }
+    })
+    return [...saved, ...ops]
   }
 
   /**
@@ -473,7 +480,15 @@ export class TaskCommands {
       }
       const { taskId, ...action } = op
       const row = store.find(notePath, taskId)
-      return row === undefined ? [] : [{ ...action, task: toLocator(row) }]
+      if (row === undefined) {
+        return []
+      }
+      const task = toLocator(row)
+      if (action.kind !== 'toggle') {
+        return [{ ...action, task }]
+      }
+      // A task that already has the state is left as it is.
+      return row.checked === action.checked ? [] : [{ kind: 'toggle', task }]
     })
     return edits.length === 0 ? null : await this.write(session.generation, notePath, edits)
   }

@@ -8,7 +8,10 @@ import type { InsertTaskTarget } from './task-insert-target.ts'
  * A change to one existing task, named by its id.
  */
 export type TaskItemOp =
-  | { kind: 'toggle'; taskId: string }
+  /**
+   * Leave the task checked (`checked: true`) or open.
+   */
+  | { kind: 'toggle'; taskId: string; checked: boolean }
   | { kind: 'setMarkdown'; taskId: string; markdown: string }
   | { kind: 'remove'; taskId: string }
   | { kind: 'toBullet'; taskId: string }
@@ -112,7 +115,7 @@ function insertRow(rows: readonly OpenTask[], op: TaskInsertOp): readonly OpenTa
 export function applyTaskOp(rows: readonly OpenTask[], op: TaskOp): readonly OpenTask[] {
   switch (op.kind) {
     case 'toggle': {
-      return rows.map((row) => (row.taskId === op.taskId ? { ...row, checked: !row.checked } : row))
+      return rows.map((row) => (row.taskId === op.taskId ? { ...row, checked: op.checked } : row))
     }
     case 'setMarkdown': {
       const rendered = renderMarkdown(op.markdown.trim())

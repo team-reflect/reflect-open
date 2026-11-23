@@ -62,8 +62,8 @@ describe('applyTaskOp', () => {
   const nested = '## Tasks\n\n+ [ ] a\n  + [ ] a1\n  + [x] a2\n+ [ ] b\n\npara\n\n+ [ ] c\n'
 
   it.each<[string, string, TaskOp]>([
-    ['toggle', nested, { kind: 'toggle', taskId: 't1' }],
-    ['toggle back', nested, { kind: 'toggle', taskId: 't2' }],
+    ['toggle', nested, { kind: 'toggle', taskId: 't1', checked: true }],
+    ['toggle back', nested, { kind: 'toggle', taskId: 't2', checked: false }],
     [
       'setMarkdown',
       nested,

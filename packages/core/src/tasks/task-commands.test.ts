@@ -75,10 +75,26 @@ describe('writes', () => {
   it('keeps every command of a task that is toggled twice at once', async () => {
     const rows = await start({ [A]: '+ [ ] one\n' })
 
-    await Promise.all([commands.toggle(rows), commands.toggle(rows)])
+    const first = commands.toggle(rows)
+    await Promise.all([first, commands.toggle(harness.tasks.get().struck)])
 
     expect(harness.files.getWrites(A)).toEqual(['+ [x] one\n', '+ [ ] one\n'])
     expect(shown()).toEqual([[rows[0]!.taskId, 'one']])
+  })
+
+  it('leaves a task checked that was completed elsewhere before its write starts', async () => {
+    const rows = await start({ [A]: '+ [ ] one\n+ [ ] two\n' })
+    harness.holdWrites()
+
+    const removing = commands.remove([rows[1]!])
+    const completing = commands.complete([rows[0]!])
+    harness.editExternally(A, '+ [x] one\n+ [ ] two\n')
+    await harness.deliverWatcherBatch()
+    await harness.landWrite()
+    await Promise.all([removing, completing])
+
+    expect(file(A)).toBe('+ [x] one\n')
+    expect(harness.files.getWrites(A)).toHaveLength(1)
   })
 
   it('completes a task that is added to a batch in flight', async () => {

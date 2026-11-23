@@ -51,7 +51,9 @@ A command names tasks by `taskId`. `TaskCommands` shows the change on the rows
 at once, then queues one write per note. A write takes the address of its tasks
 from the store when it starts, so a command never waits for another and is
 never dropped. The writes of one note run in order; different notes are written
-at the same time.
+at the same time. A command that completes or reopens a task names the state it
+wants, so a task that already has that state when the write starts stays as it
+is.
 
 `commitSourceEdit` applies a transform to the note. For an open note the
 transform runs on the editor session buffer. For a closed note it runs on the
