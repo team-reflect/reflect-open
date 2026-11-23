@@ -1,6 +1,6 @@
 {
   "name": "@reflect/index-wasm",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "private": true,
   "type": "module",
   "types": "./src/index.ts",
@@ -13,6 +13,6 @@
   "devDependencies": {
     "@ocavue/tsconfig": "^0.7.1",
     "typescript": "~6.0.3",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   }
 }

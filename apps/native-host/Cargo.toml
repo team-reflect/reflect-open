@@ -1,6 +1,6 @@
 [package]
 name = "reflect-capture-host"
-version = "0.1.0"
+version = "0.0.0"
 description = "Chrome native-messaging host: spools link captures into the graph's capture inbox (Plan 11)"
 authors.workspace = true
 edition.workspace = true

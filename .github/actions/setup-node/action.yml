@@ -26,7 +26,6 @@ runs:
         echo "DO_NOT_TRACK=1" >> $GITHUB_ENV
         echo "NO_UPDATE_NOTIFIER=1" >> $GITHUB_ENV
         echo "TURBO_CONCURRENCY=1" >> $GITHUB_ENV
-        echo "TURBO_LOG_ORDER=stream" >> $GITHUB_ENV
 
     - name: Install pnpm
       uses: pnpm/setup@731dfb6463bbd11c11fd0ee11fe00ed0e36d48a1 # v3.2.0

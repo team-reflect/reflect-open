@@ -7,9 +7,6 @@ import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar.tsx'
 import type { MobileForm } from '@/mobile/mobile-form.ts'
 import { TabCapsule } from '@/mobile/mobile-tab-bar.tsx'
 
-const RAIL_BOTTOM =
-  'calc(max(var(--twsa-safe-area-inset-bottom), var(--keyboard-height, 0px)) + var(--spacing) * 2)'
-
 /**
  * The shell's bottom chrome in each form. While the keyboard is up the
  * formatting toolbar takes the bottom of the shell root, which ends at the
@@ -25,9 +22,8 @@ function WebShellBars({ form, tab, onSelectTab, keyboardVisible }: ShellBarsProp
       return (
         <>
           <aside
-            className="fixed right-safe-offset-2 z-30 flex flex-col items-center gap-3"
             // Above the keyboard while it is up, so the tabs stay reachable.
-            style={{ bottom: RAIL_BOTTOM }}
+            className="fixed right-safe-offset-2 bottom-above-keyboard-offset-2 z-30 flex flex-col items-center gap-3"
           >
             <PlusSlot />
             <TabCapsule tab={tab} onSelect={onSelectTab} orientation="vertical" />
@@ -98,12 +94,12 @@ function webShellStyle(form: MobileForm): CSSProperties {
       return { '--chrome-safe-bottom': '0px' } as CSSProperties
     case 'rail':
       return {
-        '--chrome-safe-bottom': 'var(--twsa-safe-area-inset-bottom)',
+        '--chrome-safe-bottom': 'var(--twsa-inset-bottom)',
         paddingRight: 'calc(var(--spacing) * 16)',
       } as CSSProperties
     case 'pad':
       return {
-        '--chrome-safe-bottom': 'var(--twsa-safe-area-inset-bottom)',
+        '--chrome-safe-bottom': 'var(--twsa-inset-bottom)',
         paddingTop: 'calc(var(--spacing) * 20)',
       } as CSSProperties
   }

@@ -10,22 +10,6 @@ inputs:
     description: Whether to cache the target directory.
     required: false
     default: 'true'
-  s3-endpoint:
-    description: S3 endpoint of the sccache bucket.
-    required: false
-    default: ''
-  s3-bucket:
-    description: Name of the sccache bucket.
-    required: false
-    default: ''
-  s3-access-key-id:
-    description: Access key ID for the sccache bucket.
-    required: false
-    default: ''
-  s3-secret-access-key:
-    description: Secret access key for the sccache bucket.
-    required: false
-    default: ''
 
 runs:
   using: composite
@@ -56,49 +40,6 @@ runs:
     - name: Set the ONNX Runtime cache dir
       shell: bash
       run: echo "ORT_CACHE_DIR=$RUNNER_TEMP/ort_cache" >> "$GITHUB_ENV"
-
-    # Skip sccache on Windows because of error "The filename or extension is too long" (os error 206). See https://github.com/mozilla/sccache/issues/2397
-    - name: Install sccache
-      if: inputs.cache == 'true' && runner.os != 'Windows'
-      uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
-
-    - name: Enable sccache
-      if: inputs.cache == 'true' && runner.os != 'Windows'
-      shell: bash
-      env:
-        S3_ENDPOINT: ${{ inputs.s3-endpoint }}
-        S3_BUCKET: ${{ inputs.s3-bucket }}
-        S3_ACCESS_KEY_ID: ${{ inputs.s3-access-key-id }}
-        S3_SECRET_ACCESS_KEY: ${{ inputs.s3-secret-access-key }}
-      run: |
-        echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
-        echo "SCCACHE_IDLE_TIMEOUT=0" >> "$GITHUB_ENV"
-
-        # Look up the local disk first, then S3.
-        # https://github.com/mozilla/sccache/blob/v0.19.0/docs/MultiLevel.md
-        # https://github.com/mozilla/sccache/blob/v0.19.0/docs/S3.md
-        echo "SCCACHE_DIR=$RUNNER_TEMP/sccache" >> "$GITHUB_ENV"
-        if [ -n "$S3_ENDPOINT" ] && [ -n "$S3_BUCKET" ] && [ -n "$S3_ACCESS_KEY_ID" ] && [ -n "$S3_SECRET_ACCESS_KEY" ]; then
-          echo "Found S3 secrets: sccache uses the local disk first, then S3."
-          echo "SCCACHE_MULTILEVEL_CHAIN=disk,s3" >> "$GITHUB_ENV"
-          echo "SCCACHE_ENDPOINT=$S3_ENDPOINT" >> "$GITHUB_ENV"
-          echo "SCCACHE_BUCKET=$S3_BUCKET" >> "$GITHUB_ENV"
-          echo "SCCACHE_REGION=auto" >> "$GITHUB_ENV"
-          echo "SCCACHE_S3_KEY_PREFIX=sccache/" >> "$GITHUB_ENV"
-          echo "AWS_ACCESS_KEY_ID=$S3_ACCESS_KEY_ID" >> "$GITHUB_ENV"
-          echo "AWS_SECRET_ACCESS_KEY=$S3_SECRET_ACCESS_KEY" >> "$GITHUB_ENV"
-        else
-          echo "No S3 secrets: sccache uses the local disk only."
-        fi
-
-        # Without this, sccache writes a probe file before every write, and a
-        # rate-limited probe makes it skip the write.
-        echo "SCCACHE_SKIP_CACHE_CHECK=true" >> "$GITHUB_ENV"
-
-        # Upload only on master.
-        if [ "$GITHUB_REF" != "refs/heads/master" ]; then
-          echo "SCCACHE_S3_RW_MODE=READ_ONLY" >> "$GITHUB_ENV"
-        fi
 
     - name: Cache ONNX Runtime
       if: inputs.cache == 'true'

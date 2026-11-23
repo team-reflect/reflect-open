@@ -1,6 +1,6 @@
 {
   "name": "@reflect/design-system",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "private": true,
   "description": "Reflect design tokens, fonts, and UI primitives.",
   "type": "module",
@@ -10,6 +10,6 @@
     "./assets/*": "./assets/*"
   },
   "devDependencies": {
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.1"
   }
 }
