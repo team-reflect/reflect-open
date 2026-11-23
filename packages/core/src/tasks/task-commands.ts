@@ -16,8 +16,8 @@ import {
 import type { OpenTask } from './open-task.ts'
 import { resolveTaskEdit } from './task-content.ts'
 import { NoteEditError } from '../documents/note-edit-error.ts'
-import { toInsertTarget, type InsertTaskTarget } from './task-insert-target.ts'
-import type { TaskInsertOp, TaskOp } from './task-ops.ts'
+import type { InsertTaskTarget } from './task-insert-target.ts'
+import type { TaskOp } from './task-ops.ts'
 import { withDraftDueDate } from './task-schedule-content.ts'
 import type { TaskStore, TaskWriteResult } from './task-store.ts'
 
@@ -240,15 +240,7 @@ export class TaskCommands {
 
   #addNewTask(target: InsertTaskTarget, after: string | null): OpenTask {
     const { clock, publish } = this.#deps
-    const store = this.#deps.store()
-    const row = store.addNewTask({
-      kind: 'insert',
-      taskId: store.createTaskId(),
-      note: toInsertTarget(target),
-      after,
-      markdown: '',
-      updatedAt: clock.now(),
-    })
+    const row = this.#deps.store().addNewTask(target, after, clock.now())
     publish()
     return row
   }
@@ -287,10 +279,9 @@ export class TaskCommands {
     actionsFor: (markdown: string) => readonly TaskAction[],
   ): TaskOp[] {
     const { taskId } = task
-    const draft = store.takeDraft(taskId)
-    const newTask = store.takeNewTask(taskId)
-    if (newTask !== undefined) {
-      const markdown = (draft?.markdown ?? newTask.markdown).trim()
+    const text = store.takeText(task)
+    if (text.insert !== undefined) {
+      const markdown = text.markdown.trim()
       const actions = markdown === '' ? [] : actionsFor(markdown)
       // A new task with no text, or one that is removed, is dropped: nothing is written.
       if (markdown === '' || actions.some((action) => action.kind === 'remove')) {
@@ -299,19 +290,15 @@ export class TaskCommands {
       const rewrite = actions.findLast((action) => action.kind === 'setMarkdown')
       return [
         {
-          ...newTask,
+          ...text.insert,
           markdown: rewrite?.markdown ?? markdown,
           checked: actions.some((action) => action.kind === 'toggle'),
           bullet: actions.some((action) => action.kind === 'toBullet'),
         },
       ]
     }
-    const held = store.takeHeldText(taskId)
-    const base =
-      held === undefined
-        ? (draft?.base ?? task.markdown)
-        : (store.find(task.notePath, taskId)?.markdown ?? task.markdown)
-    const edit = resolveTaskEdit(base, draft?.markdown ?? held ?? base)
+    const { base } = text
+    const edit = resolveTaskEdit(base, text.markdown)
     // A task whose text was cleared is removed, whatever the command.
     if (edit.type === 'delete') {
       return [{ kind: 'remove', taskId }]
@@ -338,36 +325,23 @@ export class TaskCommands {
     ops: readonly TaskOp[],
   ): Promise<void> {
     const { publish } = this.#deps
-    let pending = store.push(notePath, ops)
+    let pending = store.begin(notePath, ops)
     const run = async (): Promise<void> => {
-      const written = this.#foldNewTasks(store, ops)
-      if (written !== ops) {
-        store.drop(pending)
-        pending = store.push(notePath, written)
-      }
+      pending = store.fold(pending)
       try {
         const result = session.signal.aborted
           ? null
-          : await this.#writeOps(session, store, notePath, written)
+          : await this.#writeOps(session, store, notePath, pending.ops)
         if (result === null) {
-          store.drop(pending)
+          store.fail(pending)
         } else {
           store.landCommit(notePath, result, pending)
         }
       } catch (cause) {
-        store.drop(pending)
-        if (session.signal.aborted) {
-          return
+        store.fail(pending)
+        if (!session.signal.aborted) {
+          this.#report(cause)
         }
-        // Text that was not written stays in its row until a later write takes it.
-        for (const op of written) {
-          if (op.kind === 'insert') {
-            store.addNewTask({ ...op, checked: false, bullet: false })
-          } else if (op.kind === 'setMarkdown' && store.find(notePath, op.taskId) !== undefined) {
-            store.holdText(notePath, op.taskId, op.markdown)
-          }
-        }
-        this.#report(cause)
       }
       publish()
     }
@@ -379,42 +353,6 @@ export class TaskCommands {
       }
     })
     return queued
-  }
-
-  /**
-   * `ops` with each op that names a new task no write holds folded into the
-   * insert of that task: the write that held the new task failed.
-   */
-  #foldNewTasks(store: TaskStore, ops: readonly TaskOp[]): readonly TaskOp[] {
-    const kept: TaskOp[] = []
-    const inserts = new Map<string, TaskInsertOp>()
-    for (const op of ops) {
-      const insert =
-        op.kind === 'insert' ? undefined : (inserts.get(op.taskId) ?? store.takeNewTask(op.taskId))
-      if (op.kind === 'insert' || insert === undefined) {
-        kept.push(op)
-        continue
-      }
-      switch (op.kind) {
-        case 'setMarkdown': {
-          inserts.set(op.taskId, { ...insert, markdown: op.markdown })
-          break
-        }
-        case 'toggle': {
-          inserts.set(op.taskId, { ...insert, checked: op.checked })
-          break
-        }
-        case 'toBullet': {
-          inserts.set(op.taskId, { ...insert, bullet: true })
-          break
-        }
-        case 'remove': {
-          inserts.delete(op.taskId)
-          break
-        }
-      }
-    }
-    return kept.length === ops.length ? ops : [...kept, ...inserts.values()]
   }
 
   /**

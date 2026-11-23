@@ -175,7 +175,7 @@ describe('TaskStore struck tasks', () => {
     store.strike(['t0', 't1'])
     expect(labels(store.view().struck)).toEqual(['t1:done'])
 
-    store.push(A, [{ kind: 'toggle', taskId: 't0', checked: true }])
+    store.begin(A, [{ kind: 'toggle', taskId: 't0', checked: true }])
     expect(labels(store.view().struck)).toEqual(['t0:a', 't1:done'])
 
     store.archive()
@@ -193,27 +193,36 @@ describe('TaskStore writes', () => {
     return { store, a: a!, b: b! }
   }
 
-  it('shows the ops of a write until it is dropped', () => {
+  it('shows the ops of a write until it fails', () => {
     const { store } = loaded()
-    const write = store.push(A, [{ kind: 'setMarkdown', taskId: 't0', markdown: 'a!' }])
-    expect(labels(store.view().open)).toEqual(['t0:a!', 't1:b'])
+    const write = store.begin(A, [{ kind: 'toggle', taskId: 't0', checked: true }])
+    expect(labels(store.view().open)).toEqual(['t1:b'])
 
-    store.drop(write)
+    store.fail(write)
     expect(labels(store.view().open)).toEqual(['t0:a', 't1:b'])
   })
 
-  it('keeps the ops of another write when one write is dropped', () => {
+  it('keeps the ops of another write when one write fails', () => {
     const { store } = loaded()
-    const first = store.push(A, [{ kind: 'setMarkdown', taskId: 't0', markdown: 'a!' }])
-    store.push(A, [{ kind: 'toggle', taskId: 't1', checked: true }])
+    const first = store.begin(A, [{ kind: 'toBullet', taskId: 't0' }])
+    store.begin(A, [{ kind: 'toggle', taskId: 't1', checked: true }])
 
-    store.drop(first)
+    store.fail(first)
     expect(labels(store.view().open)).toEqual(['t0:a'])
+  })
+
+  it('keeps the text of a failed write in its row until it is taken', () => {
+    const { store, a } = loaded()
+    store.fail(store.begin(A, [{ kind: 'setMarkdown', taskId: 't0', markdown: 'a!' }]))
+    expect(labels(store.view().open)).toEqual(['t0:a!', 't1:b'])
+
+    expect(store.takeText(a)).toEqual({ base: 'a', markdown: 'a!' })
+    expect(labels(store.view().open)).toEqual(['t0:a', 't1:b'])
   })
 
   it('applies the ops over the rows a read lands during the write', () => {
     const { store } = loaded()
-    store.push(A, [{ kind: 'setMarkdown', taskId: 't1', markdown: 'b!' }])
+    store.begin(A, [{ kind: 'setMarkdown', taskId: 't1', markdown: 'b!' }])
 
     store.landPaths(fullRead(2, { [A]: '+ [ ] above\n+ [ ] a\n+ [ ] b\n' }), [A])
     expect(labels(store.view().open)).toEqual(['t2:above', 't0:a', 't1:b!'])
@@ -222,7 +231,7 @@ describe('TaskStore writes', () => {
   it('replaces the rows of the note with the tasks of the commit and keeps the ids', () => {
     const { store, a } = loaded()
     const ops: TaskOp[] = [{ kind: 'remove', taskId: 't0' }]
-    const write = store.push(A, ops)
+    const write = store.begin(A, ops)
 
     store.landCommit(A, resultOf(source, [{ kind: 'remove', task: locate(a) }], 2), write)
     expect(store.view().open).toMatchObject([
@@ -239,7 +248,7 @@ describe('TaskStore writes', () => {
   it('gives an inserted task the id of its op', () => {
     const { store, a } = loaded()
     const note = { notePath: A, noteTitle: A, dailyDate: null, isPinned: false, pinnedOrder: null }
-    const write = store.push(A, [
+    const write = store.begin(A, [
       { kind: 'insert', taskId: 'draft', note, after: 't0', markdown: '', updatedAt: 3 },
     ])
     expect(labels(store.view().open)).toEqual(['t0:a', 't1:b', 'draft:'])
@@ -264,7 +273,7 @@ describe('TaskStore writes', () => {
       isPinned: false,
       pinnedOrder: null,
     }
-    const write = store.push(B, [
+    const write = store.begin(B, [
       { kind: 'insert', taskId: 'draft', note, after: null, markdown: 'x', updatedAt: 3 },
     ])
     expect(store.view().open).toMatchObject([
@@ -290,7 +299,7 @@ describe('TaskStore writes', () => {
   it('gives an inserted task the id of its op when the note text is not the output of the edit', () => {
     const { store, a } = loaded()
     const note = { notePath: A, noteTitle: A, dailyDate: null, isPinned: false, pinnedOrder: null }
-    const write = store.push(A, [
+    const write = store.begin(A, [
       { kind: 'insert', taskId: 'draft', note, after: 't0', markdown: 'c', updatedAt: 3 },
     ])
     const edit: TaskEdit = {

@@ -8,7 +8,7 @@ import {
   type TaskSnapshot,
 } from '../markdown/index.ts'
 import type { OpenTask } from './open-task.ts'
-import { toInsertTarget } from './task-insert-target.ts'
+import { toInsertTarget, type InsertTaskTarget } from './task-insert-target.ts'
 import { applyTaskOp, type TaskInsertOp, type TaskOp } from './task-ops.ts'
 import { reconcileNoteTasks } from './task-reconcile.ts'
 
@@ -147,9 +147,9 @@ function compareByRecency(left: OpenTask, right: OpenTask): number {
  */
 export class TaskStore {
   /**
-   * Make an id that no task of this store holds.
+   * Makes an id that no task of this store holds.
    */
-  readonly createTaskId: () => string
+  readonly #createTaskId: () => string
   readonly #notes = new Map<string, NoteEntry>()
   /**
    * The index seq each path was last learned at, kept after the path has no task.
@@ -170,7 +170,7 @@ export class TaskStore {
   #view: TaskStoreView | null = null
 
   constructor(createTaskId: () => string) {
-    this.createTaskId = createTaskId
+    this.#createTaskId = createTaskId
   }
 
   /**
@@ -229,9 +229,9 @@ export class TaskStore {
 
   /**
    * Show `ops` on the rows of `notePath` until the returned write ends with
-   * {@link TaskStore.landCommit} or {@link TaskStore.drop}.
+   * {@link TaskStore.landCommit} or {@link TaskStore.fail}.
    */
-  push(notePath: string, ops: readonly TaskOp[]): PendingWrite {
+  begin(notePath: string, ops: readonly TaskOp[]): PendingWrite {
     const write = { notePath, ops }
     this.#pending.push(write)
     this.#view = null
@@ -239,20 +239,81 @@ export class TaskStore {
   }
 
   /**
-   * End a write that failed: its ops leave the rows.
+   * `write` as it runs: each op that names a new task no write holds is
+   * folded into the insert of that task, which the returned write holds.
    */
-  drop(write: PendingWrite): void {
-    this.#pending = this.#pending.filter((pending) => pending !== write)
-    this.#view = null
+  fold(write: PendingWrite): PendingWrite {
+    const { notePath, ops } = write
+    const kept: TaskOp[] = []
+    const inserts = new Map<string, TaskInsertOp>()
+    for (const op of ops) {
+      const insert =
+        op.kind === 'insert' ? undefined : (inserts.get(op.taskId) ?? this.#takeNewTask(op.taskId))
+      if (op.kind === 'insert' || insert === undefined) {
+        kept.push(op)
+        continue
+      }
+      switch (op.kind) {
+        case 'setMarkdown': {
+          inserts.set(op.taskId, { ...insert, markdown: op.markdown })
+          break
+        }
+        case 'toggle': {
+          inserts.set(op.taskId, { ...insert, checked: op.checked })
+          break
+        }
+        case 'toBullet': {
+          inserts.set(op.taskId, { ...insert, bullet: true })
+          break
+        }
+        case 'remove': {
+          inserts.delete(op.taskId)
+          break
+        }
+      }
+    }
+    if (kept.length === ops.length) {
+      return write
+    }
+    this.#drop(write)
+    return this.begin(notePath, [...kept, ...inserts.values()])
   }
 
   /**
-   * Show a new task that no write holds yet, and return its row.
+   * End a write that left nothing in its note: its ops leave the rows. Text
+   * that was not written stays in its row until {@link TaskStore.takeText}:
+   * a new task of the write shows again, unchecked, and the text of a task
+   * of the note shows as held text.
    */
-  addNewTask(op: TaskInsertOp): OpenTask {
-    const { notePath } = op.note
-    this.#unwritten.set(op.taskId, this.push(notePath, [op]))
-    const row = this.rows(notePath).find((candidate) => candidate.taskId === op.taskId)
+  fail(write: PendingWrite): void {
+    this.#drop(write)
+    for (const op of write.ops) {
+      if (op.kind === 'insert') {
+        this.#showNewTask({ ...op, checked: false, bullet: false })
+      } else if (op.kind === 'setMarkdown' && this.find(write.notePath, op.taskId) !== undefined) {
+        this.#takeUnwritten(op.taskId)
+        this.#unwritten.set(op.taskId, this.begin(write.notePath, [op]))
+      }
+    }
+  }
+
+  /**
+   * Show a new empty task in `note` that no write holds yet, and return its
+   * row. It ends the list of the task `after`, or the Tasks section of the
+   * note for `null`.
+   */
+  addNewTask(note: InsertTaskTarget, after: string | null, updatedAt: number): OpenTask {
+    const taskId = this.#createTaskId()
+    const { notePath } = note
+    this.#showNewTask({
+      kind: 'insert',
+      taskId,
+      note: toInsertTarget(note),
+      after,
+      markdown: '',
+      updatedAt,
+    })
+    const row = this.rows(notePath).find((candidate) => candidate.taskId === taskId)
     if (row === undefined) {
       throw new Error('The new task has no row.')
     }
@@ -268,38 +329,6 @@ export class TaskStore {
   }
 
   /**
-   * Stop showing the new task of `taskId` and return it, for a write to hold.
-   */
-  takeNewTask(taskId: string): TaskInsertOp | undefined {
-    const op = this.findNewTask(taskId)
-    if (op !== undefined) {
-      this.#takeUnwritten(taskId)
-    }
-    return op
-  }
-
-  /**
-   * Show `markdown` as the text of the task of `taskId` in `notePath` until a
-   * write takes it.
-   */
-  holdText(notePath: string, taskId: string, markdown: string): void {
-    this.#takeUnwritten(taskId)
-    this.#unwritten.set(taskId, this.push(notePath, [{ kind: 'setMarkdown', taskId, markdown }]))
-  }
-
-  /**
-   * Stop showing the held text of `taskId` and return it, for a write to hold.
-   */
-  takeHeldText(taskId: string): string | undefined {
-    const op = this.#unwritten.get(taskId)?.ops[0]
-    if (op?.kind !== 'setMarkdown') {
-      return undefined
-    }
-    this.#takeUnwritten(taskId)
-    return op.markdown
-  }
-
-  /**
    * Keep `markdown` as the text typed into the editor of `task`.
    */
   setDraft(task: Pick<OpenTask, 'notePath' | 'taskId' | 'markdown'>, markdown: string): void {
@@ -308,12 +337,31 @@ export class TaskStore {
   }
 
   /**
-   * Forget the draft of `taskId` and return it.
+   * Take the text of `task` that no write holds, for a write to hold: its
+   * draft, and its new task or held text, which stop showing. `markdown` is
+   * the text to write and `base` the text it replaces. `insert` is the new
+   * task, when `task` is one.
    */
-  takeDraft(taskId: string): TaskDraft | undefined {
+  takeText(task: Pick<OpenTask, 'notePath' | 'taskId' | 'markdown'>): {
+    base: string
+    markdown: string
+    insert?: TaskInsertOp | undefined
+  } {
+    const { taskId } = task
     const draft = this.#drafts.get(taskId)
     this.#drafts.delete(taskId)
-    return draft
+    const insert = this.#takeNewTask(taskId)
+    if (insert !== undefined) {
+      return { base: '', markdown: draft?.markdown ?? insert.markdown, insert }
+    }
+    const op = this.#unwritten.get(taskId)?.ops[0]
+    if (op?.kind !== 'setMarkdown') {
+      const base = draft?.base ?? task.markdown
+      return { base, markdown: draft?.markdown ?? base }
+    }
+    this.#takeUnwritten(taskId)
+    const base = this.find(task.notePath, taskId)?.markdown ?? task.markdown
+    return { base, markdown: draft?.markdown ?? op.markdown }
   }
 
   /**
@@ -375,7 +423,7 @@ export class TaskStore {
       }
     }
     if (write !== null) {
-      this.drop(write)
+      this.#drop(write)
     }
   }
 
@@ -433,11 +481,31 @@ export class TaskStore {
     return this.#view
   }
 
+  #drop(write: PendingWrite): void {
+    this.#pending = this.#pending.filter((pending) => pending !== write)
+    this.#view = null
+  }
+
+  #showNewTask(op: TaskInsertOp): void {
+    this.#unwritten.set(op.taskId, this.begin(op.note.notePath, [op]))
+  }
+
+  /**
+   * Stop showing the new task of `taskId` and return it.
+   */
+  #takeNewTask(taskId: string): TaskInsertOp | undefined {
+    const op = this.findNewTask(taskId)
+    if (op !== undefined) {
+      this.#takeUnwritten(taskId)
+    }
+    return op
+  }
+
   #takeUnwritten(taskId: string): void {
     const write = this.#unwritten.get(taskId)
     if (write !== undefined) {
       this.#unwritten.delete(taskId)
-      this.drop(write)
+      this.#drop(write)
     }
   }
 
@@ -483,7 +551,7 @@ export class TaskStore {
       return
     }
     const ordered = tasks.toSorted((left, right) => compareTaskPaths(left.astPath, right.astPath))
-    const ids = reconcileNoteTasks(previous?.rows ?? [], ordered, moves, this.createTaskId)
+    const ids = reconcileNoteTasks(previous?.rows ?? [], ordered, moves, this.#createTaskId)
     const known = new Set(previous?.rows.map((row) => row.taskId))
     for (const op of unplaced) {
       const index = ordered.findIndex((task, i) => {
