@@ -208,7 +208,7 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
         with:
-          cache-scope: test-rust
+          cache-scope: test-node
           cache-save: 'false'
 
       - name: Install Playwright

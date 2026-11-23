@@ -60,19 +60,26 @@ runs:
         path: ${{ env.ORT_CACHE_DIR }}
         key: ort-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
 
+    # Restores the newest cache of this scope first, then the newest cache of
+    # any scope on this platform.
     - name: Compute the mbx cache key
       id: mbx-key
       shell: bash
       env:
         SCOPE: ${{ inputs.cache-scope || github.job }}
-        TOOLCHAIN: ${{ hashFiles('rust-toolchain.toml') }}
       run: |
-        prefix="mbx-objects-v1-$RUNNER_OS-$RUNNER_ARCH-$SCOPE-$TOOLCHAIN-"
-        echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
-        echo "key=$prefix$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+        prefix="mbx-objects-v1-$RUNNER_OS-$RUNNER_ARCH-"
+        echo "key=$prefix$SCOPE-$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+        {
+          echo "restore-keys<<EOF"
+          echo "$prefix$SCOPE-"
+          echo "$prefix"
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
 
     # Uses the mbx that mise installed. The `objects` mode restores and saves
-    # the mbx object store; only a successful push to master saves.
+    # the mbx object store; a successful push to master or workflow_dispatch
+    # saves.
     # https://mr-boxington.jdx.dev/github-action
     # The action skips the save when ACTIONS_CACHE_MODE does not permit writes.
     # https://github.com/jdx/mr-boxington-action/blob/b3ef673bd77c5426927fe8836c6185cdae04c2dd/src/lib.ts#L489-L505
@@ -84,4 +91,5 @@ runs:
         backend: ${{ inputs.cache == 'true' && 'github' || 'local' }}
         github-cache-mode: objects
         cache-key: ${{ steps.mbx-key.outputs.key }}
-        restore-keys: ${{ steps.mbx-key.outputs.prefix }}
+        restore-keys: ${{ steps.mbx-key.outputs.restore-keys }}
+        save-on-workflow-dispatch: ${{ inputs.cache-save }}
