@@ -40,6 +40,7 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
+      # FIXME: remove "Install Rust toolchain"。 just use setup-rust action
       # `cargo about` in `gen:licenses` also needs the toolchain.
       - name: Install Rust toolchain
         if: steps.changes.outputs.rust == 'true' || steps.changes.outputs.licenses == 'true'
@@ -59,6 +60,7 @@ jobs:
         if: steps.changes.outputs.rust == 'true'
         run: pnpm gen:types
 
+      # FIXME: add a new scriptpts/lint-swift.sh [--fix] to replace this. scriptpts/check-swift.sh has an optional --fix argument to fix the code. --fix is by default off.
       - name: Fix (Swift)
         run: |
           swift format --version

@@ -1,4 +1,4 @@
-# Put setup-mise after setup-rust
+# FIXME: merge setup-mise and setup-rust into a single setup-rust action. delete setup-mise
 
 name: Set up mise
 description: Installs mise and the tools in `mise.toml`.

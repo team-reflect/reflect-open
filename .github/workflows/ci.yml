@@ -270,11 +270,13 @@ jobs:
 
       - uses: ./.github/actions/setup-xcode
 
+      # FIXME: add the new scriptpts/lint-swift.sh to replace the steps blow.
       - run: swift --version
       - run: swift format --version
       - run: git ls-files -z '*.swift' | xargs -0 swift format format --parallel --in-place
       - run: git ls-files -z '*.swift' | xargs -0 swift format lint --strict --parallel
       - run: git diff --exit-code '*.swift'
+      # FIXME: add the new scriptpts/check-swift.sh to replace the steps above.
 
       - uses: ./.github/actions/setup-node
 
