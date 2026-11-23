@@ -78,3 +78,15 @@ runs:
           mbx-v2/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/${{ hashFiles('Cargo.lock') }}/
           mbx-v2/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/
         save-on-workflow-dispatch: true
+
+    # The ort-sys build script declares no input for the downloaded binaries,
+    # so Cargo reuses its output from the restored target directory.
+    # Removing its build directories makes Cargo run it again.
+    - name: Run the ort-sys build script again
+      if: inputs.cache == 'true' && steps.ort.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        shopt -s nullglob
+        dirs=(target/*/build/ort-sys target/*/*/build/ort-sys)
+        echo "Removing: ${dirs[*]:-nothing}"
+        rm -rf "${dirs[@]}"
