@@ -14,6 +14,7 @@ import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import {
   applyTaskEdits,
+  encodeTaskPath,
   renderTaskSnapshot,
   type TaskEdit,
   type TaskEditResult,
@@ -376,6 +377,7 @@ function isReopenedAfter(struck: OpenTask, live: OpenTask): boolean {
 function toOpenTasks(notes: readonly NoteTasks[]): OpenTask[] {
   return notes.flatMap((note) => {
     return note.tasks.map((task) => ({
+      taskId: `${note.path}:${encodeTaskPath(task.astPath)}`,
       notePath: note.path,
       revision: note.hash,
       noteTitle: note.title,

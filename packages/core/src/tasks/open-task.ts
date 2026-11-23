@@ -5,6 +5,10 @@ import { compareTaskPaths, type TaskRow } from '../markdown/index.ts'
  * by. `astPath`, `markdown`, and `checked` address the task for writes.
  */
 export interface OpenTask extends TaskRow {
+  /**
+   * The id the task holds while the app runs. It is not stored in the note.
+   */
+  taskId: string
   notePath: string
   /**
    * The hash of the note text the row describes.

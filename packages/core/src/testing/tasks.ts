@@ -1,4 +1,4 @@
-import { renderInlineText } from '../markdown/index.ts'
+import { encodeTaskPath, renderInlineText } from '../markdown/index.ts'
 import type { OpenTask } from '../tasks/open-task.ts'
 
 /**
@@ -7,7 +7,10 @@ import type { OpenTask } from '../tasks/open-task.ts'
  */
 export function makeOpenTask(overrides: Partial<OpenTask> = {}): OpenTask {
   const markdown = overrides.markdown ?? overrides.text ?? 'do it'
+  const notePath = overrides.notePath ?? 'notes/n.md'
+  const astPath = overrides.astPath ?? [0]
   return {
+    taskId: `${notePath}:${encodeTaskPath(astPath)}`,
     notePath: 'notes/n.md',
     revision: '',
     astPath: [0],

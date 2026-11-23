@@ -1,4 +1,4 @@
-import { renderTaskSnapshot, type TaskSnapshot } from '../markdown/index.ts'
+import { encodeTaskPath, renderTaskSnapshot, type TaskSnapshot } from '../markdown/index.ts'
 import type { OpenTask } from './open-task.ts'
 
 /**
@@ -23,6 +23,7 @@ export function createInsertedTaskRow(
   const { notePath, noteTitle, dailyDate, isPinned, pinnedOrder } = target
   return {
     ...renderTaskSnapshot(created),
+    taskId: `${notePath}:${encodeTaskPath(created.astPath)}`,
     notePath,
     revision,
     noteTitle,

@@ -15,6 +15,7 @@ const FUTURE = '2026-06-20'
 /** An open-task row with sensible defaults; override only what a case needs. */
 function task(overrides: Partial<OpenTask> = {}): OpenTask {
   return {
+    taskId: 't',
     notePath: 'notes/n.md',
     revision: '',
     astPath: [0],
