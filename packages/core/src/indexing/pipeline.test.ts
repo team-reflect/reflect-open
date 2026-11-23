@@ -16,7 +16,6 @@ import type { FileChange } from './file-change-service.ts'
 import { createIndexQueryService } from './index-query-service.ts'
 import type { WritableIndexStoreService } from './index-store-service.ts'
 import { buildIndexedNote, PROJECTION_VERSION } from './indexed-note.ts'
-import { createDirtySet } from './dirty-set.ts'
 import { createIndexWriter, type ChangesAppliedEmitter, type IndexWriter } from './index-writer.ts'
 import { createNoteIndexer, PROJECTION_VERSION_KEY } from './indexer.ts'
 
@@ -179,7 +178,7 @@ function setup(options?: {
           },
           canWrite: () => gate.canWrite,
         },
-        { dirty: createDirtySet(), generation, fileGeneration: FILE_GENERATION },
+        { generation, fileGeneration: FILE_GENERATION },
       )
       writers.set(generation, writer)
     }

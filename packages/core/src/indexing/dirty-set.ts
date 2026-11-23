@@ -1,5 +1,4 @@
 import type { NoteRead } from '@reflect/types'
-import type { Unlisten } from '../unlisten.ts'
 
 /**
  * What a source knows about a path it reports as dirty.
@@ -63,22 +62,13 @@ export interface DirtySet {
    */
   restore(entries: readonly DirtyEntry[]): void
   /**
-   * Whether `path` is dirty.
-   */
-  has(path: string): boolean
-  /**
    * The number of dirty paths.
    */
   size(): number
-  /**
-   * Call `listener` after each {@link DirtySet.add}.
-   */
-  subscribe(listener: () => void): Unlisten
 }
 
 class DirtySetImpl implements DirtySet {
   readonly #entries = new Map<string, DirtyEntry>()
-  readonly #listeners = new Set<() => void>()
 
   add(path: string, hint?: DirtyHint): void {
     const earlier = this.#entries.get(path)
@@ -90,9 +80,6 @@ class DirtySetImpl implements DirtySet {
       force: (hint?.force ?? false) || (earlier?.force ?? false),
       bulk: (hint?.bulk ?? false) && (earlier?.bulk ?? true),
     })
-    for (const listener of this.#listeners) {
-      listener()
-    }
   }
 
   take(): DirtyEntry[] {
@@ -119,19 +106,8 @@ class DirtySetImpl implements DirtySet {
     }
   }
 
-  has(path: string): boolean {
-    return this.#entries.has(path)
-  }
-
   size(): number {
     return this.#entries.size
-  }
-
-  subscribe(listener: () => void): Unlisten {
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
   }
 }
 

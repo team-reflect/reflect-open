@@ -12,7 +12,6 @@ import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { FileChange, FileChangeService } from './file-change-service.ts'
 import { createNoteIndexer, type NoteIndexer } from './indexer.ts'
-import { createDirtySet } from './dirty-set.ts'
 import {
   createIndexWriter,
   INDEX_RETRY_MAX_MS,
@@ -390,7 +389,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     )
     this.#stopFollowing ??= fileChanges.subscribe(({ changes }) => {
       if (this.#writer !== null) {
-        markFileChanges(this.#writer.dirty, changes)
+        markFileChanges(this.#writer, changes)
       }
     })
     if (session.signal.aborted) {
@@ -609,7 +608,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
   markDirty(changes: readonly FileChange[], generation: number, fileGeneration: number): void {
     const writer = this.#writerAt(generation, fileGeneration)
     if (writer !== null) {
-      markFileChanges(writer.dirty, changes)
+      markFileChanges(writer, changes)
     }
   }
 
@@ -660,8 +659,11 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     if (writer === null) {
       return null
     }
-    writer.dirty.add(path, { note: options.note, modifiedMs: options.mtime })
-    const outcome = await writer.settledFirst(path)
+    const outcome = await writer.write(
+      path,
+      { note: options.note, modifiedMs: options.mtime },
+      { first: true },
+    )
     switch (outcome.status) {
       case 'applied':
         return outcome.seq
@@ -761,11 +763,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
       return null
     }
     current?.dispose()
-    const writer = createIndexWriter(this.#writerDeps, {
-      dirty: createDirtySet(),
-      generation,
-      fileGeneration,
-    })
+    const writer = createIndexWriter(this.#writerDeps, { generation, fileGeneration })
     this.#writer = writer
     return writer
   }

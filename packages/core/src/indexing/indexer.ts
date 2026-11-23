@@ -1,4 +1,5 @@
 import { errorMessage } from '../errors.ts'
+import type { DirtyHint } from './dirty-set.ts'
 import { createAssetReferences, type AssetReferences } from './asset-refs.ts'
 import type { SkippedIndexedNote } from './index-store-service.ts'
 import type { IndexingDeps, IndexWriteOutcome, IndexWriter } from './index-writer.ts'
@@ -143,10 +144,9 @@ class NoteIndexerImpl implements NoteIndexer {
         notePaths.add(notePath)
       }
     }
-    for (const notePath of notePaths) {
-      writer.dirty.add(notePath, { force: true })
-    }
-    const outcomes = await Promise.all([...notePaths].map((path) => writer.settled(path)))
+    const outcomes = await Promise.all(
+      [...notePaths].map((path) => writer.write(path, { force: true })),
+    )
     for (const outcome of outcomes) {
       if (outcome.status === 'failed') {
         throw outcome.error
@@ -174,12 +174,9 @@ class NoteIndexerImpl implements NoteIndexer {
     // materialization upsert.
     const evicted = files.filter((file) => file.placeholder === true).map((file) => file.path)
     const readable = files.filter((file) => file.placeholder !== true)
-    for (const file of readable) {
-      writer.dirty.add(file.path, { modifiedMs: file.modifiedMs, bulk: true })
-    }
-    const outcomes = await this.#settlePaths(
+    const outcomes = await this.#writePaths(
       writer,
-      readable.map((file) => file.path),
+      readable.map((file) => [file.path, { modifiedMs: file.modifiedMs, bulk: true }]),
       signal,
       (worked) => {
         onFileProgress?.(evicted.length + worked, files.length, worked)
@@ -214,16 +211,17 @@ class NoteIndexerImpl implements NoteIndexer {
       // writer works through the readable candidates.
       onStalePlaceholders?.(scan.stalePlaceholders)
     }
-    for (const candidate of scan.candidates) {
-      writer.dirty.add(candidate.path, { modifiedMs: candidate.modifiedMs, bulk: true })
-    }
-    for (const orphan of scan.orphans) {
-      writer.dirty.add(orphan.path, { kind: 'remove', bulk: true })
-    }
     const total = scan.candidates.length
-    const outcomes = await this.#settlePaths(
+    const outcomes = await this.#writePaths(
       writer,
-      [...scan.candidates, ...scan.orphans].map((file) => file.path),
+      [
+        ...scan.candidates.map((candidate): [string, DirtyHint] => {
+          return [candidate.path, { modifiedMs: candidate.modifiedMs, bulk: true }]
+        }),
+        ...scan.orphans.map((orphan): [string, DirtyHint] => {
+          return [orphan.path, { kind: 'remove', bulk: true }]
+        }),
+      ],
       signal,
       (settled) => {
         const done = Math.min(settled, total)
@@ -279,14 +277,15 @@ class NoteIndexerImpl implements NoteIndexer {
   }
 
   /**
-   * Wait until the writer settled each of `paths`. Resolves with the outcome
-   * of every path, or with `null` when the pass cannot complete: `signal`
-   * aborted, or the writer deferred a path. `onSettled` receives the number
-   * of settled paths every {@link INDEX_PASS_YIELD_EVERY} paths.
+   * Mark each of `marks` dirty and wait until the writer settled it. Resolves
+   * with the outcome of every path, or with `null` when the pass cannot
+   * complete: `signal` aborted, or the writer deferred a path. `onSettled`
+   * receives the number of settled paths every {@link INDEX_PASS_YIELD_EVERY}
+   * paths.
    */
-  async #settlePaths(
+  async #writePaths(
     writer: IndexWriter,
-    paths: readonly string[],
+    marks: ReadonlyArray<readonly [path: string, hint: DirtyHint]>,
     signal: AbortSignal | undefined,
     onSettled: ((settled: number) => void) | undefined,
   ): Promise<Map<string, IndexWriteOutcome> | null> {
@@ -301,8 +300,8 @@ class NoteIndexerImpl implements NoteIndexer {
       { signal: stopWaiting.signal },
     )
     const settled = Promise.all(
-      paths.map(async (path) => {
-        const outcome = await writer.settled(path)
+      marks.map(async ([path, hint]) => {
+        const outcome = await writer.write(path, hint)
         outcomes.set(path, outcome)
         if (outcomes.size % INDEX_PASS_YIELD_EVERY === 0 && signal?.aborted !== true) {
           onSettled?.(outcomes.size)

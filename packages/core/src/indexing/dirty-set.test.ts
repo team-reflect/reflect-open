@@ -21,7 +21,6 @@ describe('createDirtySet', () => {
     dirty.add('notes/a.md')
 
     expect(dirty.take()).toHaveLength(1)
-    expect(dirty.has('notes/a.md')).toBe(false)
     expect(dirty.take()).toEqual([])
   })
 
@@ -99,20 +98,5 @@ describe('createDirtySet', () => {
       ['notes/changed.md', undefined, 9, true],
       ['notes/kept.md', '# taken', undefined, false],
     ])
-  })
-
-  it('calls its subscribers after each add, until they unlisten', () => {
-    const dirty = createDirtySet()
-    const sizes: number[] = []
-    const unlisten = dirty.subscribe(() => {
-      sizes.push(dirty.size())
-    })
-
-    dirty.add('notes/a.md')
-    dirty.add('notes/b.md')
-    unlisten()
-    dirty.add('notes/c.md')
-
-    expect(sizes).toEqual([1, 2])
   })
 })

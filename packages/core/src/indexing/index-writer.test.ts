@@ -9,7 +9,6 @@ import { createTestDatabaseService, seedNotes, type TestNote } from '../testing/
 import { createTestNoteFileService } from '../testing/graph.ts'
 import { createTestIndexStoreService, type IndexStoreCall } from '../testing/index-store.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
-import { createDirtySet } from './dirty-set.ts'
 import type { FileChange } from './file-change-service.ts'
 import { createIndexQueryService } from './index-query-service.ts'
 import { INDEX_APPLY_BATCH_SIZE } from './index-store-service.ts'
@@ -113,7 +112,6 @@ function setup(options?: {
       }
     })
   }
-  const dirty = createDirtySet()
   const clock = createTestClockService({ now: NOW })
   const writer = createIndexWriter(
     {
@@ -134,11 +132,10 @@ function setup(options?: {
       },
       canWrite: () => gate.canWrite,
     },
-    { dirty, generation: INDEX_GENERATION, fileGeneration: FILE_GENERATION },
+    { generation: INDEX_GENERATION, fileGeneration: FILE_GENERATION },
   )
   return {
     writer,
-    dirty,
     store,
     files,
     clock,
@@ -154,14 +151,13 @@ function setup(options?: {
 
 describe('createIndexWriter', () => {
   it('writes upserts in one batch and removes at its generation, and reports each commit seq', async () => {
-    const { writer, dirty, store } = setup({ files: { 'notes/a.md': '# a', 'notes/b.md': '# b' } })
+    const { writer, store } = setup({ files: { 'notes/a.md': '# a', 'notes/b.md': '# b' } })
 
-    dirty.add('notes/a.md', { modifiedMs: 4242 })
-    dirty.add('notes/b.md')
-    dirty.add('notes/gone.md', { kind: 'remove' })
-    const outcomes = await Promise.all(
-      ['notes/a.md', 'notes/b.md', 'notes/gone.md'].map((path) => writer.settled(path)),
-    )
+    const outcomes = await Promise.all([
+      writer.write('notes/a.md', { modifiedMs: 4242 }),
+      writer.write('notes/b.md'),
+      writer.write('notes/gone.md', { kind: 'remove' }),
+    ])
 
     expect(store.calls()).toMatchObject([
       { method: 'applyBatch', generation: INDEX_GENERATION },
@@ -179,9 +175,9 @@ describe('createIndexWriter', () => {
   })
 
   it('reads the file when the run starts, not when the path was added', async () => {
-    const { writer, dirty, files, store } = setup({ files: { 'notes/a.md': '# first' } })
+    const { writer, files, store } = setup({ files: { 'notes/a.md': '# first' } })
 
-    dirty.add('notes/a.md')
+    writer.mark('notes/a.md')
     files.set('notes/a.md', '# second')
     await writer.drained()
 
@@ -189,9 +185,9 @@ describe('createIndexWriter', () => {
   })
 
   it('writes hinted content without a read', async () => {
-    const { writer, dirty, store, reads } = setup({ files: { 'notes/a.md': '# on disk' } })
+    const { writer, store, reads } = setup({ files: { 'notes/a.md': '# on disk' } })
 
-    dirty.add('notes/a.md', { note: noteOf('# hinted'), modifiedMs: 7 })
+    writer.mark('notes/a.md', { note: noteOf('# hinted'), modifiedMs: 7 })
     await writer.drained()
 
     expect(reads).toEqual([])
@@ -199,10 +195,10 @@ describe('createIndexWriter', () => {
   })
 
   it('reads the file when a later add without content replaced a content hint', async () => {
-    const { writer, dirty, store, reads } = setup({ files: { 'notes/a.md': '# on disk' } })
+    const { writer, store, reads } = setup({ files: { 'notes/a.md': '# on disk' } })
 
-    dirty.add('notes/a.md', { note: noteOf('# hinted') })
-    dirty.add('notes/a.md')
+    writer.mark('notes/a.md', { note: noteOf('# hinted') })
+    writer.mark('notes/a.md')
     await writer.drained()
 
     expect(reads).toEqual(['notes/a.md'])
@@ -211,15 +207,14 @@ describe('createIndexWriter', () => {
 
   it('writes a path again when it turns dirty during its run', async () => {
     const firstRead = Promise.withResolvers<void>()
-    const { writer, dirty, store, reads } = setup({
+    const { writer, store, reads } = setup({
       files: { 'notes/a.md': '# on disk' },
       read: () => firstRead.promise,
     })
 
-    dirty.add('notes/a.md')
+    writer.mark('notes/a.md')
     await vi.waitFor(() => expect(reads).toEqual(['notes/a.md']))
-    dirty.add('notes/a.md', { note: noteOf('# newer') })
-    const newer = writer.settled('notes/a.md')
+    const newer = writer.write('notes/a.md', { note: noteOf('# newer') })
     firstRead.resolve()
 
     await expect(newer).resolves.toEqual({ status: 'applied', seq: 2 })
@@ -228,7 +223,7 @@ describe('createIndexWriter', () => {
 
   it('runs one at a time: a path added during a run waits for the next run', async () => {
     const slowRead = Promise.withResolvers<void>()
-    const { writer, dirty, reads, writes } = setup({
+    const { writer, reads, writes } = setup({
       files: { 'notes/slow.md': '# slow', 'notes/fast.md': '# fast' },
       read: async (path) => {
         if (path === 'notes/slow.md') {
@@ -237,9 +232,9 @@ describe('createIndexWriter', () => {
       },
     })
 
-    dirty.add('notes/slow.md')
+    writer.mark('notes/slow.md')
     await vi.waitFor(() => expect(reads).toEqual(['notes/slow.md']))
-    dirty.add('notes/fast.md')
+    writer.mark('notes/fast.md')
     await Promise.resolve()
     expect(reads).toEqual(['notes/slow.md'])
 
@@ -248,22 +243,21 @@ describe('createIndexWriter', () => {
     expect(writes()).toEqual(['apply:notes/slow.md', 'apply:notes/fast.md'])
   })
 
-  it('writes and reports a `settledFirst` path ahead of the rest of the run in flight', async () => {
+  it('writes and reports a path that asks to be first ahead of the rest of the run in flight', async () => {
     const gates: Record<string, PromiseWithResolvers<void>> = {
       'notes/a.md': Promise.withResolvers(),
       'notes/c.md': Promise.withResolvers(),
     }
-    const { writer, dirty, reads, writes, reports } = setup({
+    const { writer, reads, writes, reports } = setup({
       files: { 'notes/a.md': '# a', 'notes/b.md': '# b', 'notes/c.md': '# c' },
       read: (path) => gates[path]?.promise,
     })
     for (const path of ['notes/a.md', 'notes/b.md', 'notes/c.md']) {
-      dirty.add(path, { bulk: true })
+      writer.mark(path, { bulk: true })
     }
     await vi.waitFor(() => expect(reads).toEqual(['notes/a.md']))
 
-    dirty.add('notes/now.md', { note: noteOf('# now') })
-    const first = writer.settledFirst('notes/now.md')
+    const first = writer.write('notes/now.md', { note: noteOf('# now') }, { first: true })
     gates['notes/a.md']!.resolve()
 
     expect(await first).toEqual({ status: 'applied', seq: 2 })
@@ -280,19 +274,17 @@ describe('createIndexWriter', () => {
     ])
   })
 
-  it('writes a `settledFirst` path once, with its newer hint, when the run already took it', async () => {
+  it('writes a path that asks to be first once, with its newer hint, when the run already took it', async () => {
     const gate = Promise.withResolvers<void>()
-    const { writer, dirty, reads, writes } = setup({
+    const { writer, reads, writes } = setup({
       files: { 'notes/a.md': '# a', 'notes/p.md': '# old' },
       read: (path) => (path === 'notes/a.md' ? gate.promise : undefined),
     })
-    dirty.add('notes/a.md', { bulk: true })
-    dirty.add('notes/p.md', { bulk: true })
-    const taken = writer.settled('notes/p.md')
+    writer.mark('notes/a.md', { bulk: true })
+    const taken = writer.write('notes/p.md', { bulk: true })
     await vi.waitFor(() => expect(reads).toEqual(['notes/a.md']))
 
-    dirty.add('notes/p.md', { note: noteOf('# new') })
-    const first = writer.settledFirst('notes/p.md')
+    const first = writer.write('notes/p.md', { note: noteOf('# new') }, { first: true })
     gate.resolve()
 
     expect(await Promise.all([taken, first])).toEqual([
@@ -305,7 +297,7 @@ describe('createIndexWriter', () => {
   })
 
   it('gives a failed read to the waiter and writes the rest of the run', async () => {
-    const { writer, dirty, writes, logger } = setup({
+    const { writer, writes, logger } = setup({
       files: { 'notes/bad.md': '# bad', 'notes/good.md': '# ok' },
       read: (path) => {
         if (path === 'notes/bad.md') {
@@ -314,9 +306,9 @@ describe('createIndexWriter', () => {
       },
     })
 
-    dirty.add('notes/bad.md')
-    dirty.add('notes/good.md')
-    const outcome = await writer.settled('notes/bad.md')
+    const bad = writer.write('notes/bad.md')
+    writer.mark('notes/good.md')
+    const outcome = await bad
     await writer.drained()
 
     expect(outcome).toMatchObject({ status: 'failed', stage: 'read' })
@@ -325,14 +317,14 @@ describe('createIndexWriter', () => {
   })
 
   it('logs a failure nobody waits for', async () => {
-    const { writer, dirty, logger } = setup({
+    const { writer, logger } = setup({
       files: { 'notes/bad.md': '# bad' },
       read: () => {
         throw new AppError('io', 'unreadable')
       },
     })
 
-    dirty.add('notes/bad.md')
+    writer.mark('notes/bad.md')
     await writer.drained()
 
     expect(logger.getErrors().map((entry) => entry.message)).toEqual([
@@ -341,7 +333,7 @@ describe('createIndexWriter', () => {
   })
 
   it('splits a refused batch until the failing note stands alone', async () => {
-    const { writer, dirty, store } = setup({
+    const { writer, store } = setup({
       files: { 'notes/a.md': '# a', 'notes/bad.md': '# bad', 'notes/c.md': '# c' },
       failStore: (call) => {
         return call.method === 'applyBatch' &&
@@ -351,11 +343,8 @@ describe('createIndexWriter', () => {
       },
     })
 
-    dirty.add('notes/a.md')
-    dirty.add('notes/bad.md')
-    dirty.add('notes/c.md')
     const outcomes = await Promise.all(
-      ['notes/a.md', 'notes/bad.md', 'notes/c.md'].map((path) => writer.settled(path)),
+      ['notes/a.md', 'notes/bad.md', 'notes/c.md'].map((path) => writer.write(path)),
     )
 
     expect(outcomes.map((outcome) => outcome.status)).toEqual(['applied', 'failed', 'applied'])
@@ -365,7 +354,7 @@ describe('createIndexWriter', () => {
 
   it('writes a note again after its write failed, with a wait that doubles', async () => {
     let failures = 2
-    const { writer, dirty, clock, store, reports } = setup({
+    const { writer, clock, store, reports } = setup({
       files: { 'notes/a.md': '# a' },
       failStore: (call) => {
         const failed = call.method === 'applyBatch' && failures > 0
@@ -374,9 +363,10 @@ describe('createIndexWriter', () => {
       },
     })
 
-    dirty.add('notes/a.md', { bulk: true })
-    expect(await writer.settled('notes/a.md')).toMatchObject({ status: 'failed', stage: 'write' })
-    expect(dirty.has('notes/a.md')).toBe(false)
+    expect(await writer.write('notes/a.md', { bulk: true })).toMatchObject({
+      status: 'failed',
+      stage: 'write',
+    })
 
     await clock.advance(INDEX_RETRY_MIN_MS)
     await writer.drained()
@@ -398,12 +388,12 @@ describe('createIndexWriter', () => {
       { length: INDEX_APPLY_BATCH_SIZE + 1 },
       (_, position) => `notes/n${position}.md`,
     )
-    const { writer, dirty, store } = setup({
+    const { writer, store } = setup({
       files: Object.fromEntries(paths.map((path) => [path, `# ${path}`])),
     })
 
     for (const path of paths) {
-      dirty.add(path)
+      writer.mark(path)
     }
     await writer.drained()
 
@@ -413,19 +403,19 @@ describe('createIndexWriter', () => {
   })
 
   it('lets the last kind of a path win: an upsert then a remove only removes', async () => {
-    const { writer, dirty, writes } = setup()
+    const { writer, writes } = setup()
 
-    dirty.add('notes/x.md', { modifiedMs: 42 })
-    dirty.add('notes/x.md', { kind: 'remove' })
+    writer.mark('notes/x.md', { modifiedMs: 42 })
+    writer.mark('notes/x.md', { kind: 'remove' })
     await writer.drained()
 
     expect(writes()).toEqual(['remove:notes/x.md'])
   })
 
   it('writes a note reported as removed when its file exists', async () => {
-    const { writer, dirty, writes, reports } = setup({ files: { 'notes/x.md': '# recreated' } })
+    const { writer, writes, reports } = setup({ files: { 'notes/x.md': '# recreated' } })
 
-    dirty.add('notes/x.md', { kind: 'remove' })
+    writer.mark('notes/x.md', { kind: 'remove' })
     await writer.drained()
 
     expect(writes()).toEqual(['apply:notes/x.md'])
@@ -433,11 +423,10 @@ describe('createIndexWriter', () => {
   })
 
   it('removes the rows of an upsert whose file is gone', async () => {
-    const { writer, dirty, writes, reports } = setup()
+    const { writer, writes, reports } = setup()
 
-    dirty.add('notes/gone.md', { kind: 'remove' })
-    dirty.add('notes/gone.md')
-    const outcome = await writer.settled('notes/gone.md')
+    writer.mark('notes/gone.md', { kind: 'remove' })
+    const outcome = await writer.write('notes/gone.md')
 
     expect(outcome.status).toBe('applied')
     expect(writes()).toEqual(['remove:notes/gone.md'])
@@ -445,24 +434,24 @@ describe('createIndexWriter', () => {
   })
 
   it('writes a queued upsert before a later remove of the same run', async () => {
-    const { writer, dirty, writes } = setup({ files: { 'notes/a.md': '# a' } })
+    const { writer, writes } = setup({ files: { 'notes/a.md': '# a' } })
 
-    dirty.add('notes/a.md')
-    dirty.add('notes/gone.md', { kind: 'remove' })
+    writer.mark('notes/a.md')
+    writer.mark('notes/gone.md', { kind: 'remove' })
     await writer.drained()
 
     expect(writes()).toEqual(['apply:notes/a.md', 'remove:notes/gone.md'])
   })
 
   it('reports the settled paths of a run after its writes and before their waiters resume', async () => {
-    const { writer, dirty, reports, writesAtReport, reads } = setup({
+    const { writer, reports, writesAtReport, reads } = setup({
       files: { 'notes/a.md': '# a' },
     })
 
-    dirty.add('assets/x.png', { modifiedMs: 3 })
-    dirty.add('notes/a.md')
-    dirty.add('notes/gone.md', { kind: 'remove' })
-    await writer.settled('notes/a.md')
+    writer.mark('assets/x.png', { modifiedMs: 3 })
+    const settled = writer.write('notes/a.md')
+    writer.mark('notes/gone.md', { kind: 'remove' })
+    await settled
 
     expect(reports).toEqual([
       [
@@ -476,17 +465,15 @@ describe('createIndexWriter', () => {
   })
 
   it('keeps writing after a report threw', async () => {
-    const { writer, dirty, writes, logger } = setup({
+    const { writer, writes, logger } = setup({
       files: { 'notes/a.md': '# a', 'notes/b.md': '# b' },
       report: () => {
         throw new Error('listener failed')
       },
     })
 
-    dirty.add('notes/a.md')
-    const first = await writer.settled('notes/a.md')
-    dirty.add('notes/b.md')
-    const second = await writer.settled('notes/b.md')
+    const first = await writer.write('notes/a.md')
+    const second = await writer.write('notes/b.md')
 
     expect([first.status, second.status]).toEqual(['applied', 'applied'])
     expect(writes()).toEqual(['apply:notes/a.md', 'apply:notes/b.md'])
@@ -497,7 +484,7 @@ describe('createIndexWriter', () => {
   })
 
   it('reports neither a `bulk` path nor a failed one', async () => {
-    const { writer, dirty, reports, writes } = setup({
+    const { writer, reports, writes } = setup({
       files: { 'notes/pass.md': '# pass', 'notes/bad.md': '# bad' },
       read: (path) => {
         if (path === 'notes/bad.md') {
@@ -506,9 +493,8 @@ describe('createIndexWriter', () => {
       },
     })
 
-    dirty.add('notes/pass.md', { bulk: true })
-    dirty.add('notes/bad.md')
-    await writer.settled('notes/bad.md')
+    writer.mark('notes/pass.md', { bulk: true })
+    await writer.write('notes/bad.md')
     await writer.drained()
 
     expect(writes()).toEqual(['apply:notes/pass.md'])
@@ -516,29 +502,30 @@ describe('createIndexWriter', () => {
   })
 
   it('skips an upsert whose row already has the same old mtime, without a read', async () => {
-    const { writer, dirty, reads, store } = setup({
+    const { writer, reads, store } = setup({
       stored: [{ path: 'notes/a.md', markdown: '# Hello', fileHash: 'stored', mtime: 1_000 }],
     })
 
-    dirty.add('notes/a.md', { modifiedMs: 1_000 })
-
-    await expect(writer.settled('notes/a.md')).resolves.toEqual({ status: 'unchanged' })
+    await expect(writer.write('notes/a.md', { modifiedMs: 1_000 })).resolves.toEqual({
+      status: 'unchanged',
+    })
     expect(reads).toEqual([])
     expect(store.calls()).toEqual([])
   })
 
   it('re-stamps the stored mtime when the content is unchanged but the mtime moved', async () => {
     const content = '# same content\n'
-    const { writer, dirty, store } = setup({
+    const { writer, store } = setup({
       files: { 'notes/a.md': content },
       stored: [
         { path: 'notes/a.md', markdown: content, fileHash: await sha256Hex(content), mtime: 1_000 },
       ],
     })
 
-    dirty.add('notes/a.md', { modifiedMs: 2_000 })
-
-    await expect(writer.settled('notes/a.md')).resolves.toEqual({ status: 'applied', seq: 1 })
+    await expect(writer.write('notes/a.md', { modifiedMs: 2_000 })).resolves.toEqual({
+      status: 'applied',
+      seq: 1,
+    })
     expect(store.calls()).toEqual([
       {
         method: 'touch',
@@ -549,12 +536,12 @@ describe('createIndexWriter', () => {
   })
 
   it('still reads when the reported mtime is too fresh to trust', async () => {
-    const { writer, dirty, reads, writes } = setup({
+    const { writer, reads, writes } = setup({
       files: { 'notes/a.md': '# fresh content' },
       stored: [{ path: 'notes/a.md', markdown: '# Hello', fileHash: 'stale', mtime: NOW - 10 }],
     })
 
-    dirty.add('notes/a.md', { modifiedMs: NOW - 10 })
+    writer.mark('notes/a.md', { modifiedMs: NOW - 10 })
     await writer.drained()
 
     expect(reads).toEqual(['notes/a.md'])
@@ -563,14 +550,14 @@ describe('createIndexWriter', () => {
 
   it('writes a `force` path although its hash matches the row', async () => {
     const content = '# same content\n'
-    const { writer, dirty, writes } = setup({
+    const { writer, writes } = setup({
       files: { 'notes/a.md': content },
       stored: [
         { path: 'notes/a.md', markdown: content, fileHash: await sha256Hex(content), mtime: 1_000 },
       ],
     })
 
-    dirty.add('notes/a.md', { modifiedMs: 1_000, force: true })
+    writer.mark('notes/a.md', { modifiedMs: 1_000, force: true })
     await writer.drained()
 
     expect(writes()).toEqual(['apply:notes/a.md'])
@@ -578,13 +565,12 @@ describe('createIndexWriter', () => {
 
   it('stops a run before its write once it may not write, and writes the path after resume', async () => {
     const pendingRead = Promise.withResolvers<void>()
-    const { writer, dirty, gate, reads, writes } = setup({
+    const { writer, gate, reads, writes } = setup({
       files: { 'notes/a.md': '# a' },
       read: () => pendingRead.promise,
     })
 
-    dirty.add('notes/a.md')
-    const outcome = writer.settled('notes/a.md')
+    const outcome = writer.write('notes/a.md')
     await vi.waitFor(() => expect(reads).toEqual(['notes/a.md']))
     gate.canWrite = false
     pendingRead.resolve()
@@ -592,7 +578,6 @@ describe('createIndexWriter', () => {
     await expect(outcome).resolves.toEqual({ status: 'deferred' })
     await writer.drained()
     expect(writes()).toEqual([])
-    expect(dirty.has('notes/a.md')).toBe(true)
 
     gate.canWrite = true
     writer.resume()
@@ -601,15 +586,13 @@ describe('createIndexWriter', () => {
   })
 
   it('keeps collecting paths while `canWrite` says no, and defers their waiters', async () => {
-    const { writer, dirty, gate, reads, writes } = setup({
+    const { writer, gate, reads, writes } = setup({
       files: { 'notes/a.md': '# a', 'notes/b.md': '# b' },
     })
 
     gate.canWrite = false
-    dirty.add('notes/a.md')
-    dirty.add('notes/b.md')
-
-    await expect(writer.settled('notes/a.md')).resolves.toEqual({ status: 'deferred' })
+    await expect(writer.write('notes/a.md')).resolves.toEqual({ status: 'deferred' })
+    writer.mark('notes/b.md')
     await writer.drained()
     expect(reads).toEqual([])
     expect(writes()).toEqual([])
@@ -621,12 +604,12 @@ describe('createIndexWriter', () => {
   })
 
   it('wipes the tables in order with its runs', async () => {
-    const { writer, dirty, writes } = setup({ files: { 'notes/a.md': '# a', 'notes/b.md': '# b' } })
+    const { writer, writes } = setup({ files: { 'notes/a.md': '# a', 'notes/b.md': '# b' } })
 
-    dirty.add('notes/a.md')
+    writer.mark('notes/a.md')
     await writer.drained()
     const commit = writer.clear()
-    dirty.add('notes/b.md')
+    writer.mark('notes/b.md')
 
     await expect(commit).resolves.toEqual({ seq: 2 })
     await writer.drained()
@@ -634,12 +617,10 @@ describe('createIndexWriter', () => {
   })
 
   it('stops for good once disposed', async () => {
-    const { writer, dirty, store } = setup({ files: { 'notes/a.md': '# a' } })
+    const { writer, store } = setup({ files: { 'notes/a.md': '# a' } })
 
     writer.dispose()
-    dirty.add('notes/a.md')
-
-    await expect(writer.settled('notes/a.md')).resolves.toEqual({ status: 'deferred' })
+    await expect(writer.write('notes/a.md')).resolves.toEqual({ status: 'deferred' })
     await writer.drained()
     expect(store.calls()).toEqual([])
   })
@@ -661,11 +642,12 @@ describe('createIndexWriter move healing (Plan 17)', () => {
   }
 
   it('heals an external rename of one run: the rows move, then the new path is written', async () => {
-    const { writer, dirty, store, writes, moves, reads } = setupRename()
+    const { writer, store, writes, moves, reads } = setupRename()
 
-    dirty.add(OLD, { kind: 'remove' })
-    dirty.add(NEW, { modifiedMs: 42 })
-    const outcomes = await Promise.all([writer.settled(OLD), writer.settled(NEW)])
+    const outcomes = await Promise.all([
+      writer.write(OLD, { kind: 'remove' }),
+      writer.write(NEW, { modifiedMs: 42 }),
+    ])
 
     expect(writes()).toEqual([`move:${OLD}>${NEW}`, `apply:${NEW}`])
     expect(store.applied().map((note) => note.mtime)).toEqual([42])
@@ -678,12 +660,12 @@ describe('createIndexWriter move healing (Plan 17)', () => {
   })
 
   it('falls back to remove and apply when the ids do not match', async () => {
-    const { writer, dirty, writes, moves } = setupRename({
+    const { writer, writes, moves } = setupRename({
       rowContent: '---\nid: 01zzzzzzzzzzzzzzzzzzzzzzzz\n---\n# Meeting Notes\n',
     })
 
-    dirty.add(OLD, { kind: 'remove' })
-    dirty.add(NEW)
+    writer.mark(OLD, { kind: 'remove' })
+    writer.mark(NEW)
     await writer.drained()
 
     expect(moves).toEqual([])
@@ -691,10 +673,10 @@ describe('createIndexWriter move healing (Plan 17)', () => {
   })
 
   it('never pairs when the removed path has no row left', async () => {
-    const { writer, dirty, writes, moves } = setup({ files: { [NEW]: CONTENT } })
+    const { writer, writes, moves } = setup({ files: { [NEW]: CONTENT } })
 
-    dirty.add(OLD, { kind: 'remove' })
-    dirty.add(NEW)
+    writer.mark(OLD, { kind: 'remove' })
+    writer.mark(NEW)
     await writer.drained()
 
     expect(moves).toEqual([])
@@ -702,14 +684,14 @@ describe('createIndexWriter move healing (Plan 17)', () => {
   })
 
   it('logs a refused move and falls back to remove and apply', async () => {
-    const { writer, dirty, writes, moves, logger } = setup({
+    const { writer, writes, moves, logger } = setup({
       files: { [NEW]: CONTENT },
       indexed: [{ path: OLD, markdown: CONTENT }],
       failStore: (call) => (call.method === 'move' ? new AppError('io', 'refused') : undefined),
     })
 
-    dirty.add(OLD, { kind: 'remove' })
-    dirty.add(NEW)
+    writer.mark(OLD, { kind: 'remove' })
+    writer.mark(NEW)
     await writer.drained()
 
     expect(moves).toEqual([])

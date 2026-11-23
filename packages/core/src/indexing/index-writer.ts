@@ -10,7 +10,7 @@ import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { createAssetDescriptionText, type AssetDescriptionText } from './asset-description-text.ts'
 import type { DatabaseService } from './database-service.ts'
-import type { DirtyEntry, DirtySet } from './dirty-set.ts'
+import { createDirtySet, type DirtyEntry, type DirtyHint } from './dirty-set.ts'
 import type { FileChange } from './file-change-service.ts'
 import { matchesTrustedMtime } from './hash.ts'
 import type { IndexedFileFacts, IndexQueryService } from './index-query-service.ts'
@@ -88,7 +88,6 @@ export interface IndexWriterDeps extends IndexingDeps {
  * What identifies the index session a writer writes to.
  */
 export interface IndexWriterOptions {
-  readonly dirty: DirtySet
   /**
    * The index generation every write carries.
    */
@@ -100,28 +99,29 @@ export interface IndexWriterOptions {
 }
 
 /**
- * The one writer of the index projection. It applies the dirty set in serial
- * runs: each run takes every dirty path, reads the files then (unless a hint
+ * The one writer of the index projection. It owns the dirty set, the paths
+ * whose files may differ from the index, and applies it in serial runs: each run takes every dirty path, reads the files then (unless a hint
  * carries the content), and writes the rows that differ. The file decides
  * whether a note is removed: a `remove` hint for a file that exists is an
  * upsert, and an upsert of a file that is gone is a remove.
  */
 export interface IndexWriter {
-  readonly dirty: DirtySet
   readonly generation: number
   readonly fileGeneration: number
   /**
-   * Resolve with the outcome of `path` once the run that covers its current
-   * dirty entry settles it. For a path the run reports, that is after the
-   * report. A path that is neither dirty nor in a run resolves `unchanged`
-   * at once.
+   * Mark `path` dirty: a later run writes it. The hint replaces the earlier
+   * hint of the path, so a mark without `note` drops the older text. Only
+   * `force` survives a later mark, and a path is `bulk` only while every
+   * mark of it was.
    */
-  settled(path: string): Promise<IndexWriteOutcome>
+  mark(path: string, hint?: DirtyHint): void
   /**
-   * Like {@link IndexWriter.settled}, and the run in flight writes and
-   * reports `path` before its remaining paths.
+   * Mark `path` dirty and resolve with its outcome once the run that covers
+   * the mark settles it. For a path the run reports, that is after the
+   * report. With `first`, the run in flight writes and reports `path` before
+   * its remaining paths.
    */
-  settledFirst(path: string): Promise<IndexWriteOutcome>
+  write(path: string, hint?: DirtyHint, options?: { first?: boolean }): Promise<IndexWriteOutcome>
   /**
    * The seq of this writer's latest commit, `null` before its first.
    */
@@ -183,12 +183,11 @@ function toFileChange(entry: DirtyEntry): FileChange {
 
 class IndexWriterImpl implements IndexWriter {
   readonly #deps: IndexWriterDeps
-  readonly dirty: DirtySet
+  readonly #dirty = createDirtySet()
   readonly generation: number
   readonly fileGeneration: number
   readonly #assetText: AssetDescriptionText
   readonly #moveHealing: MoveHealing
-  readonly #stopListening: () => void
   readonly #waiters = new Map<string, PromiseWithResolvers<IndexWriteOutcome>>()
   readonly #runs = new Set<WriterRun>()
   readonly #first = new Set<string>()
@@ -205,39 +204,26 @@ class IndexWriterImpl implements IndexWriter {
 
   constructor(deps: IndexWriterDeps, options: IndexWriterOptions) {
     this.#deps = deps
-    this.dirty = options.dirty
     this.generation = options.generation
     this.fileGeneration = options.fileGeneration
     this.#assetText = createAssetDescriptionText(deps)
     this.#moveHealing = createMoveHealing(deps)
-    this.#stopListening = this.dirty.subscribe(() => {
-      this.#wake()
-    })
+  }
+
+  mark(path: string, hint?: DirtyHint): void {
+    this.#dirty.add(path, hint)
     this.#wake()
   }
 
-  settled(path: string): Promise<IndexWriteOutcome> {
-    if (this.dirty.has(path)) {
-      if (this.#isStopped()) {
-        return Promise.resolve({ status: 'deferred' })
-      }
-      this.#wake()
-      return this.#waiterIn(this.#waiters, path).promise
+  write(path: string, hint?: DirtyHint, options?: { first?: boolean }): Promise<IndexWriteOutcome> {
+    this.mark(path, hint)
+    if (this.#isStopped()) {
+      return Promise.resolve({ status: 'deferred' })
     }
-    for (const run of this.#runs) {
-      if (run.open.has(path)) {
-        return this.#waiterIn(run.waiters, path).promise
-      }
-    }
-    return Promise.resolve({ status: 'unchanged' })
-  }
-
-  settledFirst(path: string): Promise<IndexWriteOutcome> {
-    const settled = this.settled(path)
-    if (this.#runQueued || this.#runs.size > 0) {
+    if ((options?.first ?? false) && (this.#runQueued || this.#runs.size > 0)) {
       this.#first.add(path)
     }
-    return settled
+    return this.#waiterIn(this.#waiters, path).promise
   }
 
   seq(): number | null {
@@ -264,7 +250,6 @@ class IndexWriterImpl implements IndexWriter {
 
   dispose(): void {
     this.#disposed = true
-    this.#stopListening()
     if (this.#retryTimer !== null) {
       this.#deps.clock.clearTimeout(this.#retryTimer)
       this.#retryTimer = null
@@ -299,7 +284,7 @@ class IndexWriterImpl implements IndexWriter {
    * Queue a run when there is dirty work and none is queued.
    */
   #wake(): void {
-    if (this.#runQueued || this.dirty.size() === 0) {
+    if (this.#runQueued || this.#dirty.size() === 0) {
       return
     }
     if (this.#isStopped()) {
@@ -320,7 +305,7 @@ class IndexWriterImpl implements IndexWriter {
       this.#deferWaiters()
       return
     }
-    await this.#settleEntries(this.dirty.take())
+    await this.#settleEntries(this.#dirty.take())
     if (this.#retryTimer === null) {
       this.#retryDelayMs = INDEX_RETRY_MIN_MS
     }
@@ -356,7 +341,7 @@ class IndexWriterImpl implements IndexWriter {
     }
     this.#runs.delete(run)
     const unwritten = [...run.open.values()]
-    this.dirty.restore(unwritten)
+    this.#dirty.restore(unwritten)
     for (const entry of unwritten) {
       run.waiters.get(entry.path)?.resolve({ status: 'deferred' })
     }
@@ -374,7 +359,7 @@ class IndexWriterImpl implements IndexWriter {
   }
 
   /**
-   * Write the paths of {@link IndexWriter.settledFirst} as a run of their own, inside `run`.
+   * Write the paths that asked to be first as a run of their own, inside `run`.
    */
   async #writeFirst(
     run: WriterRun,
@@ -388,7 +373,7 @@ class IndexWriterImpl implements IndexWriter {
       const taken = run.open.get(path)
       if (taken !== undefined) {
         run.open.delete(path)
-        this.dirty.restore([taken])
+        this.#dirty.restore([taken])
         const waiter = run.waiters.get(path)
         if (waiter !== undefined) {
           run.waiters.delete(path)
@@ -397,7 +382,7 @@ class IndexWriterImpl implements IndexWriter {
           })
         }
       }
-      const entry = this.dirty.takePath(path)
+      const entry = this.#dirty.takePath(path)
       if (entry !== undefined) {
         entries.push(entry)
       }
@@ -705,7 +690,7 @@ class IndexWriterImpl implements IndexWriter {
     }
     this.#retryTimer = this.#deps.clock.setTimeout(() => {
       this.#retryTimer = null
-      this.dirty.restore(this.#failed.splice(0))
+      this.#dirty.restore(this.#failed.splice(0))
       this.#wake()
     }, this.#retryDelayMs)
     this.#retryDelayMs = Math.min(this.#retryDelayMs * 2, INDEX_RETRY_MAX_MS)

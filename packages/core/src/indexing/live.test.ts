@@ -6,7 +6,7 @@ describe('markFileChanges', () => {
   it('marks the reported notes and asset files dirty, with their kind and mtime', () => {
     const dirty = createDirtySet()
 
-    markFileChanges(dirty, [
+    markFileChanges({ mark: dirty.add.bind(dirty) }, [
       { path: 'notes/a.md', kind: 'upsert', modifiedMs: 1234 },
       { path: 'notes/gone.md', kind: 'remove' },
       { path: 'assets/x.png', kind: 'upsert' },
@@ -22,7 +22,7 @@ describe('markFileChanges', () => {
   it('skips files the index does not track', () => {
     const dirty = createDirtySet()
 
-    markFileChanges(dirty, [
+    markFileChanges({ mark: dirty.add.bind(dirty) }, [
       { path: 'audio-memos/audio-memo-2026-06-12-090000-000.m4a', kind: 'upsert' },
     ])
 
