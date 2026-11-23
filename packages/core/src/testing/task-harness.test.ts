@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { sleep } from '@ocavue/utils'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TaskHarness } from './task-harness.ts'
 
 const harnesses: TaskHarness[] = []
@@ -162,6 +163,30 @@ describe('drained task view', () => {
       'two, while suspended',
       'three, lost by the watcher',
     ])
+    expect(harness.view()).toEqual(harness.projectFiles())
+  })
+})
+
+describe('task rows during an index rebuild', () => {
+  it('keep showing, under their ids, while the index holds no row', async () => {
+    const harness = await start({ 'notes/a.md': '+ [ ] one\n+ [ ] two\n' })
+    const before = harness.tasks.get().open
+    let whileEmpty: unknown
+    const clear = harness.indexStore.clear.bind(harness.indexStore)
+    vi.spyOn(harness.indexStore, 'clear').mockImplementation(async (generation) => {
+      const commit = await clear(generation)
+      await sleep(0)
+      whileEmpty = harness.tasks.get().open
+      return commit
+    })
+
+    await harness.index.rebuildVisibly()
+    await harness.drain()
+
+    expect(whileEmpty).toBe(before)
+    expect(harness.tasks.get().open?.map((row) => row.taskId)).toEqual(
+      before?.map((row) => row.taskId),
+    )
     expect(harness.view()).toEqual(harness.projectFiles())
   })
 })
