@@ -59,4 +59,7 @@ runs:
       uses: jdx/mr-boxington-action@b3ef673bd77c5426927fe8836c6185cdae04c2dd # v1.7.4
       with:
         backend: ${{ inputs.cache == 'true' && 'github' || 'local' }}
-        cache-key-suffix: ${{ github.job }}
+        # The generation is part of the restore key prefix, so each job
+        # restores only its own target cache.
+        # https://github.com/jdx/mr-boxington-action/blob/b3ef673bd77c5426927fe8836c6185cdae04c2dd/src/lib.ts#L322-L329
+        cache-generation: v1-${{ github.job }}
