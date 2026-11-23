@@ -239,6 +239,62 @@ describe('createIndexWriter', () => {
     expect(writes()).toEqual(['apply:notes/slow.md', 'apply:notes/fast.md'])
   })
 
+  it('writes and reports a `settledFirst` path ahead of the rest of the run in flight', async () => {
+    const gates: Record<string, PromiseWithResolvers<void>> = {
+      'notes/a.md': Promise.withResolvers(),
+      'notes/c.md': Promise.withResolvers(),
+    }
+    const { writer, dirty, reads, writes, reports } = setup({
+      files: { 'notes/a.md': '# a', 'notes/b.md': '# b', 'notes/c.md': '# c' },
+      read: (path) => gates[path]?.promise,
+    })
+    for (const path of ['notes/a.md', 'notes/b.md', 'notes/c.md']) {
+      dirty.add(path, { bulk: true })
+    }
+    await vi.waitFor(() => expect(reads).toEqual(['notes/a.md']))
+
+    dirty.add('notes/now.md', { content: '# now' })
+    const first = writer.settledFirst('notes/now.md')
+    gates['notes/a.md']!.resolve()
+
+    expect(await first).toEqual({ status: 'applied', seq: 2 })
+    expect(writes()).toEqual(['apply:notes/a.md', 'apply:notes/now.md'])
+    expect(reports).toEqual([[{ path: 'notes/now.md', kind: 'upsert' }]])
+
+    gates['notes/c.md']!.resolve()
+    await writer.drained()
+    expect(writes()).toEqual([
+      'apply:notes/a.md',
+      'apply:notes/now.md',
+      'apply:notes/b.md',
+      'apply:notes/c.md',
+    ])
+  })
+
+  it('writes a `settledFirst` path once, with its newer hint, when the run already took it', async () => {
+    const gate = Promise.withResolvers<void>()
+    const { writer, dirty, reads, writes } = setup({
+      files: { 'notes/a.md': '# a', 'notes/p.md': '# old' },
+      read: (path) => (path === 'notes/a.md' ? gate.promise : undefined),
+    })
+    dirty.add('notes/a.md', { bulk: true })
+    dirty.add('notes/p.md', { bulk: true })
+    const taken = writer.settled('notes/p.md')
+    await vi.waitFor(() => expect(reads).toEqual(['notes/a.md']))
+
+    dirty.add('notes/p.md', { content: '# new' })
+    const first = writer.settledFirst('notes/p.md')
+    gate.resolve()
+
+    expect(await Promise.all([taken, first])).toEqual([
+      { status: 'applied', seq: 2 },
+      { status: 'applied', seq: 2 },
+    ])
+    await writer.drained()
+    expect(writes()).toEqual(['apply:notes/a.md', 'apply:notes/p.md'])
+    expect(reads).toEqual(['notes/a.md'])
+  })
+
   it('gives a failed read to the waiter and writes the rest of the run', async () => {
     const { writer, dirty, writes, logger } = setup({
       files: { 'notes/bad.md': '# bad', 'notes/good.md': '# ok' },

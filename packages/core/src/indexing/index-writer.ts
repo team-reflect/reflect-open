@@ -103,6 +103,11 @@ export interface IndexWriter {
    */
   settled(path: string): Promise<IndexWriteOutcome>
   /**
+   * Like {@link IndexWriter.settled}, and the run in flight writes and
+   * reports `path` before its remaining paths.
+   */
+  settledFirst(path: string): Promise<IndexWriteOutcome>
+  /**
    * Resolve once no run is queued or in flight: every dirty path is settled,
    * or the writer is paused.
    */
@@ -170,7 +175,8 @@ class IndexWriterImpl implements IndexWriter {
   readonly #moveHealing: MoveHealing
   readonly #stopListening: () => void
   readonly #waiters = new Map<string, PromiseWithResolvers<IndexWriteOutcome>>()
-  #run: WriterRun | null = null
+  readonly #runs = new Set<WriterRun>()
+  readonly #first = new Set<string>()
   #tail: Promise<void> = Promise.resolve()
   #runQueued = false
   #paused = false
@@ -197,10 +203,20 @@ class IndexWriterImpl implements IndexWriter {
       this.#wake()
       return this.#waiterIn(this.#waiters, path).promise
     }
-    if (this.#run !== null && this.#run.open.has(path)) {
-      return this.#waiterIn(this.#run.waiters, path).promise
+    for (const run of this.#runs) {
+      if (run.open.has(path)) {
+        return this.#waiterIn(run.waiters, path).promise
+      }
     }
     return Promise.resolve({ status: 'unchanged' })
+  }
+
+  settledFirst(path: string): Promise<IndexWriteOutcome> {
+    const settled = this.settled(path)
+    if (this.#runQueued || this.#runs.size > 0) {
+      this.#first.add(path)
+    }
+    return settled
   }
 
   async drained(): Promise<void> {
@@ -277,7 +293,14 @@ class IndexWriterImpl implements IndexWriter {
       this.#deferWaiters()
       return
     }
-    const entries = this.dirty.take()
+    await this.#settleEntries(this.dirty.take())
+    this.#wake()
+  }
+
+  /**
+   * Write `entries` as one run, report it, and put back what it did not settle.
+   */
+  async #settleEntries(entries: readonly DirtyEntry[]): Promise<void> {
     const run: WriterRun = {
       open: new Map(entries.map((entry) => [entry.path, entry])),
       waiters: new Map(),
@@ -292,7 +315,7 @@ class IndexWriterImpl implements IndexWriter {
         this.#waiters.delete(entry.path)
       }
     }
-    this.#run = run
+    this.#runs.add(run)
     try {
       await this.#write(run, entries)
     } catch (error) {
@@ -301,7 +324,7 @@ class IndexWriterImpl implements IndexWriter {
         this.#settle(run, entry, { status: 'failed', stage: 'write', error })
       }
     }
-    this.#run = null
+    this.#runs.delete(run)
     const unwritten = [...run.open.values()]
     this.dirty.restore(unwritten)
     for (const entry of unwritten) {
@@ -313,7 +336,39 @@ class IndexWriterImpl implements IndexWriter {
     for (const release of run.afterReport) {
       release()
     }
-    this.#wake()
+  }
+
+  /**
+   * Write the paths of {@link IndexWriter.settledFirst} as a run of their own, inside `run`.
+   */
+  async #writeFirst(
+    run: WriterRun,
+    applies: PendingApply[],
+    touches: PendingTouch[],
+  ): Promise<void> {
+    await this.#flushApplies(run, applies)
+    await this.#flushTouches(run, touches.splice(0))
+    const entries: DirtyEntry[] = []
+    for (const path of this.#first) {
+      const taken = run.open.get(path)
+      if (taken !== undefined) {
+        run.open.delete(path)
+        this.dirty.restore([taken])
+        const waiter = run.waiters.get(path)
+        if (waiter !== undefined) {
+          run.waiters.delete(path)
+          void this.#waiterIn(this.#waiters, path).promise.then((outcome) => {
+            waiter.resolve(outcome)
+          })
+        }
+      }
+      const entry = this.dirty.takePath(path)
+      if (entry !== undefined) {
+        entries.push(entry)
+      }
+    }
+    this.#first.clear()
+    await this.#settleEntries(entries)
   }
 
   /**
@@ -347,6 +402,15 @@ class IndexWriterImpl implements IndexWriter {
       }
       if (this.#isStopped()) {
         return
+      }
+      if (this.#first.size > 0) {
+        await this.#writeFirst(run, applies, touches)
+        if (this.#isStopped()) {
+          return
+        }
+        if (!run.open.has(path)) {
+          continue
+        }
       }
       if (entry.kind === 'remove') {
         // An upsert queued earlier in this run must not land after the remove.

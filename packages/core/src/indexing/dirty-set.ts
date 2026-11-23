@@ -53,6 +53,10 @@ export interface DirtySet {
    */
   take(): DirtyEntry[]
   /**
+   * Remove and return the entry of `path`, if it is dirty.
+   */
+  takePath(path: string): DirtyEntry | undefined
+  /**
    * Put back entries that {@link DirtySet.take} returned. A path marked dirty
    * since then keeps its newer hint.
    */
@@ -94,6 +98,12 @@ class DirtySetImpl implements DirtySet {
     const entries = [...this.#entries.values()]
     this.#entries.clear()
     return entries
+  }
+
+  takePath(path: string): DirtyEntry | undefined {
+    const entry = this.#entries.get(path)
+    this.#entries.delete(path)
+    return entry
   }
 
   restore(entries: readonly DirtyEntry[]): void {

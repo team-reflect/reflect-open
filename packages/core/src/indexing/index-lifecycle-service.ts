@@ -269,8 +269,8 @@ export interface IndexLifecycleService {
    */
   rebuildVisibly(): Promise<void>
   /**
-   * Mark one note dirty and wait until the index writer wrote it, without
-   * waiting for the watcher. For an in-app write whose row must be readable
+   * Mark one note dirty and wait until the index writer wrote it, ahead of
+   * the other dirty files and without waiting for the watcher. For an in-app write whose row must be readable
    * at once. `content` saves the read, which otherwise carries
    * `fileGeneration`; the write carries the index `generation`. Rejects when
    * the read or the write failed. Resolves without a write while the index is
@@ -655,7 +655,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
       return
     }
     writer.dirty.add(path, { content: options.content, modifiedMs: options.mtime })
-    const outcome = await writer.settled(path)
+    const outcome = await writer.settledFirst(path)
     if (outcome.status === 'failed') {
       throw outcome.error
     }
