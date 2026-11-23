@@ -1,4 +1,4 @@
-import { noop } from '@ocavue/utils'
+import { noop, returnFalse } from '@ocavue/utils'
 import { sha256Hex } from '@reflect/utils'
 import type { XArchiveService } from '../embeds/x-archive-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
@@ -486,7 +486,7 @@ class IndexWriterImpl implements IndexWriter {
     const { noteFile } = this.#deps
     return await Promise.all(
       notes.map(async (entry) => {
-        if (entry.kind !== 'remove' || !(await noteFile.exists(entry.path).catch(() => false))) {
+        if (entry.kind !== 'remove' || !(await noteFile.exists(entry.path).catch(returnFalse))) {
           return entry
         }
         const upsert: DirtyEntry = { ...entry, kind: 'upsert' }
