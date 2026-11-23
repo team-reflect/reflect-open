@@ -180,7 +180,8 @@ export function SessionEditorView({
 
   return (
     <>
-      <div className={gutterClassName}>
+      {/* App feedback, not note content: kept off paper. */}
+      <div className={cn(gutterClassName, 'print:hidden')}>
         <NoteSaveAlerts saveError={saveError} assetSaveError={assetSaveError} />
 
         {/* Daily notes are date-titled, so a contact can never match one —

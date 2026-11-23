@@ -33,9 +33,9 @@ describe('printNote', () => {
     expect(print).toHaveBeenCalledOnce()
   })
 
-  it('does nothing when the note is not on screen', () => {
+  it('clears the old mark and does not print when the note is not on screen', () => {
     const print = vi.spyOn(window, 'print').mockImplementation(noop)
-    addBlock('notes/other.md')
+    addBlock('notes/other.md').setAttribute('data-print-target', '')
 
     printNote('notes/"quoted".md')
 

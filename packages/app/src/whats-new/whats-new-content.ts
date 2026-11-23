@@ -28,7 +28,7 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
     {
       id: 'print-note',
       title: 'Print notes',
-      body: 'Press ⌘P to print the note you are looking at, or the day in focus in your daily notes.',
+      body: 'Press ⌘P (Ctrl+P on Windows and Linux) to print the note you are looking at, or the day in focus in your daily notes.',
       platforms: ['darwin', 'windows', 'linux'],
     },
   ],
