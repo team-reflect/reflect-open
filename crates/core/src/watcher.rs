@@ -15,7 +15,8 @@
 //! enumerates the descendants of a renamed or removed folder, so the watcher
 //! only reports "something structural changed" (`index:reconcile`) and the
 //! frontend answers with its ordinary full reconcile pass — re-list, hash
-//! gate, prune. One coarse signal instead of a shadow manifest.
+//! gate, prune. One coarse signal instead of a shadow manifest. A watch error
+//! reports the same signal.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -256,6 +257,28 @@ fn collect_changes(paths: &[PathBuf], root: &Path) -> BatchEffects {
     }
 }
 
+/// The effects of one debouncer delivery. A watch error means events were
+/// lost, so it demands a reconcile.
+fn batch_effects(result: DebounceEventResult, root: &Path) -> BatchEffects {
+    let events = match result {
+        Ok(events) => events,
+        Err(errors) => {
+            tracing::warn!(?errors, "file watcher reported errors");
+            return BatchEffects {
+                changes: Vec::new(),
+                reconcile: true,
+            };
+        }
+    };
+    let paths: Vec<PathBuf> = events
+        .iter()
+        .flat_map(|event| event.paths.clone())
+        .collect();
+    let mut effects = collect_changes(&paths, root);
+    effects.reconcile |= events.iter().any(|event| event.need_rescan());
+    effects
+}
+
 fn lock_watcher(
     watcher: &WatcherState,
 ) -> AppResult<std::sync::MutexGuard<'_, Option<(PathBuf, FileId, GraphDebouncer)>>> {
@@ -319,19 +342,10 @@ impl Core {
         let handler_root = root.clone();
         let core = Arc::downgrade(self);
         let debouncer = watch_graph(&root, move |result: DebounceEventResult| {
-            let Ok(events) = result else {
-                return; // watch errors are transient; the next batch recovers
-            };
-            let rescan_demanded = events.iter().any(|event| event.need_rescan());
-            let paths: Vec<PathBuf> = events
-                .iter()
-                .flat_map(|event| event.paths.clone())
-                .collect();
             let Some(core) = core.upgrade() else {
                 return;
             };
-            let mut effects = collect_changes(&paths, &handler_root);
-            effects.reconcile |= rescan_demanded;
+            let effects = batch_effects(result, &handler_root);
             if effects.reconcile || !effects.changes.is_empty() {
                 // Drop the cached catalog before telling the frontend: its
                 // follow-up `list_files` must re-walk, not replay the cache.
@@ -589,6 +603,19 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(batch.iter().any(|event| event.paths.contains(&written)));
+    }
+
+    #[test]
+    fn a_watch_error_demands_a_reconcile() {
+        let dir = tempfile::tempdir().unwrap();
+        let effects = batch_effects(Err(vec![notify::Error::generic("overflow")]), dir.path());
+        assert_eq!(
+            effects,
+            BatchEffects {
+                changes: Vec::new(),
+                reconcile: true,
+            }
+        );
     }
 
     #[test]
