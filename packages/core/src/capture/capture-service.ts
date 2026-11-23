@@ -19,7 +19,7 @@ import { isMobilePlatform } from '../ports/platform-facts.ts'
 import { isSilentStop, type ReconcileStop } from '../reconcile/reconcile.ts'
 import type { WebFetchService } from '../link-preview/web-fetch-service.ts'
 import type { NoteDocumentService } from '../documents/note-document-service.ts'
-import { NoteBusyError } from '../tasks/task-errors.ts'
+import { NoteEditError } from '../tasks/task-errors.ts'
 import { errorMessage, toAppError } from '../errors.ts'
 import type { AssetStoreService } from '../graph/asset-store-service.ts'
 import type { CaptureInboxService } from '../graph/capture-inbox-service.ts'
@@ -412,7 +412,7 @@ class CaptureServiceImpl implements CaptureService {
         { generation, createIfMissing: true },
       )
     } catch (cause) {
-      if (cause instanceof NoteBusyError) {
+      if (cause instanceof NoteEditError && cause.kind === 'notWritable') {
         throw new Error('Resolve or finish loading the daily note before saving X posts', { cause })
       }
       throw cause

@@ -35,7 +35,7 @@ import {
   withRelocatedTasks,
   type TaskMoves,
 } from './task-cache.ts'
-import { NoteBusyError } from './task-errors.ts'
+import { NoteEditError } from './task-errors.ts'
 import { getTaskKey, isSameTask } from './task-identity.ts'
 import { createInsertedTaskRow, type InsertTaskTarget } from './task-insert-target.ts'
 import { getScheduledMarkdown } from './task-schedule-content.ts'
@@ -1136,7 +1136,10 @@ class TaskServiceImpl implements TaskService {
       { generation, createIfMissing: options.createIfMissing === true },
     )
     if (result === undefined) {
-      throw new NoteBusyError('This note can’t be updated right now — try again in a moment.')
+      throw new NoteEditError(
+        'notWritable',
+        'This note can’t be updated right now — try again in a moment.',
+      )
     }
     return { ...result, updatedAt: clock.now() }
   }

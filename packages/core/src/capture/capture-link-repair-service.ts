@@ -9,7 +9,7 @@ import { isWikiLinkSafeText } from '../indexing/suggest.ts'
 import { parseNote } from '../markdown/extract.ts'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
-import { NoteBusyError } from '../tasks/task-errors.ts'
+import { NoteEditError } from '../tasks/task-errors.ts'
 
 /**
  * One capture whose Daily link text is still the drain's placeholder.
@@ -168,7 +168,10 @@ class CaptureLinkRepairServiceImpl implements CaptureLinkRepairService {
       )
     } catch (cause) {
       // A missing daily holds no link, and a busy session takes the repair on a later sweep.
-      if (cause instanceof NoteBusyError || (isAppError(cause) && cause.kind === 'notFound')) {
+      if (
+        (cause instanceof NoteEditError && cause.kind === 'notWritable') ||
+        (isAppError(cause) && cause.kind === 'notFound')
+      ) {
         return
       }
       throw cause

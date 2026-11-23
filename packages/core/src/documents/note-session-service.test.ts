@@ -1,6 +1,5 @@
 import type { RoundTripFidelity } from '@meowdown/markdown'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { TaskStaleError } from '../tasks/task-errors.ts'
 import { applyTaskEdits } from '../markdown/task-edit.ts'
 import { projectTasks } from '../markdown/task-project.ts'
 import type { TaskLocator } from '../markdown/task-model.ts'
@@ -1325,7 +1324,7 @@ describe('commitSourceEdit', () => {
     expect(h.snapshots.at(-1)?.error).toBeNull()
   })
 
-  it('propagates an error the transform throws, such as TaskStaleError, without writing', async () => {
+  it('propagates an error the transform throws, such as a stale refusal, without writing', async () => {
     const source = '+ [ ] gone\n'
     const h = harness({ disk: source })
     h.session.load()
@@ -1334,7 +1333,7 @@ describe('commitSourceEdit', () => {
     h.session.editorChanged('+ [ ] something else entirely\n')
     await expect(
       h.session.commitSourceEdit(toggleTransform(firstTask(source))),
-    ).rejects.toBeInstanceOf(TaskStaleError)
+    ).rejects.toMatchObject({ kind: 'stale' })
     expect(h.writes).toEqual([])
     expect(h.session.content()).toBe('+ [ ] something else entirely\n')
   })

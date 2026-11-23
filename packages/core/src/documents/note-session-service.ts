@@ -610,7 +610,7 @@ class NoteSessionImpl implements NoteSession {
    * not a reason to refuse. Returns `null` when the session can't safely take a
    * body edit (no write channel, disposed, protected/read-only, or failed to
    * load) so the caller refuses rather than clobber the buffer
-   * via disk. `transform` runs before any mutation, so a `TaskStaleError` (the
+   * via disk. `transform` runs before any mutation, so a stale refusal (the
    * marker can't be located) propagates with nothing changed. And the write is
    * all-or-nothing: a failed flush reverts the in-memory edit so the editor and
    * the Tasks list can't diverge, then re-throws the failure.

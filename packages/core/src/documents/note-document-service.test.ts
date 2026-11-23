@@ -7,7 +7,6 @@ import {
   overrideNoteFileService,
   type TestNoteFileServiceOptions,
 } from '../testing/graph.ts'
-import { NoteBusyError, NoteConflictError } from '../tasks/task-errors.ts'
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createNoteDocumentService } from './note-document-service.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
@@ -165,14 +164,14 @@ describe('commitSourceEdit', () => {
     expect(noteFile.writes()).toEqual([])
   })
 
-  it('refuses with NoteBusyError when the session declines, without touching disk', async () => {
+  it('refuses as not writable when the session declines, without touching disk', async () => {
     const { noteDocuments, noteFile } = setup({
       files: { 'notes/a.md': 'disk\n' },
       session: { content: 'live\n', accepts: false },
     })
     await expect(
       noteDocuments.commitSourceEdit('notes/a.md', shout, { generation: 7 }),
-    ).rejects.toBeInstanceOf(NoteBusyError)
+    ).rejects.toMatchObject({ kind: 'notWritable' })
     expect(noteFile.writes()).toEqual([])
   })
 
@@ -199,12 +198,12 @@ describe('commitSourceEdit', () => {
     expect(noteFile.getWrites('notes/a.md')).toEqual(['DISK\nTHEIRS\n'])
   })
 
-  it('gives up with NoteConflictError when the file changes during every attempt', async () => {
+  it('gives up with a conflict when the file changes during every attempt', async () => {
     const { noteDocuments, noteFile, externalWrites } = setup({ files: { 'notes/a.md': 'disk\n' } })
     externalWrites.push('one\n', 'two\n', 'three\n')
     await expect(
       noteDocuments.commitSourceEdit('notes/a.md', shout, { generation: 7 }),
-    ).rejects.toBeInstanceOf(NoteConflictError)
+    ).rejects.toMatchObject({ kind: 'conflict' })
     expect(noteFile.files().get('notes/a.md')).toBe('three\n')
     expect(noteFile.writes()).toEqual([])
   })

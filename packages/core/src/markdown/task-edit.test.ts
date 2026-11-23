@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createTestLoggerService, type TestLoggerService } from '../testing/logger.ts'
 import { splitFrontmatter } from './frontmatter.ts'
-import { NoteNotSerializableError, TaskStaleError } from '../tasks/task-errors.ts'
 import {
   applyTaskEdits,
   findTaskMove,
@@ -76,7 +75,7 @@ describe('applyTaskEdits: toggle', () => {
     const source = '+ [ ] dup\n+ [ ] dup\n'
     const gone = { ...locate(source), markdown: 'zzz' }
     expect(() => applyTaskEdits(ctx, source, [{ kind: 'toggle', task: gone }])).toThrow(
-      TaskStaleError,
+      expect.objectContaining({ kind: 'stale' }),
     )
   })
 
@@ -84,7 +83,7 @@ describe('applyTaskEdits: toggle', () => {
     const source = '+ [ ] real\n\n```\n+ [ ] fake\n```\n'
     const fake: TaskLocator = { astPath: [2], markdown: 'fake', checked: false }
     expect(() => applyTaskEdits(ctx, source, [{ kind: 'toggle', task: fake }])).toThrow(
-      TaskStaleError,
+      expect.objectContaining({ kind: 'stale' }),
     )
   })
 
@@ -166,7 +165,9 @@ describe('applyTaskEdits: setMarkdown', () => {
   it('refuses a continuation line that would open a new block', () => {
     const source = '+ [ ] a\n'
     const edit = { kind: 'setMarkdown', task: locate(source), markdown: 'one\n- two' } as const
-    expect(() => applyTaskEdits(ctx, source, [edit])).toThrow(NoteNotSerializableError)
+    expect(() => applyTaskEdits(ctx, source, [edit])).toThrow(
+      expect.objectContaining({ kind: 'notWritable' }),
+    )
   })
 })
 
@@ -385,7 +386,7 @@ describe('applyTaskEdits: batches', () => {
         { kind: 'remove', task: locate(source, 0) },
         { kind: 'insert', at: { kind: 'contextEnd', task: locate(source, 1) }, markdown: '' },
       ])
-    }).toThrow(TaskStaleError)
+    }).toThrow(expect.objectContaining({ kind: 'stale' }))
   })
 
   it('refuses a later edit on a task removed earlier in the batch', () => {
@@ -396,13 +397,13 @@ describe('applyTaskEdits: batches', () => {
         { kind: 'remove', task },
         { kind: 'toggle', task },
       ])
-    }).toThrow(TaskStaleError)
+    }).toThrow(expect.objectContaining({ kind: 'stale' }))
     expect(() => {
       return applyTaskEdits(ctx, source, [
         { kind: 'remove', task },
         { kind: 'remove', task },
       ])
-    }).toThrow(TaskStaleError)
+    }).toThrow(expect.objectContaining({ kind: 'stale' }))
   })
 })
 

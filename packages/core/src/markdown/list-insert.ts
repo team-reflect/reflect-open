@@ -10,7 +10,7 @@ import {
 import { appendBlock } from './append-section.ts'
 import { splitFrontmatter } from './frontmatter.ts'
 import { renderInlineText } from './inline-text.ts'
-import { NoteNotSerializableError, TaskStaleError } from '../tasks/task-errors.ts'
+import { NoteEditError } from '../tasks/task-errors.ts'
 import { foldKey } from './keys.ts'
 import { scanInlineWikiLinks } from './scan.ts'
 import { getFirstParagraphMarkdown, isBlockParent, type BlockParent } from './task-project.ts'
@@ -24,7 +24,7 @@ export type SlotTarget =
 
 /**
  * The note body as a tree the serializer can write back faithfully, or a
- * {@link NoteNotSerializableError}. An empty body has no blocks (the parser
+ * `notWritable` {@link NoteEditError}. An empty body has no blocks (the parser
  * gives it one empty paragraph).
  */
 export function parseEditable(source: string): { document: MarkdownDocument; bodyOffset: number } {
@@ -37,7 +37,8 @@ export function parseEditable(source: string): { document: MarkdownDocument; bod
     document.children.length > 0 &&
     !isMarkdownAstEqual(parseMarkdownAst(serializeMarkdownAst(document)), document)
   ) {
-    throw new NoteNotSerializableError(
+    throw new NoteEditError(
+      'notWritable',
       'This note cannot be rewritten faithfully. Edit it in the note itself.',
     )
   }
@@ -271,7 +272,7 @@ export function appendListItem(source: string, insert: ListItemInsert): string {
   try {
     editable = parseEditable(source)
   } catch (cause) {
-    if (!(cause instanceof NoteNotSerializableError)) {
+    if (!(cause instanceof NoteEditError && cause.kind === 'notWritable')) {
       throw cause
     }
     // A note the serializer would alter still takes the entry: as a fresh
@@ -362,5 +363,5 @@ export function requireAttached(document: MarkdownDocument, target: MarkdownBloc
       return { parent, index: parent.children.indexOf(target) }
     }
   }
-  throw new TaskStaleError('the task was removed earlier in this batch')
+  throw new NoteEditError('stale', 'the task was removed earlier in this batch')
 }

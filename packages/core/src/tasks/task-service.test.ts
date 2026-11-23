@@ -12,7 +12,6 @@ import {
   isSameTaskPath,
   parseNote,
   projectTasks,
-  TaskStaleError,
   type TaskEditResult,
   type TaskSnapshot,
 } from '../markdown/index.ts'
@@ -38,7 +37,6 @@ import { createTestLoggerService, type TestLoggerService } from '../testing/logg
 import { createTestProgressPort, type TestProgressPort } from '../testing/ports.ts'
 import { makeOpenTask } from '../testing/tasks.ts'
 import type { OpenTask } from './open-task.ts'
-import { NoteBusyError } from './task-errors.ts'
 import { getTaskKey } from './task-identity.ts'
 import {
   createTaskService,
@@ -215,24 +213,30 @@ describe('writeTask', () => {
     expect(noteFile.writes()).toEqual([])
   })
 
-  it('throws NoteBusyError when the session declines, never clobbering via disk', async () => {
+  it('refuses as not writable when the session declines, never clobbering via disk', async () => {
     openSession(sessionOver('+ [ ] do it\n', false))
 
-    await expect(tasks.writeTask(task, [{ kind: 'remove' }])).rejects.toBeInstanceOf(NoteBusyError)
+    await expect(tasks.writeTask(task, [{ kind: 'remove' }])).rejects.toMatchObject({
+      kind: 'notWritable',
+    })
     expect(noteFile.writes()).toEqual([])
   })
 
-  it('propagates TaskStaleError from the disk path when the index is stale', async () => {
+  it('propagates a stale refusal from the disk path when the index is stale', async () => {
     noteFile.set('notes/a.md', '+ [ ] something else entirely\n')
 
-    await expect(tasks.writeTask(task, [{ kind: 'toggle' }])).rejects.toBeInstanceOf(TaskStaleError)
+    await expect(tasks.writeTask(task, [{ kind: 'toggle' }])).rejects.toMatchObject({
+      kind: 'stale',
+    })
     expect(noteFile.writes()).toEqual([])
   })
 
-  it('propagates TaskStaleError from the session path too', async () => {
+  it('propagates a stale refusal from the session path too', async () => {
     openSession(sessionOver('+ [ ] something else entirely\n'))
 
-    await expect(tasks.writeTask(task, [{ kind: 'toggle' }])).rejects.toBeInstanceOf(TaskStaleError)
+    await expect(tasks.writeTask(task, [{ kind: 'toggle' }])).rejects.toMatchObject({
+      kind: 'stale',
+    })
   })
 
   it('replaces the Markdown, on disk or through the session', async () => {
@@ -539,7 +543,7 @@ describe('batch writes', () => {
     const one = makeOpenTask({ notePath: 'notes/a.md', astPath: [0], markdown: 'one' })
     const gone = makeOpenTask({ notePath: 'notes/a.md', astPath: [5], markdown: 'gone' })
 
-    await expect(tasks.completeTasks([one, gone])).rejects.toBeInstanceOf(TaskStaleError)
+    await expect(tasks.completeTasks([one, gone])).rejects.toMatchObject({ kind: 'stale' })
     expect(noteFile.getWrites('notes/a.md')).toEqual(['+ [x] one\n'])
   })
 })
@@ -595,7 +599,7 @@ describe('snippet tasks', () => {
         locator: { astPath: [0], markdown: 'do it', checked: true },
         checked: true,
       }),
-    ).rejects.toBeInstanceOf(TaskStaleError)
+    ).rejects.toMatchObject({ kind: 'stale' })
     expect(progress.findByLabel('Reopening task')?.status).toBe('failed')
   })
 })

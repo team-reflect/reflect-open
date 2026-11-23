@@ -5,7 +5,7 @@ import {
   type MarkdownNode,
 } from '@meowdown/markdown'
 import type { LoggerService } from '../ports/logger-service.ts'
-import { NoteNotSerializableError, TaskStaleError } from '../tasks/task-errors.ts'
+import { NoteEditError } from '../tasks/task-errors.ts'
 import {
   bodyEndSlot,
   createListItem,
@@ -123,7 +123,7 @@ export function applyTaskEdits(
   const inserted = created.map((item) => {
     const snapshot = snapshotOf.get(item)
     if (snapshot === undefined) {
-      throw new NoteNotSerializableError('the new task did not survive the edit')
+      throw new NoteEditError('notWritable', 'the new task did not survive the edit')
     }
     return snapshot
   })
@@ -177,7 +177,10 @@ function locateTask(
 ): TaskEntry {
   const match = resolveTaskLocator(ctx, before, (entry) => entry, locator)
   if (match === undefined) {
-    throw new TaskStaleError(`task is no longer in the note: ${JSON.stringify(locator.markdown)}`)
+    throw new NoteEditError(
+      'stale',
+      `task is no longer in the note: ${JSON.stringify(locator.markdown)}`,
+    )
   }
   return match
 }
@@ -240,7 +243,10 @@ function applyItemEdit(
 function requireParagraphMarkdown(markdown: string): string {
   const trimmed = markdown.trim()
   if (/\n[ \t]*\n/.test(trimmed)) {
-    throw new TaskStaleError(`task content must be one paragraph: ${JSON.stringify(markdown)}`)
+    throw new NoteEditError(
+      'stale',
+      `task content must be one paragraph: ${JSON.stringify(markdown)}`,
+    )
   }
   return trimmed
 }
@@ -268,7 +274,8 @@ function assertTasksSurvive(body: string, expected: readonly TaskEntry[]): void 
       )
     })
   if (!survives) {
-    throw new NoteNotSerializableError(
+    throw new NoteEditError(
+      'notWritable',
       'This text cannot be saved as one task. Remove the line that starts a new block and try again.',
     )
   }

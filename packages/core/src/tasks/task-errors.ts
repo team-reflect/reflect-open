@@ -1,40 +1,20 @@
-/** The task a caller addressed is not in the note anymore: the write is refused. */
-export class TaskStaleError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'TaskStaleError'
-  }
-}
-
-/** The note cannot be rewritten through the AST without changing its content. */
-export class NoteNotSerializableError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'NoteNotSerializableError'
-  }
-}
+/**
+ * Why an edit of a note was refused. `stale`: the addressed task is not in
+ * the note. `notWritable`: the note cannot be rewritten faithfully, or its
+ * open session cannot take an edit. `conflict`: the note changed on disk
+ * during every attempt.
+ */
+export type NoteEditErrorKind = 'stale' | 'notWritable' | 'conflict'
 
 /**
- * A note couldn't be written because it is open with unsaved edits that
- * the session can't persist right now: it's read-only/protected or disposed.
- * Distinct from `TaskStaleError` (a stale index): the
- * recovery is "save or resolve the note", not "reindex". We refuse rather than
- * write to disk, which would clobber the live buffer.
+ * An edit of a note that was refused. Nothing was written.
  */
-export class NoteBusyError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'NoteBusyError'
-  }
-}
+export class NoteEditError extends Error {
+  readonly kind: NoteEditErrorKind
 
-/**
- * A note changed on disk during every attempt to commit an edit to it.
- * Nothing was written.
- */
-export class NoteConflictError extends Error {
-  constructor(message: string) {
+  constructor(kind: NoteEditErrorKind, message: string) {
     super(message)
-    this.name = 'NoteConflictError'
+    this.name = 'NoteEditError'
+    this.kind = kind
   }
 }

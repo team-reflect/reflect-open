@@ -1,4 +1,4 @@
-import { NoteBusyError, NoteConflictError } from '../tasks/task-errors.ts'
+import { NoteEditError } from '../tasks/task-errors.ts'
 import { requireGraphSession, type GraphSessionSource } from '../graph/graph-session.ts'
 import { isAppError } from '../errors.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
@@ -56,11 +56,11 @@ export interface NoteDocumentService {
    * keystroke. The session declines (and we refuse rather than clobber via
    * disk) only when it can't persist now (failed to load, protected/read-only,
    * or disposed); a session still loading waits for its load instead.
-   * A decline is surfaced as {@link NoteBusyError}. When the note is **not**
+   * A decline is surfaced as `notWritable` {@link NoteEditError}. When the note is **not**
    * open, disk is the source of truth: read, transform, and write only while
    * the file still holds the text that was read. A file that changed in
    * between runs `transform` again on its new text, and
-   * {@link NoteConflictError} is thrown after three attempts. A `transform`
+   * `conflict` {@link NoteEditError} is thrown after three attempts. A `transform`
    * that returns its input writes nothing.
    *
    * The index holds the committed text before the result resolves.
@@ -209,7 +209,10 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
       if (owner !== null) {
         const commit = await owner.commitSourceEdit(transform)
         if (commit === null) {
-          throw new NoteBusyError('This note can’t be updated right now — try again in a moment.')
+          throw new NoteEditError(
+            'notWritable',
+            'This note can’t be updated right now — try again in a moment.',
+          )
         }
         const [revision, indexSeq] = await Promise.all([
           sha256Hex(commit.content),
@@ -239,7 +242,7 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
         }
         source = written.merged
       }
-      throw new NoteConflictError(`${path} kept changing on disk; the edit was not saved.`)
+      throw new NoteEditError('conflict', `${path} kept changing on disk; the edit was not saved.`)
     })
   }
 
