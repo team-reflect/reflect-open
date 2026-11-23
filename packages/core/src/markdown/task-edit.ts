@@ -41,6 +41,8 @@ export interface TaskEditInsert {
   markdown: string
   /** The new task is written checked. */
   checked?: boolean | undefined
+  /** The text is written as a plain bullet, which `inserted` leaves out. */
+  bullet?: boolean | undefined
 }
 
 export type TaskEdit = TaskEditItem | TaskEditInsert
@@ -85,10 +87,14 @@ export function applyTaskEdits(
     if (edit.kind === 'insert') {
       const slot = resolveInsertPosition(document, before, baseRevision, edit.at)
       const markdown = requireParagraphMarkdown(edit.markdown)
-      const item = createListItem('task', '+', markdown)
-      item.checked = edit.checked === true
+      const bullet = edit.bullet === true
+      const item = createListItem(bullet ? 'bullet' : 'task', '+', markdown)
+      item.checked = !bullet && edit.checked === true
       return () => {
-        created.push(insertItem(document, slot, item))
+        const inserted = insertItem(document, slot, item)
+        if (!bullet) {
+          created.push(inserted)
+        }
       }
     }
     const { node } = locateTask(before, baseRevision, edit.task)

@@ -138,8 +138,9 @@ function describeFailure(cause: unknown): string | null {
  * written at the same time.
  *
  * A write that finds its task gone reads the note from the index again and
- * runs once more. A write that still fails leaves the rows as the store holds
- * them, and shows a line only when the user can act on it. A command settles
+ * runs once more. A write that still fails keeps the text of its tasks in
+ * their rows for the next command that names them, drops its other changes,
+ * and shows a line only when the user can act on it. A command settles
  * when its writes ended, and never rejects.
  */
 export class TaskCommands {
@@ -365,20 +366,23 @@ export class TaskCommands {
           ...newTask,
           markdown: rewrite?.markdown ?? markdown,
           checked: actions.some((action) => action.kind === 'toggle'),
+          bullet: actions.some((action) => action.kind === 'toBullet'),
         },
       ]
     }
-    const edit =
-      draft === undefined
-        ? { type: 'cancel' as const }
-        : resolveTaskEdit(draft.base, draft.markdown)
+    const held = store.takeHeldText(taskId)
+    const base =
+      held === undefined
+        ? (draft?.base ?? task.markdown)
+        : (store.find(task.notePath, taskId)?.markdown ?? task.markdown)
+    const edit = resolveTaskEdit(base, draft?.markdown ?? held ?? base)
     // A task whose text was cleared is removed, whatever the command.
     if (edit.type === 'delete') {
       return [{ kind: 'remove', taskId }]
     }
     const saved: TaskOp[] =
       edit.type === 'commit' ? [{ kind: 'setMarkdown', taskId, markdown: edit.content }] : []
-    const markdown = edit.type === 'commit' ? edit.content : task.markdown
+    const markdown = edit.type === 'commit' ? edit.content : base
     return [...saved, ...actionsFor(markdown).map((action): TaskOp => ({ ...action, taskId }))]
   }
 
@@ -410,10 +414,13 @@ export class TaskCommands {
         if (session.signal.aborted) {
           return
         }
-        // A new task that was not written keeps its row and its text.
+        // Text that was not written stays in its row until a later write takes it.
+        const gone = cause instanceof NoteEditError && cause.kind === 'stale'
         for (const op of ops) {
           if (op.kind === 'insert') {
-            store.addNewTask({ ...op, checked: false })
+            store.addNewTask({ ...op, checked: false, bullet: false })
+          } else if (op.kind === 'setMarkdown' && !gone) {
+            store.holdText(notePath, op.taskId, op.markdown)
           }
         }
         this.#report(cause)
@@ -470,6 +477,7 @@ export class TaskCommands {
                 : { kind: 'contextEnd', task: toLocator(anchor) },
             markdown: op.markdown,
             checked: op.checked,
+            bullet: op.bullet,
           },
         ]
       }

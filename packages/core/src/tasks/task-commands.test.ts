@@ -198,6 +198,21 @@ describe('typed text', () => {
     )
   })
 
+  it('keeps the text in the row when its write fails, and writes it later', async () => {
+    const rows = await start({ [A]: '+ [ ] one\n' })
+    const write = vi.spyOn(commands, 'write').mockRejectedValueOnce(new Error('disk full'))
+
+    commands.setDraft(rows[0]!, 'one more')
+    await commands.toggle(rows)
+    expect(shown()).toEqual([[rows[0]!.taskId, 'one more']])
+    expect(file(A)).toBe('+ [ ] one\n')
+
+    write.mockRestore()
+    await commands.commitDrafts()
+    expect(file(A)).toBe('+ [ ] one more\n')
+    expect(shown()).toEqual([[rows[0]!.taskId, 'one more']])
+  })
+
   it('saves every typed text when the app is about to stop', async () => {
     const rows = await start({ [A]: '+ [ ] one\n' })
     const filled = commands.add(TODAY)
@@ -258,6 +273,17 @@ describe('a new task', () => {
 
     expect(shown()).toEqual([])
     expect(harness.files.writes()).toEqual([])
+  })
+
+  it('is written as a bullet when it is converted', async () => {
+    await start({})
+
+    const row = commands.add(TODAY)
+    commands.setDraft(row, 'buy milk')
+    await commands.convert([row])
+
+    expect(harness.files.getWrites(TODAY.notePath)).toEqual(['## Tasks\n\n+ buy milk\n'])
+    expect(shown()).toEqual([])
   })
 
   it('never reaches the file empty while three tasks are entered one after the other', async () => {

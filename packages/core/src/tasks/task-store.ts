@@ -155,7 +155,8 @@ function compareByRecency(left: OpenTask, right: OpenTask): number {
  * applied. A task keeps its id while reads and writes replace its note.
  * The struck set is view state: it names tasks by id and holds no row.
  * A new task is a row with no write in flight: it shows until it is taken.
- * A draft is typed text that no row shows.
+ * A held text is the text of a write that failed: its row shows it until it
+ * is taken. A draft is typed text that no row shows.
  */
 export class TaskStore {
   /**
@@ -169,9 +170,9 @@ export class TaskStore {
   readonly #seqs = new Map<string, number>()
   #pending: PendingWrite[] = []
   /**
-   * The new tasks that no write holds yet, by task id.
+   * The new tasks and the held texts that no write holds, by task id.
    */
-  readonly #newTasks = new Map<string, PendingWrite>()
+  readonly #unwritten = new Map<string, PendingWrite>()
   readonly #drafts = new Map<string, TaskDraft>()
   /**
    * The ids of the tasks that stay in the active list while they are checked.
@@ -257,7 +258,7 @@ export class TaskStore {
    */
   addNewTask(op: TaskInsertOp): OpenTask {
     const { notePath } = op.note
-    this.#newTasks.set(op.taskId, this.push(notePath, [op]))
+    this.#unwritten.set(op.taskId, this.push(notePath, [op]))
     const row = this.rows(notePath).find((candidate) => candidate.taskId === op.taskId)
     if (row === undefined) {
       throw new Error('The new task has no row.')
@@ -269,7 +270,7 @@ export class TaskStore {
    * The new task of `taskId` that no write holds yet.
    */
   findNewTask(taskId: string): TaskInsertOp | undefined {
-    const op = this.#newTasks.get(taskId)?.ops[0]
+    const op = this.#unwritten.get(taskId)?.ops[0]
     return op?.kind === 'insert' ? op : undefined
   }
 
@@ -278,12 +279,31 @@ export class TaskStore {
    */
   takeNewTask(taskId: string): TaskInsertOp | undefined {
     const op = this.findNewTask(taskId)
-    const write = this.#newTasks.get(taskId)
-    if (write !== undefined) {
-      this.#newTasks.delete(taskId)
-      this.drop(write)
+    if (op !== undefined) {
+      this.#takeUnwritten(taskId)
     }
     return op
+  }
+
+  /**
+   * Show `markdown` as the text of the task of `taskId` in `notePath` until a
+   * write takes it.
+   */
+  holdText(notePath: string, taskId: string, markdown: string): void {
+    this.#takeUnwritten(taskId)
+    this.#unwritten.set(taskId, this.push(notePath, [{ kind: 'setMarkdown', taskId, markdown }]))
+  }
+
+  /**
+   * Stop showing the held text of `taskId` and return it, for a write to hold.
+   */
+  takeHeldText(taskId: string): string | undefined {
+    const op = this.#unwritten.get(taskId)?.ops[0]
+    if (op?.kind !== 'setMarkdown') {
+      return undefined
+    }
+    this.#takeUnwritten(taskId)
+    return op.markdown
   }
 
   /**
@@ -304,21 +324,21 @@ export class TaskStore {
   }
 
   /**
-   * The tasks that hold text no write has taken: every draft, and every new
-   * task. A new task with no text is left out.
+   * The tasks that hold text no write has taken: every draft, held text, and
+   * new task. A new task with no text is left out.
    */
   unsaved(): TaskIdentity[] {
     const tasks = new Map<string, TaskIdentity>()
     for (const [taskId, draft] of this.#drafts) {
       tasks.set(taskId, { notePath: draft.notePath, taskId })
     }
-    for (const taskId of this.#newTasks.keys()) {
+    for (const [taskId, write] of this.#unwritten) {
       const op = this.findNewTask(taskId)
       const markdown = this.#drafts.get(taskId)?.markdown ?? op?.markdown ?? ''
-      if (op === undefined || markdown.trim() === '') {
+      if (op !== undefined && markdown.trim() === '') {
         tasks.delete(taskId)
       } else {
-        tasks.set(taskId, { notePath: op.note.notePath, taskId })
+        tasks.set(taskId, { notePath: write.notePath, taskId })
       }
     }
     return [...tasks.values()]
@@ -333,7 +353,8 @@ export class TaskStore {
   landCommit(commit: TaskCommit, write: PendingWrite | null): void {
     const { notePath } = commit
     const previous = this.#notes.get(notePath)
-    const inserts = write?.ops.filter((op) => op.kind === 'insert') ?? []
+    const inserts =
+      write?.ops.filter((op) => op.kind === 'insert').filter((op) => op.bullet !== true) ?? []
     const context = previous?.rows[0] ?? inserts[0]?.note
     if (context !== undefined) {
       const exact =
@@ -413,6 +434,14 @@ export class TaskStore {
   view(): TaskStoreView {
     this.#view ??= this.#computeView()
     return this.#view
+  }
+
+  #takeUnwritten(taskId: string): void {
+    const write = this.#unwritten.get(taskId)
+    if (write !== undefined) {
+      this.#unwritten.delete(taskId)
+      this.drop(write)
+    }
   }
 
   #isCurrent(path: string, seq: number): boolean {

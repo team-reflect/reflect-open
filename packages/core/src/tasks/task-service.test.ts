@@ -581,7 +581,7 @@ describe('task list state', () => {
     expect(noteFile.files().get(A)).toBe('+ [x] one\n')
   })
 
-  it('puts the row back and reports it when a write fails', async () => {
+  it('keeps the typed text in the row and reports it when a write fails', async () => {
     const { rows } = await subscribed()
     failWrites(new Error('disk full'))
 
@@ -594,7 +594,16 @@ describe('task list state', () => {
     })
 
     await editing
-    expect(tasks.get().open).toEqual(rows)
+    expect(tasks.get().open).toEqual([
+      {
+        ...rows[0]!,
+        markdown: 'edited [[2026-06-20]]',
+        text: 'edited 2026-06-20',
+        dueDate: '2026-06-20',
+      },
+      rows[1]!,
+    ])
+    expect(noteFile.files().get(A)).toBe('+ [ ] one\n')
     expect(progress.findByLabel('Saving task')?.message).toBe('The task could not be saved.')
   })
 
@@ -617,7 +626,8 @@ describe('task list state', () => {
     await landing
     first.resolve()
     await failing
-    expect(markdowns(tasks.get().open)).toEqual(['one', 'two!'])
+    expect(markdowns(tasks.get().open)).toEqual(['one!', 'two!'])
+    expect(noteFile.files().get(A)).toBe('+ [ ] one\n')
   })
 
   /**
@@ -673,7 +683,7 @@ describe('task list state', () => {
 
     await reopening
     expect(tasks.get().open).toEqual([])
-    expect(tasks.get().struck).toEqual([struck])
+    expect(tasks.get().struck).toEqual([{ ...struck, markdown: 'edited', text: 'edited' }])
   })
 
   it('keeps a checked task struck when its delete fails', async () => {

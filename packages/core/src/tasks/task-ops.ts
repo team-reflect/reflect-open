@@ -33,6 +33,10 @@ export interface TaskInsertOp {
    */
   checked?: boolean | undefined
   /**
+   * The text is written as a plain bullet, which no row shows.
+   */
+  bullet?: boolean | undefined
+  /**
    * Epoch milliseconds when the op was made, to order the row of a note with no other row.
    */
   updatedAt: number
@@ -119,7 +123,7 @@ export function applyTaskOp(rows: readonly OpenTask[], op: TaskOp): readonly Ope
       return rows.filter((row) => row.taskId !== op.taskId)
     }
     case 'insert': {
-      return insertRow(rows, op)
+      return op.bullet === true ? rows : insertRow(rows, op)
     }
   }
 }
