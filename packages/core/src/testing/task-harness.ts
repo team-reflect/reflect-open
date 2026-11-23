@@ -165,9 +165,15 @@ export class TaskHarness {
       this.index.refresh(this.session)
     })
     const steppedFiles = overrideNoteFileService(this.files, {
-      write: async (path, contents, generation, expectedContents) => {
+      write: async (path, contents, generation, expectedContents, onMismatch) => {
         await this.#writes.pass()
-        const result = await this.files.write(path, contents, generation, expectedContents)
+        const result = await this.files.write(
+          path,
+          contents,
+          generation,
+          expectedContents,
+          onMismatch,
+        )
         this.#unreported.add(path)
         return result
       },

@@ -80,6 +80,20 @@ describe('createNoteFileService', () => {
     })
   })
 
+  it('returns the disk text of a rejecting write and does not report it', async () => {
+    const { ipc, fileChanges, noteFile } = setup()
+    ipc.onCommand('note_write', () => ({ modifiedMs: 1_234, merged: 'a\nb\nc', hash: 'h3' }))
+
+    await expect(noteFile.write('notes/a.md', 'a\nB', 7, 'a\nb', 'reject')).resolves.toEqual({
+      merged: 'a\nb\nc',
+      hash: 'h3',
+      modifiedMs: 1_234,
+    })
+
+    expect(ipc.calls()[0]?.args).toMatchObject({ expectedContents: 'a\nb', rejectMismatch: true })
+    expect(fileChanges.ownWrites()).toEqual([])
+  })
+
   it('sends `expectedContents` for a checked write and does not report a rejected one', async () => {
     const { ipc, fileChanges, noteFile } = setup()
     ipc.onCommand('note_write', () => {

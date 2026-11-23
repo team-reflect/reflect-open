@@ -10,7 +10,9 @@ export type { LocalNoteRead, VaultScanStats } from '@reflect/types'
  */
 export interface NoteWriteResult {
   /**
-   * The full text now on disk when the write merged with a newer disk text, else `null`.
+   * The full text now on disk when the disk text had moved past the expected
+   * one, else `null`: the merge of both, or the unchanged disk text when the
+   * write rejected the mismatch.
    */
   merged: string | null
   /**
@@ -43,12 +45,16 @@ export interface NoteFileService {
    * the write is checked: `null` requires a missing file, and a note whose
    * disk text moved past `expectedContents` is merged with it (see
    * {@link NoteWriteResult.merged}). Omitting it writes unconditionally.
+   * With `onMismatch: 'reject'` a checked write whose disk text is neither
+   * `expectedContents` nor `contents` writes nothing and resolves with the
+   * disk text as `merged`.
    */
   write(
     path: string,
     contents: string,
     generation: number,
     expectedContents?: string | null,
+    onMismatch?: 'merge' | 'reject',
   ): Promise<NoteWriteResult>
   /**
    * Create a note only when `path` is free. A collision is returned, never overwritten.
@@ -106,6 +112,7 @@ class NoteFileServiceImpl implements NoteFileService {
     contents: string,
     generation: number,
     expectedContents?: string | null,
+    onMismatch?: 'merge' | 'reject',
   ): Promise<NoteWriteResult> {
     const { ipc, clock, fileChanges } = this.#deps
     const outcome = await ipc.call('note_write', {
@@ -114,10 +121,12 @@ class NoteFileServiceImpl implements NoteFileService {
       generation,
       checkContents: expectedContents === undefined ? null : true,
       expectedContents: expectedContents ?? null,
-      rejectMismatch: null,
+      rejectMismatch: onMismatch === 'reject' ? true : null,
     })
     const modifiedMs = outcome.modifiedMs ?? clock.now()
-    fileChanges.reportOwnWrite([{ path, kind: 'upsert', modifiedMs }])
+    if (onMismatch !== 'reject' || outcome.merged === null) {
+      fileChanges.reportOwnWrite([{ path, kind: 'upsert', modifiedMs }])
+    }
     return { merged: outcome.merged, hash: outcome.hash, modifiedMs }
   }
 

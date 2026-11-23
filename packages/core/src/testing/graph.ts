@@ -149,14 +149,28 @@ class TestNoteFileServiceImpl implements TestNoteFileService {
     contents: string,
     pinned: number,
     expectedContents?: string | null,
+    onMismatch?: 'merge' | 'reject',
   ): Promise<NoteWriteResult> {
     return Promise.try(() => {
       checkGeneration(this.#generation, pinned)
+      const current = this.#files.get(path)
+      if (
+        onMismatch === 'reject' &&
+        expectedContents !== undefined &&
+        current !== undefined &&
+        current.contents !== expectedContents &&
+        current.contents !== contents
+      ) {
+        return {
+          merged: current.contents,
+          hash: sha256HexSync(current.contents),
+          modifiedMs: current.modifiedMs,
+        }
+      }
       const merged = this.#merges.get(path) ?? null
       if (merged !== null) {
         this.#merges.delete(path)
       } else if (expectedContents !== undefined) {
-        const current = this.#files.get(path)
         if (current?.contents === contents) {
           return { merged, hash: sha256HexSync(contents), modifiedMs: current.modifiedMs }
         }
@@ -323,12 +337,14 @@ class NoteFileOverrideService implements NoteFileService {
     contents: string,
     generation: number,
     expectedContents?: string | null,
+    onMismatch?: 'merge' | 'reject',
   ): Promise<NoteWriteResult> {
     return (this.#overrides.write ?? this.#inner.write.bind(this.#inner))(
       path,
       contents,
       generation,
       expectedContents,
+      onMismatch,
     )
   }
 

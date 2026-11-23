@@ -187,10 +187,20 @@ class DevBridgeImpl implements IpcBridge {
         return { kind: 'content', content: contents }
       }
       case 'note_write': {
-        const { path, contents, checkContents, expectedContents } = argsOf('note_write', args)
+        const { path, contents, checkContents, expectedContents, rejectMismatch } = argsOf(
+          'note_write',
+          args,
+        )
         if (checkContents === true) {
           const current = files.read(path)
           if (current !== (expectedContents ?? null) && current !== contents) {
+            if (rejectMismatch === true && current !== null) {
+              return sha256Hex(current).then((hash) => ({
+                modifiedMs: null,
+                merged: current,
+                hash,
+              }))
+            }
             throw new AppError('io', 'Note changed on disk; reload before retrying')
           }
         }
