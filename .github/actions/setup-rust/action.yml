@@ -50,11 +50,20 @@ runs:
       run: echo "ORT_CACHE_DIR=$RUNNER_TEMP/ort_cache" >> "$GITHUB_ENV"
 
     - name: Cache ONNX Runtime
+      id: ort
       if: inputs.cache == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ env.ORT_CACHE_DIR }}
         key: ort-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
+
+    # The ort-sys build script downloads ONNX Runtime only when it runs, and
+    # mbx replays a cached build-script run instead of running it.
+    # https://github.com/jdx/mr-boxington/blob/v1.30.0/docs/limits.md#build-script-execution-follows-cargos-freshness-inputs
+    - name: Run build scripts without the mbx cache
+      if: inputs.cache == 'true' && steps.ort.outputs.cache-hit != 'true'
+      shell: bash
+      run: echo "MBX_BUILD_SCRIPT_EXECUTION=0" >> "$GITHUB_ENV"
 
     # Uses the mbx that mise installed. A push to master or a workflow_dispatch
     # saves the cache. https://mr-boxington.jdx.dev/github-action
