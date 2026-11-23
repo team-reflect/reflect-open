@@ -877,11 +877,7 @@ export function composeCoreServices(
     localStorage: adapters.storage.local,
     sessionStorage: adapters.storage.session,
   })
-  const fileChanges = create.fileChanges({
-    ipc,
-    logger,
-    echoOwnWrites: isMobilePlatform(adapters.platform.appPlatform),
-  })
+  const fileChanges = create.fileChanges({ ipc, logger })
   const id = adapters.id ?? createSystemIdService()
   const secretStore = create.secretStore({ ipc })
   // The desktop shell's web-auth plugin answers every sign-in as cancelled.

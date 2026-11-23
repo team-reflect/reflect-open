@@ -189,11 +189,7 @@ export {
   createTestPersistenceFlushService,
   type TestPersistenceFlushService,
 } from './persistence-flush.ts'
-export {
-  createTestFileChangeService,
-  type TestFileChangeService,
-  type TestFileChangeServiceOptions,
-} from './file-change.ts'
+export { createTestFileChangeService, type TestFileChangeService } from './file-change.ts'
 export {
   createTestAppStoreService,
   createTestHapticsService,

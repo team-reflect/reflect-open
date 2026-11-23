@@ -5,13 +5,6 @@ import type {
 } from '../indexing/file-change-service.ts'
 import type { Unlisten } from '../unlisten.ts'
 
-export interface TestFileChangeServiceOptions {
-  /**
-   * Echo own writes onto the change stream. Defaults to `false`.
-   */
-  echoOwnWrites?: boolean
-}
-
 export interface TestFileChangeService extends FileChangeService {
   /**
    * Notify every `subscribeReconcile` listener.
@@ -50,16 +43,11 @@ function attach<Args extends unknown[]>(
 }
 
 class TestFileChangeServiceImpl implements TestFileChangeService {
-  readonly #echoOwnWrites: boolean
   readonly #changeListeners = new Set<(batch: FileChangeBatch) => void>()
   readonly #reconcileListeners = new Set<() => void>()
   readonly #delivered: FileChangeBatch[] = []
   readonly #reported: (readonly string[])[] = []
   #running = false
-
-  constructor(options: TestFileChangeServiceOptions | undefined) {
-    this.#echoOwnWrites = options?.echoOwnWrites ?? false
-  }
 
   subscribe(listener: (batch: FileChangeBatch) => void): Unlisten {
     return attach(this.#changeListeners, listener)
@@ -78,9 +66,7 @@ class TestFileChangeServiceImpl implements TestFileChangeService {
 
   reportOwnWrite(changes: readonly FileChange[]): void {
     this.#reported.push(changes.map((change) => change.path))
-    if (this.#echoOwnWrites) {
-      this.emit({ changes: [...changes], source: 'own-write' })
-    }
+    this.emit({ changes: [...changes], source: 'own-write' })
   }
 
   startWatcher(): void {
@@ -120,8 +106,6 @@ class TestFileChangeServiceImpl implements TestFileChangeService {
 /**
  * An in-memory {@link FileChangeService} with no native watcher behind it.
  */
-export function createTestFileChangeService(
-  options?: TestFileChangeServiceOptions,
-): TestFileChangeService {
-  return new TestFileChangeServiceImpl(options)
+export function createTestFileChangeService(): TestFileChangeService {
+  return new TestFileChangeServiceImpl()
 }

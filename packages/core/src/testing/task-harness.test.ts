@@ -76,6 +76,29 @@ describe('note commit', () => {
   })
 })
 
+describe('note commit echo', () => {
+  it('applies the projection once, and the watcher echo applies nothing', async () => {
+    const harness = await start({ 'notes/a.md': '+ [ ] one\n' })
+    const before = harness.indexStore.calls().length
+
+    await harness.documents.commitSourceEdit(
+      'notes/a.md',
+      (source) => source.replace('one', 'two'),
+      { generation: harness.session.generation },
+    )
+    await harness.index.drained()
+    expect(
+      harness.indexStore
+        .calls()
+        .slice(before)
+        .map((call) => call.method),
+    ).toEqual(['applyBatch'])
+
+    await harness.deliverWatcherBatch()
+    expect(harness.indexStore.calls()).toHaveLength(before + 1)
+  })
+})
+
 describe('drained task view', () => {
   it('equals the open tasks of the files after writes, external edits, a pass, and a suspend', async () => {
     const harness = await start({

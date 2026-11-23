@@ -76,25 +76,6 @@ describe('createCoreServices', () => {
     expect(mobile.mobile?.mobileAudioMemo).toBeDefined()
   })
 
-  it('echoes own writes onto the file-change stream on mobile only', () => {
-    for (const [appPlatform, echoed] of [
-      ['desktop', 0],
-      ['ios', 1],
-    ] as const) {
-      const services = createCoreServices({
-        ...requiredAdapters(),
-        logger: createTestLoggerService(),
-        platform: createTestPlatformService({ appPlatform }),
-      })
-      let batches = 0
-      services.fileChanges.subscribe(() => {
-        batches++
-      })
-      services.fileChanges.reportOwnWrite([{ path: 'notes/a.md', kind: 'upsert' }])
-      expect(batches, appPlatform).toBe(echoed)
-    }
-  })
-
   it('reports note writes to the composed file-change service', async () => {
     const ipc = createTestIpcBridgeService({
       commands: { note_write: () => ({ modifiedMs: null, merged: null, hash: '' }) },

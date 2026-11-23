@@ -9,10 +9,10 @@ import {
 } from './file-change-service.ts'
 import { returnNull } from '@ocavue/utils'
 
-function setup(echoOwnWrites = false) {
+function setup() {
   const ipc = createTestIpcBridgeService()
   const logger = createTestLoggerService()
-  const fileChanges = createFileChangeService({ ipc, logger, echoOwnWrites })
+  const fileChanges = createFileChangeService({ ipc, logger })
   return { ipc, logger, fileChanges }
 }
 
@@ -81,7 +81,7 @@ describe('createFileChangeService', () => {
       },
       logger,
     })
-    const fileChanges = createFileChangeService({ ipc, logger, echoOwnWrites: false })
+    const fileChanges = createFileChangeService({ ipc, logger })
     const listener = vi.fn()
     const reconcile = vi.fn()
 
@@ -123,18 +123,8 @@ describe('createFileChangeService', () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps own writes off the change stream when echo is off', () => {
-    const { fileChanges } = setup(false)
-    const changes = vi.fn()
-    fileChanges.subscribe(changes)
-
-    fileChanges.reportOwnWrite([{ path: 'notes/a.md', kind: 'upsert', modifiedMs: 1 }])
-
-    expect(changes).not.toHaveBeenCalled()
-  })
-
-  it('echoes own writes onto the change stream when echo is on', () => {
-    const { fileChanges } = setup(true)
+  it('echoes own writes onto the change stream', () => {
+    const { fileChanges } = setup()
     const seen: FileChangeBatch[] = []
     fileChanges.subscribe((batch) => {
       seen.push(batch)
