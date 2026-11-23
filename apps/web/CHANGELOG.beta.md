@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.20.0-beta.2...v0.20.0-beta.3) (2026-11-23)
+
+
+### Features
+
+* **cli:** add `reflect tasks` command ([#2302](https://github.com/team-reflect/reflect-open/issues/2302)) ([f338d44](https://github.com/team-reflect/reflect-open/commit/f338d4454367f4f0f66cdd42b3d7c6f46e15a334))
+
 ## [0.20.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.20.0-beta.1...v0.20.0-beta.2) (2026-11-23)
 
 
