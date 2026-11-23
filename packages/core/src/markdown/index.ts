@@ -53,19 +53,15 @@ export { compareTaskPaths, decodeTaskPath, encodeTaskPath, isSameTaskPath } from
 export {
   appendListItem,
   linkSectionHeading,
+  NoteNotSerializableError,
+  TaskStaleError,
   type ListItemInsert,
   type ListItemKind,
   type SectionTarget,
+} from './list-insert.ts'
+export {
   applyTaskEdits,
   findTaskMove,
-  getFirstParagraphMarkdown,
-  getRoundTasks,
-  getTaskDueDate,
-  isRoundTask,
-  NoteNotSerializableError,
-  projectTasks,
-  renderTaskSnapshot,
-  TaskStaleError,
   type InsertPosition,
   type TaskEdit,
   type TaskEditInsert,
@@ -73,7 +69,15 @@ export {
   type TaskEditResult,
   type TaskLogContext,
   type TaskMove,
+} from './task-edit.ts'
+export {
+  getFirstParagraphMarkdown,
+  getRoundTasks,
+  getTaskDueDate,
+  isRoundTask,
+  projectTasks,
+  renderTaskSnapshot,
   type TaskEntry,
   type TaskRow,
-} from './task-ast.ts'
+} from './task-project.ts'
 export type { ParsedTask, TaskLocator, TaskSnapshot } from './task-model.ts'

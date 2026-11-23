@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyTaskEdits } from '../markdown/task-ast.ts'
+import { applyTaskEdits } from '../markdown/task-edit.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { blockContextLinesAt, prepareBlockContext } from './block-context.ts'
 import { createSourceTaskLocator, extractSnippetTasks, type SnippetTask } from './snippet-tasks.ts'

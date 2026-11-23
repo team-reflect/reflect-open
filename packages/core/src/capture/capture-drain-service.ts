@@ -30,12 +30,8 @@ import { dailyPath, notePath } from '../graph/paths.ts'
 import { parseNote } from '../markdown/extract.ts'
 import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter.ts'
 import { headingNamesSection, sectionEnd, topLevelHeadings } from '../markdown/heading-blocks.ts'
-import {
-  appendListItem,
-  applyTaskEdits,
-  linkSectionHeading,
-  type SectionTarget,
-} from '../markdown/task-ast.ts'
+import { appendListItem, linkSectionHeading, type SectionTarget } from '../markdown/list-insert.ts'
+import { applyTaskEdits } from '../markdown/task-edit.ts'
 import { createArchivedPost, type XArchiveService } from '../embeds/x-archive-service.ts'
 import type { BacklinkTargetService } from './backlink-target-service.ts'
 

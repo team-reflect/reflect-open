@@ -37,7 +37,7 @@ import { AUDIO_MEMOS_DIR, dailyPath } from '../graph/paths.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
 import { WritableStore, type Store } from '../store.ts'
 import { wikiLinkSafe } from '../markdown/edit.ts'
-import { appendListItem } from '../markdown/task-ast.ts'
+import { appendListItem } from '../markdown/list-insert.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
 import { returnNull } from '@ocavue/utils'
 
