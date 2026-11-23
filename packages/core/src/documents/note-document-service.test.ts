@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { createTestNoteSession, type TestNoteSessionOptions } from '../testing/documents.ts'
 import { createTestFileChangeService } from '../testing/file-change.ts'
@@ -304,6 +305,44 @@ describe('commitSourceEdit', () => {
     await expect(first).rejects.toThrow('stale')
     await second
     expect(noteFile.getWrites('notes/a.md')).toEqual(['A'])
+  })
+})
+
+describe('direct note file writes', () => {
+  /**
+   * The modules that call `noteFile.write` themselves, by path under `src/`.
+   */
+  const DIRECT_WRITERS = [
+    // The commit protocol and the editor session save.
+    'documents/note-document-service.ts',
+    'documents/note-session-service.ts',
+    // Writes of a whole note that the module creates.
+    'assets/asset-description-service.ts',
+    'audio/audio-memo-transcription-service.ts',
+    'capture/capture-drain-service.ts',
+    'graph/onboarding.ts',
+    // Edits of an existing note with a read and a write of their own.
+    'capture/capture-enrichment-service.ts',
+    'capture/capture-enrichment-write.ts',
+    'contacts/contact-suggestion-service.ts',
+    'documents/alias-placement.ts',
+    'documents/template-service.ts',
+    'documents/title-rename-service.ts',
+  ]
+
+  it('come only from the listed modules', () => {
+    const root = new URL('../', import.meta.url)
+    const writers = readdirSync(root, { recursive: true, encoding: 'utf8' })
+      .map((file) => file.replaceAll('\\', '/'))
+      .filter((file) => {
+        return (
+          file.endsWith('.ts') &&
+          !file.endsWith('.test.ts') &&
+          !file.startsWith('testing/') &&
+          readFileSync(new URL(file, root), 'utf8').includes('noteFile.write(')
+        )
+      })
+    expect(writers.toSorted()).toEqual(DIRECT_WRITERS.toSorted())
   })
 })
 
