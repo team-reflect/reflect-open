@@ -3,6 +3,9 @@
 
 use sea_query::Iden;
 
+/// The `index_meta` key of the commit sequence.
+pub(crate) const COMMIT_SEQ_KEY: &str = "commit_seq";
+
 macro_rules! tables {
     ($( $(#[$meta:meta])* $name:ident { $($(#[$column_meta:meta])* $column:ident),* $(,)? } )*) => {
         $(

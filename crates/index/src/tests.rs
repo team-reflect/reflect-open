@@ -5,9 +5,9 @@
 use expect_test::{Expect, expect};
 use reflect_index_schema::LATEST_SCHEMA_VERSION;
 use reflect_types::{
-    ChatConversation, ChatMessageRow, EmbeddedChunk, IndexedAlias, IndexedClaim, IndexedEmail,
-    IndexedLink, IndexedNote, IndexedTag, IndexedTask, LinkKind, MovedNoteAddress, NoteKind,
-    TagFacet, VisitedNote,
+    ChatConversation, ChatMessageRow, EmbeddedChunk, IndexTouch, IndexedAlias, IndexedClaim,
+    IndexedEmail, IndexedLink, IndexedNote, IndexedTag, IndexedTask, LinkKind, MovedNoteAddress,
+    NoteKind, TagFacet, VisitedNote,
 };
 use rusqlite::Connection;
 use sea_query::{QueryStatementWriter, SqliteQueryBuilder};
@@ -28,7 +28,7 @@ use super::read::embed::{related_chunks, semantic_chunks};
 use super::read::lists::{
     list_notes, list_notes_query, list_tags_query, note_tags, recent_notes, recent_notes_query,
 };
-use super::read::meta::meta;
+use super::read::meta::{commit_seq, meta};
 use super::read::notes::privacy;
 use super::read::notes::{
     embeddable_paths, file_facts, note as note_row, note_ids, path_taken, person_owners,
@@ -2116,6 +2116,96 @@ fn a_single_connection_host_queries_on_the_writer() {
         .apply(generation, &[note("notes/a.md", "A", vec![])])
         .unwrap();
     assert_eq!(note_count(&session), Value::from(1));
+}
+
+fn commit_seq_of(session: &IndexSession) -> u64 {
+    let requested = session.read_generation().unwrap();
+    session.read(requested, commit_seq).unwrap()
+}
+
+#[test]
+fn each_committed_index_write_adds_one_to_the_commit_seq() {
+    let graph_dir = tempfile::tempdir().expect("tempdir");
+    let (session, generation) = file_session(graph_dir.path());
+    assert_eq!(commit_seq_of(&session), 0);
+
+    session
+        .apply(
+            generation,
+            &[
+                note("notes/a.md", "A", vec![]),
+                note("notes/b.md", "B", vec![]),
+            ],
+        )
+        .unwrap();
+    assert_eq!(commit_seq_of(&session), 1);
+    session
+        .touch(
+            generation,
+            &[IndexTouch {
+                path: "notes/a.md".to_string(),
+                mtime: 5,
+            }],
+        )
+        .unwrap();
+    assert_eq!(commit_seq_of(&session), 2);
+    session
+        .move_rows(
+            generation,
+            "notes/a.md",
+            "notes/c.md",
+            &moved_address("notes/c.md"),
+        )
+        .unwrap();
+    assert_eq!(commit_seq_of(&session), 3);
+    session.remove(generation, "notes/b.md").unwrap();
+    assert_eq!(commit_seq_of(&session), 4);
+    session.clear(generation).unwrap();
+    assert_eq!(commit_seq_of(&session), 5);
+    assert_eq!(note_count(&session), Value::from(0));
+}
+
+#[test]
+fn a_write_that_does_not_commit_keeps_the_commit_seq() {
+    let graph_dir = tempfile::tempdir().expect("tempdir");
+    let (session, generation) = file_session(graph_dir.path());
+    session
+        .apply(generation, &[note("notes/a.md", "A", vec![])])
+        .unwrap();
+
+    let mut invalid = daily_note("daily/2026-01-02.md", "2026-01-02");
+    invalid.daily_date = None;
+    session
+        .apply(generation, &[note("notes/b.md", "B", vec![]), invalid])
+        .expect_err("the daily-date check rejects the batch");
+    assert_eq!(
+        session
+            .apply(generation + 1, &[note("notes/b.md", "B", vec![])])
+            .unwrap(),
+        Applied::Stale
+    );
+    session
+        .set_meta(generation, "commit_seq", "0")
+        .expect_err("the key is reserved");
+
+    assert_eq!(commit_seq_of(&session), 1);
+    assert_eq!(note_count(&session), Value::from(1));
+}
+
+#[test]
+fn the_commit_seq_continues_after_the_index_reopens() {
+    let graph_dir = tempfile::tempdir().expect("tempdir");
+    let (session, generation) = file_session(graph_dir.path());
+    session
+        .apply(generation, &[note("notes/a.md", "A", vec![])])
+        .unwrap();
+    session.clear(generation).unwrap();
+
+    let (reopened, generation) = file_session(graph_dir.path());
+    reopened
+        .apply(generation, &[note("notes/a.md", "A", vec![])])
+        .unwrap();
+    assert_eq!(commit_seq_of(&reopened), 3);
 }
 
 /// The root the shell walks for a reconcile scan comes from the session, not

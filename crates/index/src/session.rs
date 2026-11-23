@@ -4,8 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
-use rusqlite::Connection;
-use sea_query::{OnConflict, Query};
+use rusqlite::{Connection, Transaction};
 
 use reflect_types::{
     AppError, AppResult, ChatConversation, ChatMessageRow, EmbeddedChunk, FileMeta, IndexTouch,
@@ -15,8 +14,7 @@ use reflect_types::{
 use crate::chat_write;
 use crate::embed_write;
 use crate::scan;
-use crate::schema::IndexMeta;
-use crate::sql;
+use crate::schema::COMMIT_SEQ_KEY;
 use crate::visit_write;
 use crate::write;
 
@@ -192,12 +190,13 @@ impl IndexSession {
     /// transaction.
     pub fn apply(&self, generation: u64, notes: &[IndexedNote]) -> AppResult<Applied> {
         Self::applied(self.write(generation, |conn| {
-            let tx = conn.transaction()?;
-            for note in notes {
-                write::apply_note(&tx, note)?;
-            }
-            tx.commit()?;
-            Ok(())
+            commit(conn, |tx| {
+                for note in notes {
+                    write::apply_note(tx, note)?;
+                }
+                Ok(())
+            })
+            .map(drop)
         }))
     }
 
@@ -210,11 +209,11 @@ impl IndexSession {
             // One transaction: a half-removed note (row gone, chunks left)
             // would let a later note at the same path surface stale chunk text
             // in semantic search until a re-embed.
-            let tx = conn.transaction()?;
-            write::remove_note(&tx, path)?;
-            embed_write::remove_chunks(&tx, path)?;
-            tx.commit()?;
-            Ok(())
+            commit(conn, |tx| {
+                write::remove_note(tx, path)?;
+                embed_write::remove_chunks(tx, path)
+            })
+            .map(drop)
         }))
     }
 
@@ -297,12 +296,13 @@ impl IndexSession {
     /// path whose row vanished in between updates nothing.
     pub fn touch(&self, generation: u64, entries: &[IndexTouch]) -> AppResult<Applied> {
         Self::applied(self.write(generation, |conn| {
-            let tx = conn.transaction()?;
-            for entry in entries {
-                write::touch_note(&tx, &entry.path, entry.mtime)?;
-            }
-            tx.commit()?;
-            Ok(())
+            commit(conn, |tx| {
+                for entry in entries {
+                    write::touch_note(tx, &entry.path, entry.mtime)?;
+                }
+                Ok(())
+            })
+            .map(drop)
         }))
     }
 
@@ -312,28 +312,19 @@ impl IndexSession {
     ///
     /// [`clear`]: IndexSession::clear
     pub fn set_meta(&self, generation: u64, key: &str, value: &str) -> AppResult<Applied> {
-        Self::applied(self.write(generation, |conn| {
-            sql::execute(
-                conn,
-                Query::insert()
-                    .into_table(IndexMeta::Table)
-                    .columns([IndexMeta::Key, IndexMeta::Value])
-                    .values_panic([key.into(), value.into()])
-                    .on_conflict(
-                        OnConflict::column(IndexMeta::Key)
-                            .update_column(IndexMeta::Value)
-                            .to_owned(),
-                    ),
-            )?;
-            Ok(())
-        }))
+        if key == COMMIT_SEQ_KEY {
+            return Err(AppError::io(format!("{COMMIT_SEQ_KEY} is a reserved key")));
+        }
+        Self::applied(self.write(generation, |conn| write::set_meta(conn, key, value)))
     }
 
     /// Wipe all derived tables (the TS layer then re-applies every note). The
     /// `chat_*` and `note_visits` tables are deliberately untouched: they are
     /// durable, not a rebuildable projection.
     pub fn clear(&self, generation: u64) -> AppResult<Applied> {
-        Self::applied(self.write(generation, |conn| write::clear_index(conn)))
+        Self::applied(self.write(generation, |conn| {
+            commit(conn, |tx| write::clear_index(tx)).map(drop)
+        }))
     }
 
     /// Upsert one chat message and its conversation row in a single
@@ -445,11 +436,25 @@ fn move_rows(
     to: &str,
     address: &MovedNoteAddress,
 ) -> AppResult<()> {
+    commit(conn, |tx| {
+        // Child tables FK `notes(path)`; deferring lets the parent key move
+        // first and the constraint re-check at commit, when the children have
+        // followed.
+        tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;
+        write::move_note(tx, from, to, address)
+    })
+    .map(drop)
+}
+
+/// Run `body` in one transaction that counts as one index commit. Returns the
+/// commit sequence after it.
+fn commit(
+    conn: &mut Connection,
+    body: impl FnOnce(&Transaction) -> AppResult<()>,
+) -> AppResult<u64> {
     let tx = conn.transaction()?;
-    // Child tables FK `notes(path)`; deferring lets the parent key move first
-    // and the constraint re-check at commit, when the children have followed.
-    tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;
-    write::move_note(&tx, from, to, address)?;
+    body(&tx)?;
+    let seq = write::bump_commit_seq(&tx)?;
     tx.commit()?;
-    Ok(())
+    Ok(seq)
 }
