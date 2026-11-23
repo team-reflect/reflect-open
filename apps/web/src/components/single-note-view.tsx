@@ -30,7 +30,10 @@ interface SingleNoteViewProps {
 export function SingleNoteView({ path, dailyDate, heading }: SingleNoteViewProps): ReactElement {
   return (
     <ScrollRestored className="h-full overflow-auto px-0">
-      <div className="mx-auto flex min-h-full w-full max-w-full flex-col py-8">
+      <div
+        className="mx-auto flex min-h-full w-full max-w-full flex-col py-8"
+        data-print-path={path}
+      >
         {heading}
         <NotePane
           path={path}

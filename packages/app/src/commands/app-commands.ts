@@ -30,6 +30,7 @@ export type AppCommandId =
   | 'note.attachFile'
   | 'note.copyDeepLink'
   | 'note.copyPath'
+  | 'note.print'
   | 'note.random'
   | 'template.insert'
   | 'template.new'
@@ -216,6 +217,11 @@ export const APP_COMMANDS = {
     keywords: ['file', 'absolute', 'filesystem', 'clipboard', 'location'],
     // Finder's Copy-as-Pathname chord.
     keybinding: 'Alt-Mod-c',
+  },
+  'note.print': {
+    title: 'Print note…',
+    keywords: ['printer', 'paper', 'pdf', 'export'],
+    keybinding: 'Mod-p',
   },
   'note.random': {
     title: 'Open random note',

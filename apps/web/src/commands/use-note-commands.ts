@@ -6,6 +6,7 @@ import {
   routeForPath,
 } from '@reflect/app'
 import { noteEditorHandleFor } from '@/editor/editor-handle-registry.ts'
+import { printNote } from '@/lib/print-note.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { useCommandHandler } from './use-commands.ts'
 
@@ -69,5 +70,14 @@ export function useNoteCommands(path: string | null): void {
   useCommandHandler(
     'note.copyPath',
     path === null ? undefined : () => copyNotePath(services, app, path),
+  )
+  // In the daily stream `path` is the focused day, so only that day prints.
+  useCommandHandler(
+    'note.print',
+    path === null
+      ? undefined
+      : () => {
+          printNote(path)
+        },
   )
 }

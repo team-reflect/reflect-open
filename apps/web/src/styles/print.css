@@ -1,0 +1,48 @@
+/* Print styles for the "Print note" command (lib/print-note.ts). Only the block
+   marked `[data-print-target]` prints: everything else is hidden, and the app
+   frame around it (fixed heights, scroll containers, the daily stream's
+   virtualizer offsets) is unwound so the note flows across pages. The dark
+   theme is screen-only, so paper always gets the light tokens. */
+
+/* Tauri's macOS print sets zero page margins, so the page sets its own. */
+@page {
+  margin: 1.5cm;
+}
+
+@media print {
+  :root {
+    color-scheme: light !important;
+  }
+
+  body :not([data-print-target], [data-print-target] *, :has([data-print-target])) {
+    display: none !important;
+  }
+
+  :has([data-print-target]),
+  [data-print-target] {
+    position: static !important;
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    transform: none !important;
+  }
+
+  :has([data-print-target]) {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+  }
+
+  [data-print-target] {
+    margin: 0 !important;
+    border: 0 !important;
+  }
+
+  /* The editor keeps focus while printing; its caret is not content. */
+  [data-print-target] * {
+    caret-color: transparent !important;
+  }
+}

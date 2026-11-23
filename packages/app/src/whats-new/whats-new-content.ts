@@ -24,6 +24,14 @@ const MENUS_BODY =
  * marketing version's list, and each update shows only the items not seen yet.
  */
 export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
+  '0.20.0': [
+    {
+      id: 'print-note',
+      title: 'Print notes',
+      body: 'Press ⌘P to print the note you are looking at, or the day in focus in your daily notes.',
+      platforms: ['darwin', 'windows', 'linux'],
+    },
+  ],
   '0.19.1': [
     {
       id: 'recently-opened-notes',

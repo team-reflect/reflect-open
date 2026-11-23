@@ -57,6 +57,8 @@ export const APP_MENU_LAYOUT: readonly AppSubmenuLayout[] = [
       command('note.new'),
       command('note.attachFile'),
       separator(),
+      command('note.print'),
+      separator(),
       predefined('CloseWindow'),
     ],
   },
