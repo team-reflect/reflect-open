@@ -3,24 +3,20 @@
 use rusqlite::Connection;
 use sea_query::{Expr, ExprTrait, Order, Query};
 
-use reflect_types::{AppResult, NoteTasks, TaskRead, TaskRow};
+use reflect_types::{AppResult, NoteTasks, TaskRow};
 
-use crate::read::meta::commit_seq;
 use crate::schema::{Notes, Tasks};
 use crate::sql::{self, lit};
 
-/// The tasks of every note but templates, grouped by note, with the commit
-/// sequence of the index. `checked` keeps only the open (`false`) or the
-/// completed tasks, and `paths` only the tasks of those notes; a note with no
-/// such task is absent from the result. The caller runs this in one read
-/// transaction, so the tasks and the sequence come from one state. A task
+/// The tasks of every note but templates, grouped by note. `checked` keeps
+/// only the open (`false`) or the completed tasks, and `paths` only the tasks
+/// of those notes; a note with no such task is absent from the result. A task
 /// whose address or breadcrumbs do not decode is logged and left out.
 pub(crate) fn tasks(
     conn: &Connection,
     checked: Option<bool>,
     paths: Option<&[String]>,
-) -> AppResult<TaskRead> {
-    let seq = commit_seq(conn)?;
+) -> AppResult<Vec<NoteTasks>> {
     let mut notes: Vec<NoteTasks> = Vec::new();
     let mut select = Query::select();
     select
@@ -87,7 +83,7 @@ pub(crate) fn tasks(
         }
         Ok(())
     })?;
-    Ok(TaskRead { seq, notes })
+    Ok(notes)
 }
 
 /// The address in the stored JSON text: a non-empty array of indexes.

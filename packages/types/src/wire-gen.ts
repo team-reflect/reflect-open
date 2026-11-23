@@ -1846,8 +1846,8 @@ export type IcloudSweepOutcome = {
 export type IndexCommit = {
   /**
    *  The commit sequence of the index after the write: the number of
-   *  projection write transactions committed to this database file. Absent
-   *  when the generation was stale, so nothing was written.
+   *  projection write transactions the running index session committed.
+   *  Absent when the generation was stale, so nothing was written.
    */
   seq: number | null
 }
@@ -2622,7 +2622,10 @@ export type TagFacet = {
 
 /**  The result of one read of the tasks. */
 export type TaskRead = {
-  /**  The commit sequence of the index state that `notes` was read from. */
+  /**
+   *  A commit sequence of the index that the state of `notes` covers: the
+   *  rows hold every write up to it, and may hold later ones.
+   */
   seq: number
   /**  The notes with a selected task, by path. */
   notes: NoteTasks[]

@@ -193,7 +193,8 @@ pub struct NoteTasks {
 #[cfg_attr(feature = "codegen", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct TaskRead {
-    /// The commit sequence of the index state that `notes` was read from.
+    /// A commit sequence of the index that the state of `notes` covers: the
+    /// rows hold every write up to it, and may hold later ones.
     pub seq: u64,
     /// The notes with a selected task, by path.
     pub notes: Vec<NoteTasks>,

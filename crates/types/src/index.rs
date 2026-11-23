@@ -236,8 +236,8 @@ pub struct MovedNoteAddress {
 #[serde(rename_all = "camelCase")]
 pub struct IndexCommit {
     /// The commit sequence of the index after the write: the number of
-    /// projection write transactions committed to this database file. Absent
-    /// when the generation was stale, so nothing was written.
+    /// projection write transactions the running index session committed.
+    /// Absent when the generation was stale, so nothing was written.
     pub seq: Option<u64>,
 }
 

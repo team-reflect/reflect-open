@@ -271,7 +271,10 @@ impl<'a> IndexCommands<'a> {
         checked: Option<bool>,
         paths: Option<Vec<String>>,
     ) -> AppResult<TaskRead> {
-        self.read(|conn| read::tasks::tasks(conn, checked, paths.as_deref()))
+        // Taken before the query, so the rows are never older than `seq`.
+        let seq = self.session.commit_seq();
+        let notes = self.read(|conn| read::tasks::tasks(conn, checked, paths.as_deref()))?;
+        Ok(TaskRead { seq, notes })
     }
 
     /// The note that wins the wiki key `key`.

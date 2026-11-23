@@ -6,9 +6,6 @@ use sea_query::Iden;
 #[cfg(test)]
 use strum::EnumIter;
 
-/// The `index_meta` key of the commit sequence.
-pub(crate) const COMMIT_SEQ_KEY: &str = "commit_seq";
-
 #[derive(Iden, Clone, Copy, Debug)]
 #[cfg_attr(test, derive(EnumIter))]
 #[allow(dead_code)]

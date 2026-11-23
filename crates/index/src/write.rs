@@ -10,8 +10,8 @@ use sea_query::{Expr, ExprTrait, OnConflict, Query};
 use reflect_types::{AppError, AppResult, IndexedNote, MovedNoteAddress};
 
 use crate::schema::{
-    Aliases, Assets, COMMIT_SEQ_KEY, EmbeddingChunks, EmbeddingVectors, IndexMeta, Links,
-    NoteClaims, NoteEmails, NoteVisits, Notes, SearchFts, Tags, Tasks,
+    Aliases, Assets, EmbeddingChunks, EmbeddingVectors, IndexMeta, Links, NoteClaims, NoteEmails,
+    NoteVisits, Notes, SearchFts, Tags, Tasks,
 };
 use crate::sql::{self, lit};
 
@@ -404,12 +404,4 @@ pub(super) fn set_meta(conn: &Connection, key: &str, value: &str) -> AppResult<(
             ),
     )?;
     Ok(())
-}
-
-/// Add one to the commit sequence and return the new value. The caller runs
-/// this inside the transaction it counts, so a rollback also undoes the count.
-pub(super) fn bump_commit_seq(conn: &Connection) -> AppResult<u64> {
-    let seq = crate::read::meta::commit_seq(conn)? + 1;
-    set_meta(conn, COMMIT_SEQ_KEY, &seq.to_string())?;
-    Ok(seq)
 }

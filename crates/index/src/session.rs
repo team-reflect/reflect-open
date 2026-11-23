@@ -2,6 +2,7 @@
 //! gated on that generation.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
 use rusqlite::{Connection, Transaction};
@@ -16,7 +17,6 @@ use crate::chat_write;
 use crate::connections::{is_corrupt, reset_corrupt};
 use crate::embed_write;
 use crate::scan;
-use crate::schema::COMMIT_SEQ_KEY;
 use crate::visit_write;
 use crate::write;
 
@@ -81,6 +81,9 @@ struct ReaderInner {
 pub struct IndexSession {
     writer: Mutex<WriterInner>,
     reader: Mutex<ReaderInner>,
+    /// The number of index write transactions this session committed, over
+    /// every open and every index file. It only grows.
+    commit_seq: AtomicU64,
 }
 
 impl IndexSession {
@@ -183,6 +186,49 @@ impl IndexSession {
         body(conn).map(Some)
     }
 
+    /// The commit sequence now. A read takes it before it queries, and a
+    /// write returns it after it commits.
+    pub fn commit_seq(&self) -> u64 {
+        self.commit_seq.load(Ordering::SeqCst)
+    }
+
+    /// Count one committed index write and return the new commit sequence.
+    /// The caller holds the writer lock.
+    fn bump_commit_seq(&self) -> u64 {
+        self.commit_seq.fetch_add(1, Ordering::SeqCst) + 1
+    }
+
+    /// Run `body` on `conn` in one transaction that counts as one index
+    /// commit. Returns the commit sequence after it.
+    fn commit_on(
+        &self,
+        conn: &mut Connection,
+        body: impl FnOnce(&Transaction) -> AppResult<()>,
+    ) -> AppResult<u64> {
+        let tx = conn.transaction()?;
+        body(&tx)?;
+        tx.commit()?;
+        Ok(self.bump_commit_seq())
+    }
+
+    /// One committed row-move transaction (the rename pipeline's halves).
+    /// Returns the commit sequence after it.
+    fn move_rows_on(
+        &self,
+        conn: &mut Connection,
+        from: &str,
+        to: &str,
+        address: &MovedNoteAddress,
+    ) -> AppResult<u64> {
+        self.commit_on(conn, |tx| {
+            // Child tables FK `notes(path)`; deferring lets the parent key move
+            // first and the constraint re-check at commit, when the children have
+            // followed.
+            tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;
+            write::move_note(tx, from, to, address)
+        })
+    }
+
     /// Run `body` on the writer in one transaction that counts as one index
     /// commit, when `generation` is current.
     fn commit(
@@ -190,7 +236,7 @@ impl IndexSession {
         generation: u64,
         body: impl FnOnce(&Transaction) -> AppResult<()>,
     ) -> AppResult<IndexCommit> {
-        let seq = self.write(generation, |conn| commit(conn, body))?;
+        let seq = self.write(generation, |conn| self.commit_on(conn, body))?;
         Ok(IndexCommit { seq })
     }
 
@@ -238,7 +284,9 @@ impl IndexSession {
         to: &str,
         address: &MovedNoteAddress,
     ) -> AppResult<IndexCommit> {
-        let seq = self.write(generation, |conn| move_rows(conn, from, to, address))?;
+        let seq = self.write(generation, |conn| {
+            self.move_rows_on(conn, from, to, address)
+        })?;
         Ok(IndexCommit { seq })
     }
 
@@ -266,12 +314,14 @@ impl IndexSession {
             ));
         }
         let conn = writer.conn.as_mut().ok_or_else(AppError::no_graph)?;
-        let seq = move_rows(conn, &request.from, &request.to, &request.to_address)?;
+        let seq = self.move_rows_on(conn, &request.from, &request.to, &request.to_address)?;
         if let Err(err) = rename() {
             // Compensate: the disk refused, so the rows go back. Best-effort:
             // a failed compensation must surface the *original* error, and
             // the reconcile heals any residue by id.
-            if let Err(comp) = move_rows(conn, &request.to, &request.from, &request.from_address) {
+            if let Err(comp) =
+                self.move_rows_on(conn, &request.to, &request.from, &request.from_address)
+            {
                 tracing::error!(
                     ?comp,
                     "rename compensation failed; reconcile will heal by id"
@@ -320,9 +370,6 @@ impl IndexSession {
     ///
     /// [`clear`]: IndexSession::clear
     pub fn set_meta(&self, generation: u64, key: &str, value: &str) -> AppResult<Applied> {
-        if key == COMMIT_SEQ_KEY {
-            return Err(AppError::io(format!("{COMMIT_SEQ_KEY} is a reserved key")));
-        }
         Self::applied(self.write(generation, |conn| write::set_meta(conn, key, value)))
     }
 
@@ -332,11 +379,11 @@ impl IndexSession {
     /// empty index instead, and the durable tables are lost with it.
     pub fn clear(&self, generation: u64) -> AppResult<IndexCommit> {
         let seq = self.write(generation, |conn| {
-            match commit(conn, |tx| write::clear_index(tx)) {
+            match self.commit_on(conn, |tx| write::clear_index(tx)) {
                 #[cfg(any(feature = "native", test))]
                 Err(err) if is_corrupt(&err) => {
-                    reset_keeping_seq(conn, &err)?;
-                    commit(conn, |_| Ok(()))
+                    reset_corrupt(conn, &err)?;
+                    Ok(self.bump_commit_seq())
                 }
                 result => result,
             }
@@ -363,7 +410,7 @@ impl IndexSession {
         let Some(conn) = writer.conn.as_mut() else {
             return false;
         };
-        if let Err(reset_err) = reset_keeping_seq(conn, err) {
+        if let Err(reset_err) = reset_corrupt(conn, err) {
             tracing::error!(
                 error = reset_err.message(),
                 "resetting the corrupt index file failed"
@@ -472,43 +519,4 @@ impl IndexSession {
             body(&tx)
         })
     }
-}
-
-/// One committed row-move transaction (the rename pipeline's halves). Returns
-/// the commit sequence after it.
-fn move_rows(
-    conn: &mut Connection,
-    from: &str,
-    to: &str,
-    address: &MovedNoteAddress,
-) -> AppResult<u64> {
-    commit(conn, |tx| {
-        // Child tables FK `notes(path)`; deferring lets the parent key move
-        // first and the constraint re-check at commit, when the children have
-        // followed.
-        tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;
-        write::move_note(tx, from, to, address)
-    })
-}
-
-/// Resets a corrupt index file to an empty index. The commit sequence
-/// continues from its value when the file still gives it.
-#[cfg(any(feature = "native", test))]
-fn reset_keeping_seq(conn: &mut Connection, err: &AppError) -> AppResult<()> {
-    let seq = crate::read::meta::commit_seq(conn).unwrap_or(0);
-    reset_corrupt(conn, err)?;
-    write::set_meta(conn, COMMIT_SEQ_KEY, &seq.to_string())
-}
-
-/// Run `body` in one transaction that counts as one index commit. Returns the
-/// commit sequence after it.
-fn commit(
-    conn: &mut Connection,
-    body: impl FnOnce(&Transaction) -> AppResult<()>,
-) -> AppResult<u64> {
-    let tx = conn.transaction()?;
-    body(&tx)?;
-    let seq = write::bump_commit_seq(&tx)?;
-    tx.commit()?;
-    Ok(seq)
 }
