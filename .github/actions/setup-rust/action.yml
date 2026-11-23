@@ -93,3 +93,5 @@ runs:
         cache-key: ${{ steps.mbx-key.outputs.key }}
         restore-keys: ${{ steps.mbx-key.outputs.restore-keys }}
         save-on-workflow-dispatch: ${{ inputs.cache-save }}
+        # TEMPORARY [mbx-exp]: save PR caches to measure them. Revert.
+        save-on-pull-request: ${{ inputs.cache-save }}
