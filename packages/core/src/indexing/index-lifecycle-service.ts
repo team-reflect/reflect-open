@@ -161,18 +161,18 @@ export interface IndexLifecycleService {
    */
   close(): Promise<void>
   /**
-   * Suspend index writes for a backgrounded mobile app: abort the bulk pass,
-   * pause the index writer, and stop following the file-change stream
-   * synchronously. A later {@link IndexLifecycleService.resume} follows it
-   * again and reconciles the whole graph, so file events missed while
-   * suspended converge.
+   * Suspend index writes for a backgrounded mobile app: abort the bulk pass
+   * and pause the index writer synchronously. Files reported meanwhile stay
+   * dirty. A later {@link IndexLifecycleService.resume} writes them and
+   * reconciles the whole graph, so changes nobody reported converge too.
    */
   suspend(): void
   /**
-   * Resume after {@link IndexLifecycleService.suspend} and run one coalesced
-   * full sync for anything that changed while the file-change stream was not
-   * followed. A null session, or one without an index, clears suspension
-   * without starting work (foreground can precede graph open).
+   * Resume after {@link IndexLifecycleService.suspend}: the index writer
+   * writes the files marked dirty meanwhile, and one coalesced full sync
+   * finds what nobody reported. A null session, or one without an index,
+   * clears suspension without starting a sync (foreground can precede graph
+   * open).
    */
   resume(session: GraphSession | null): void
   /**
@@ -377,9 +377,6 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
       return
     }
     this.#cancelRetry()
-    if (this.#isSuspended()) {
-      return
-    }
     const writer = this.#writerAt(generation, fileGeneration)
     if (writer === null) {
       return
@@ -395,6 +392,9 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     this.#follow(writer)
     if (session.signal.aborted) {
       this.#disposeWriter(writer)
+    }
+    if (this.#isSuspended()) {
+      return
     }
 
     this.#emitProgress('reconciling')
@@ -536,7 +536,6 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     this.#cancelRetry()
     this.#abort?.abort()
     this.#writer?.pause()
-    this.#unfollow()
     this.#emitProgress('idle')
   }
 
@@ -544,9 +543,8 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     this.#suspended = false
     this.#writer?.resume()
     if (session !== null && session.indexGeneration !== null && !session.signal.aborted) {
-      // Events intentionally dropped while suspended are recovered by the
-      // full reconcile. `refresh` also folds a rapid resume/poll burst into a
-      // single queued rerun when a prior pass is still settling.
+      // `refresh` folds a rapid resume/poll burst into a single queued rerun
+      // when a prior pass is still settling.
       this.refresh(session)
     }
   }
@@ -578,8 +576,8 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
         }
       }
     })
-    // Synchronous teardown prevents a locally emitted or metadata-watcher
-    // batch from entering the index queue after iOS begins suspension.
+    // Pausing synchronously keeps a locally emitted or metadata-watcher batch
+    // from being written after iOS begins suspension.
     const stopHidden = activity.subscribeHidden(() => {
       this.suspend()
     })

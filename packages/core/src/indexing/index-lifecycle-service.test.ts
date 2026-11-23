@@ -666,7 +666,7 @@ describe('createIndexLifecycleService', () => {
 
     index.sync(sessionAt(5))
     await Promise.resolve()
-    expect(steps).toEqual([])
+    expect(steps).toEqual(['subscribe'])
 
     backgrounded = false
     index.resume(sessionAt(5))
@@ -689,7 +689,7 @@ describe('createIndexLifecycleService', () => {
     expect(steps).toEqual(['subscribe', 'scan', 'watchStart'])
   })
 
-  it('suspend() aborts bulk work, drops live work, and resume coalesces catch-up triggers', async () => {
+  it('suspend() aborts bulk work, keeps changes dirty, and resume coalesces catch-up triggers', async () => {
     const settles: Array<() => void> = []
     let hold = false
     const { index, store, files, fileChanges, passes, subscriptions, progress } = setup({
@@ -707,9 +707,9 @@ describe('createIndexLifecycleService', () => {
     expect(subscriptions()).toBe(1)
 
     index.suspend()
-    expect(subscriptions()).toBe(0)
+    expect(subscriptions()).toBe(1)
     expect(progress.at(-1)).toBe('idle')
-    // A batch that arrives while suspended is not applied.
+    // A batch that arrives while suspended is not written until resume.
     files.set('notes/a.md', '# A, edited')
     fileChanges.emit({ changes: [{ path: 'notes/a.md', kind: 'upsert' }], source: 'external' })
     await sleep(0)
@@ -718,6 +718,7 @@ describe('createIndexLifecycleService', () => {
     hold = true
     index.resume(sessionAt(5))
     await vi.waitFor(() => expect(settles).toHaveLength(1))
+    expect(store.applied().map((note) => note.path)).toEqual(['notes/a.md'])
     index.refresh(sessionAt(5))
     index.refresh(sessionAt(5))
 
@@ -1174,16 +1175,22 @@ describe('followActivity', () => {
     await expect.poll(() => context.passes()).toBe(1)
   })
 
-  it('suspends the live index when the app hides', async () => {
-    const context = setup({ appPlatform: 'ios' })
+  it('stops index writes and passes when the app hides', async () => {
+    const context = setup({ appPlatform: 'ios', files: { 'notes/a.md': '# A' } })
     context.index.followActivity()
     const session = sessionAt(7)
     context.index.sync(session)
-    await expect.poll(() => context.subscriptions()).toBe(1)
+    await expect.poll(() => context.passes()).toBe(1)
+    await settle(context.index)
 
     context.activity.emitHidden()
+    context.fileChanges.emit({
+      changes: [{ path: 'notes/a.md', kind: 'upsert' }],
+      source: 'external',
+    })
+    await sleep(0)
 
-    expect(context.subscriptions()).toBe(0)
+    expect(context.store.applied()).toEqual([])
     context.index.refresh(session)
     await settle(context.index)
     expect(context.passes()).toBe(1)
