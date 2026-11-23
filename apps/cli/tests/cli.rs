@@ -748,6 +748,20 @@ fn tasks_excludes_private_notes() {
 }
 
 #[test]
+fn tasks_warns_when_an_indexed_note_cannot_be_read() {
+    let fixture = graph();
+    let gone = fixture.write_note("notes/gone.md", "# Gone\n\n+ [ ] lost\n");
+    fixture.build_index();
+    fixture.index_task("notes/gone.md", "[1,0]", "lost", false);
+    fs::remove_file(gone).unwrap();
+
+    let output = reflect(&fixture, &["tasks"]);
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    assert_eq!(stdout(&output), "");
+    assert!(stderr(&output).contains("1 note(s) that could not be read"));
+}
+
+#[test]
 fn tasks_of_a_daily_note_that_does_not_exist_yet_is_empty() {
     let fixture = graph();
     fixture.write_note("notes/a.md", "anything\n");

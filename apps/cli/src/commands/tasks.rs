@@ -54,11 +54,22 @@ pub fn run(
 
     let mut notes: Vec<NoteTasks> =
         reflect_index::read::tasks::tasks(&opened.conn, checked, paths.as_deref(), true)
-            .map_err(|err| CliError::runtime(err.message()))?
-            .into_iter()
-            // The file's own frontmatter decides; an unreadable file fails closed.
-            .filter(|note| read_note(&graph.root, &note.path).is_ok())
-            .collect();
+            .map_err(|err| CliError::runtime(err.message()))?;
+    // The file's own frontmatter decides; an unreadable file fails closed.
+    let mut unreadable = 0;
+    notes.retain(|note| match read_note(&graph.root, &note.path) {
+        Ok(_) => true,
+        Err(CliError::Private(_)) => false,
+        Err(_) => {
+            unreadable += 1;
+            false
+        }
+    });
+    if unreadable > 0 {
+        warn(format!(
+            "left out the tasks of {unreadable} note(s) that could not be read"
+        ));
+    }
     for note in &mut notes {
         note.tasks
             .sort_by(|left, right| left.ast_path.cmp(&right.ast_path));
