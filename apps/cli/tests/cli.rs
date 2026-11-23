@@ -11,7 +11,6 @@ use std::process::{Command, Output};
 use rusqlite::params;
 use tempfile::TempDir;
 
-use reflect_cli::hash::hash_content;
 use reflect_cli::note_file::parse_note_meta;
 use reflect_cli::paths::{daily_path, today_date};
 use reflect_index::text::keys::fold_key;
@@ -62,7 +61,7 @@ impl Fixture {
                     fold_key(&meta.title),
                     daily_date,
                     i64::from(meta.private),
-                    hash_content(&content),
+                    reflect_utils::note_hash(&content),
                     note.mtime_ms as i64,
                     meta.id,
                     kind,

@@ -4838,11 +4838,11 @@ dependencies = [
  "reflect-index",
  "reflect-index-schema",
  "reflect-types",
+ "reflect-utils",
  "rusqlite",
  "saphyr",
  "serde",
  "serde_json",
- "sha2 0.11.1",
  "tempfile",
 ]
 
@@ -4925,10 +4925,10 @@ dependencies = [
  "reflect-graph-paths",
  "reflect-index-schema",
  "reflect-types",
+ "reflect-utils",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
- "sha2 0.11.1",
  "tempfile",
  "tokio",
  "tracing",
@@ -5004,6 +5004,7 @@ dependencies = [
  "reflect-graph-io",
  "reflect-index",
  "reflect-types",
+ "reflect-utils",
  "regex",
  "serde_json",
  "tauri",
@@ -5036,6 +5037,13 @@ dependencies = [
  "specta-swift",
  "specta-typescript",
  "specta-util",
+]
+
+[[package]]
+name = "reflect-utils"
+version = "0.0.0"
+dependencies = [
+ "sha2 0.11.1",
 ]
 
 [[package]]

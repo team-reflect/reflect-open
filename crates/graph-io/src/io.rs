@@ -14,8 +14,9 @@ use std::path::Path;
 use std::time::UNIX_EPOCH;
 
 use reflect_graph_paths::{
-    evicted_logical_path, eviction_placeholder, is_dataless, normalize_line_endings, to_slash_lossy,
+    evicted_logical_path, eviction_placeholder, is_dataless, to_slash_lossy,
 };
+use reflect_utils::normalize_line_endings;
 
 use crate::graph_gitignore;
 use reflect_types::{AppError, AppResult};
