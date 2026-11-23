@@ -1,5 +1,5 @@
 [tools]
-rust = { version = "1.100.0", mr_boxington = true }
+rust = { version = "1.100.0", mr_boxington = true } # keep sync with rust-toolchain.toml
 mr-boxington = "1.30.0"
 "github:Boshen/cargo-shear" = "1.14.0"
 "github:EmbarkStudios/cargo-about" = "0.9.3"
