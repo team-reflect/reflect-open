@@ -146,10 +146,10 @@ describe('createWindowService', () => {
     const { window } = setup({ ipc })
     const written = vi.fn()
 
-    window.subscribeIndexWritten(written)
+    window.subscribeIndexCommitted(written)
     listen.resolve()
     await settle()
-    ipc.emit('index:written', null)
+    ipc.emit('index:committed', null)
 
     expect(written).toHaveBeenCalledOnce()
   })
@@ -159,11 +159,11 @@ describe('createWindowService', () => {
     ipc.transport.listen = () => Promise.reject(new Error('denied'))
     const { window, logger } = setup({ ipc })
 
-    window.subscribeIndexWritten(noop)
+    window.subscribeIndexCommitted(noop)
     await settle()
 
     expect(logger.getErrors()).toEqual([
-      { message: 'index:written listener failed:', cause: new AppError('unknown', 'denied') },
+      { message: 'index:committed listener failed:', cause: new AppError('unknown', 'denied') },
     ])
   })
 

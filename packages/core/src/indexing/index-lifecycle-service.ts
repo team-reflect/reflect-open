@@ -1,5 +1,6 @@
 import type { MaybePromise } from '@reflect/utils'
 import type { GraphRole, GraphSession } from '../graph/graph-session.ts'
+import { isNotePath } from '../graph/paths.ts'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { isMobilePlatform } from '../ports/platform-facts.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
@@ -343,6 +344,10 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     this.#deps = deps
     const emitChangesApplied = (changes: readonly FileChange[], generation: number): void => {
       this.#emitApplied({ generation, changes })
+      const paths = changes.map((change) => change.path).filter(isNotePath)
+      if (paths.length > 0) {
+        this.#announce(generation, paths)
+      }
     }
     this.#indexer = createNoteIndexer(deps)
     this.#writerDeps = {
@@ -455,6 +460,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
           return
         }
         this.#emitApplied({ generation, changes: null })
+        this.#announce(generation, null)
         for (const listener of this.#reconciledListeners) {
           void listener({ generation, fileGeneration, source: 'sync' })
         }
@@ -685,6 +691,25 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     }
   }
 
+  /**
+   * Tell every window that the note rows of `paths` were committed at
+   * `generation`: `null` when any note may have changed.
+   */
+  #announce(generation: number, paths: string[] | null): void {
+    const { indexStore, logger } = this.#deps
+    const seq = this.#writer?.generation === generation ? this.#writer.seq() : null
+    if (seq === null) {
+      return
+    }
+    void (async () => {
+      try {
+        await indexStore.announce({ seq, paths }, generation)
+      } catch (error) {
+        logger.error('failed to announce an index commit:', error)
+      }
+    })()
+  }
+
   #emitProgress(progress: IndexLifecycleProgress): void {
     if (progress !== 'reconciling') {
       this.#fileProgress.set(null) // the pass finished (or went idle): clear the pill
@@ -815,6 +840,8 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     } catch (cause) {
       operation.fail(errorMessage(cause))
       return
+    } finally {
+      this.#announce(generation, null)
     }
     // A manual rebuild bypasses the watcher pipeline, and `index_clear` wiped
     // the embedding tables with everything else: followers refresh their

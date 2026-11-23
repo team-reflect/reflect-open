@@ -927,7 +927,7 @@ describe('task list state', () => {
     expect(struckListener).toHaveBeenCalledTimes(1)
   })
 
-  it('re-reads on an index:written broadcast in a note window only', async () => {
+  it('re-reads on an index:committed broadcast in a note window only', async () => {
     for (const [role, reads] of [
       ['main', 1],
       ['note-window', 2],
@@ -937,7 +937,7 @@ describe('task list state', () => {
       tasks.subscribe(noop)
       await flushMicrotasks()
 
-      ipc.emit('index:written', null)
+      ipc.emit('index:committed', { seq: 1, paths: null })
       await flushMicrotasks()
 
       expect(getOpenTasks).toHaveBeenCalledTimes(reads)

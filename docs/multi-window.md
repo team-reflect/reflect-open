@@ -80,13 +80,13 @@ bridges that gap.
 | Event | Consumed by | Purpose |
 | ----- | ----------- | ------- |
 | `index:changed` | every window | Open editors reconcile external changes; main's indexer applies the batch. Note windows get editor freshness from it for free. |
-| `index:written` | note windows only | Refetch index-backed queries after a **committed** write. Main invalidates in-process and must not subscribe, or it would refetch twice. |
+| `index:committed` | note windows only | Refetch index-backed queries after **committed** note rows. Carries `{ seq, paths }`; `paths` is `null` after a pass over the whole graph. Main's index writer sends it through `index_announce`, and a note move sends it from Rust. Main invalidates in-process and must not subscribe, or it would refetch twice. |
 | `note:moved` | **every** window | Retarget sessions and router history after a rename. A rename can start in any window, and a window left behind would resurrect the dead path on its next save. |
 | `window:navigate` | the target note window | Reopening a target re-navigates its window, which may have browsed elsewhere. |
 | `app:quit-requested` | every window | Each window flushes its own dirty buffers, then confirms. |
 
 A note window saves via the ordinary `note_write`, the watcher reports the file,
-main indexes it, and `index:written` tells other note windows to refetch. A
+main indexes it, and `index:committed` tells other note windows to refetch. A
 note-window edit is indistinguishable from an external edit by design; no new
 sync or indexing paths exist.
 

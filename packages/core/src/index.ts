@@ -10,7 +10,7 @@
  */
 export {
   createIpcBridgeService,
-  INDEX_WRITTEN_EVENT,
+  INDEX_COMMITTED_EVENT,
   listenNow,
   type CommandArgs,
   type CommandName,

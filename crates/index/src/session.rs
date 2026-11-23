@@ -253,7 +253,7 @@ impl IndexSession {
         root: &Path,
         request: &NoteMoveRequest,
         rename: impl FnOnce() -> AppResult<()>,
-    ) -> AppResult<()> {
+    ) -> AppResult<u64> {
         let mut writer = self.lock_writer()?;
         if writer.root.as_deref() != Some(root) {
             return Err(AppError::io(
@@ -261,7 +261,7 @@ impl IndexSession {
             ));
         }
         let conn = writer.conn.as_mut().ok_or_else(AppError::no_graph)?;
-        move_rows(conn, &request.from, &request.to, &request.to_address)?;
+        let seq = move_rows(conn, &request.from, &request.to, &request.to_address)?;
         if let Err(err) = rename() {
             // Compensate: the disk refused, so the rows go back. Best-effort:
             // a failed compensation must surface the *original* error, and
@@ -274,7 +274,7 @@ impl IndexSession {
             }
             return Err(err);
         }
-        Ok(())
+        Ok(seq)
     }
 
     /// Compare the listed notes against the stored rows and return only what

@@ -1,7 +1,7 @@
 import type { MaybePromise } from '@reflect/utils'
 import {
   errorMessage,
-  INDEX_WRITTEN_EVENT,
+  INDEX_COMMITTED_EVENT,
   listenNow,
   type IpcBridgeService,
   type LoggerService,
@@ -90,7 +90,7 @@ export interface WindowService {
   /**
    * Listen for committed index writes.
    */
-  subscribeIndexWritten(listener: () => void): Unlisten
+  subscribeIndexCommitted(listener: () => void): Unlisten
   /**
    * Listen for an event that another window sent here with {@link emitTo}.
    */
@@ -180,8 +180,8 @@ class WindowServiceImpl implements WindowService {
     })
   }
 
-  subscribeIndexWritten(listener: () => void): Unlisten {
-    return this.#listenIpc(INDEX_WRITTEN_EVENT, () => {
+  subscribeIndexCommitted(listener: () => void): Unlisten {
+    return this.#listenIpc(INDEX_COMMITTED_EVENT, () => {
       listener()
     })
   }

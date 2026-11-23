@@ -1907,7 +1907,7 @@ public struct EmbeddedChunk: Codable, Sendable, Equatable {
 public enum EventName: String, Codable, Sendable, Equatable, CaseIterable {
     case indexChanged = "index:changed"
     case indexReconcile = "index:reconcile"
-    case indexWritten = "index:written"
+    case indexCommitted = "index:committed"
     case noteMoved = "note:moved"
 }
 
@@ -2617,6 +2617,34 @@ public struct IndexCommit: Codable, Sendable, Equatable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(seq, forKey: .seq)
+    }
+}
+
+/// The payload of [`EventName::IndexCommitted`].
+public struct IndexCommitted: Codable, Sendable, Equatable {
+    public let seq: UInt64
+    public let paths: [String]?
+
+    private enum CodingKeys: String, CodingKey {
+        case seq = "seq"
+        case paths = "paths"
+    }
+
+    public init(seq: UInt64, paths: [String]?) {
+        self.seq = seq
+        self.paths = paths
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.seq = try container.decode(UInt64.self, forKey: .seq)
+        self.paths = try container.decodeIfPresent([String].self, forKey: .paths)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(seq, forKey: .seq)
+        try container.encode(paths, forKey: .paths)
     }
 }
 

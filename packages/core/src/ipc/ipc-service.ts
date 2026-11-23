@@ -6,9 +6,10 @@ import { AppError, toAppError } from '../errors.ts'
 import type { Unlisten } from '../unlisten.ts'
 
 /**
- * The shell's broadcast after an index write command commits.
+ * The shell's broadcast to every window after note rows of the index were
+ * committed. Its payload is an `IndexCommitted`.
  */
-export const INDEX_WRITTEN_EVENT = 'index:written' satisfies EventName
+export const INDEX_COMMITTED_EVENT = 'index:committed' satisfies EventName
 
 /**
  * A command from the generated command table: the Rust core, the desktop

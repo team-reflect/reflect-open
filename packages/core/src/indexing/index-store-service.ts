@@ -6,6 +6,7 @@ import type { DatabaseService } from './database-service.ts'
 
 import type {
   IndexCommit,
+  IndexCommitted,
   IndexTouch,
   ReconcileScan,
   ScanCandidate,
@@ -13,7 +14,7 @@ import type {
 } from '@reflect/types'
 import type { IndexedNote } from './indexed-note.ts'
 
-export type { IndexCommit, IndexTouch, ReconcileScan, ScanCandidate, ScanOrphan }
+export type { IndexCommit, IndexCommitted, IndexTouch, ReconcileScan, ScanCandidate, ScanOrphan }
 
 /**
  * Notes per `index_apply_batch` transaction, and re-stamps per `index_touch`
@@ -86,6 +87,10 @@ export interface IndexStoreService {
    * Wipe all derived tables (precedes a full rebuild); `chat_*`, `note_visits`, and `index_meta` stay.
    */
   clear(generation: number): Promise<IndexCommit>
+  /**
+   * Broadcast `index:committed` to every window; a stale generation broadcasts nothing.
+   */
+  announce(commit: IndexCommitted, generation: number): Promise<void>
   /**
    * One `index_meta` value, or `null` when the key has never been written.
    */
@@ -171,6 +176,10 @@ class IndexStoreServiceImpl implements IndexStoreService {
 
   async clear(generation: number): Promise<IndexCommit> {
     return await this.#deps.ipc.call('index_clear', { generation })
+  }
+
+  async announce(commit: IndexCommitted, generation: number): Promise<void> {
+    await this.#deps.ipc.call('index_announce', { ...commit, generation })
   }
 
   async getMeta(key: string): Promise<string | null> {

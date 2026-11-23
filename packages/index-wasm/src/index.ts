@@ -160,7 +160,7 @@ class WasmIndexBackendImpl implements WasmIndexBackend {
  * Create an index over a new in-memory database. `files` backs the two
  * commands that read or move note files; without it the graph lists no files
  * and a note move fails. `onEvent` receives the events that the native shell
- * broadcasts after a committed write (`index:written`, `note:moved`), after
+ * broadcasts after a committed write (`index:committed`, `note:moved`), after
  * the command that caused them has returned.
  */
 export function createWasmIndexBackend(

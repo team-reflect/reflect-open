@@ -1027,6 +1027,14 @@ export type Commands = {
     }
     result: IndexCommit
   }
+  index_announce: {
+    args: {
+      seq: number
+      paths: string[] | null
+      generation: number
+    }
+    result: null
+  }
   index_meta_set: {
     args: {
       key: string
@@ -1568,11 +1576,10 @@ export type EventName =
   /**  Asks the frontend for one full reconcile pass. Carries no payload. */
   | 'index:reconcile'
   /**
-   *  Fired after a note-projection write commits. Secondary note windows run
-   *  no indexer of their own and refetch their index-backed queries on this
-   *  signal.
+   *  Fired after note-projection writes committed, with an
+   *  [`IndexCommitted`]. Every window hears it.
    */
-  | 'index:written'
+  | 'index:committed'
   /**
    *  Fired after a note's rows move to a new path (an in-app rename or an
    *  id-healed external one), with `{ "from": ..., "to": ... }`.
@@ -1843,6 +1850,14 @@ export type IndexCommit = {
    *  when the generation was stale, so nothing was written.
    */
   seq: number | null
+}
+
+/**  The payload of [`EventName::IndexCommitted`]. */
+export type IndexCommitted = {
+  /**  A commit sequence of the index that covers the announced writes. */
+  seq: number
+  /**  The notes whose rows changed, or `None` when any note may have. */
+  paths: string[] | null
 }
 
 /**
@@ -2789,6 +2804,7 @@ export type IndexWriteCommand =
   | 'index_clear'
   | 'index_move'
   | 'index_touch'
+  | 'index_announce'
   | 'index_meta_set'
   | 'chat_message_save'
   | 'chat_conversation_delete'

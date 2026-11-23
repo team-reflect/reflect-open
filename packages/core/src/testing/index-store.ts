@@ -4,6 +4,7 @@ import { dateFromDailyPath, foldGraphPath } from '../graph/paths.ts'
 import type { IndexedNote } from '../indexing/indexed-note.ts'
 import type {
   IndexCommit,
+  IndexCommitted,
   IndexTouch,
   IndexStoreService,
   ReconcileScan,
@@ -91,6 +92,10 @@ export interface TestIndexStoreService extends IndexStoreService {
    * Every successful `move` and `moveIndexed`, in order.
    */
   moved(): readonly { readonly from: string; readonly to: string }[]
+  /**
+   * Every commit passed to `announce`, in order. `calls` leaves them out.
+   */
+  announced(): readonly IndexCommitted[]
 }
 
 const EMPTY_SCAN: ReconcileScan = { total: 0, candidates: [], orphans: [], stalePlaceholders: [] }
@@ -105,6 +110,7 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
   readonly #appliedNotes: IndexedNote[] = []
   readonly #removedPaths: string[] = []
   readonly #moves: { from: string; to: string }[] = []
+  readonly #announcements: IndexCommitted[] = []
   #metaSeeded: boolean
   #seq = 0
 
@@ -188,6 +194,11 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
     })
   }
 
+  announce(commit: IndexCommitted): Promise<void> {
+    this.#announcements.push(commit)
+    return Promise.resolve()
+  }
+
   async getMeta(key: string): Promise<string | null> {
     this.#record({ method: 'getMeta', key })
     const database = this.#database
@@ -208,6 +219,10 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
 
   calls(): readonly IndexStoreCall[] {
     return [...this.#log]
+  }
+
+  announced(): readonly IndexCommitted[] {
+    return [...this.#announcements]
   }
 
   applied(): readonly IndexedNote[] {

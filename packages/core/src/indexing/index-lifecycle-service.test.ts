@@ -327,6 +327,34 @@ describe('createIndexLifecycleService', () => {
     expect(batches).toHaveLength(2)
   })
 
+  it('announces a pass once without paths, and a watcher batch by its note paths', async () => {
+    const { index, store, fileChanges } = setup({
+      files: { 'notes/a.md': '# A', 'notes/b.md': '# B' },
+      store: {
+        scan: {
+          total: 1,
+          candidates: [{ path: 'notes/a.md', modifiedMs: 9, storedMtime: null, storedHash: null }],
+          orphans: [],
+          stalePlaceholders: [],
+        },
+      },
+    })
+    index.sync(sessionAt(5))
+    await index.settled()
+    expect(store.announced()).toEqual([{ seq: 1, paths: null }])
+
+    fileChanges.emit({
+      changes: [
+        { path: 'notes/b.md', kind: 'upsert' },
+        { path: 'assets/photo.png', kind: 'upsert' },
+      ],
+      source: 'external',
+    })
+    await vi.waitFor(() => expect(store.announced()).toHaveLength(2))
+    expect(store.announced()[1]).toEqual({ seq: 2, paths: ['notes/b.md'] })
+    await index.close()
+  })
+
   it('reports the notes a description re-index applied, to its own listeners only', async () => {
     const REFERENCING = '# Hello\n\n![pic](assets/pic.png)\n'
     const { index } = setup({
@@ -865,6 +893,7 @@ describe('rebuildVisibly', () => {
     expect(reconciled).toEqual([
       { generation: 7, fileGeneration: FILE_GENERATION, source: 'rebuild' },
     ])
+    expect(store.announced()).toEqual([{ seq: 2, paths: null }])
   })
 
   it('coalesces concurrent requests at the same generation onto one pass', async () => {

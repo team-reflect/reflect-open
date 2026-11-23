@@ -10,7 +10,7 @@ use reflect_index::{
     INDEX_READ_COMMANDS, INDEX_WRITE_COMMANDS, IndexCommands, IndexConnections, IndexEvents,
     IndexSession,
 };
-use reflect_types::events::EventName;
+use reflect_types::events::{EventName, IndexCommitted};
 use reflect_types::{AppError, AppResult, FileMeta};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -77,8 +77,8 @@ impl EventQueue {
 }
 
 impl IndexEvents for EventQueue {
-    fn index_written(&self) {
-        self.push(EventName::IndexWritten, serde_json::Value::Null);
+    fn index_committed(&self, commit: &IndexCommitted) {
+        self.push(EventName::IndexCommitted, serde_json::json!(commit));
     }
 
     fn note_moved(&self, from: &str, to: &str) {
@@ -165,8 +165,11 @@ impl Index {
     ) -> AppResult<()> {
         let reflect_types::commands::note_move_indexed::Args { request, .. } =
             parse_args("note_move_indexed", args_json)?;
-        self.session.move_note(Path::new(ROOT), &request, rename)?;
-        self.events.index_written();
+        let seq = self.session.move_note(Path::new(ROOT), &request, rename)?;
+        self.events.index_committed(&IndexCommitted {
+            seq,
+            paths: Some(vec![request.from.clone(), request.to.clone()]),
+        });
         self.events.note_moved(&request.from, &request.to);
         Ok(())
     }
@@ -304,14 +307,11 @@ mod tests {
             .unwrap_err();
         assert!(matches!(error, AppError::Io { .. }), "{error:?}");
         assert_eq!(paths(&index), r#"[{"path":"notes/a.md"}]"#);
-        assert_eq!(
-            index.take_events().unwrap(),
-            r#"[{"event":"index:written","payload":null}]"#
-        );
+        assert_eq!(index.take_events().unwrap(), "[]");
         index.move_note(&args, || Ok(())).unwrap();
         assert_eq!(
             index.take_events().unwrap(),
-            r#"[{"event":"index:written","payload":null},{"event":"note:moved","payload":{"from":"notes/a.md","to":"notes/b.md"}}]"#
+            r#"[{"event":"index:committed","payload":{"paths":["notes/a.md","notes/b.md"],"seq":4}},{"event":"note:moved","payload":{"from":"notes/a.md","to":"notes/b.md"}}]"#
         );
         assert_eq!(index.take_events().unwrap(), "[]");
         assert_eq!(paths(&index), r#"[{"path":"notes/b.md"}]"#);

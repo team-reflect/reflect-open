@@ -112,6 +112,7 @@ macro_rules! commands {
                 index_clear(generation: u64) -> IndexCommit,
                 index_move(from: String, to: String, generation: u64, to_address: MovedNoteAddress) -> IndexCommit,
                 index_touch(entries: Vec<IndexTouch>, generation: u64) -> IndexCommit,
+                index_announce(seq: u64, paths: Option<Vec<String>>, generation: u64) -> (),
                 index_meta_set(key: String, value: String, generation: u64) -> (),
                 chat_message_save(conversation: ChatConversation, message: ChatMessageRow, generation: u64) -> (),
                 chat_conversation_delete(id: String, generation: u64) -> (),

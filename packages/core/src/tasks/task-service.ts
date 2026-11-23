@@ -8,7 +8,7 @@ import type { NoteDocumentService } from '../documents/note-document-service.ts'
 import { AppError } from '../errors.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
-import { INDEX_WRITTEN_EVENT, listenNow, type IpcBridgeService } from '../ipc/ipc-service.ts'
+import { INDEX_COMMITTED_EVENT, listenNow, type IpcBridgeService } from '../ipc/ipc-service.ts'
 import type { SnippetTask } from '../indexing/snippet-tasks.ts'
 import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
@@ -49,7 +49,7 @@ export interface TaskServiceDeps {
   readonly graphSession: Store<{ readonly session: GraphSession | null }>
   readonly indexLifecycle: IndexLifecycleService
   /**
-   * Which window this webview is; only a note window follows {@link INDEX_WRITTEN_EVENT}.
+   * Which window this webview is; only a note window follows {@link INDEX_COMMITTED_EVENT}.
    */
   readonly role: GraphRole
   readonly ipc: IpcBridgeService
@@ -848,9 +848,9 @@ class TaskServiceImpl implements TaskService {
       // A note window runs no indexer; the main window's committed writes reach it here.
       unlisteners.push(
         listenNow(
-          () => ipc.listen(INDEX_WRITTEN_EVENT, () => this.#throttledInvalidate()),
+          () => ipc.listen(INDEX_COMMITTED_EVENT, () => this.#throttledInvalidate()),
           (cause) => {
-            logger.error(`${INDEX_WRITTEN_EVENT} listener failed:`, cause)
+            logger.error(`${INDEX_COMMITTED_EVENT} listener failed:`, cause)
           },
         ),
       )

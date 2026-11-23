@@ -364,7 +364,7 @@ class DevBridgeImpl implements IpcBridge {
     return bytes
   }
 
-  // The index events (`index:written`, `note:moved`) fire like the native
+  // The index events (`index:committed`, `note:moved`) fire like the native
   // broadcast: after the command that caused them has replied. The other native event streams (watcher, embeddings, EventKit)
   // do not exist in the browser: those subscriptions succeed and never fire.
   // Plugin event registrations do the same, so the keyboard and recorder
