@@ -294,7 +294,11 @@ class IndexWriterImpl implements IndexWriter {
       return
     }
     this.#runQueued = true
-    this.#tail = this.#tail.then(() => this.#runOnce())
+    this.#tail = this.#tail
+      .then(() => this.#runOnce())
+      .catch((error: unknown) => {
+        this.#deps.logger.error('index writer run failed:', error)
+      })
   }
 
   async #runOnce(): Promise<void> {
@@ -340,11 +344,16 @@ class IndexWriterImpl implements IndexWriter {
     for (const entry of unwritten) {
       run.waiters.get(entry.path)?.resolve({ status: 'deferred' })
     }
-    if (run.reported.length > 0 && !this.#disposed) {
-      this.#deps.emitChangesApplied(run.reported, this.generation)
-    }
-    for (const release of run.afterReport) {
-      release()
+    try {
+      if (run.reported.length > 0 && !this.#disposed) {
+        this.#deps.emitChangesApplied(run.reported, this.generation)
+      }
+    } catch (error) {
+      this.#deps.logger.error('index change report failed:', error)
+    } finally {
+      for (const release of run.afterReport) {
+        release()
+      }
     }
   }
 

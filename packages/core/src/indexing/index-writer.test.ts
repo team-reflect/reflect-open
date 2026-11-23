@@ -56,6 +56,7 @@ function setup(options?: {
   stored?: readonly StoredNote[]
   read?: (path: string) => MaybePromise<void>
   failStore?: (call: IndexStoreCall) => Error | undefined
+  report?: () => void
 }) {
   const database = createTestDatabaseService()
   databases.push(database)
@@ -125,6 +126,7 @@ function setup(options?: {
       emitChangesApplied: (changes) => {
         reports.push([...changes])
         writesAtReport.push(writes())
+        options?.report?.()
       },
       emitMoved: (from, to) => {
         moves.push([from, to])
@@ -422,6 +424,27 @@ describe('createIndexWriter', () => {
     ])
     expect(writesAtReport).toEqual([['apply:notes/a.md', 'remove:notes/gone.md']])
     expect(reads).toEqual(['notes/a.md'])
+  })
+
+  it('keeps writing after a report threw', async () => {
+    const { writer, dirty, writes, logger } = setup({
+      files: { 'notes/a.md': '# a', 'notes/b.md': '# b' },
+      report: () => {
+        throw new Error('listener failed')
+      },
+    })
+
+    dirty.add('notes/a.md')
+    const first = await writer.settled('notes/a.md')
+    dirty.add('notes/b.md')
+    const second = await writer.settled('notes/b.md')
+
+    expect([first.status, second.status]).toEqual(['applied', 'applied'])
+    expect(writes()).toEqual(['apply:notes/a.md', 'apply:notes/b.md'])
+    expect(logger.getErrors().map((entry) => entry.message)).toEqual([
+      'index change report failed:',
+      'index change report failed:',
+    ])
   })
 
   it('reports neither a `bulk` path nor a failed one', async () => {
