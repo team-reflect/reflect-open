@@ -118,6 +118,8 @@ function createTasks(
       openDocuments,
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
+      indexLifecycle: createTestIndexLifecycleService(),
+      logger: createTestLoggerService(),
     }),
     progress,
     clock,

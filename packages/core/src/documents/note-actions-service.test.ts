@@ -44,7 +44,7 @@ function recordingIndexLifecycle(
   const indexLifecycle = createTestIndexLifecycleService()
   vi.spyOn(indexLifecycle, 'indexNote').mockImplementation((path, indexOptions) => {
     log.push({ path, generation: indexOptions.generation })
-    return Promise.resolve()
+    return Promise.resolve(null)
   })
   return indexLifecycle
 }
@@ -52,7 +52,7 @@ function recordingIndexLifecycle(
 /**
  * An index lifecycle whose `indexNote` runs `indexNote`.
  */
-function indexLifecycleWith(indexNote: () => Promise<void>): IndexLifecycleService {
+function indexLifecycleWith(indexNote: () => Promise<never>): IndexLifecycleService {
   const indexLifecycle = createTestIndexLifecycleService()
   vi.spyOn(indexLifecycle, 'indexNote').mockImplementation(indexNote)
   return indexLifecycle
@@ -82,6 +82,8 @@ function createNoteActions(deps: {
       openDocuments,
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
+      indexLifecycle: createTestIndexLifecycleService(),
+      logger: createTestLoggerService(),
     }),
     noteFile,
     openDocuments,
@@ -104,7 +106,7 @@ function setup(options?: {
    * Wraps the in-memory files, e.g. to make a call fail.
    */
   wrapNoteFile?: (files: NoteFileService) => NoteFileService
-  indexNote?: () => Promise<void>
+  indexNote?: () => Promise<never>
   /**
    * The pinned shelf the index lists.
    */

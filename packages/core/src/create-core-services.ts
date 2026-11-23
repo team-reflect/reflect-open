@@ -976,11 +976,6 @@ export function composeCoreServices(
   })
   const path = create.path({ transport: adapters.path })
   const mobileStorage = create.mobileStorage({ ipc })
-  const noteDocuments = create.noteDocuments({
-    openDocuments,
-    noteFile,
-    graphSession: lateGraphSession,
-  })
   const noteMove = create.noteMove({ ipc, indexStore, openDocuments, logger })
   const captureInbox = create.captureInbox({ ipc })
   const webFetch = create.webFetch({ ipc })
@@ -1011,6 +1006,13 @@ export function composeCoreServices(
     activity,
     platform,
     role: adapters.role,
+  })
+  const noteDocuments = create.noteDocuments({
+    openDocuments,
+    noteFile,
+    graphSession: lateGraphSession,
+    indexLifecycle,
+    logger,
   })
   const noteRows = create.noteRows({
     // The graph session is built on these rows.

@@ -272,9 +272,10 @@ export interface IndexLifecycleService {
    * Mark one note dirty and wait until the index writer wrote it, ahead of
    * the other dirty files and without waiting for the watcher. For an in-app write whose row must be readable
    * at once. `content` saves the read, which otherwise carries
-   * `fileGeneration`; the write carries the index `generation`. Rejects when
-   * the read or the write failed. Resolves without a write while the index is
-   * suspended; the note stays dirty.
+   * `fileGeneration`; the write carries the index `generation`. Resolves
+   * with the seq of an index commit that holds the note, `null` when none is
+   * known. Rejects when the read or the write failed. Resolves `null` without
+   * a write while the index is closed or suspended; the note stays dirty.
    */
   indexNote(
     path: string,
@@ -284,7 +285,7 @@ export interface IndexLifecycleService {
       content?: string | undefined
       mtime?: number | undefined
     },
-  ): Promise<void>
+  ): Promise<number | null>
   /**
    * Re-index every note that references any of `assetPaths`, so an asset
    * description written after its notes were indexed reaches their search
@@ -649,15 +650,22 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
       content?: string | undefined
       mtime?: number | undefined
     },
-  ): Promise<void> {
+  ): Promise<number | null> {
     const writer = this.#writerAt(options.generation, options.fileGeneration)
     if (writer === null) {
-      return
+      return null
     }
     writer.dirty.add(path, { content: options.content, modifiedMs: options.mtime })
     const outcome = await writer.settledFirst(path)
-    if (outcome.status === 'failed') {
-      throw outcome.error
+    switch (outcome.status) {
+      case 'applied':
+        return outcome.seq
+      case 'unchanged':
+        return writer.seq()
+      case 'deferred':
+        return null
+      case 'failed':
+        throw outcome.error
     }
   }
 

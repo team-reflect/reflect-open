@@ -1076,11 +1076,9 @@ describe('indexNote', () => {
   it('reads, parses, and writes the note at its generation', async () => {
     const { index, store } = setup({ files: { 'notes/a.md': '# Hello\n\n[[World]]' } })
 
-    await index.indexNote('notes/a.md', {
-      generation: 7,
-      fileGeneration: FILE_GENERATION,
-      mtime: 5,
-    })
+    await expect(
+      index.indexNote('notes/a.md', { generation: 7, fileGeneration: FILE_GENERATION, mtime: 5 }),
+    ).resolves.toBe(1)
 
     expect(store.calls()).toMatchObject([{ method: 'applyBatch', generation: 7 }])
     const [note] = store.applied()
@@ -1123,7 +1121,9 @@ describe('indexNote', () => {
     const { index, store } = setup({ files: { 'notes/a.md': '# Hello' } })
     index.suspend()
 
-    await index.indexNote('notes/a.md', { generation: 7, fileGeneration: FILE_GENERATION })
+    await expect(
+      index.indexNote('notes/a.md', { generation: 7, fileGeneration: FILE_GENERATION }),
+    ).resolves.toBeNull()
     expect(store.calls()).toEqual([])
 
     index.resume(null)

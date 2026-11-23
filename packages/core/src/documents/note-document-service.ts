@@ -2,6 +2,8 @@ import { NoteBusyError, NoteConflictError } from '../tasks/task-errors.ts'
 import { requireGraphSession, type GraphSessionSource } from '../graph/graph-session.ts'
 import { isAppError } from '../errors.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
+import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
+import type { LoggerService } from '../ports/logger-service.ts'
 import { splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter.ts'
 import type { OpenDocumentsService } from './open-documents-service.ts'
@@ -58,8 +60,10 @@ export interface NoteDocumentService {
    * open, disk is the source of truth: read, transform, and write only while
    * the file still holds the text that was read. A file that changed in
    * between runs `transform` again on its new text, and
-   * {@link NoteConflictError} is thrown after {@link COMMIT_ATTEMPT_LIMIT}
-   * attempts. A `transform` that returns its input writes nothing.
+   * {@link NoteConflictError} is thrown after three attempts. A `transform`
+   * that returns its input writes nothing.
+   *
+   * The index holds the committed text before the result resolves.
    *
    * Edits to one path are serialized: the next only reads after the previous
    * has written, whether that one resolved or rejected. An error thrown by
@@ -79,7 +83,7 @@ export interface NoteDocumentService {
 /**
  * How many times a disk commit runs its transform against a file that keeps changing.
  */
-export const COMMIT_ATTEMPT_LIMIT = 3
+const COMMIT_ATTEMPT_LIMIT = 3
 
 /**
  * What {@link NoteDocumentService.commitSourceEdit} left on disk.
@@ -98,14 +102,15 @@ export interface NoteCommitResult {
    */
   readonly merged: boolean
   /**
-   * The index commit that holds `content`, `null` when the index did not write it.
+   * The seq of an index commit that holds `content`. `null` when the commit
+   * wrote nothing, the index is closed or suspended, or the index write failed.
    */
   readonly indexSeq: number | null
 }
 
 export interface CommitSourceEditOptions {
   /**
-   * The index generation the disk write carries.
+   * The graph generation the disk write carries.
    */
   readonly generation: number
   /**
@@ -128,6 +133,8 @@ export interface NoteDocumentServiceDeps {
   readonly openDocuments: OpenDocumentsService
   readonly noteFile: NoteFileService
   readonly graphSession: GraphSessionSource
+  readonly indexLifecycle: IndexLifecycleService
+  readonly logger: LoggerService
 }
 
 class NoteDocumentServiceImpl implements NoteDocumentService {
@@ -204,8 +211,11 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
         if (commit === null) {
           throw new NoteBusyError('This note can’t be updated right now — try again in a moment.')
         }
-        const revision = await sha256Hex(commit.content)
-        return { ...commit, revision, indexSeq: null }
+        const [revision, indexSeq] = await Promise.all([
+          sha256Hex(commit.content),
+          this.#indexCommit(path, options.generation, commit.content),
+        ])
+        return { ...commit, revision, indexSeq }
       }
       let source = await this.#readForEdit(
         path,
@@ -219,7 +229,13 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
         }
         const written = await noteFile.write(path, content, options.generation, source, 'reject')
         if (written.merged === null) {
-          return { content, revision: written.hash, merged: false, indexSeq: null }
+          const indexSeq = await this.#indexCommit(
+            path,
+            options.generation,
+            content,
+            written.modifiedMs,
+          )
+          return { content, revision: written.hash, merged: false, indexSeq }
         }
         source = written.merged
       }
@@ -264,6 +280,34 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
       }
     })
     return result
+  }
+
+  /**
+   * Write `content`, the text a commit left in the note file, to the index of
+   * the graph session that `generation` belongs to.
+   */
+  async #indexCommit(
+    path: string,
+    generation: number,
+    content: string,
+    mtime?: number,
+  ): Promise<number | null> {
+    const { graphSession, indexLifecycle, logger } = this.#deps
+    const { session } = graphSession.get()
+    if (session === null || session.generation !== generation || session.indexGeneration === null) {
+      return null
+    }
+    try {
+      return await indexLifecycle.indexNote(path, {
+        generation: session.indexGeneration,
+        fileGeneration: generation,
+        content,
+        mtime,
+      })
+    } catch (error) {
+      logger.error(`failed to index the commit of ${path}:`, error)
+      return null
+    }
   }
 
   /**

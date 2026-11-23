@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createNoteDocumentService } from '../documents/note-document-service.ts'
 import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
 import { createPrivacyService } from '../privacy/privacy-service.ts'
@@ -9,6 +10,7 @@ import {
   createTestWebFetchService,
 } from '../testing/index.ts'
 import { createLinkPreviewService } from './link-preview-service.ts'
+import { createTestLoggerService } from '../testing/logger.ts'
 
 const PATH = 'notes/a.md'
 const PAGE = 'https://example.com/page'
@@ -26,6 +28,8 @@ function setup(source: string) {
       openDocuments: createOpenDocumentsService({ fileChanges: createTestFileChangeService() }),
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
+      indexLifecycle: createTestIndexLifecycleService(),
+      logger: createTestLoggerService(),
     }),
     privacy: createPrivacyService({
       noteFile: createTestNoteFileService(),

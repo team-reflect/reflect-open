@@ -23,6 +23,7 @@ import { createNoteDocumentService, type NoteDocumentService } from './note-docu
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createNotePreviewService, type NotePreviewServiceDeps } from './note-preview-service.ts'
 import { createOpenDocumentsService } from './open-documents-service.ts'
+import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 
 /**
  * A test graph session with a graph of generation 7 open.
@@ -54,6 +55,8 @@ function documentsWith(read: () => Promise<string>): NoteDocumentService {
     openDocuments: createOpenDocumentsService({ fileChanges: createTestFileChangeService() }),
     noteFile: createTestNoteFileService(),
     graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
+    indexLifecycle: createTestIndexLifecycleService(),
+    logger: createTestLoggerService(),
   })
   vi.spyOn(noteDocuments, 'readExisting').mockImplementation(read)
   return noteDocuments
@@ -74,6 +77,8 @@ function notePreviewOver(
         openDocuments: createOpenDocumentsService({ fileChanges: createTestFileChangeService() }),
         noteFile,
         graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
+        indexLifecycle: createTestIndexLifecycleService(),
+        logger: createTestLoggerService(),
       }),
     attachments: options?.attachments ?? createTestAttachmentService(),
     graphSession: options?.graphSession ?? openGraph(),
@@ -132,6 +137,8 @@ describe('previewWikiTarget', () => {
         openDocuments,
         noteFile,
         graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
+        indexLifecycle: createTestIndexLifecycleService(),
+        logger: createTestLoggerService(),
       }),
     })
 

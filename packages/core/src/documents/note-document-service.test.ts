@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createTestNoteSession, type TestNoteSessionOptions } from '../testing/documents.ts'
 import { createTestFileChangeService } from '../testing/file-change.ts'
 import {
@@ -7,15 +7,18 @@ import {
   type TestNoteFileServiceOptions,
 } from '../testing/graph.ts'
 import { NoteBusyError, NoteConflictError } from '../tasks/task-errors.ts'
+import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createNoteDocumentService } from './note-document-service.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { sha256HexSync } from '../testing/sha256.ts'
 import { createOpenDocumentsService } from './open-documents-service.ts'
+import { createTestLoggerService } from '../testing/logger.ts'
 
 function setup(options?: {
   files?: TestNoteFileServiceOptions['files']
   generation?: number
   session?: Omit<TestNoteSessionOptions, 'path'>
+  indexGeneration?: number | null
 }) {
   const noteFile = createTestNoteFileService({
     files: options?.files,
@@ -40,12 +43,22 @@ function setup(options?: {
   if (session !== null) {
     openDocuments.register({ session })
   }
+  const indexLifecycle = createTestIndexLifecycleService()
+  const indexNote = vi.spyOn(indexLifecycle, 'indexNote').mockResolvedValue(12)
+  const logger = createTestLoggerService()
   const noteDocuments = createNoteDocumentService({
     openDocuments,
     noteFile: racedNoteFile,
-    graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
+    graphSession: createTestGraphSessionService({
+      graph: {
+        generation: 3,
+        indexGeneration: options?.indexGeneration === undefined ? 5 : options.indexGeneration,
+      },
+    }),
+    indexLifecycle,
+    logger,
   })
-  return { noteDocuments, noteFile, session, externalWrites }
+  return { noteDocuments, noteFile, session, externalWrites, indexNote, logger }
 }
 
 describe('readSource', () => {
@@ -193,6 +206,49 @@ describe('commitSourceEdit', () => {
     ).rejects.toBeInstanceOf(NoteConflictError)
     expect(noteFile.files().get('notes/a.md')).toBe('three\n')
     expect(noteFile.writes()).toEqual([])
+  })
+
+  it('writes a disk commit through to the index of its graph session', async () => {
+    const { noteDocuments, indexNote } = setup({ files: { 'notes/a.md': 'disk\n' } })
+    await expect(
+      noteDocuments.commitSourceEdit('notes/a.md', shout, { generation: 3 }),
+    ).resolves.toMatchObject({ content: 'DISK\n', indexSeq: 12 })
+    expect(indexNote.mock.calls).toEqual([
+      ['notes/a.md', { generation: 5, fileGeneration: 3, content: 'DISK\n', mtime: 1 }],
+    ])
+  })
+
+  it('writes a session commit through to the index', async () => {
+    const { noteDocuments, indexNote } = setup({ session: { content: 'live\n' } })
+    await expect(
+      noteDocuments.commitSourceEdit('notes/a.md', shout, { generation: 3 }),
+    ).resolves.toMatchObject({ content: 'LIVE\n', indexSeq: 12 })
+    expect(indexNote.mock.calls).toEqual([
+      ['notes/a.md', { generation: 5, fileGeneration: 3, content: 'LIVE\n', mtime: undefined }],
+    ])
+  })
+
+  it('returns a null indexSeq while the index is closed', async () => {
+    const { noteDocuments, indexNote } = setup({
+      files: { 'notes/a.md': 'disk\n' },
+      indexGeneration: null,
+    })
+    await expect(
+      noteDocuments.commitSourceEdit('notes/a.md', shout, { generation: 3 }),
+    ).resolves.toMatchObject({ content: 'DISK\n', indexSeq: null })
+    expect(indexNote).not.toHaveBeenCalled()
+  })
+
+  it('keeps the commit and logs when the index write fails', async () => {
+    const { noteDocuments, noteFile, indexNote, logger } = setup({
+      files: { 'notes/a.md': 'disk\n' },
+    })
+    indexNote.mockRejectedValue(new Error('index on fire'))
+    await expect(
+      noteDocuments.commitSourceEdit('notes/a.md', shout, { generation: 3 }),
+    ).resolves.toMatchObject({ content: 'DISK\n', indexSeq: null })
+    expect(noteFile.files().get('notes/a.md')).toBe('DISK\n')
+    expect(logger.getErrors()).toHaveLength(1)
   })
 
   it('writes nothing when the transform changes nothing', async () => {

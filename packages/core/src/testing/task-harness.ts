@@ -190,6 +190,8 @@ export class TaskHarness {
         openDocuments: createOpenDocumentsService({ fileChanges: this.fileChanges }),
         noteFile: steppedFiles,
         graphSession,
+        indexLifecycle: this.index,
+        logger,
       }),
       progress: createTestProgressPort(),
       clock: this.clock,

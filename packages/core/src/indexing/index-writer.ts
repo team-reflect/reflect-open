@@ -1,5 +1,5 @@
 import { noop, returnFalse } from '@ocavue/utils'
-import { sha256Hex } from '@reflect/utils'
+import { sha256Hex, type MaybePromise } from '@reflect/utils'
 import type { XArchiveService } from '../embeds/x-archive-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { isNotePath } from '../graph/paths.ts'
@@ -108,6 +108,10 @@ export interface IndexWriter {
    */
   settledFirst(path: string): Promise<IndexWriteOutcome>
   /**
+   * The seq of this writer's latest commit, `null` before its first.
+   */
+  seq(): number | null
+  /**
    * Resolve once no run is queued or in flight: every dirty path is settled,
    * or the writer is paused.
    */
@@ -178,6 +182,7 @@ class IndexWriterImpl implements IndexWriter {
   readonly #runs = new Set<WriterRun>()
   readonly #first = new Set<string>()
   #tail: Promise<void> = Promise.resolve()
+  #seq: number | null = null
   #runQueued = false
   #paused = false
   #disposed = false
@@ -219,6 +224,10 @@ class IndexWriterImpl implements IndexWriter {
     return settled
   }
 
+  seq(): number | null {
+    return this.#seq
+  }
+
   async drained(): Promise<void> {
     let tail: Promise<void>
     do {
@@ -228,7 +237,7 @@ class IndexWriterImpl implements IndexWriter {
   }
 
   clear(): Promise<IndexCommit> {
-    const commit = this.#tail.then(() => this.#deps.indexStore.clear(this.generation))
+    const commit = this.#tail.then(() => this.#commit(this.#deps.indexStore.clear(this.generation)))
     this.#tail = commit.then(noop, noop)
     return commit
   }
@@ -419,7 +428,7 @@ class IndexWriterImpl implements IndexWriter {
           return
         }
         try {
-          const { seq } = await indexStore.remove(path, this.generation)
+          const { seq } = await this.#commit(indexStore.remove(path, this.generation))
           this.#settle(run, entry, { status: 'applied', seq })
         } catch (error) {
           this.#settle(run, entry, { status: 'failed', stage: 'write', error })
@@ -524,7 +533,7 @@ class IndexWriterImpl implements IndexWriter {
           return
         }
         try {
-          const { seq } = await indexStore.move(move.from, move.to, this.generation)
+          const { seq } = await this.#commit(indexStore.move(move.from, move.to, this.generation))
           this.#settle(run, from, { status: 'applied', seq })
           run.open.set(move.to, { ...to, force: true })
           this.#deps.emitMoved(move.from, move.to)
@@ -584,9 +593,11 @@ class IndexWriterImpl implements IndexWriter {
       return
     }
     try {
-      const { seq } = await this.#deps.indexStore.applyBatch(
-        applies.map((apply) => apply.projection),
-        this.generation,
+      const { seq } = await this.#commit(
+        this.#deps.indexStore.applyBatch(
+          applies.map((apply) => apply.projection),
+          this.generation,
+        ),
       )
       for (const { entry } of applies) {
         this.#settle(run, entry, { status: 'applied', seq })
@@ -606,9 +617,11 @@ class IndexWriterImpl implements IndexWriter {
     for (let start = 0; start < touches.length; start += INDEX_APPLY_BATCH_SIZE) {
       const batch = touches.slice(start, start + INDEX_APPLY_BATCH_SIZE)
       try {
-        const { seq } = await this.#deps.indexStore.touch(
-          batch.map(({ entry, mtime }) => ({ path: entry.path, mtime })),
-          this.generation,
+        const { seq } = await this.#commit(
+          this.#deps.indexStore.touch(
+            batch.map(({ entry, mtime }) => ({ path: entry.path, mtime })),
+            this.generation,
+          ),
         )
         for (const { entry } of batch) {
           this.#settle(run, entry, { status: 'applied', seq })
@@ -619,6 +632,15 @@ class IndexWriterImpl implements IndexWriter {
         }
       }
     }
+  }
+
+  /**
+   * Await an index write and remember its seq.
+   */
+  async #commit(write: MaybePromise<IndexCommit>): Promise<IndexCommit> {
+    const commit = await write
+    this.#seq = commit.seq ?? this.#seq
+    return commit
   }
 
   /**

@@ -11,6 +11,7 @@ import {
   type TestNoteFileService,
   type TestNoteSession,
 } from '../testing/index.ts'
+import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createNoteDocumentService } from '../documents/note-document-service.ts'
 import {
   createOpenDocumentsService,
@@ -69,6 +70,8 @@ function contactSuggestionsOver(deps?: {
       openDocuments,
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
+      indexLifecycle: createTestIndexLifecycleService(),
+      logger: createTestLoggerService(),
     }),
     openDocuments,
     noteFile,

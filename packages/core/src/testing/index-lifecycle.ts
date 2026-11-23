@@ -205,7 +205,7 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
       content?: string | undefined
       mtime?: number | undefined
     },
-  ): Promise<void> {
+  ): Promise<number | null> {
     return this.#inner.indexNote(path, options)
   }
 
