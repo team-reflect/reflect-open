@@ -68,7 +68,10 @@ beforeEach(() => {
   readNoteSource.mockReset().mockImplementation(() => Promise.resolve(noteSource.value))
   commitNoteFrontmatter.mockReset().mockImplementation((_path, patch) => {
     return Promise.try(() => {
-      noteSource.value = upsertFrontmatter(noteSource.value, frontmatterPatchToYaml(patch))
+      const resolved = typeof patch === 'function' ? patch(noteSource.value) : patch
+      if (resolved !== null) {
+        noteSource.value = upsertFrontmatter(noteSource.value, frontmatterPatchToYaml(resolved))
+      }
     })
   })
   shareMock.mockReset().mockResolvedValue(undefined)

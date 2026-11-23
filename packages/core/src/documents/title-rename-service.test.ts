@@ -159,7 +159,6 @@ function setup(options?: SetupOptions) {
           },
         })
   const titleRename = createTitleRenameService({
-    noteFile: failingNoteFile,
     noteDocuments: createTestNoteDocumentService({ noteFile: failingNoteFile, openDocuments }),
     wikiResolver,
     backlinks: createBacklinkService({
@@ -169,7 +168,6 @@ function setup(options?: SetupOptions) {
     }),
     notePath: createNotePathService({ database, noteFile }),
     noteMove,
-    openDocuments,
     progress,
     clock,
     logger,
@@ -284,8 +282,7 @@ describe('rename coordinator', () => {
     })
     await renameOnce(coordinator, 'Old Title', 'New Title')
 
-    expect(session!.getCalls('updateFrontmatter')).toEqual([[{ aliases: ['Old Title'] }]])
-    expect(session!.getCalls('flush')).toHaveLength(1)
+    expect(session!.getCalls('commitFrontmatter')).toEqual([[{ aliases: ['Old Title'] }]])
     expect(noteFile.writes()).toEqual([])
     expect((await operationOutcomes())[0]!.outcome).toBe('done')
   })

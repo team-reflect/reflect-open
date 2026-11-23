@@ -47,9 +47,14 @@ export interface NoteDocumentService {
    * Routes through the live session when one can take the patch; otherwise
    * patches the file, and creates a missing one, with the disk rules of
    * {@link NoteDocumentService.commitSourceEdit}. A patch that changes
-   * nothing is a no-op.
+   * nothing is a no-op. A {@link FrontmatterPatcher} makes the patch from
+   * the text it lands on.
    */
-  commitFrontmatter(path: string, patch: FrontmatterPatch, generation: number): Promise<void>
+  commitFrontmatter(
+    path: string,
+    patch: FrontmatterPatch | FrontmatterPatcher,
+    generation: number,
+  ): Promise<void>
   /**
    * Apply a synchronous full-source `transform` ({@link NoteSourceTransform}) to the note and persist it,
    * routing the same way every time: when the note is **open**, through its
@@ -81,6 +86,12 @@ export interface NoteDocumentService {
    */
   isOstensiblyEmpty(source: string): boolean
 }
+
+/**
+ * The frontmatter patch for a note that holds `source`, or `null` to leave
+ * the note as it is. `source` is `null` for a note with no file.
+ */
+export type FrontmatterPatcher = (source: string | null) => FrontmatterPatch | null
 
 /**
  * How many times a disk commit runs its transform against a file that keeps changing.
@@ -181,16 +192,31 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
     return await noteFile.read(path, generation)
   }
 
-  commitFrontmatter(path: string, patch: FrontmatterPatch, generation: number): Promise<void> {
+  commitFrontmatter(
+    path: string,
+    patch: FrontmatterPatch | FrontmatterPatcher,
+    generation: number,
+  ): Promise<void> {
     const { openDocuments } = this.#deps
+    const patchOf = typeof patch === 'function' ? patch : () => patch
     return this.#serializeByPath(path, async () => {
       const owner = openDocuments.sessionFor(path)
-      if (owner !== null && (await owner.commitFrontmatter(patch))) {
-        return
+      // Only a patcher reads the buffer of the session.
+      const live = typeof patch === 'function' ? (owner?.liveContent() ?? null) : ''
+      if (owner !== null && live !== null) {
+        const livePatch = patchOf(live)
+        if (livePatch === null || (await owner.commitFrontmatter(livePatch))) {
+          return
+        }
       }
       await this.#commitToDisk(
         path,
-        (source) => upsertFrontmatter(source ?? '', frontmatterPatchToYaml(patch)),
+        (source) => {
+          const diskPatch = patchOf(source)
+          return diskPatch === null
+            ? (source ?? '')
+            : upsertFrontmatter(source ?? '', frontmatterPatchToYaml(diskPatch))
+        },
         generation,
         true,
       )

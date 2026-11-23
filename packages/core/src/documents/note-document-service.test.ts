@@ -349,7 +349,6 @@ describe('direct note file writes', () => {
     'capture/capture-enrichment-service.ts',
     'capture/capture-enrichment-write.ts',
     'contacts/contact-suggestion-service.ts',
-    'documents/alias-placement.ts',
     'documents/template-service.ts',
   ]
 

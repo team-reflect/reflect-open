@@ -1251,13 +1251,11 @@ export function composeCoreServices(
     openDocuments,
     noteMove,
     titleRename: create.titleRename({
-      noteFile,
       noteDocuments,
       wikiResolver,
       backlinks,
       notePath,
       noteMove,
-      openDocuments,
       progress,
       clock,
       logger,
