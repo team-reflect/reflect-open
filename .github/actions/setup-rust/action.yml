@@ -6,6 +6,10 @@ inputs:
     description: Whether to restore and save the caches.
     required: false
     default: 'true'
+  cache-scope:
+    description: The name of the mbx cache that this job restores and saves.
+    required: false
+    default: ${{ github.workflow }}-${{ github.job }}
 
 runs:
   using: composite
@@ -46,17 +50,31 @@ runs:
       run: echo "ORT_CACHE_DIR=$RUNNER_TEMP/ort_cache" >> "$GITHUB_ENV"
 
     - name: Cache ONNX Runtime
+      id: ort
       if: inputs.cache == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ env.ORT_CACHE_DIR }}
         key: ort-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
 
-    # Uses the mbx that mise installed. The `github` backend restores and saves
-    # `target/` and the cargo registry and git downloads; only a successful push
-    # to master saves. https://mr-boxington.jdx.dev/github-action
+    # The ort-sys build script downloads ONNX Runtime only when it runs, and
+    # mbx replays a cached build-script run instead of running it.
+    # https://github.com/jdx/mr-boxington/blob/v1.30.0/docs/limits.md#build-script-execution-follows-cargos-freshness-inputs
+    - name: Run build scripts without the mbx cache
+      if: inputs.cache == 'true' && steps.ort.outputs.cache-hit != 'true'
+      shell: bash
+      run: echo "MBX_BUILD_SCRIPT_EXECUTION=0" >> "$GITHUB_ENV"
+
+    # Uses the mbx that mise installed. A push to master or a workflow_dispatch
+    # saves the cache. https://mr-boxington.jdx.dev/github-action
     - name: Set up mbx
       uses: jdx/mr-boxington-action@b3ef673bd77c5426927fe8836c6185cdae04c2dd # v1.7.4
       with:
         backend: ${{ inputs.cache == 'true' && 'github' || 'local' }}
-        cache-key-suffix: ${{ github.job }}
+        github-cache-mode: objects
+        cache-key: |
+          mbx-v2/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/${{ hashFiles('Cargo.lock') }}/${{ github.sha }}
+        restore-keys: |
+          mbx-v2/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/${{ hashFiles('Cargo.lock') }}/
+          mbx-v2/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/
+        save-on-workflow-dispatch: true

@@ -160,6 +160,8 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-scope: node
 
       - name: Verify the generated iOS CSP is current
         run: |
@@ -183,6 +185,7 @@ jobs:
     needs: [classify]
     if: needs.classify.outputs.test-chromium == 'true'
     runs-on: ubuntu-24.04
+    cache-mode: read
     strategy:
       fail-fast: false
       matrix:
@@ -207,6 +210,8 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-scope: node
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:chromium
