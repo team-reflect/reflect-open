@@ -32,6 +32,7 @@ import { isSilentStop, type ReconcileStop } from '../reconcile/reconcile.ts'
 import type { BacklinkTargetService } from '../capture/backlink-target-service.ts'
 import { errorMessage, isAppError, toAppError } from '../errors.ts'
 import type { AssetStoreService } from '../graph/asset-store-service.ts'
+import type { NoteDocumentService } from '../documents/note-document-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { AUDIO_MEMOS_DIR, dailyPath } from '../graph/paths.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
@@ -93,6 +94,7 @@ export interface ReconcileAudioMemosOutcome {
 
 export interface AudioMemoTranscriptionServiceDeps {
   readonly noteFile: NoteFileService
+  readonly noteDocuments: NoteDocumentService
   readonly assetStore: AssetStoreService
   readonly backlinkTarget: BacklinkTargetService
   readonly transcription: TranscriptionService
@@ -656,8 +658,7 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
 
   /**
    * Append the memo's wikilink once under `## [[Audio memos]]`, creating the
-   * heading and daily file as needed. The watcher reindexes the direct write;
-   * open dirty editors park a conflict instead of being clobbered.
+   * heading and daily file as needed.
    */
   async #ensureDailyBacklink(
     memo: AudioMemoIdentity,
@@ -665,19 +666,21 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
     memosNoteTitle: string,
     generation: number,
   ): Promise<void> {
-    const { noteFile } = this.#deps
-    const source = await this.#dailyNoteSource(memo.date, generation)
-    if (hasBacklink(source, memo)) {
-      return
-    }
     const displayTitle = wikiLinkSafe(title) || memo.title
-    const entry = `[[${memo.base}|${displayTitle}]]`
-    const updated = appendListItem(source, {
-      kind: 'bullet',
-      markdown: entry,
-      section: { titles: [memosNoteTitle, MEMOS_NOTE_TITLE], linked: true },
-    })
-    await noteFile.write(dailyPath(memo.date), updated, generation)
+    await this.#deps.noteDocuments.commitSourceEdit(
+      dailyPath(memo.date),
+      (source) => {
+        if (hasBacklink(source, memo)) {
+          return source
+        }
+        return appendListItem(source, {
+          kind: 'bullet',
+          markdown: `[[${memo.base}|${displayTitle}]]`,
+          section: { titles: [memosNoteTitle, MEMOS_NOTE_TITLE], linked: true },
+        })
+      },
+      { generation, createIfMissing: true },
+    )
   }
 
   /**

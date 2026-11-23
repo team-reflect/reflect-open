@@ -1087,6 +1087,7 @@ export function composeCoreServices(
   const audioMemo = create.audioMemo({
     assetStore,
     noteFile,
+    noteDocuments,
     backlinkTarget,
     transcription,
     transcriptEnrichment,
