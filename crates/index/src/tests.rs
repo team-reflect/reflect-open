@@ -2657,7 +2657,7 @@ fn tasks_split_by_checked_and_skip_templates() {
     apply_note(&conn, &with_tasks).unwrap();
     apply_note(&conn, &template).unwrap();
 
-    let open = tasks(&conn, false).unwrap().notes;
+    let open = tasks(&conn, Some(false), None).unwrap().notes;
     assert_eq!(open.len(), 1);
     assert_eq!(
         (open[0].path.as_str(), open[0].title.as_str()),
@@ -2669,7 +2669,7 @@ fn tasks_split_by_checked_and_skip_templates() {
     assert_eq!(open[0].tasks[0].markdown, "open one");
     assert_eq!(open[0].tasks[0].ast_path, [0]);
     assert!(!open[0].tasks[0].checked);
-    let done = tasks(&conn, true).unwrap().notes;
+    let done = tasks(&conn, Some(true), None).unwrap().notes;
     assert_eq!(done.len(), 1);
     assert_eq!(done[0].tasks[0].markdown, "done one");
 }
@@ -2683,7 +2683,7 @@ fn a_tasks_read_groups_the_tasks_of_each_note() {
         apply_note(&conn, &with_tasks).unwrap();
     }
 
-    let counts: Vec<(String, usize)> = tasks(&conn, false)
+    let counts: Vec<(String, usize)> = tasks(&conn, Some(false), None)
         .unwrap()
         .notes
         .into_iter()
@@ -2696,6 +2696,27 @@ fn a_tasks_read_groups_the_tasks_of_each_note() {
 }
 
 #[test]
+fn a_tasks_read_of_paths_returns_every_task_of_those_notes() {
+    let conn = migrated();
+    for path in ["notes/a.md", "notes/b.md"] {
+        let mut with_tasks = note(path, path, vec![]);
+        with_tasks.tasks = vec![task(0, "open", false), task(1, "done", true)];
+        apply_note(&conn, &with_tasks).unwrap();
+    }
+    apply_note(&conn, &note("notes/empty.md", "Empty", vec![])).unwrap();
+
+    let paths = ["notes/b.md", "notes/empty.md", "notes/absent.md"].map(String::from);
+    let read = tasks(&conn, None, Some(&paths)).unwrap().notes;
+    assert_eq!(read.len(), 1);
+    assert_eq!(
+        (read[0].path.as_str(), read[0].tasks.len()),
+        ("notes/b.md", 2)
+    );
+    let open = tasks(&conn, Some(false), Some(&paths)).unwrap().notes;
+    assert_eq!(open[0].tasks.len(), 1);
+}
+
+#[test]
 fn a_tasks_read_leaves_out_a_row_with_an_unreadable_address() {
     let conn = migrated();
     let mut with_tasks = note("notes/a.md", "A", vec![]);
@@ -2704,7 +2725,7 @@ fn a_tasks_read_leaves_out_a_row_with_an_unreadable_address() {
     with_tasks.tasks[1].ast_path = "[]".to_string();
     apply_note(&conn, &with_tasks).unwrap();
 
-    let open = &tasks(&conn, false).unwrap().notes[0].tasks;
+    let open = &tasks(&conn, Some(false), None).unwrap().notes[0].tasks;
     assert_eq!(open.len(), 1);
     assert_eq!(open[0].markdown, "kept");
     assert_eq!(open[0].breadcrumbs, ["Heading"]);
@@ -2714,7 +2735,11 @@ fn a_tasks_read_leaves_out_a_row_with_an_unreadable_address() {
 fn a_tasks_read_carries_the_commit_seq_of_its_rows() {
     let graph_dir = tempfile::tempdir().expect("tempdir");
     let (session, generation) = file_session(graph_dir.path());
-    let read = || session.read(generation, |conn| tasks(conn, false)).unwrap();
+    let read = || {
+        session
+            .read(generation, |conn| tasks(conn, Some(false), None))
+            .unwrap()
+    };
     assert_eq!((read().seq, read().notes.len()), (0, 0));
 
     let mut with_task = note("notes/a.md", "A", vec![]);

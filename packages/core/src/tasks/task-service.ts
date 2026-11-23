@@ -483,12 +483,12 @@ class TaskServiceImpl implements TaskService {
   }
 
   async getOpenTasks(): Promise<OpenTask[]> {
-    const { notes } = await this.#deps.database.read('index_tasks', { checked: false })
+    const { notes } = await this.#deps.database.read('index_tasks', { checked: false, paths: null })
     return toOpenTasks(notes).sort(compareTasksByNote)
   }
 
   async getCompletedTasks(): Promise<OpenTask[]> {
-    const { notes } = await this.#deps.database.read('index_tasks', { checked: true })
+    const { notes } = await this.#deps.database.read('index_tasks', { checked: true, paths: null })
     return toOpenTasks(notes).sort(
       (left, right) => right.updatedAt - left.updatedAt || compareTasksByNote(left, right),
     )

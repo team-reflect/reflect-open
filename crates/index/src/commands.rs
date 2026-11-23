@@ -257,9 +257,14 @@ impl<'a> IndexCommands<'a> {
         self.read(read::lists::note_tags)
     }
 
-    /// The open or the completed tasks of every note but templates.
-    fn index_tasks(&self, checked: bool) -> AppResult<TaskRead> {
-        self.read(|conn| read::tasks::tasks(conn, checked))
+    /// The tasks of every note but templates: all, or only the open or the
+    /// completed ones, or only those of the notes in `paths`.
+    fn index_tasks(
+        &self,
+        checked: Option<bool>,
+        paths: Option<Vec<String>>,
+    ) -> AppResult<TaskRead> {
+        self.read(|conn| read::tasks::tasks(conn, checked, paths.as_deref()))
     }
 
     /// The note that wins the wiki key `key`.

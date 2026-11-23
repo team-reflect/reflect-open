@@ -1171,7 +1171,8 @@ export type Commands = {
   }
   index_tasks: {
     args: {
-      checked: boolean
+      checked: boolean | null
+      paths: string[] | null
     }
     result: TaskRead
   }
