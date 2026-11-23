@@ -8,7 +8,7 @@ import {
   TestTaskIndex,
   type TestCoreServices,
 } from '@reflect/core/testing'
-import type { OpenTask, TaskAction } from '@reflect/core'
+import type { OpenTask } from '@reflect/core'
 import type { ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
 import { useRouterState } from '@/routing/router.tsx'
@@ -16,7 +16,7 @@ import { fireEvent } from '@/test-utils/fire-event.ts'
 import { MOD_KEY } from '@/test-utils/mod-key.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { spyOnTaskWrites, type TaskWriteSpies } from '@/test-utils/task-writes.ts'
+import { spyOnTaskWrites, type TaskAction, type TaskWriteSpies } from '@/test-utils/task-writes.ts'
 import { useTaskDraft } from '@/lib/tasks/use-task-draft.ts'
 import type { TaskEditorHandlers } from './task-editor.tsx'
 import { TasksScreen } from './tasks-screen.tsx'

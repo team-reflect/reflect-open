@@ -1,7 +1,14 @@
 import { vi, type Mock } from 'vitest'
 import type { TestTaskIndex } from '@reflect/core/testing'
-import type { TaskAction, TaskCommands, TaskLocator } from '@reflect/core'
+import type { TaskCommands, TaskLocator } from '@reflect/core'
 import type { MaybePromise } from '@reflect/utils'
+
+/**
+ * One change a write makes to a task.
+ */
+export type TaskAction =
+  | { kind: 'toggle' | 'remove' | 'toBullet' }
+  | { kind: 'setMarkdown'; markdown: string }
 
 /**
  * The address of a task a write changed.

@@ -31,20 +31,35 @@ import { createTestNoteFileService, type TestNoteFileService } from '../testing/
 import { createTestIpcBridgeService, type TestIpcBridgeService } from '../testing/ipc.ts'
 import { createTestLoggerService, type TestLoggerService } from '../testing/logger.ts'
 import { createTestProgressPort, type TestProgressPort } from '../testing/ports.ts'
-import { TaskHarness } from '../testing/task-harness.ts'
+import { TaskHarness, type TaskAddress } from '../testing/task-harness.ts'
 import type { OpenTask } from './open-task.ts'
-import {
-  createTaskService,
-  type TaskRef,
-  type TaskService,
-  type TaskServiceDeps,
-} from './task-service.ts'
+import { createTaskService, type TaskService, type TaskServiceDeps } from './task-service.ts'
+import type { TaskWriteResult } from './task-store.ts'
 import { sleep, noop } from '@ocavue/utils'
+
+/**
+ * Apply `actions` to the task at `address` in one write of its note, at `generation`.
+ */
+function writeTask(
+  service: TaskService,
+  generation: number,
+  address: TaskAddress,
+  actions: ReadonlyArray<
+    { kind: 'toggle' | 'remove' | 'toBullet' } | { kind: 'setMarkdown'; markdown: string }
+  >,
+): Promise<TaskWriteResult> {
+  const { notePath, ...task } = address
+  return service.commands.write(
+    generation,
+    notePath,
+    actions.map((action) => ({ ...action, task })),
+  )
+}
 
 /**
  * The `index`th task of `source` as the index would hand it to the Tasks view.
  */
-function ref(source: string, index = 0, notePath = 'notes/a.md'): TaskRef {
+function ref(source: string, index = 0, notePath = 'notes/a.md'): TaskAddress {
   const task = projectTasks(source)[index]
   if (task === undefined) {
     throw new Error(`no task #${index} in ${JSON.stringify(source)}`)
@@ -146,8 +161,8 @@ describe('write serialization', () => {
       return writes === 1 ? pendingFirstWrite.promise : Promise.resolve(UNMERGED_WRITE)
     })
 
-    const first = tasks.writeTask(task, [{ kind: 'toggle' }])
-    const second = tasks.writeTask(task, [{ kind: 'toggle' }])
+    const first = writeTask(tasks, openGraph.generation, task, [{ kind: 'toggle' }])
+    const second = writeTask(tasks, openGraph.generation, task, [{ kind: 'toggle' }])
     await flushMicrotasks()
 
     // The first write is in flight; the second hasn't even read yet — it's queued.
@@ -165,18 +180,18 @@ describe('write serialization', () => {
     noteFile.set('notes/a.md', '+ [ ] do it\n')
     vi.spyOn(noteFile, 'write').mockRejectedValueOnce(new Error('disk full'))
 
-    const first = tasks.writeTask(task, [{ kind: 'toggle' }])
-    const second = tasks.writeTask(task, [{ kind: 'toggle' }])
+    const first = writeTask(tasks, openGraph.generation, task, [{ kind: 'toggle' }])
+    const second = writeTask(tasks, openGraph.generation, task, [{ kind: 'toggle' }])
     await expect(first).rejects.toThrow('disk full')
     await expect(second).resolves.toMatchObject({ source: '+ [x] do it\n' })
   })
 })
 
-describe('writeTask', () => {
+describe('task writes', () => {
   it('writes the toggled task to disk when the note is not open', async () => {
     noteFile.set('notes/a.md', '+ [ ] do it\n')
 
-    const result = await tasks.writeTask(task, [{ kind: 'toggle' }])
+    const result = await writeTask(tasks, openGraph.generation, task, [{ kind: 'toggle' }])
     expect(noteFile.getWrites('notes/a.md')).toContain('+ [x] do it\n')
     expect(movedFrom(result, [0])).toMatchObject({ astPath: [0], markdown: 'do it', checked: true })
   })
@@ -187,7 +202,7 @@ describe('writeTask', () => {
     const session = sessionOver('+ [ ] do it\n')
     openSession(session)
 
-    const result = await tasks.writeTask(task, [{ kind: 'toggle' }])
+    const result = await writeTask(tasks, openGraph.generation, task, [{ kind: 'toggle' }])
     expect(session.getCalls('commitSourceEdit')).toHaveLength(1)
     expect(result.source).toBe('+ [x] do it\n')
     expect(noteFile.writes()).toEqual([])
@@ -203,7 +218,9 @@ describe('writeTask', () => {
       }),
     )
 
-    await expect(tasks.writeTask(task, [{ kind: 'remove' }])).rejects.toMatchObject({
+    await expect(
+      writeTask(tasks, openGraph.generation, task, [{ kind: 'remove' }]),
+    ).rejects.toMatchObject({
       kind: 'notWritable',
     })
     expect(noteFile.writes()).toEqual([])
@@ -212,7 +229,9 @@ describe('writeTask', () => {
   it('propagates a stale refusal from the disk path when the index is stale', async () => {
     noteFile.set('notes/a.md', '+ [ ] something else entirely\n')
 
-    await expect(tasks.writeTask(task, [{ kind: 'toggle' }])).rejects.toMatchObject({
+    await expect(
+      writeTask(tasks, openGraph.generation, task, [{ kind: 'toggle' }]),
+    ).rejects.toMatchObject({
       kind: 'stale',
     })
     expect(noteFile.writes()).toEqual([])
@@ -221,18 +240,24 @@ describe('writeTask', () => {
   it('propagates a stale refusal from the session path too', async () => {
     openSession(sessionOver('+ [ ] something else entirely\n'))
 
-    await expect(tasks.writeTask(task, [{ kind: 'toggle' }])).rejects.toMatchObject({
+    await expect(
+      writeTask(tasks, openGraph.generation, task, [{ kind: 'toggle' }]),
+    ).rejects.toMatchObject({
       kind: 'stale',
     })
   })
 
   it('replaces the Markdown, on disk or through the session', async () => {
     noteFile.set('notes/a.md', '+ [ ] do it\n')
-    await tasks.writeTask(task, [{ kind: 'setMarkdown', markdown: 'do it well' }])
+    await writeTask(tasks, openGraph.generation, task, [
+      { kind: 'setMarkdown', markdown: 'do it well' },
+    ])
     expect(noteFile.getWrites('notes/a.md')).toContain('+ [ ] do it well\n')
 
     openSession(sessionOver('+ [ ] do it\n'))
-    const result = await tasks.writeTask(task, [{ kind: 'setMarkdown', markdown: 'do it well' }])
+    const result = await writeTask(tasks, openGraph.generation, task, [
+      { kind: 'setMarkdown', markdown: 'do it well' },
+    ])
     expect(result.source).toBe('+ [ ] do it well\n')
     expect(noteFile.writes()).toHaveLength(1)
   })
@@ -240,7 +265,7 @@ describe('writeTask', () => {
   it('removes the task and reports the rows below it moving up', async () => {
     noteFile.set('notes/a.md', '+ [ ] do it\n+ [ ] keep\n')
 
-    const result = await tasks.writeTask(task, [{ kind: 'remove' }])
+    const result = await writeTask(tasks, openGraph.generation, task, [{ kind: 'remove' }])
     expect(noteFile.getWrites('notes/a.md')).toContain('+ [ ] keep\n')
     expect(movedFrom(result, [0])).toBeNull()
     expect(movedFrom(result, [1])).toMatchObject({ astPath: [0], markdown: 'keep' })
@@ -249,7 +274,7 @@ describe('writeTask', () => {
   it('drops the checkbox, so the row leaves the projection', async () => {
     noteFile.set('notes/a.md', '+ [ ] do it\n+ [ ] keep\n')
 
-    const result = await tasks.writeTask(task, [{ kind: 'toBullet' }])
+    const result = await writeTask(tasks, openGraph.generation, task, [{ kind: 'toBullet' }])
     expect(noteFile.getWrites('notes/a.md')).toContain('+ do it\n+ [ ] keep\n')
     expect(movedFrom(result, [0])).toBeNull()
   })
@@ -257,7 +282,7 @@ describe('writeTask', () => {
   it('lands several actions in one write', async () => {
     noteFile.set('notes/a.md', '+ [ ] do it\n')
 
-    const result = await tasks.writeTask(task, [
+    const result = await writeTask(tasks, openGraph.generation, task, [
       { kind: 'setMarkdown', markdown: 'done it' },
       { kind: 'toggle' },
     ])
@@ -266,7 +291,7 @@ describe('writeTask', () => {
     expect(movedFrom(result, [0])).toMatchObject({ markdown: 'done it', checked: true })
 
     noteFile.set('notes/a.md', '+ [ ] do it\n')
-    await tasks.writeTask(task, [
+    await writeTask(tasks, openGraph.generation, task, [
       { kind: 'setMarkdown', markdown: 'just a note' },
       { kind: 'toBullet' },
     ])
@@ -381,7 +406,9 @@ describe('write results', () => {
     noteFile.set('notes/a.md', '+ [ ] do it\n')
     clock.setNow(4242)
 
-    await expect(tasks.writeTask(task, [{ kind: 'toggle' }])).resolves.toMatchObject({
+    await expect(
+      writeTask(tasks, openGraph.generation, task, [{ kind: 'toggle' }]),
+    ).resolves.toMatchObject({
       updatedAt: 4242,
     })
   })
@@ -452,7 +479,7 @@ describe('no graph open', () => {
     noteFile.set('notes/a.md', '+ [ ] do it\n')
     const closed = createTasks(new WritableStore({ session: null }))
 
-    await expect(closed.writeTask(task, [{ kind: 'toggle' }])).rejects.toThrow('No graph is open.')
+    await expect(closed.commands.toggleAt('notes/a.md', task)).rejects.toThrow('No graph is open.')
     await closed.toggleSnippetTask('notes/a.md', { locator: task, checked: false })
     expect(noteFile.writes()).toEqual([])
     expect(progress.get()).toEqual([])
@@ -931,7 +958,9 @@ describe('reads racing writes', () => {
     const source = '## Tasks\n\n+ [ ] \n+ [ ] \n'
     harness = new TaskHarness({ files: { [NOTE]: source } })
 
-    await harness.tasks.writeTask(second, [{ kind: 'setMarkdown', markdown: 'buy milk' }])
+    await writeTask(harness.tasks, harness.session.generation, second, [
+      { kind: 'setMarkdown', markdown: 'buy milk' },
+    ])
     expect(harness.files.files().get(NOTE)).toBe('## Tasks\n\n+ [ ] buy milk\n+ [ ] \n')
   })
 })

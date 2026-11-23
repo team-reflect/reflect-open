@@ -1,6 +1,6 @@
 import { noop } from '@ocavue/utils'
 import type { ClockService } from '../ports/clock-service.ts'
-import type { GraphSession } from '../graph/graph-session.ts'
+import { requireGraphSession, type GraphSession } from '../graph/graph-session.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import type { NoteDocumentService } from '../documents/note-document-service.ts'
@@ -12,24 +12,16 @@ import {
   toTaskLocator,
   type TaskEdit,
   type TaskEditResult,
+  type TaskLocator,
 } from '../markdown/index.ts'
 import type { OpenTask } from './open-task.ts'
 import { resolveTaskEdit } from './task-content.ts'
 import { NoteEditError } from '../documents/note-edit-error.ts'
 import type { InsertTaskTarget } from './task-insert-target.ts'
-import type { TaskOp } from './task-ops.ts'
+import type { TaskItemOp, TaskOp } from './task-ops.ts'
 import { withDraftDueDate } from './task-schedule-content.ts'
 import type { TaskReader } from './task-reader.ts'
 import type { TaskStore, TaskWriteResult } from './task-store.ts'
-
-/**
- * One change to a task.
- */
-export type TaskAction =
-  | { kind: 'toggle' }
-  | { kind: 'setMarkdown'; markdown: string }
-  | { kind: 'remove' }
-  | { kind: 'toBullet' }
 
 export interface TaskCommandsDeps {
   readonly noteDocuments: NoteDocumentService
@@ -127,7 +119,7 @@ export class TaskCommands {
     const store = this.#deps.store()
     return store.batch(() => {
       store.strike(open.map((task) => task.taskId))
-      return this.#apply(open, () => [{ kind: 'toggle' }])
+      return this.#apply(open, ({ taskId }) => [{ kind: 'toggle', taskId, checked: true }])
     })
   }
 
@@ -139,29 +131,29 @@ export class TaskCommands {
   toggle(tasks: readonly OpenTask[]): Promise<void> {
     return tasks.some((task) => !task.checked)
       ? this.complete(tasks)
-      : this.#apply(tasks, () => [{ kind: 'toggle' }])
+      : this.#apply(tasks, ({ taskId }) => [{ kind: 'toggle', taskId, checked: false }])
   }
 
   /**
    * Remove `tasks` from their notes. Nested items move up.
    */
   remove(tasks: readonly OpenTask[]): Promise<void> {
-    return this.#apply(tasks, () => [{ kind: 'remove' }])
+    return this.#apply(tasks, ({ taskId }) => [{ kind: 'remove', taskId }])
   }
 
   /**
    * Turn `tasks` into plain bullets: they stay in their notes and leave the rows.
    */
   convert(tasks: readonly OpenTask[]): Promise<void> {
-    return this.#apply(tasks, () => [{ kind: 'toBullet' }])
+    return this.#apply(tasks, ({ taskId }) => [{ kind: 'toBullet', taskId }])
   }
 
   /**
    * Set the due date of `tasks` to `isoDate`, or clear it for `null`.
    */
   schedule(tasks: readonly OpenTask[], isoDate: string | null): Promise<void> {
-    return this.#apply(tasks, (markdown) => [
-      { kind: 'setMarkdown', markdown: withDraftDueDate(markdown, isoDate) },
+    return this.#apply(tasks, ({ taskId }, markdown) => [
+      { kind: 'setMarkdown', taskId, markdown: withDraftDueDate(markdown, isoDate) },
     ])
   }
 
@@ -194,6 +186,19 @@ export class TaskCommands {
       const kept = store.rows(task.notePath).some((row) => row.taskId === task.taskId)
       return this.#addNewTask(task, kept ? task.taskId : (replaced?.after ?? null))
     })
+  }
+
+  /**
+   * Toggle the task at the address `locator` in the note at `notePath`. The
+   * rows take the tasks the write left. Rejects when the write fails.
+   */
+  async toggleAt(notePath: string, locator: TaskLocator): Promise<void> {
+    const { generation } = requireGraphSession(this.#deps.graphSession)
+    const store = this.#deps.store()
+    const result = await this.write(generation, notePath, [
+      { kind: 'toggle', task: toTaskLocator(locator) },
+    ])
+    store.landCommit(notePath, result, null)
   }
 
   /**
@@ -240,12 +245,12 @@ export class TaskCommands {
   }
 
   /**
-   * Save the text typed into each of `tasks`, then apply the actions that
-   * `actionsFor` gives for the task's Markdown, in one write per note.
+   * Save the text typed into each of `tasks`, then apply the ops that
+   * `opsFor` gives for the task and its Markdown, in one write per note.
    */
   #apply(
     tasks: readonly OpenTask[],
-    actionsFor: (markdown: string) => readonly TaskAction[],
+    opsFor: (task: OpenTask, markdown: string) => readonly TaskItemOp[],
   ): Promise<void> {
     const { session } = this.#deps.graphSession.get()
     if (session === null) {
@@ -255,7 +260,7 @@ export class TaskCommands {
     const writes = store.batch(() => {
       const byNote = new Map<string, TaskOp[]>()
       for (const task of tasks) {
-        const ops = this.#takeOps(store, task, actionsFor)
+        const ops = this.#takeOps(store, task, opsFor)
         if (ops.length > 0) {
           byNote.set(task.notePath, [...(byNote.get(task.notePath) ?? []), ...ops])
         }
@@ -271,42 +276,35 @@ export class TaskCommands {
   #takeOps(
     store: TaskStore,
     task: OpenTask,
-    actionsFor: (markdown: string) => readonly TaskAction[],
+    opsFor: (task: OpenTask, markdown: string) => readonly TaskItemOp[],
   ): TaskOp[] {
     const { taskId } = task
     const text = store.takeText(task)
     if (text.insert !== undefined) {
       const markdown = text.markdown.trim()
-      const actions = markdown === '' ? [] : actionsFor(markdown)
+      const ops = markdown === '' ? [] : opsFor(task, markdown)
       // A new task with no text, or one that is removed, is dropped: nothing is written.
-      if (markdown === '' || actions.some((action) => action.kind === 'remove')) {
+      if (markdown === '' || ops.some((op) => op.kind === 'remove')) {
         return []
       }
-      const rewrite = actions.findLast((action) => action.kind === 'setMarkdown')
+      const rewrite = ops.findLast((op) => op.kind === 'setMarkdown')
       return [
         {
           ...text.insert,
           markdown: rewrite?.markdown ?? markdown,
-          checked: actions.some((action) => action.kind === 'toggle'),
-          bullet: actions.some((action) => action.kind === 'toBullet'),
+          checked: ops.some((op) => op.kind === 'toggle' && op.checked),
+          bullet: ops.some((op) => op.kind === 'toBullet'),
         },
       ]
     }
-    const { base } = text
-    const edit = resolveTaskEdit(base, text.markdown)
+    const edit = resolveTaskEdit(text.base, text.markdown)
     // A task whose text was cleared is removed, whatever the command.
     if (edit.type === 'delete') {
       return [{ kind: 'remove', taskId }]
     }
-    const saved: TaskOp[] =
-      edit.type === 'commit' ? [{ kind: 'setMarkdown', taskId, markdown: edit.content }] : []
-    const markdown = edit.type === 'commit' ? edit.content : base
-    const ops = actionsFor(markdown).map((action): TaskOp => {
-      return action.kind === 'toggle'
-        ? { kind: 'toggle', taskId, checked: !task.checked }
-        : { ...action, taskId }
-    })
-    return [...saved, ...ops]
+    return edit.type === 'commit'
+      ? [{ kind: 'setMarkdown', taskId, markdown: edit.content }, ...opsFor(task, edit.content)]
+      : [...opsFor(task, text.base)]
   }
 
   /**

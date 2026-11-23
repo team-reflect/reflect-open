@@ -10,13 +10,13 @@ import {
   type TestHapticsService,
   type TestStorageService,
 } from '@reflect/core/testing'
-import type { OpenTask, TaskAction } from '@reflect/core'
+import type { OpenTask } from '@reflect/core'
 import { createTestSystemPreferencesService } from '@reflect/app/testing'
 import { useRouterState } from '@/routing/router.tsx'
 import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { spyOnTaskWrites, type TaskWriteSpies } from '@/test-utils/task-writes.ts'
+import { spyOnTaskWrites, type TaskAction, type TaskWriteSpies } from '@/test-utils/task-writes.ts'
 import { act } from '@/test-utils/act.ts'
 import { scrollElement } from '@/test-utils/scroll.ts'
 import { MobileTasks } from './tasks.tsx'

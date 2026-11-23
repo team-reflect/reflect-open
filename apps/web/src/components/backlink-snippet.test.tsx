@@ -5,7 +5,7 @@ import {
 } from '@reflect/core/testing'
 import { userEvent } from 'vitest/browser'
 import { describe, expect, it, vi, type MockInstance } from 'vitest'
-import type { SnippetTask, TaskService } from '@reflect/core'
+import type { SnippetTask, TaskCommands } from '@reflect/core'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { BacklinkSnippet } from './backlink-snippet.tsx'
 import { noop } from '@ocavue/utils'
@@ -40,7 +40,7 @@ function anchors(): SnippetTask[] {
 }
 
 let operations: TestCoreServices['progress']
-let writeTask: MockInstance<TaskService['writeTask']>
+let toggleAt: MockInstance<TaskCommands['toggleAt']>
 
 async function renderSnippet(
   tasks: SnippetTask[] = anchors(),
@@ -49,17 +49,7 @@ async function renderSnippet(
 ) {
   const core = createTestCoreServices({ database: createTestDatabaseService() })
   operations = core.progress
-  writeTask = vi.spyOn(core.tasks, 'writeTask').mockResolvedValue({
-    source: '',
-    baseRevision: '',
-    revision: '',
-    moved: [],
-    inserted: [],
-    tasks: [],
-    merged: false,
-    indexSeq: null,
-    updatedAt: 0,
-  })
+  toggleAt = vi.spyOn(core.tasks.commands, 'toggleAt').mockResolvedValue()
   return await renderInApp(
     <BacklinkSnippet
       text={text}
@@ -77,17 +67,13 @@ describe('BacklinkSnippet task checkboxes', () => {
     const boxes = view.container.querySelectorAll('input[type="checkbox"]')
     expect(boxes).toHaveLength(3)
     await userEvent.click(boxes[0]!)
-    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
-    expect(writeTask).toHaveBeenCalledWith(
-      {
-        notePath: 'notes/meeting.md',
-        revision: 'r1',
-        astPath: [0, 1],
-        markdown: 'prep agenda',
-        checked: false,
-      },
-      [{ kind: 'toggle' }],
-    )
+    await vi.waitFor(() => expect(toggleAt).toHaveBeenCalledTimes(1))
+    expect(toggleAt).toHaveBeenCalledWith('notes/meeting.md', {
+      revision: 'r1',
+      astPath: [0, 1],
+      markdown: 'prep agenda',
+      checked: false,
+    })
     await view.unmount()
   })
 
@@ -95,17 +81,13 @@ describe('BacklinkSnippet task checkboxes', () => {
     const view = await renderSnippet()
     const boxes = view.container.querySelectorAll('input[type="checkbox"]')
     await userEvent.click(boxes[2]!)
-    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
-    expect(writeTask).toHaveBeenCalledWith(
-      {
-        notePath: 'notes/meeting.md',
-        revision: 'r1',
-        astPath: [0, 3],
-        markdown: 'send invite',
-        checked: true,
-      },
-      [{ kind: 'toggle' }],
-    )
+    await vi.waitFor(() => expect(toggleAt).toHaveBeenCalledTimes(1))
+    expect(toggleAt).toHaveBeenCalledWith('notes/meeting.md', {
+      revision: 'r1',
+      astPath: [0, 3],
+      markdown: 'send invite',
+      checked: true,
+    })
     await view.unmount()
   })
 
@@ -114,7 +96,7 @@ describe('BacklinkSnippet task checkboxes', () => {
     const boxes = view.container.querySelectorAll('input[type="checkbox"]')
     expect((boxes[1] as HTMLInputElement).checked).toBe(true)
     await userEvent.click(boxes[1]!, { force: true })
-    expect(writeTask).not.toHaveBeenCalled()
+    expect(toggleAt).not.toHaveBeenCalled()
     expect(operations.get()).toEqual([])
     await view.unmount()
   })
@@ -126,7 +108,7 @@ describe('BacklinkSnippet task checkboxes', () => {
     const view = await renderSnippet(drifted)
     const boxes = view.container.querySelectorAll('input[type="checkbox"]')
     await userEvent.click(boxes[0]!)
-    expect(writeTask).not.toHaveBeenCalled()
+    expect(toggleAt).not.toHaveBeenCalled()
     await vi.waitFor(() => expect(operations.findByLabel('Updating task')?.status).toBe('failed'))
     await view.unmount()
   })
@@ -146,7 +128,7 @@ describe('BacklinkSnippet task checkboxes', () => {
     const view = await renderSnippet(squareOnly, '- [[Roadmap]] plan\n  - [x] square box')
     const box = view.container.querySelector('input[type="checkbox"]')!
     await userEvent.click(box, { force: true })
-    expect(writeTask).not.toHaveBeenCalled()
+    expect(toggleAt).not.toHaveBeenCalled()
     await view.unmount()
   })
 })

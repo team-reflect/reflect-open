@@ -1,7 +1,7 @@
 import { isShallowEqual } from '@ocavue/utils'
 import { errorMessage } from '../errors.ts'
 import type { ClockService } from '../ports/clock-service.ts'
-import { requireGraphSession, type GraphSession } from '../graph/graph-session.ts'
+import type { GraphSession } from '../graph/graph-session.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import type { NoteDocumentService } from '../documents/note-document-service.ts'
@@ -10,10 +10,10 @@ import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 import type { SnippetTask } from '../indexing/snippet-tasks.ts'
 import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
-import { toTaskLocator, type TaskLocator } from '../markdown/index.ts'
-import { TaskCommands, type TaskAction } from './task-commands.ts'
+import type { TaskLocator } from '../markdown/index.ts'
+import { TaskCommands } from './task-commands.ts'
 import { createTaskReader, type TaskReader } from './task-reader.ts'
-import { TaskStore, type TaskStoreView, type TaskWriteResult } from './task-store.ts'
+import { TaskStore, type TaskStoreView } from './task-store.ts'
 
 export interface TaskServiceDeps {
   readonly database: DatabaseService
@@ -32,13 +32,6 @@ interface SnippetTaskClick {
   index: number
   checked: boolean
   text: string
-}
-
-/**
- * A task's locator ({@link TaskLocator}) plus the note it lives in.
- */
-export interface TaskRef extends TaskLocator {
-  notePath: string
 }
 
 /**
@@ -80,13 +73,6 @@ export interface TaskService extends Store<TaskStoreView> {
    */
   readonly commands: TaskCommands
   /**
-   * Apply `actions` to the task at the address `task` in one write: toggle
-   * its checkbox, replace its Markdown (the first paragraph without the
-   * marker), remove it (nested items move up), or demote it to a plain
-   * bullet. The rows take the tasks the write left.
-   */
-  writeTask(task: TaskRef, actions: readonly TaskAction[]): Promise<TaskWriteResult>
-  /**
    * The clicked snippet checkbox against the anchor for the same index. The
    * view and the anchors enumerate the same markdown independently (the
    * render walk vs the core's parse — see `extractSnippetTasks`), so index,
@@ -97,7 +83,7 @@ export interface TaskService extends Store<TaskStoreView> {
   resolveSnippetTask(tasks: readonly SnippetTask[], click: SnippetTaskClick): SnippetTask | null
   /**
    * Write a backlink-snippet checkbox click through to the source note: one
-   * {@link TaskService.writeTask} toggle of `locator`, or nothing when no graph
+   * {@link TaskCommands.toggleAt} of `locator`, or nothing when no graph
    * is open. A failed write is reported as a failed operation, then rethrown.
    */
   toggleSnippetTask(
@@ -208,20 +194,6 @@ class TaskServiceImpl implements TaskService {
     }
   }
 
-  async writeTask(task: TaskRef, actions: readonly TaskAction[]): Promise<TaskWriteResult> {
-    const { generation } = requireGraphSession(this.#deps.graphSession)
-    this.#adoptSession()
-    const store = this.#store
-    const locator = toTaskLocator(task)
-    const result = await this.commands.write(
-      generation,
-      task.notePath,
-      actions.map((action) => ({ ...action, task: locator })),
-    )
-    store.landCommit(task.notePath, result, null)
-    return result
-  }
-
   resolveSnippetTask(tasks: readonly SnippetTask[], click: SnippetTaskClick): SnippetTask | null {
     const anchor = tasks[click.index]
     if (anchor === undefined || anchor.checked !== click.checked || anchor.text !== click.text) {
@@ -240,7 +212,7 @@ class TaskServiceImpl implements TaskService {
       return
     }
     try {
-      await this.writeTask({ notePath, ...task.locator }, [{ kind: 'toggle' }])
+      await this.commands.toggleAt(notePath, task.locator)
     } catch (cause) {
       progress.fail(task.checked ? 'Reopening task' : 'Completing task', errorMessage(cause))
       throw cause

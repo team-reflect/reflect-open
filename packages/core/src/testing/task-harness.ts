@@ -12,10 +12,10 @@ import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.
 import type { ReconcileScan } from '../indexing/index-store-service.ts'
 import { PROJECTION_VERSION } from '../indexing/indexed-note.ts'
 import { PROJECTION_VERSION_KEY } from '../indexing/indexer.ts'
-import { projectTasks } from '../markdown/index.ts'
+import { projectTasks, type TaskLocator } from '../markdown/index.ts'
 import { WritableStore } from '../store.ts'
 import type { OpenTask } from '../tasks/open-task.ts'
-import { createTaskService, type TaskRef, type TaskService } from '../tasks/task-service.ts'
+import { createTaskService, type TaskService } from '../tasks/task-service.ts'
 import { createTestClockService, type TestClockService } from './clock.ts'
 import { createTestDatabaseService, type TestDatabaseService } from './database.ts'
 import { createTestFileChangeService, type TestFileChangeService } from './file-change.ts'
@@ -100,6 +100,13 @@ class StepGate {
     await this.arrived()
     this.#waiting.shift()?.reject(error)
   }
+}
+
+/**
+ * The address of a task: its note and its locator.
+ */
+export interface TaskAddress extends TaskLocator {
+  notePath: string
 }
 
 export interface TaskHarnessOptions {
@@ -389,7 +396,7 @@ export class TaskHarness {
   /**
    * The open tasks the task list shows.
    */
-  view(): TaskRef[] {
+  view(): TaskAddress[] {
     return (this.tasks.get().open ?? []).map(
       ({ notePath, revision, astPath, markdown, checked }) => {
         return { notePath, revision, astPath, markdown, checked }
@@ -400,7 +407,7 @@ export class TaskHarness {
   /**
    * The open tasks of the notes on disk, by note path, then by place in the note.
    */
-  projectFiles(): TaskRef[] {
+  projectFiles(): TaskAddress[] {
     return [...this.files.files()]
       .toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .flatMap(([notePath, source]) => {
