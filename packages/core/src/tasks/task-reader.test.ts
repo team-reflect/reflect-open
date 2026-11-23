@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { AppError } from '../errors.ts'
 import { INDEX_COMMITTED_EVENT } from '../ipc/ipc-service.ts'
@@ -97,5 +98,31 @@ describe('subscribe', () => {
     unlisten()
     ipc.emit(INDEX_COMMITTED_EVENT, { seq: 5, paths: null })
     expect(commits).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('index_tasks reads', () => {
+  /**
+   * The modules that call `index_tasks` themselves, by path under `src/`.
+   */
+  const TASK_READERS = [
+    'tasks/task-reader.ts',
+    // Reads on its own until its rows come from the reader.
+    'tasks/task-service.ts',
+  ]
+
+  it('come only from the listed modules', () => {
+    const root = new URL('../', import.meta.url)
+    const readers = readdirSync(root, { recursive: true, encoding: 'utf8' })
+      .map((file) => file.replaceAll('\\', '/'))
+      .filter((file) => {
+        return (
+          file.endsWith('.ts') &&
+          !file.endsWith('.test.ts') &&
+          !file.startsWith('testing/') &&
+          readFileSync(new URL(file, root), 'utf8').includes("'index_tasks'")
+        )
+      })
+    expect(readers.toSorted()).toEqual(TASK_READERS.toSorted())
   })
 })
