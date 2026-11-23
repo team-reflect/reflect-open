@@ -21,7 +21,7 @@ import {
   type IndexWriter,
   type IndexWriterDeps,
 } from './index-writer.ts'
-import { followFileChanges, markFileChanges } from './live.ts'
+import { markFileChanges } from './live.ts'
 import { noop } from '@ocavue/utils'
 
 /**
@@ -121,7 +121,7 @@ export interface IndexLifecycleService {
   open(): Promise<number | null>
   /**
    * Background-sync the open index of `session`: follow the file-change
-   * stream until the session ends, sync the whole graph (hash reconcile, or a
+   * stream until {@link IndexLifecycleService.close}, sync the whole graph (hash reconcile, or a
    * full rebuild when the stored projection version is stale), then start the
    * Rust watcher. The stream and the pass both mark files dirty and the index
    * writer of the session writes them, so index writes never run concurrently
@@ -325,7 +325,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
   #done: Promise<void> = Promise.resolve()
   #suspended = false
   #suspendGuard: (() => boolean) | null = null
-  #following: { readonly writer: IndexWriter; readonly stop: Unlisten } | null = null
+  #stopFollowing: Unlisten | null = null
   #refreshRunning = false
   #refreshQueued = false
   #rebuildInFlight: { generation: number; promise: Promise<void> } | null = null
@@ -384,13 +384,17 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     session.signal.addEventListener(
       'abort',
       () => {
-        this.#disposeWriter(writer)
+        writer.dispose()
       },
       { once: true },
     )
-    this.#follow(writer)
+    this.#stopFollowing ??= fileChanges.subscribe(({ changes }) => {
+      if (this.#writer !== null) {
+        markFileChanges(this.#writer.dirty, changes)
+      }
+    })
     if (session.signal.aborted) {
-      this.#disposeWriter(writer)
+      writer.dispose()
     }
     if (this.#isSuspended()) {
       return
@@ -756,9 +760,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     if (current !== null && current.generation > generation) {
       return null
     }
-    if (current !== null) {
-      this.#disposeWriter(current)
-    }
+    current?.dispose()
     const writer = createIndexWriter(this.#writerDeps, {
       dirty: createDirtySet(),
       generation,
@@ -769,34 +771,13 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
   }
 
   /**
-   * Mark the files that the file-change stream reports dirty in `writer`,
-   * until the writer is disposed.
+   * Dispose the writer and stop following the file-change stream.
    */
-  #follow(writer: IndexWriter): void {
-    if (this.#following?.writer === writer) {
-      return
-    }
-    this.#unfollow()
-    this.#following = { writer, stop: followFileChanges(this.#deps.fileChanges, writer.dirty) }
-  }
-
-  #unfollow(): void {
-    this.#following?.stop()
-    this.#following = null
-  }
-
-  #disposeWriter(writer: IndexWriter): void {
-    writer.dispose()
-    if (this.#following?.writer === writer) {
-      this.#unfollow()
-    }
-  }
-
   #dropWriter(): void {
-    if (this.#writer !== null) {
-      this.#disposeWriter(this.#writer)
-      this.#writer = null
-    }
+    this.#writer?.dispose()
+    this.#writer = null
+    this.#stopFollowing?.()
+    this.#stopFollowing = null
   }
 
   async #runRebuild(generation: number, fileGeneration: number): Promise<void> {

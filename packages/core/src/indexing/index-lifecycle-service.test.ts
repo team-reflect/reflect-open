@@ -66,8 +66,7 @@ afterEach(() => {
  * A lifecycle over test doubles, with every event recorded. The index is
  * stamped with the current projection version, so a sync pass is one
  * reconcile scan (`scan` in `steps`). The hooks run inside the matching
- * call: `onScan` may hold or reject the reconcile, `onSubscribe` runs as the
- * lifecycle subscribes to the file-change stream, `onWatchStart` as the
+ * call: `onScan` may hold or reject the reconcile, `onWatchStart` runs as the
  * watcher starts.
  */
 function setup(options?: {
@@ -77,7 +76,6 @@ function setup(options?: {
   failStore?: (call: IndexStoreCall) => Error | undefined
   onScan?: () => Promise<void>
   onClear?: () => Promise<void>
-  onSubscribe?: () => void
   onWatchStart?: () => void
   onRead?: () => void
   appPlatform?: AppPlatform
@@ -119,9 +117,7 @@ function setup(options?: {
   const subscribe = fileChanges.subscribe.bind(fileChanges)
   vi.spyOn(fileChanges, 'subscribe').mockImplementation((listener) => {
     steps.push('subscribe')
-    const unlisten = subscribe(listener)
-    options?.onSubscribe?.()
-    return unlisten
+    return subscribe(listener)
   })
   const startWatcher = fileChanges.startWatcher.bind(fileChanges)
   vi.spyOn(fileChanges, 'startWatcher').mockImplementation(async () => {
@@ -470,36 +466,24 @@ describe('createIndexLifecycleService', () => {
     expect(progress).toEqual(['reconciling', 'idle'])
   })
 
-  it('bails after reconcile when superseded: no subscription, no watcher', async () => {
-    const { index, steps, subscriptions } = setup()
+  it('bails after reconcile when superseded: no watcher', async () => {
+    const { index, steps } = setup()
     index.sync(endedSessionAt(5)) // stale immediately after reconcile
     await index.settled()
     expect(steps).toEqual(['subscribe', 'scan'])
-    expect(subscriptions()).toBe(0)
   })
 
-  it('drops the subscription of a session that ends while it subscribes', async () => {
+  it('writes no change reported after its session ends', async () => {
     const opened = new AbortController()
-    const { index, steps, subscriptions } = setup({
-      onSubscribe: () => {
-        opened.abort()
-      },
-    })
+    const { index, store, files, fileChanges } = setup()
     index.sync(sessionAt(5, opened.signal))
     await index.settled()
-    expect(steps).toEqual(['subscribe', 'scan'])
-    expect(subscriptions()).toBe(0)
-  })
-
-  it('drops the subscription when its session ends', async () => {
-    const opened = new AbortController()
-    const { index, subscriptions } = setup()
-    index.sync(sessionAt(5, opened.signal))
-    await index.settled()
-    expect(subscriptions()).toBe(1)
 
     opened.abort()
-    expect(subscriptions()).toBe(0)
+    files.set('notes/a.md', '# A')
+    fileChanges.emit({ changes: [{ path: 'notes/a.md', kind: 'upsert' }], source: 'external' })
+    await index.drained()
+    expect(store.applied()).toEqual([])
   })
 
   it('keeps one subscription across refresh passes', async () => {
@@ -576,14 +560,15 @@ describe('createIndexLifecycleService', () => {
     expect(fileChanges.watcherRunning()).toBe(false)
   })
 
-  it('sync() at a newer generation drops the subscription of the previous one', async () => {
-    const { index, subscriptions } = setup()
+  it('keeps one subscription across generations', async () => {
+    const { index, steps, subscriptions } = setup()
     index.sync(sessionAt(5))
     await index.settled()
 
-    index.sync(endedSessionAt(6))
-    expect(subscriptions()).toBe(0)
+    index.sync(sessionAt(6))
     await index.settled()
+    expect(steps.filter((step) => step === 'subscribe')).toHaveLength(1)
+    expect(subscriptions()).toBe(1)
   })
 
   it('refresh() coalesces stacked triggers into a single queued rerun', async () => {
