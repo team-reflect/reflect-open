@@ -159,14 +159,16 @@ describe('applyTaskEdits: setMarkdown', () => {
   it('refuses a blank line, which would split the paragraph', () => {
     const source = '+ [ ] a\n'
     const edit = { kind: 'setMarkdown', task: locate(source), markdown: 'one\n\ntwo' } as const
-    expect(() => applyTaskEdits(ctx, source, [edit])).toThrow(/one paragraph/)
+    expect(() => applyTaskEdits(ctx, source, [edit])).toThrow(
+      expect.objectContaining({ kind: 'invalidContent' }),
+    )
   })
 
   it('refuses a continuation line that would open a new block', () => {
     const source = '+ [ ] a\n'
     const edit = { kind: 'setMarkdown', task: locate(source), markdown: 'one\n- two' } as const
     expect(() => applyTaskEdits(ctx, source, [edit])).toThrow(
-      expect.objectContaining({ kind: 'notWritable' }),
+      expect.objectContaining({ kind: 'invalidContent' }),
     )
   })
 })
