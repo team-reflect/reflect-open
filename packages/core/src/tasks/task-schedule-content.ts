@@ -1,12 +1,4 @@
 import { clearTaskDueDate, setTaskDueDate } from '../markdown/index.ts'
-import type { OpenTask } from './open-task.ts'
-
-/**
- * The task's Markdown after setting or clearing its scheduled date link.
- */
-export function getScheduledMarkdown(task: OpenTask, isoDate: string | null): string {
-  return isoDate === null ? clearTaskDueDate(task.markdown) : setTaskDueDate(task.markdown, isoDate)
-}
 
 /**
  * The mobile quick-edit sheet's draft with its due-date link set to `isoDate`,

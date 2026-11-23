@@ -39,6 +39,8 @@ export interface TaskEditInsert {
   kind: 'insert'
   at: InsertPosition
   markdown: string
+  /** The new task is written checked. */
+  checked?: boolean | undefined
 }
 
 export type TaskEdit = TaskEditItem | TaskEditInsert
@@ -83,8 +85,10 @@ export function applyTaskEdits(
     if (edit.kind === 'insert') {
       const slot = resolveInsertPosition(document, before, baseRevision, edit.at)
       const markdown = requireParagraphMarkdown(edit.markdown)
+      const item = createListItem('task', '+', markdown)
+      item.checked = edit.checked === true
       return () => {
-        created.push(insertItem(document, slot, createListItem('task', '+', markdown)))
+        created.push(insertItem(document, slot, item))
       }
     }
     const { node } = locateTask(before, baseRevision, edit.task)

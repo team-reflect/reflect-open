@@ -12,11 +12,10 @@ import { useMarkdownLinkClick } from '@/editor/use-markdown-link-click.ts'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation.ts'
 import { addDaysToIsoDate } from '@reflect/utils'
 import { getTaskDueDate, type OpenTask, withDraftDueDate, formatDayLabel } from '@reflect/core'
-import type { TaskActions } from '@/lib/tasks/use-task-actions.ts'
+import { useTaskDraft } from '@/lib/tasks/use-task-draft.ts'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { useTaskSheetFinalizer } from '@/mobile/use-task-sheet-finalizer.ts'
 import {
   useDateFormat,
   useEditorMarkdownSyntax,
@@ -24,19 +23,18 @@ import {
   useEditorSpellCheck,
   useTimeFormat,
 } from '@/providers/settings-provider.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
 import { noop } from '@ocavue/utils'
 
 interface MobileTaskEditSheetProps {
   /** The task being edited. Remount (key by task) to reseed the draft. */
   task: OpenTask
   open: boolean
-  /** Close the sheet. A user dismissal commits the draft first (V1 mobile). */
+  /** Close the sheet. A user dismissal saves the typed text first (V1 mobile). */
   onOpenChange: (open: boolean) => void
   /** Today's live ISO date, for the schedule shortcuts. */
   today: string
-  /** The screen's shared task actions — one optimistic-cache path for every write. */
-  actions: TaskActions
-  /** Navigate to the task's source note (the sheet commits the draft first). */
+  /** Navigate to the task's source note (the sheet saves the typed text first). */
   onOpenNote: (notePath: string) => void
   /**
    * Focus the editor (raising the keyboard) as soon as the sheet opens — the
@@ -52,19 +50,17 @@ interface MobileTaskEditSheetProps {
  * opening the note. The text is desktop's inline task editor surface — the real
  * {@link NoteEditor}, with meowdown's `[[`/`#` menus and clickable links — over
  * the same markdown draft, and due-date changes edit the draft's
- * `[[YYYY-MM-DD]]` link in place, so everything lands as **one** write when the
- * sheet closes: dismissing commits a changed draft, an emptied draft deletes
- * the task, and an untouched draft writes nothing — the exit rules live in
- * {@link useTaskSheetFinalizer}. The action buttons route through the same
- * {@link TaskActions} the desktop view uses — save-then-act, never a racing
- * second write path.
+ * `[[YYYY-MM-DD]]` link in place. The draft goes to the task commands, so
+ * everything lands as **one** write: closing the sheet saves changed text,
+ * removes a task whose text was cleared, drops a new task left empty, and
+ * writes nothing for untouched text. The action buttons send the same
+ * commands as the desktop view, and each saves the typed text in its write.
  */
 export function MobileTaskEditSheet({
   task,
   open,
   onOpenChange,
   today,
-  actions,
   onOpenNote,
   autoFocusEditor = false,
 }: MobileTaskEditSheetProps): ReactElement {
@@ -78,40 +74,37 @@ export function MobileTaskEditSheet({
   const onLinkClick = useMarkdownLinkClick(null)
   const navigateTag = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
-  // The editor is uncontrolled; a reopen reseeds the draft (the row may have
-  // been rewritten by an action), so remount it via this seed to re-read it.
+  const { commands } = useCoreServices().tasks
+  const setTaskDraft = useTaskDraft(task)
+  // The editor is uncontrolled, and the sheet stays mounted after it closes:
+  // a reopen takes the row's current Markdown and remounts the editor.
+  const [draft, setDraft] = useState(task.markdown)
   const [editorSeed, setEditorSeed] = useState(0)
-  const editorRef = useRef<NoteEditorHandle | null>(null)
-  // The editor's live markdown, mirrored from its own onChange stream (the
-  // desktop task editor's currentRef pattern) so an edit the state hasn't
-  // re-rendered yet is never dropped or clobbered. Tagged with the editor
-  // instance: after a reseed remount the previous instance's leftovers read
-  // as null. Never an imperative getMarkdown() — that coalesces "not ready"
-  // and "torn down" into '', indistinguishable from a genuine clear, and an
-  // empty draft means delete.
-  const liveDraftRef = useRef<{ seed: number; markdown: string } | null>(null)
-  const readLiveDraft = (): string | null => {
-    return liveDraftRef.current !== null && liveDraftRef.current.seed === editorSeed
-      ? liveDraftRef.current.markdown
-      : null
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) {
+      setDraft(task.markdown)
+      setEditorSeed((seed) => seed + 1)
+    }
   }
-  // The commit/cancel/delete rules — baseline frozen at open, reseed on
-  // reopen, dismissal vs navigate vs unmount — live in the finalizer. It
-  // resolves against the live mirror (readDraft) with the state as fallback.
-  const { draft, setDraft, resolve, handleOpenChange, closeHandled, closeNavigate } =
-    useTaskSheetFinalizer({
-      task,
-      open,
-      onOpenChange,
-      actions,
-      readDraft: readLiveDraft,
-      onReseed: () => setEditorSeed((seed) => seed + 1),
-    })
+  const editorRef = useRef<NoteEditorHandle | null>(null)
+  // The editor's latest Markdown, ahead of the `draft` state by one render.
+  // It is tagged with the editor instance, so the text of an earlier visit
+  // reads as absent.
+  const liveDraftRef = useRef<{ seed: number; markdown: string } | null>(null)
   const dueDate = getTaskDueDate(draft)
 
-  const handleChange = (markdown: string): void => {
+  const changeDraft = (markdown: string): void => {
     liveDraftRef.current = { seed: editorSeed, markdown }
     setDraft(markdown)
+    setTaskDraft(markdown)
+  }
+  const handleOpenChange = (nextOpen: boolean): void => {
+    if (!nextOpen) {
+      void commands.commit(task)
+    }
+    onOpenChange(nextOpen)
   }
   // Stable while the editor is mounted: the flag only changes between visits
   // (the screen sets it before opening), never mid-edit, so the ref callback
@@ -126,8 +119,8 @@ export function MobileTaskEditSheet({
     [autoFocusEditor],
   )
 
-  // Enter finishes the visit exactly like a dismissal (commit / delete-empty),
-  // read through a latest-closure ref so the keymap binds once.
+  // Enter finishes the visit exactly like a dismissal, read through a
+  // latest-closure ref so the keymap binds once.
   const finishRef = useRef<() => void>(noop)
   useEffect(() => {
     finishRef.current = () => handleOpenChange(false)
@@ -136,66 +129,52 @@ export function MobileTaskEditSheet({
 
   const complete = (): void => {
     hapticImpactLight(haptics)
-    const result = resolve()
-    if (result.type === 'commit') {
-      actions.editAndToggle(task, result.content)
-    } else if (result.type === 'delete') {
-      // Emptied then completed: delete, like desktop's ⌘↵ on an emptied row —
-      // never toggle text the user just cleared back into the note.
-      actions.remove([task])
-    } else {
-      actions.checkboxToggle(task)
-    }
-    closeHandled()
+    void commands.toggle([task])
+    onOpenChange(false)
   }
 
   const convertToBullet = (): void => {
     hapticImpactLight(haptics)
-    const result = resolve()
-    if (result.type === 'commit') {
-      actions.editAndConvertToBullet(task, result.content)
-    } else if (result.type === 'delete') {
-      // Emptied then converted: delete, like desktop's ⌘⇧K on an emptied row —
-      // converting would resurrect the cleared text as a bullet.
-      actions.remove([task])
-    } else {
-      actions.convertToBullet([task])
-    }
-    closeHandled()
+    void commands.convert([task])
+    onOpenChange(false)
+  }
+
+  const closeToNavigate = (): void => {
+    void commands.commit(task)
+    onOpenChange(false)
   }
 
   const openNote = (): void => {
     hapticImpactLight(haptics)
-    closeNavigate()
+    closeToNavigate()
     onOpenNote(task.notePath)
   }
 
-  // A link tapped *inside* the draft navigates like "Open note": commit the
-  // draft first, then resolve the target (the shared editor hooks).
+  // A link tapped inside the draft navigates like "Open note": save the typed
+  // text first, then resolve the target (the shared editor hooks).
   const openWikiLink = ({ target }: { target: string }): void => {
-    closeNavigate()
+    closeToNavigate()
     navigateWikiLink({ target, openInNewWindow: false })
   }
 
   const openTag = (tag: string): void => {
-    closeNavigate()
+    closeToNavigate()
     navigateTag(tag)
   }
 
   const remove = (): void => {
     hapticImpactLight(haptics)
-    actions.remove([task])
-    closeHandled()
+    void commands.remove([task])
+    onOpenChange(false)
   }
 
   const schedule = (isoDate: string | null): void => {
     hapticImpactLight(haptics)
-    // Base the rewrite on the freshest draft, then keep every mirror in step
-    // by hand: setMarkdown is silent (no onChange echo), so neither the live
-    // mirror nor the state (chip highlights) updates on its own.
-    const next = withDraftDueDate(readLiveDraft() ?? draft, isoDate)
-    liveDraftRef.current = { seed: editorSeed, markdown: next }
-    setDraft(next)
+    // `setMarkdown` reports no change, so the draft is updated by hand.
+    const live = liveDraftRef.current
+    const current = live !== null && live.seed === editorSeed ? live.markdown : draft
+    const next = withDraftDueDate(current, isoDate)
+    changeDraft(next)
     editorRef.current?.setMarkdown(next)
   }
 
@@ -221,7 +200,7 @@ export function MobileTaskEditSheet({
               key={editorSeed}
               initialContent={draft}
               singleParagraph
-              onChange={handleChange}
+              onChange={changeDraft}
               markMode={markModeFromSyntax(editorMarkdownSyntax)}
               spellCheck={editorSpellCheck}
               smoothCaretAnimation={editorSmoothCaretAnimation}

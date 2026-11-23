@@ -29,6 +29,10 @@ export interface TaskInsertOp {
   after: string | null
   markdown: string
   /**
+   * The new task is written checked.
+   */
+  checked?: boolean | undefined
+  /**
    * Epoch milliseconds when the op was made, to order the row of a note with no other row.
    */
   updatedAt: number
@@ -88,7 +92,7 @@ function insertRow(rows: readonly OpenTask[], op: TaskInsertOp): readonly OpenTa
     revision: previous?.revision ?? '',
     astPath: previous?.astPath ?? [],
     breadcrumbs: context?.breadcrumbs ?? TASKS_SECTION.titles.slice(0, 1),
-    checked: false,
+    checked: op.checked === true,
     ...renderMarkdown(op.markdown.trim()),
   }
   return [...rows.slice(0, index), row, ...rows.slice(index)]

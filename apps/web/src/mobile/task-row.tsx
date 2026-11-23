@@ -27,10 +27,6 @@ interface MobileTaskRowProps {
    */
   onToggle: () => void
   /**
-   * Whether a Tasks write is in flight; the checkbox waits for it.
-   */
-  togglePending: boolean
-  /**
    * Open the quick-edit sheet for this task (V1 mobile: tap edits in place).
    */
   onEdit: (task: OpenTask) => void
@@ -62,7 +58,6 @@ export function MobileTaskRow({
   task,
   showSource,
   onToggle,
-  togglePending,
   onEdit,
   revealedRow,
   onOpenNote,
@@ -127,14 +122,13 @@ export function MobileTaskRow({
           <button
             type="button"
             aria-label={task.checked ? `Reopen: ${label}` : `Complete: ${label}`}
-            disabled={togglePending}
             onClick={() => {
               hapticImpactLight(haptics)
               onToggle()
             }}
             // A generous touch target around the small glyph; self-stretch keeps
             // the circle vertically centered in the row as task text wraps.
-            className="flex shrink-0 self-stretch items-center pl-4 pr-3 text-text-muted disabled:opacity-50"
+            className="flex shrink-0 self-stretch items-center pl-4 pr-3 text-text-muted"
           >
             {task.checked ? (
               <CircleCheck aria-hidden className="size-5 text-accent" strokeWidth={2} />

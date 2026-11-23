@@ -1,7 +1,7 @@
 import { noop } from '@ocavue/utils'
 import type { ReactElement } from 'react'
 import { page, userEvent } from 'vitest/browser'
-import { beforeEach, describe, expect, it, vi, type Mock, type MockInstance } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import {
   createTestDatabaseService,
   createTestCoreServices,
@@ -9,18 +9,11 @@ import {
   TestTaskIndex,
   type TestCoreServices,
 } from '@reflect/core/testing'
+import { spyOnTaskWrites, type TaskWriteSpies } from '@/test-utils/task-writes.ts'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
 import { useDailyCapture } from './daily-capture-menu.tsx'
 import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
-import {
-  WritableStore,
-  type MobileAudioMemoSessionState,
-  type InsertedTask,
-  type OpenTask,
-  type TaskService,
-  type TaskSnapshot,
-  type TaskWriteResult,
-} from '@reflect/core'
+import { WritableStore, type MobileAudioMemoSessionState, type OpenTask } from '@reflect/core'
 import { MobileAudioMemoContext } from '@/mobile/audio-memo-provider.tsx'
 import { act } from '@/test-utils/act.ts'
 
@@ -50,18 +43,10 @@ function setMemo(patch: Partial<MobileAudioMemoSessionState>): void {
   state.set({ ...state.get(), ...patch })
 }
 
-const TODAY = 'daily/2026-06-14.md'
-
-/**
- * The empty task `insertTask` writes at the top of today's note.
- */
-const CREATED: TaskSnapshot = { astPath: [0], markdown: '', breadcrumbs: [], checked: false }
-
 let core: TestCoreServices
 let getOpenTasks: Mock<() => Promise<OpenTask[]>>
-let insertTask: MockInstance<TaskService['insertTask']>
-let writeTask: MockInstance<TaskService['writeTask']>
-let taskIndex: TestTaskIndex
+let insertTask: TaskWriteSpies['insertTask']
+let writeTask: TaskWriteSpies['writeTask']
 
 /**
  * The quick-edit sheet, which the drawer portals outside the menu.
@@ -120,13 +105,10 @@ beforeEach(() => {
   // Today is 2026-06-14.
   core.clock.setNow(new Date(2026, 5, 14, 12).getTime())
   getOpenTasks = vi.fn<() => Promise<OpenTask[]>>().mockResolvedValue([])
-  taskIndex = new TestTaskIndex(core.database, getOpenTasks, () => Promise.resolve([]))
-  insertTask = vi.spyOn(core.tasks, 'insertTask').mockImplementation((notePath) => {
-    return Promise.resolve(taskIndex.insert(notePath, CREATED))
-  })
-  writeTask = vi.spyOn(core.tasks, 'writeTask').mockImplementation((ref, actions) => {
-    return Promise.resolve(taskIndex.write(ref, actions))
-  })
+  const taskIndex = new TestTaskIndex(core.database, getOpenTasks, () => Promise.resolve([]))
+  const spies = spyOnTaskWrites(core.tasks.commands, taskIndex)
+  insertTask = spies.insertTask
+  writeTask = spies.writeTask
 })
 
 describe('DailyCaptureMenu', () => {
@@ -203,31 +185,30 @@ describe('DailyCaptureMenu', () => {
       .toHaveAttribute('aria-expanded', 'false')
   })
 
-  it("adds a task to today's daily note and Enter saves what was typed into its sheet", async () => {
+  it("shows a new task for today's daily note and Enter writes what was typed into its sheet", async () => {
     const view = await renderMenu()
     await view.getByRole('button', { name: 'Show capture actions' }).click()
 
     await view.getByRole('button', { name: 'New task' }).click()
 
-    await vi.waitFor(() => expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md'))
     expect(captureToggle(view)?.getAttribute('aria-expanded')).toBe('false')
     // The task is brand new, so the editor has focus and typing starts at once.
     await focusedSheetEditor()
+    expect(insertTask).not.toHaveBeenCalled()
 
     await userEvent.keyboard('buy oat milk')
     await userEvent.keyboard('{Enter}')
 
-    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
-    expect(writeTask).toHaveBeenCalledWith(expect.objectContaining({ markdown: '' }), [
-      { kind: 'setMarkdown', markdown: 'buy oat milk' },
-    ])
+    await vi.waitFor(() => {
+      expect(insertTask.mock.calls).toEqual([
+        ['daily/2026-06-14.md', { markdown: 'buy oat milk', checked: false }],
+      ])
+    })
+    expect(writeTask).not.toHaveBeenCalled()
     await expect.element(sheet).not.toBeInTheDocument()
   })
 
-  it('edits the live row when a reindex rewrites the task while its sheet is open', async () => {
-    const today = { notePath: TODAY, dailyDate: '2026-06-14', astPath: [0] }
-    // The index holds the new task by the time the sheet reads the rows.
-    getOpenTasks.mockResolvedValue([makeOpenTask({ ...today, markdown: '' })])
+  it('keeps the new task when a reindex lands while its sheet is open', async () => {
     const view = await renderMenu()
     // The Daily screen leaves the graph's task rows alone until a sheet needs them.
     core.ipc.emit('index:committed', { seq: 1, paths: null })
@@ -236,10 +217,9 @@ describe('DailyCaptureMenu', () => {
     await view.getByRole('button', { name: 'New task' }).click()
     await focusedSheetEditor()
 
-    // Another device rewrites the task in place; the reindex re-reads the rows.
     const readsBefore = getOpenTasks.mock.calls.length
     getOpenTasks.mockResolvedValue([
-      makeOpenTask({ ...today, revision: 'synced', markdown: 'synced from another device' }),
+      makeOpenTask({ notePath: 'notes/other.md', markdown: 'other' }),
     ])
     core.ipc.emit('index:committed', { seq: 1, paths: null })
     await vi.waitFor(() => expect(getOpenTasks).toHaveBeenCalledTimes(readsBefore + 1))
@@ -250,15 +230,14 @@ describe('DailyCaptureMenu', () => {
     await userEvent.keyboard('buy oat milk')
     await userEvent.keyboard('{Escape}')
 
-    // The write addresses the row as it is now, so the guard matches it.
-    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
-    expect(writeTask).toHaveBeenCalledWith(
-      expect.objectContaining({ markdown: 'synced from another device' }),
-      [{ kind: 'setMarkdown', markdown: 'buy oat milk' }],
-    )
+    await vi.waitFor(() => {
+      expect(insertTask.mock.calls).toEqual([
+        ['daily/2026-06-14.md', { markdown: 'buy oat milk', checked: false }],
+      ])
+    })
   })
 
-  it('removes the new task when its sheet is dismissed untyped', async () => {
+  it('writes nothing when the sheet of the new task is dismissed untyped', async () => {
     const view = await renderMenu()
     await view.getByRole('button', { name: 'Show capture actions' }).click()
     await view.getByRole('button', { name: 'New task' }).click()
@@ -266,77 +245,26 @@ describe('DailyCaptureMenu', () => {
 
     await userEvent.keyboard('{Escape}')
 
-    // V1's empty-task rule: a change of heart leaves no bare `+ [ ]` behind.
-    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
-    expect(writeTask).toHaveBeenCalledWith(expect.anything(), [{ kind: 'remove' }])
-  })
-
-  it('adds one task when New task is tapped again before the first lands', async () => {
-    const pending = Promise.withResolvers<InsertedTask>()
-    insertTask.mockReturnValue(pending.promise)
-    const view = await renderMenu()
-    await view.getByRole('button', { name: 'Show capture actions' }).click()
-    await view.getByRole('button', { name: 'New task' }).click()
-    await view.getByRole('button', { name: 'Show capture actions' }).click()
-    await view.getByRole('button', { name: 'New task' }).click()
-
-    pending.resolve(taskIndex.insert(TODAY, CREATED))
-
-    await expect.element(sheet).toBeInTheDocument()
-    expect(insertTask).toHaveBeenCalledTimes(1)
-  })
-
-  it('removes a task that lands after the menu has gone', async () => {
-    const pending = Promise.withResolvers<InsertedTask>()
-    insertTask.mockReturnValue(pending.promise)
-    const view = await renderMenu()
-    await view.getByRole('button', { name: 'Show capture actions' }).click()
-    await view.getByRole('button', { name: 'New task' }).click()
-
-    await view.unmount()
-    pending.resolve(taskIndex.insert(TODAY, CREATED))
-
-    // No sheet will ever show it, so it must not stay behind as a bare `+ [ ]`.
-    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
-    expect(writeTask).toHaveBeenCalledWith(expect.anything(), [{ kind: 'remove' }])
-  })
-
-  it('removes a late task even while an earlier sheet’s delete is still pending', async () => {
-    const view = await renderMenu()
-    await view.getByRole('button', { name: 'Show capture actions' }).click()
-    await view.getByRole('button', { name: 'New task' }).click()
-    await focusedSheetEditor()
-    // The first sheet is dismissed untyped; its empty-task delete stays in flight.
-    const firstDelete = Promise.withResolvers<TaskWriteResult>()
-    writeTask.mockReturnValueOnce(firstDelete.promise)
-    await userEvent.keyboard('{Escape}')
-    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
     await expect.element(sheet).not.toBeInTheDocument()
-
-    const pending = Promise.withResolvers<InsertedTask>()
-    insertTask.mockReturnValueOnce(pending.promise)
-    await view.getByRole('button', { name: 'Show capture actions' }).click()
-    await view.getByRole('button', { name: 'New task' }).click()
-    await view.unmount()
-    pending.resolve(taskIndex.insert(TODAY, { ...CREATED, astPath: [1] }))
-
-    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(2))
-    expect(writeTask).toHaveBeenLastCalledWith(expect.objectContaining({ astPath: [1] }), [
-      { kind: 'remove' },
-    ])
-    firstDelete.resolve(taskIndex.write({ ...CREATED, notePath: TODAY, revision: '' }, []))
+    expect(core.tasks.get().open).toEqual([])
+    expect(insertTask).not.toHaveBeenCalled()
+    expect(writeTask).not.toHaveBeenCalled()
   })
 
-  it('opens no sheet when adding the task fails', async () => {
-    insertTask.mockRejectedValue(new Error('disk full'))
+  it('writes what was typed when the menu goes away under the open sheet', async () => {
     const view = await renderMenu()
     await view.getByRole('button', { name: 'Show capture actions' }).click()
-
     await view.getByRole('button', { name: 'New task' }).click()
+    await focusedSheetEditor()
+    await userEvent.keyboard('buy oat milk')
 
-    await vi.waitFor(() => expect(insertTask).toHaveBeenCalledTimes(1))
-    await vi.waitFor(() => expect(core.progress.findByLabel('Adding task')?.status).toBe('failed'))
-    expect(sheet.query()).toBeNull()
+    await view.unmount()
+
+    await vi.waitFor(() => {
+      expect(insertTask.mock.calls).toEqual([
+        ['daily/2026-06-14.md', { markdown: 'buy oat milk', checked: false }],
+      ])
+    })
   })
 
   it('starts the audio memo and collapses', async () => {

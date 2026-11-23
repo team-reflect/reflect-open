@@ -34,10 +34,6 @@ interface MobileTaskGroupProps {
    */
   onToggle: (task: OpenTask) => void
   /**
-   * Whether a Tasks write is in flight; checkboxes wait for it.
-   */
-  togglePending: boolean
-  /**
    * Open a note group's source note from its header, or a row's from its swipe action.
    */
   onOpen: (notePath: string) => void
@@ -65,7 +61,6 @@ export function MobileTaskGroup({
   onAdd,
   onEdit,
   onToggle,
-  togglePending,
   onOpen,
   onDelete,
   revealedRow,
@@ -129,7 +124,6 @@ export function MobileTaskGroup({
                 showSource={showSource}
                 onEdit={onEdit}
                 onToggle={() => onToggle(task)}
-                togglePending={togglePending}
                 revealedRow={revealedRow}
                 onOpenNote={() => onOpen(task.notePath)}
                 onDelete={() => onDelete(task)}

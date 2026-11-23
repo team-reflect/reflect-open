@@ -28,7 +28,7 @@ describe('TaskHarness', () => {
     expect(indexed()).toEqual(['notes/a.md'])
 
     harness.holdWrites()
-    const editing = harness.tasks.editTask(harness.tasks.get().open![0]!, 'two')
+    const editing = harness.edit(harness.tasks.get().open![0]!, 'two')
     expect(harness.files.files().get('notes/a.md')).toBe('+ [ ] one\n')
     await harness.landWrite()
     await editing
@@ -108,17 +108,17 @@ describe('drained task view', () => {
       return harness.tasks.get().open!.find((task) => task.markdown === markdown)!
     }
 
-    await harness.tasks.editTask(row('one'), 'one, edited')
+    await harness.edit(row('one'), 'one, edited')
     await harness.deliverWatcherBatch()
     harness.editExternally('notes/b.md', '+ [ ] zero\n+ [ ] three\n')
     await harness.deliverWatcherBatch()
     await harness.drain()
     expect(harness.view()).toEqual(harness.projectFiles())
 
-    await harness.tasks.completeTasks([row('two')])
+    await harness.tasks.commands.toggle([row('two')])
     await harness.startPass()
     await harness.endPass()
-    await harness.tasks.addTaskAfter(row('three'), 'four')
+    await harness.edit(row('three'), 'four')
     harness.suspend()
     harness.editExternally('notes/c.md', '+ [ ] five\n')
     await harness.deliverWatcherBatch()
@@ -129,7 +129,6 @@ describe('drained task view', () => {
       'one, edited',
       'zero',
       'four',
-      '',
       'five',
     ])
     expect(harness.view()).toEqual(harness.projectFiles())
@@ -221,16 +220,18 @@ describe('task rows under interleaved writes and file changes', () => {
       const row = pick()
       switch (random(7)) {
         case 0:
-          if (row !== undefined) writes.push(harness.tasks.editTask(row, `edit ${step}`))
+          if (row !== undefined) writes.push(harness.edit(row, `edit ${step}`))
           break
         case 1:
-          if (row !== undefined) writes.push(harness.tasks.completeTasks([row]))
+          if (row !== undefined) writes.push(harness.tasks.commands.toggle([row]))
           break
         case 2:
-          if (row !== undefined) writes.push(harness.tasks.addTaskAfter(row, null))
+          if (row !== undefined) {
+            writes.push(harness.edit(harness.tasks.commands.continueAfter(row), `new ${step}`))
+          }
           break
         case 3:
-          if (row !== undefined) writes.push(harness.tasks.deleteTasks([row]))
+          if (row !== undefined) writes.push(harness.tasks.commands.remove([row]))
           break
         case 4: {
           const path = NOTES[random(NOTES.length)]!

@@ -8,7 +8,7 @@ import {
 } from '../markdown/index.ts'
 import type { OpenTask } from './open-task.ts'
 import type { InsertTaskTarget } from './task-insert-target.ts'
-import { applyTaskOp, type TaskOp } from './task-ops.ts'
+import { applyTaskOp, type TaskInsertOp, type TaskOp } from './task-ops.ts'
 import { reconcileNoteTasks } from './task-reconcile.ts'
 
 /**
@@ -35,6 +35,23 @@ interface NoteEntry {
 export interface PendingWrite {
   readonly notePath: string
   readonly ops: readonly TaskOp[]
+}
+
+/**
+ * The task a row shows, without its address.
+ */
+export type TaskIdentity = Pick<OpenTask, 'notePath' | 'taskId'>
+
+/**
+ * The text typed into the editor of a task since the editor opened.
+ */
+interface TaskDraft {
+  readonly notePath: string
+  /**
+   * The Markdown of the task when the first text arrived.
+   */
+  readonly base: string
+  readonly markdown: string
 }
 
 /**
@@ -137,6 +154,8 @@ function compareByRecency(left: OpenTask, right: OpenTask): number {
  * learned at. The view is the base with the ops of every write in flight
  * applied. A task keeps its id while reads and writes replace its note.
  * The struck set is view state: it names tasks by id and holds no row.
+ * A new task is a row with no write in flight: it shows until it is taken.
+ * A draft is typed text that no row shows.
  */
 export class TaskStore {
   /**
@@ -149,6 +168,11 @@ export class TaskStore {
    */
   readonly #seqs = new Map<string, number>()
   #pending: PendingWrite[] = []
+  /**
+   * The new tasks that no write holds yet, by task id.
+   */
+  readonly #newTasks = new Map<string, PendingWrite>()
+  readonly #drafts = new Map<string, TaskDraft>()
   /**
    * The ids of the tasks that stay in the active list while they are checked.
    */
@@ -229,6 +253,78 @@ export class TaskStore {
   }
 
   /**
+   * Show a new task that no write holds yet, and return its row.
+   */
+  addNewTask(op: TaskInsertOp): OpenTask {
+    const { notePath } = op.note
+    this.#newTasks.set(op.taskId, this.push(notePath, [op]))
+    const row = this.rows(notePath).find((candidate) => candidate.taskId === op.taskId)
+    if (row === undefined) {
+      throw new Error('The new task has no row.')
+    }
+    return row
+  }
+
+  /**
+   * The new task of `taskId` that no write holds yet.
+   */
+  findNewTask(taskId: string): TaskInsertOp | undefined {
+    const op = this.#newTasks.get(taskId)?.ops[0]
+    return op?.kind === 'insert' ? op : undefined
+  }
+
+  /**
+   * Stop showing the new task of `taskId` and return it, for a write to hold.
+   */
+  takeNewTask(taskId: string): TaskInsertOp | undefined {
+    const op = this.findNewTask(taskId)
+    const write = this.#newTasks.get(taskId)
+    if (write !== undefined) {
+      this.#newTasks.delete(taskId)
+      this.drop(write)
+    }
+    return op
+  }
+
+  /**
+   * Keep `markdown` as the text typed into the editor of `task`.
+   */
+  setDraft(task: Pick<OpenTask, 'notePath' | 'taskId' | 'markdown'>, markdown: string): void {
+    const base = this.#drafts.get(task.taskId)?.base ?? task.markdown
+    this.#drafts.set(task.taskId, { notePath: task.notePath, base, markdown })
+  }
+
+  /**
+   * Forget the draft of `taskId` and return it.
+   */
+  takeDraft(taskId: string): TaskDraft | undefined {
+    const draft = this.#drafts.get(taskId)
+    this.#drafts.delete(taskId)
+    return draft
+  }
+
+  /**
+   * The tasks that hold text no write has taken: every draft, and every new
+   * task. A new task with no text is left out.
+   */
+  unsaved(): TaskIdentity[] {
+    const tasks = new Map<string, TaskIdentity>()
+    for (const [taskId, draft] of this.#drafts) {
+      tasks.set(taskId, { notePath: draft.notePath, taskId })
+    }
+    for (const taskId of this.#newTasks.keys()) {
+      const op = this.findNewTask(taskId)
+      const markdown = this.#drafts.get(taskId)?.markdown ?? op?.markdown ?? ''
+      if (op === undefined || markdown.trim() === '') {
+        tasks.delete(taskId)
+      } else {
+        tasks.set(taskId, { notePath: op.note.notePath, taskId })
+      }
+    }
+    return [...tasks.values()]
+  }
+
+  /**
    * End `write` with the tasks it left in its note, or take the tasks of a
    * write that showed no ops. A task keeps its id through the moves of the
    * edit, and an inserted task takes the id of its insert op. The tasks of a
@@ -249,12 +345,12 @@ export class TaskStore {
         commit.tasks,
         true,
         exact ? commit.moves : null,
-        exact
-          ? commit.inserted.flatMap((task, i) => {
+        commit.moves === null
+          ? []
+          : commit.inserted.flatMap((task, i) => {
               const insert = inserts[i]
               return insert === undefined ? [] : [[encodeTaskPath(task.astPath), insert.taskId]]
-            })
-          : [],
+            }),
       )
       if (commit.indexSeq !== null && this.#isCurrent(notePath, commit.indexSeq)) {
         this.#seqs.set(notePath, commit.indexSeq)
@@ -296,6 +392,19 @@ export class TaskStore {
    */
   find(notePath: string, taskId: string): OpenTask | undefined {
     return this.#notes.get(notePath)?.rows.find((row) => row.taskId === taskId)
+  }
+
+  /**
+   * The rows of `notePath` as the view shows them, in document order.
+   */
+  rows(notePath: string): readonly OpenTask[] {
+    let rows = this.#notes.get(notePath)?.rows ?? NO_TASKS
+    for (const write of this.#pending) {
+      if (write.notePath === notePath) {
+        rows = write.ops.reduce(applyTaskOp, rows)
+      }
+    }
+    return rows
   }
 
   /**
@@ -367,14 +476,8 @@ export class TaskStore {
   }
 
   #computeView(): TaskStoreView {
-    const byNote = new Map<string, readonly OpenTask[]>()
-    for (const [path, entry] of this.#notes) {
-      byNote.set(path, entry.rows)
-    }
-    for (const { notePath, ops } of this.#pending) {
-      byNote.set(notePath, ops.reduce(applyTaskOp, byNote.get(notePath) ?? []))
-    }
-    const rows = [...byNote.keys()].toSorted().flatMap((path) => byNote.get(path) ?? [])
+    const paths = new Set([...this.#notes.keys(), ...this.#pending.map((write) => write.notePath)])
+    const rows = [...paths].toSorted().flatMap((path) => this.rows(path))
     const struck = rows.filter((row) => row.checked && this.#struck.has(row.taskId))
     return {
       open: this.#loaded ? rows.filter((row) => !row.checked) : undefined,

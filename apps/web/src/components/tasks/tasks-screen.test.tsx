@@ -1,6 +1,6 @@
 import { createTestWindowService, type TestWindowService } from '@reflect/app/testing'
 import { userEvent, type Locator } from 'vitest/browser'
-import { beforeEach, describe, expect, it, vi, type Mock, type MockInstance } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import {
   createTestDatabaseService,
   createTestCoreServices,
@@ -8,14 +8,17 @@ import {
   TestTaskIndex,
   type TestCoreServices,
 } from '@reflect/core/testing'
-import type { OpenTask, TaskAction, TaskService, TaskSnapshot } from '@reflect/core'
-import { useEffect, useState, type MutableRefObject, type ReactNode } from 'react'
+import type { OpenTask, TaskAction } from '@reflect/core'
+import type { ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
 import { useRouterState } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { MOD_KEY } from '@/test-utils/mod-key.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { spyOnTaskWrites, type TaskWriteSpies } from '@/test-utils/task-writes.ts'
+import { useTaskDraft } from '@/lib/tasks/use-task-draft.ts'
+import type { TaskEditorHandlers } from './task-editor.tsx'
 import { TasksScreen } from './tasks-screen.tsx'
 import { deepLinkForRoute } from '@reflect/app'
 
@@ -24,15 +27,8 @@ import { deepLinkForRoute } from '@reflect/app'
 // `getCompletedTasks`, and steers the writes through the spies.
 let getOpenTasks: Mock<() => Promise<OpenTask[]>>
 let getCompletedTasks: Mock<() => Promise<OpenTask[]>>
-let writeTask: MockInstance<TaskService['writeTask']>
-let insertTask: MockInstance<TaskService['insertTask']>
-let continueTaskInContext: MockInstance<TaskService['continueTaskInContext']>
-let taskIndex: TestTaskIndex
-
-/**
- * The new task of an insert into a note with no other task.
- */
-const CREATED: TaskSnapshot = { astPath: [0], markdown: '', breadcrumbs: [], checked: false }
+let writeTask: TaskWriteSpies['writeTask']
+let insertTask: TaskWriteSpies['insertTask']
 
 type TaskActionKind = TaskAction['kind']
 
@@ -48,111 +44,54 @@ function writesOf(...kinds: TaskActionKind[]): unknown[][] {
 }
 
 /**
- * Reject the writes whose actions are exactly `kinds`; every other write succeeds.
+ * Reject the writes of a task whose actions are exactly `kinds`; every other write succeeds.
  */
 function failWrites(kinds: TaskActionKind[], cause: Error): void {
-  writeTask.mockImplementation((ref, actions) => {
-    return isWrite(actions, kinds)
-      ? Promise.reject(cause)
-      : Promise.resolve(taskIndex.write(ref, actions))
+  writeTask.mockImplementation((_task, actions) => {
+    return isWrite(actions, kinds) ? Promise.reject(cause) : undefined
   })
 }
 
-// Stub the real inline editor with the callback surface the row
-// wires up, so selection + edit/delete/cancel routing is testable here; the
-// editor's own commit/cancel decision is unit-tested via resolveTaskEdit.
+// Stub the real inline editor with buttons for its keys and for typing, over
+// the real draft hook, so selection and command routing is testable here.
 vi.mock('./task-editor', () => ({
   TaskEditor: ({
     task,
-    onCommit,
     onContinue,
-    onDelete,
-    onDeleteEmpty,
     onCancel,
     onComplete,
-    onCheckboxToggle,
     onConvertToBullet,
-    onFlush,
+    onDelete,
+    onDeleteEmpty,
     onNavigate,
-    checkboxToggleControllerRef,
-    convertControllerRef,
-  }: {
-    task: { text: string }
-    onCommit: (content: string) => void
-    onContinue: (content: string | null) => void
-    onDelete: () => void
-    onDeleteEmpty: () => void
-    onCancel: () => void
-    onComplete: (content: string | null) => void
-    onCheckboxToggle: (content: string | null) => void
-    onConvertToBullet: (content: string | null) => void
-    onFlush: (content: string) => void
-    onNavigate: (direction: -1 | 1, options: { span: boolean }) => void
-    checkboxToggleControllerRef?: MutableRefObject<(() => void) | null>
-    convertControllerRef?: MutableRefObject<(() => void) | null>
-  }) => {
-    const [checkboxDraft, setCheckboxDraft] = useState<string | null>(null)
-    useEffect(() => {
-      if (checkboxToggleControllerRef === undefined) {
-        return
-      }
-      checkboxToggleControllerRef.current = () => onCheckboxToggle(checkboxDraft)
-      return () => {
-        checkboxToggleControllerRef.current = null
-      }
-    }, [checkboxDraft, checkboxToggleControllerRef, onCheckboxToggle])
-    // Mirror the real editor: expose a flush-then-convert trigger (simulating a
-    // changed draft) so the toolbar button routes the sole row through it.
-    useEffect(() => {
-      if (convertControllerRef === undefined) {
-        return
-      }
-      convertControllerRef.current = () => onConvertToBullet('edited content')
-      return () => {
-        convertControllerRef.current = null
-      }
-    })
+  }: TaskEditorHandlers & { task: OpenTask }) => {
+    const setDraft = useTaskDraft(task)
     return (
       <div data-task-editor data-testid="task-editor">
         <span>editing: {task.text}</span>
-        <button type="button" onClick={() => onCommit('edited content')}>
-          commit-edit
+        <button type="button" onClick={() => setDraft('edited content')}>
+          type-edit
         </button>
-        <button type="button" onClick={() => onContinue('edited content')}>
+        <button type="button" onClick={() => setDraft('')}>
+          clear-edit
+        </button>
+        <button type="button" onClick={onContinue}>
           continue-edit
         </button>
-        <button type="button" onClick={() => onContinue(null)}>
-          continue-unchanged
-        </button>
-        <button type="button" onClick={() => onContinue('')}>
-          continue-empty
-        </button>
-        <button type="button" onClick={() => onDelete()}>
+        <button type="button" onClick={onDelete}>
           delete-edit
         </button>
-        <button type="button" onClick={() => onDeleteEmpty()}>
+        <button type="button" onClick={onDeleteEmpty}>
           delete-empty-edit
         </button>
-        <button type="button" onClick={() => onCancel()}>
+        <button type="button" onClick={onCancel}>
           cancel-edit
         </button>
-        <button type="button" onClick={() => onComplete('edited content')}>
-          complete-edited
+        <button type="button" onClick={onComplete}>
+          complete-edit
         </button>
-        <button type="button" onClick={() => onComplete(null)}>
-          complete-unchanged
-        </button>
-        <button type="button" onClick={() => setCheckboxDraft('edited content')}>
-          stage-checkbox-edit
-        </button>
-        <button type="button" onClick={() => onConvertToBullet('edited content')}>
-          convert-edited
-        </button>
-        <button type="button" onClick={() => onConvertToBullet(null)}>
-          convert-unchanged
-        </button>
-        <button type="button" onClick={() => onFlush('edited content')}>
-          flush-edit
+        <button type="button" onClick={onConvertToBullet}>
+          convert-edit
         </button>
         <button type="button" onClick={() => onNavigate(1, { span: false })}>
           nav-down
@@ -238,18 +177,10 @@ beforeEach(() => {
   const tasks = core.tasks
   getOpenTasks = vi.fn<() => Promise<OpenTask[]>>().mockResolvedValue([])
   getCompletedTasks = vi.fn<() => Promise<OpenTask[]>>().mockResolvedValue([])
-  taskIndex = new TestTaskIndex(core.database, getOpenTasks, getCompletedTasks)
-  writeTask = vi.spyOn(tasks, 'writeTask').mockImplementation((ref, actions) => {
-    return Promise.resolve(taskIndex.write(ref, actions))
-  })
-  insertTask = vi.spyOn(tasks, 'insertTask').mockImplementation((notePath) => {
-    return Promise.resolve(taskIndex.insert(notePath, CREATED))
-  })
-  continueTaskInContext = vi
-    .spyOn(tasks, 'continueTaskInContext')
-    .mockImplementation((ref, content) => {
-      return Promise.resolve(taskIndex.continue(ref, content, CREATED))
-    })
+  const taskIndex = new TestTaskIndex(core.database, getOpenTasks, getCompletedTasks)
+  const spies = spyOnTaskWrites(tasks.commands, taskIndex)
+  writeTask = spies.writeTask
+  insertTask = spies.insertTask
 })
 
 // Keep native browser navigation out of keyboard-handler tests in this suite.
@@ -595,42 +526,40 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
-  it('commits, deletes, or cancels an inline edit through the editor', async () => {
+  it('saves typed text when the row is left, discards it on Escape, and deletes', async () => {
     getOpenTasks.mockResolvedValue([
-      task({
-        notePath: 'notes/p.md',
-        astPath: [2],
-        markdown: 'first',
-        text: 'first',
-        noteTitle: 'P',
-      }),
+      task({ notePath: 'notes/p.md', astPath: [2], markdown: 'first', noteTitle: 'P' }),
+      task({ notePath: 'notes/p.md', astPath: [3], markdown: 'second', noteTitle: 'P' }),
     ])
     const view = await renderScreen()
 
-    // Commit → one setMarkdown write with the new content, and edit mode exits.
+    // Type, then select another row: one setMarkdown write with the new content.
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
-    await userEvent.click(view.getByText('commit-edit'))
+    await userEvent.click(view.getByText('type-edit'))
+    await userEvent.click(view.getByRole('button', { name: 'second' }))
     await waitFor(() => {
       expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/p.md', astPath: [2] }),
         [{ kind: 'setMarkdown', markdown: 'edited content' }],
       )
     })
-    await waitFor(() => expect(view.queryByTestId('task-editor')).toBeNull())
+    await view.findByText('editing: second')
 
-    // Re-select and cancel → no further write, edit mode exits.
-    await userEvent.click(view.getByRole('button', { name: 'edited content' }))
+    // Type and press Escape: no further write, edit mode exits.
+    await userEvent.click(view.getByText('type-edit'))
     await userEvent.click(view.getByText('cancel-edit'))
     expect(view.queryByTestId('task-editor')).toBeNull()
+    expect(view.getByRole('button', { name: 'second' })).toBeDefined()
+    expect(writeTask).toHaveBeenCalledTimes(1)
 
-    // Re-select and delete → a remove write, row gone.
+    // Re-select and delete: a remove write, row gone.
     await userEvent.click(view.getByRole('button', { name: 'edited content' }))
     await userEvent.click(view.getByText('delete-edit'))
-    await waitFor(() => expect(writesOf('remove')).not.toHaveLength(0))
+    await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
     await view.unmount()
   })
 
-  it('flush persists an edit without exiting edit mode (selection unchanged)', async () => {
+  it('saves typed text when the screen goes away', async () => {
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -643,19 +572,19 @@ describe('TasksScreen', () => {
     const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
-    await userEvent.click(view.getByText('flush-edit'))
+    await userEvent.click(view.getByText('type-edit'))
+    expect(writeTask).not.toHaveBeenCalled()
+    await view.unmount()
+
     await waitFor(() => {
       expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/p.md', astPath: [2] }),
         [{ kind: 'setMarkdown', markdown: 'edited content' }],
       )
     })
-    // The selection (and so the inline editor) is left intact — flush never clears.
-    expect(view.getByTestId('task-editor')).toBeDefined()
-    await view.unmount()
   })
 
-  it('completes from the editor: edit+complete sequences the two writes', async () => {
+  it('completes from the editor: typed text and the toggle are one write', async () => {
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -667,15 +596,16 @@ describe('TasksScreen', () => {
     ])
     const view = await renderScreen()
 
-    // ⌘↵ with an edit → save the content, then toggle the rewritten line.
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
-    await userEvent.click(view.getByText('complete-edited'))
+    await userEvent.click(view.getByText('type-edit'))
+    await userEvent.click(view.getByText('complete-edit'))
     await waitFor(() => {
       expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/p.md', astPath: [2] }),
         [{ kind: 'setMarkdown', markdown: 'edited content' }, { kind: 'toggle' }],
       )
     })
+    expect(writeTask).toHaveBeenCalledTimes(1)
     await view.unmount()
   })
 
@@ -695,7 +625,8 @@ describe('TasksScreen', () => {
     const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'done task' }))
-    await userEvent.click(view.getByText('complete-edited'))
+    await userEvent.click(view.getByText('type-edit'))
+    await userEvent.click(view.getByText('complete-edit'))
     await waitFor(() => expect(writesOf('setMarkdown')).not.toHaveLength(0))
     // The marker stays `[x]` — no toggle back to open.
     expect(writesOf('toggle')).toHaveLength(0)
@@ -715,7 +646,7 @@ describe('TasksScreen', () => {
     const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
-    await userEvent.click(view.getByText('complete-unchanged'))
+    await userEvent.click(view.getByText('complete-edit'))
     await waitFor(() => expect(writesOf('toggle')).toHaveLength(1))
     expect(writesOf('setMarkdown')).toHaveLength(0)
     await view.unmount()
@@ -830,16 +761,7 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
-  it('a note group’s "+ Add" button inserts into that note and opens the editor', async () => {
-    insertTask.mockImplementation((notePath) => {
-      return Promise.resolve(
-        taskIndex.insert(
-          notePath,
-          { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
-          [],
-        ),
-      )
-    })
+  it('a note group’s "+ Add" button opens the editor of a new row and writes nothing', async () => {
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/proj.md',
@@ -853,48 +775,41 @@ describe('TasksScreen', () => {
 
     await view.findByText('a')
     await userEvent.click(await view.findByRole('button', { name: 'Add a task to Project' }))
-    await waitFor(() => expect(insertTask).toHaveBeenCalledWith('notes/proj.md'))
-    // The new row's editor opens, ready to type.
     await view.findByTestId('task-editor')
+    expect(insertTask).not.toHaveBeenCalled()
+
+    // Typed text is written once, into that note, when the row is left.
+    await userEvent.click(view.getByText('type-edit'))
+    await userEvent.click(view.getByRole('button', { name: 'a' }))
+    await waitFor(() => {
+      expect(insertTask).toHaveBeenCalledWith('notes/proj.md', {
+        markdown: 'edited content',
+        checked: false,
+      })
+    })
+    expect(view.getByRole('button', { name: 'edited content' })).toBeDefined()
+    expect(insertTask).toHaveBeenCalledTimes(1)
+    expect(writeTask).not.toHaveBeenCalled()
     await view.unmount()
   })
 
-  it('re-keys the cached rows a section insert shifted before selecting the new row', async () => {
-    const later = task({
-      notePath: 'notes/proj.md',
-      noteTitle: 'Project',
-      astPath: [1],
-      text: 'later',
-      markdown: 'later',
-    })
-    getOpenTasks.mockResolvedValue([later])
-    insertTask.mockImplementation((notePath) => {
-      return Promise.resolve(
-        taskIndex.insert(
-          notePath,
-          { astPath: [1], markdown: '', breadcrumbs: [], checked: false },
-          [
-            {
-              from: { astPath: [1], markdown: 'later', breadcrumbs: [], checked: false },
-              to: { astPath: [2], markdown: 'later', breadcrumbs: [], checked: false },
-            },
-          ],
-        ),
-      )
-    })
+  it('writes a new row completed when its checkbox is clicked', async () => {
+    getOpenTasks.mockResolvedValue([])
     const view = await renderScreen()
 
-    await userEvent.click(await view.findByRole('button', { name: 'Add a task to Project' }))
-    await view.findByTestId('task-editor')
-    await userEvent.click(view.getByRole('button', { name: 'cancel-edit' }))
-    await userEvent.click(await view.findByRole('button', { name: 'later' }))
-    await userEvent.click(view.getByRole('button', { name: 'delete-edit' }))
+    await view.findByText('No tasks to show.')
+    await userEvent.keyboard('{Enter}')
+    await userEvent.click(await view.findByText('type-edit'))
+    await userEvent.click(view.getByRole('button', { name: 'Complete: Empty task' }))
+
     await waitFor(() => {
-      expect(writeTask).toHaveBeenCalledWith(
-        expect.objectContaining({ notePath: 'notes/proj.md', astPath: [2] }),
-        [{ kind: 'remove' }],
-      )
+      expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md', {
+        markdown: 'edited content',
+        checked: true,
+      })
     })
+    await view.findByRole('button', { name: 'Reopen: edited content' })
+    expect(writeTask).not.toHaveBeenCalled()
     await view.unmount()
   })
 
@@ -914,7 +829,7 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
-  it('Return adds a task to today’s daily and opens its inline editor', async () => {
+  it('Return shows a new row for today’s daily and opens its inline editor', async () => {
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -928,39 +843,42 @@ describe('TasksScreen', () => {
 
     await view.findByRole('button', { name: 'first' })
     await userEvent.keyboard('{Enter}')
-    // Nothing was selected, so the new task lands in today's daily note.
-    await waitFor(() => expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md'))
-    // The optimistic empty row mounts its inline editor, ready to type into.
+    // Nothing was selected, so the new row belongs to today's daily note.
     await view.findByTestId('task-editor')
+    expect(view.getByRole('heading', { name: 'Current' })).toBeDefined()
+    expect(insertTask).not.toHaveBeenCalled()
     await view.unmount()
   })
 
-  it('dismissing the inserted row deletes the right note line (V1 empty cleanup)', async () => {
+  it.each(['cancel-edit', 'delete-edit', 'delete-empty-edit', 'complete-edit'])(
+    'drops a new row left empty with %s and writes nothing',
+    async (exit) => {
+      getOpenTasks.mockResolvedValue([])
+      const view = await renderScreen()
+
+      await view.findByText('No tasks to show.')
+      await userEvent.keyboard('{Enter}')
+      await userEvent.click(await view.findByText(exit))
+
+      await view.findByText('No tasks to show.')
+      expect(insertTask).not.toHaveBeenCalled()
+      expect(writeTask).not.toHaveBeenCalled()
+      await view.unmount()
+    },
+  )
+
+  it('drops a new row left empty when the selection moves', async () => {
     getOpenTasks.mockResolvedValue([
-      task({
-        notePath: 'notes/a.md',
-        astPath: [2],
-        markdown: 'first',
-        text: 'first',
-        noteTitle: 'A',
-      }),
+      task({ notePath: 'notes/a.md', astPath: [2], markdown: 'first', noteTitle: 'A' }),
     ])
     const view = await renderScreen()
 
-    await view.findByRole('button', { name: 'first' })
-    await userEvent.keyboard('{Enter}')
+    await userEvent.click(await view.findByRole('button', { name: 'Add a task to A' }))
     await view.findByTestId('task-editor')
-    // An empty Return-to-add row, left untouched, is removed rather than left as a
-    // blank `+ [ ] ` line — the real editor routes that empty exit to delete (see
-    // the finalizer unit test); here we check the optimistic row's identity flows
-    // through, deleting the freshly written daily-note line, not some other row.
-    await userEvent.click(view.getByRole('button', { name: 'delete-edit' }))
-    await waitFor(() => {
-      expect(writeTask).toHaveBeenCalledWith(
-        expect.objectContaining({ notePath: 'daily/2026-06-14.md' }),
-        [{ kind: 'remove' }],
-      )
-    })
+    await userEvent.click(view.getByRole('button', { name: 'first' }))
+
+    await waitFor(() => expect(view.container.querySelectorAll('[data-task-key]')).toHaveLength(1))
+    expect(insertTask).not.toHaveBeenCalled()
     await view.unmount()
   })
 
@@ -1022,16 +940,6 @@ describe('TasksScreen', () => {
   })
 
   it('Enter in the editor saves the row and opens the next task (continuous entry)', async () => {
-    continueTaskInContext.mockImplementation((ref, content) => {
-      return Promise.resolve(
-        taskIndex.continue(
-          ref,
-          content,
-          { astPath: [3], markdown: '', breadcrumbs: [], checked: false },
-          [],
-        ),
-      )
-    })
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -1044,41 +952,47 @@ describe('TasksScreen', () => {
     const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
-    await view.findByTestId('task-editor')
+    await userEvent.click(view.getByText('type-edit'))
     await userEvent.click(view.getByRole('button', { name: 'continue-edit' }))
 
-    // One write persists this row's edit and adds the next task after it.
+    // The row's text is saved, and the next row opens with nothing written for it.
     await waitFor(() => {
-      expect(continueTaskInContext).toHaveBeenCalledWith(
+      expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/a.md', astPath: [2] }),
-        'edited content',
+        [{ kind: 'setMarkdown', markdown: 'edited content' }],
       )
     })
+    await view.findByText('editing:')
+    expect(view.getByRole('button', { name: 'edited content' })).toBeDefined()
     expect(insertTask).not.toHaveBeenCalled()
     await view.unmount()
   })
 
+  it('writes each of three rows entered with Enter once, and never an empty one', async () => {
+    getOpenTasks.mockResolvedValue([])
+    const view = await renderScreen()
+
+    await view.findByText('No tasks to show.')
+    await userEvent.keyboard('{Enter}')
+    for (let entered = 1; entered <= 3; entered += 1) {
+      await userEvent.click(await view.findByText('type-edit'))
+      await userEvent.click(view.getByRole('button', { name: 'continue-edit' }))
+      await waitFor(() => expect(insertTask).toHaveBeenCalledTimes(entered))
+    }
+    await userEvent.click(view.getByText('cancel-edit'))
+
+    await waitFor(() => expect(view.container.querySelectorAll('[data-task-key]')).toHaveLength(3))
+    expect(insertTask.mock.calls).toEqual(
+      Array.from({ length: 3 }, () => [
+        'daily/2026-06-14.md',
+        { markdown: 'edited content', checked: false },
+      ]),
+    )
+    expect(writeTask).not.toHaveBeenCalled()
+    await view.unmount()
+  })
+
   it('Enter in a grouped task keeps the new row in that breadcrumb context', async () => {
-    continueTaskInContext.mockImplementation((ref, content) => {
-      return Promise.resolve(
-        taskIndex.continue(
-          ref,
-          content,
-          {
-            astPath: [40],
-            markdown: '',
-            breadcrumbs: ['StartupToolbox', 'Reflections'],
-            checked: false,
-          },
-          [
-            {
-              from: { astPath: [40], markdown: 'later', breadcrumbs: [], checked: false },
-              to: { astPath: [56], markdown: 'later', breadcrumbs: [], checked: false },
-            },
-          ],
-        ),
-      )
-    })
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -1102,52 +1016,30 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await userEvent.click(view.getByRole('button', { name: 'continue-edit' }))
 
-    await waitFor(() => {
-      expect(continueTaskInContext).toHaveBeenCalledWith(
-        expect.objectContaining({
-          notePath: 'notes/a.md',
-          breadcrumbs: ['StartupToolbox', 'Reflections'],
-        }),
-        'edited content',
-      )
-    })
-    expect(insertTask).not.toHaveBeenCalled()
-    await view.findByTestId('task-editor')
+    await view.findByText('editing:')
     expect(view.getByText('later')).toBeDefined()
-
     await userEvent.click(view.getByRole('button', { name: 'StartupToolbox → Reflections' }))
     expect(view.getByRole('button', { name: 'Convert to bullet 2' })).toBeDefined()
     await view.unmount()
   })
 
-  it('preserves a grouped task draft when contextual insertion is refused', async () => {
-    continueTaskInContext.mockRejectedValue(new Error('This note is open.'))
+  it('keeps the row and the text of a new task whose write fails', async () => {
+    insertTask.mockRejectedValue(new Error('disk full'))
     getOpenTasks.mockResolvedValue([
-      task({
-        notePath: 'notes/a.md',
-        astPath: [2],
-        markdown: 'first',
-        text: 'first',
-        noteTitle: 'A',
-        breadcrumbs: ['Project'],
-      }),
+      task({ notePath: 'notes/a.md', astPath: [2], markdown: 'first', noteTitle: 'A' }),
     ])
     const view = await renderScreen()
 
-    await userEvent.click(await view.findByRole('button', { name: 'first' }))
-    await userEvent.click(view.getByRole('button', { name: 'continue-edit' }))
+    await userEvent.click(await view.findByRole('button', { name: 'Add a task to A' }))
+    await userEvent.click(await view.findByText('type-edit'))
+    await userEvent.click(view.getByRole('button', { name: 'first' }))
 
     await waitFor(() => {
-      expect(writeTask).toHaveBeenCalledWith(
-        expect.objectContaining({ notePath: 'notes/a.md', markdown: 'first' }),
-        [{ kind: 'setMarkdown', markdown: 'edited content' }],
+      expect(operations.snapshot()).toContainEqual(
+        expect.objectContaining({ status: 'failed', message: 'The task could not be saved.' }),
       )
     })
-    expect(insertTask).not.toHaveBeenCalled()
-    expect(await view.findByRole('button', { name: 'edited content' })).toBeDefined()
-    expect(operations.snapshot()).toContainEqual(
-      expect.objectContaining({ status: 'failed', message: 'This note is open.' }),
-    )
+    expect(view.getByRole('button', { name: 'edited content' })).toBeDefined()
     await view.unmount()
   })
 
@@ -1166,13 +1058,15 @@ describe('TasksScreen', () => {
     const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'scheduled' }))
-    await userEvent.click(view.getByRole('button', { name: 'continue-unchanged' }))
+    await userEvent.click(view.getByRole('button', { name: 'continue-edit' }))
+    await userEvent.click(await view.findByText('type-edit'))
+    await userEvent.click(view.getByRole('button', { name: 'scheduled' }))
 
     await waitFor(() => {
-      expect(continueTaskInContext).toHaveBeenCalledWith(
-        expect.objectContaining({ notePath: 'notes/a.md', breadcrumbs: ['Project'] }),
-        null,
-      )
+      expect(insertTask).toHaveBeenCalledWith('notes/a.md', {
+        markdown: 'edited content',
+        checked: false,
+      })
     })
     await view.unmount()
   })
@@ -1190,17 +1084,12 @@ describe('TasksScreen', () => {
     const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
-    await view.findByTestId('task-editor')
-    await userEvent.click(view.getByRole('button', { name: 'continue-empty' }))
-    // The cleared row is removed by the same write that adds the next one; it
-    // is never edited to a bare `+ [ ]`.
-    await waitFor(() => {
-      expect(continueTaskInContext).toHaveBeenCalledWith(
-        expect.objectContaining({ notePath: 'notes/a.md' }),
-        '',
-      )
-    })
-    expect(writeTask).not.toHaveBeenCalled()
+    await userEvent.click(view.getByText('clear-edit'))
+    await userEvent.click(view.getByRole('button', { name: 'continue-edit' }))
+
+    await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
+    expect(writesOf('setMarkdown')).toHaveLength(0)
+    await view.findByText('editing:')
     await view.unmount()
   })
 
@@ -1360,10 +1249,7 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
-  it('converts a sole-edited row through its editor — saving the draft before converting', async () => {
-    // The toolbar button on the sole (edited) row routes through the editor so the
-    // unsaved draft is saved first, then the marker is stripped — the data-loss race
-    // Bugbot flagged (convert landing before the editor's commit) can't happen.
+  it('converts a sole-edited row from the toolbar, with its typed text, in one write', async () => {
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -1376,9 +1262,9 @@ describe('TasksScreen', () => {
     const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'plan' })) // sole → editor mounts
+    await userEvent.click(view.getByText('type-edit'))
     await userEvent.click(view.getByRole('button', { name: /Convert to bullet 1/ }))
 
-    // Edit first (persist the draft), then convert the rewritten line.
     await waitFor(() => {
       expect(writeTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'notes/a.md', astPath: [2] }),
@@ -1386,6 +1272,7 @@ describe('TasksScreen', () => {
       )
     })
     await waitFor(() => expect(view.queryByText('plan')).toBeNull())
+    expect(writeTask).toHaveBeenCalledTimes(1)
     await view.unmount()
   })
 
@@ -1402,7 +1289,8 @@ describe('TasksScreen', () => {
     const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'plan' }))
-    await userEvent.click(view.getByRole('button', { name: 'convert-edited' }))
+    await userEvent.click(view.getByText('type-edit'))
+    await userEvent.click(view.getByRole('button', { name: 'convert-edit' }))
     await waitFor(() => {
       expect(writeTask).toHaveBeenCalledWith(expect.anything(), [
         { kind: 'setMarkdown', markdown: 'edited content' },
@@ -1654,7 +1542,7 @@ describe('TasksScreen', () => {
     const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'project task' }))
-    await userEvent.click(view.getByRole('button', { name: 'stage-checkbox-edit' }))
+    await userEvent.click(view.getByText('type-edit'))
     await userEvent.click(view.getByRole('button', { name: 'Complete: project task' }))
 
     await waitFor(() => {
@@ -1670,15 +1558,9 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
-  it('disables row checkboxes while an edit-and-toggle write is pending', async () => {
-    let resolveWrite = (): void => {
-      throw new Error('write promise was not created')
-    }
-    writeTask.mockImplementation((ref, actions) => {
-      return new Promise((resolve) => {
-        resolveWrite = () => resolve(taskIndex.write(ref, actions))
-      })
-    })
+  it('takes a second checkbox click while the write of the first is pending', async () => {
+    const pending = Promise.withResolvers<void>()
+    writeTask.mockReturnValueOnce(pending.promise)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -1690,18 +1572,14 @@ describe('TasksScreen', () => {
     ])
     const view = await renderScreen()
 
-    await userEvent.click(await view.findByRole('button', { name: 'project task' }))
-    await userEvent.click(view.getByRole('button', { name: 'stage-checkbox-edit' }))
-    await userEvent.click(view.getByRole('button', { name: 'Complete: project task' }))
+    await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
+    await userEvent.click(await view.findByRole('button', { name: 'Reopen: project task' }))
+    await view.findByRole('button', { name: 'Complete: project task' })
+    expect(writesOf('toggle')).toHaveLength(1)
 
-    await waitFor(() => expect(writesOf('setMarkdown', 'toggle')).toHaveLength(1))
-    const reopen = await view.findByRole('button', { name: 'Reopen: edited content' })
-    await waitFor(() => expect((reopen as HTMLButtonElement).disabled).toBe(true))
-    fireEvent.click(reopen)
-    expect(writesOf('toggle')).toHaveLength(0)
-
-    resolveWrite()
-    await waitFor(() => expect((reopen as HTMLButtonElement).disabled).toBe(false))
+    pending.resolve()
+    await waitFor(() => expect(writesOf('toggle')).toHaveLength(2))
+    await view.findByRole('button', { name: 'Complete: project task' })
     await view.unmount()
   })
 
@@ -1767,14 +1645,8 @@ describe('TasksScreen', () => {
 
   it('shows an open checkbox while a reopen write is pending', async () => {
     storage.session.set('reflect.tasks.filter.archived', 'true')
-    let resolveToggle = (): void => {
-      throw new Error('toggle promise was not created')
-    }
-    writeTask.mockImplementation((ref, actions) => {
-      return new Promise((resolve) => {
-        resolveToggle = () => resolve(taskIndex.write(ref, actions))
-      })
-    })
+    const pending = Promise.withResolvers<void>()
+    writeTask.mockReturnValueOnce(pending.promise)
     getOpenTasks.mockResolvedValue([])
     getCompletedTasks.mockResolvedValue([
       task({
@@ -1790,19 +1662,16 @@ describe('TasksScreen', () => {
 
     await userEvent.click(await view.findByRole('button', { name: 'Reopen: project task' }))
     const complete = await view.findByRole('button', { name: 'Complete: project task' })
-    await waitFor(() => expect((complete as HTMLButtonElement).disabled).toBe(true))
     expect(complete.querySelector('.lucide-circle-check')).toBeNull()
     expect(complete.querySelector('.lucide-circle')).not.toBeNull()
 
-    resolveToggle()
+    pending.resolve()
     await waitFor(() => expect(writesOf('toggle')).toHaveLength(1))
     await view.unmount()
   })
 
   it('restores a struck task when an unchanged editor checkbox reopen fails', async () => {
-    writeTask
-      .mockImplementationOnce((ref, actions) => Promise.resolve(taskIndex.write(ref, actions)))
-      .mockRejectedValueOnce(new Error('stale index'))
+    writeTask.mockResolvedValueOnce().mockRejectedValueOnce(new Error('disk full'))
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -1825,9 +1694,9 @@ describe('TasksScreen', () => {
     await waitFor(() => {
       expect(operations.snapshot()).toContainEqual(
         expect.objectContaining({
-          label: 'Reopening task',
+          label: 'Saving task',
           status: 'failed',
-          message: 'stale index',
+          message: 'The task could not be saved.',
         }),
       )
     })
@@ -1883,7 +1752,7 @@ describe('TasksScreen', () => {
     const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'project task' }))
-    await userEvent.click(view.getByRole('button', { name: 'stage-checkbox-edit' }))
+    await userEvent.click(view.getByText('type-edit'))
     await userEvent.click(view.getByRole('button', { name: 'Reopen: project task' }))
 
     await waitFor(() => {
@@ -1917,15 +1786,15 @@ describe('TasksScreen', () => {
     getOpenTasks.mockResolvedValue([])
 
     await userEvent.click(view.getByRole('button', { name: 'project task' }))
-    await userEvent.click(view.getByRole('button', { name: 'stage-checkbox-edit' }))
+    await userEvent.click(view.getByText('type-edit'))
     await userEvent.click(view.getByRole('button', { name: 'Reopen: project task' }))
 
     await waitFor(() => {
       expect(operations.snapshot()).toContainEqual(
         expect.objectContaining({
-          label: 'Reopening task',
+          label: 'Saving task',
           status: 'failed',
-          message: 'disk full',
+          message: 'The task could not be saved.',
         }),
       )
     })
@@ -2027,7 +1896,7 @@ describe('TasksScreen', () => {
   })
 
   it('rolls the row back and surfaces a failed completion via the operations toast', async () => {
-    failWrites(['toggle'], new Error('stale index'))
+    failWrites(['toggle'], new Error('disk full'))
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/p.md', text: 'project task', noteTitle: 'Project' }),
     ])
@@ -2037,9 +1906,9 @@ describe('TasksScreen', () => {
     await waitFor(() => {
       expect(operations.snapshot()).toContainEqual(
         expect.objectContaining({
-          label: 'Completing task',
+          label: 'Saving task',
           status: 'failed',
-          message: 'stale index',
+          message: 'The task could not be saved.',
         }),
       )
     })
@@ -2049,7 +1918,7 @@ describe('TasksScreen', () => {
   })
 
   it('shows the rows as open again when a bulk complete fails', async () => {
-    failWrites(['toggle'], new Error('stale index'))
+    failWrites(['toggle'], new Error('disk full'))
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/a.md',
@@ -2073,7 +1942,7 @@ describe('TasksScreen', () => {
     await userEvent.keyboard('{ControlOrMeta>}{Enter}{/ControlOrMeta}')
     await waitFor(() => {
       expect(operations.snapshot()).toContainEqual(
-        expect.objectContaining({ status: 'failed', message: 'stale index' }),
+        expect.objectContaining({ status: 'failed', message: 'The task could not be saved.' }),
       )
     })
     await waitFor(() => {

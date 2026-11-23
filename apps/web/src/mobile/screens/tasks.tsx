@@ -11,7 +11,6 @@ import {
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
-import { useTaskActions } from '@/lib/tasks/use-task-actions.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
@@ -40,9 +39,8 @@ interface MobileTasksProps {
  * The Tasks tab (V1 mobile's third tab over Plan 18's shipped data layer): every
  * open task across the graph in desktop's exact groups — Current / Overdue /
  * Upcoming, then per-note — via the same task rows, grouping
- * ({@link composeVisibleTaskGroups}) and optimistic writes
- * ({@link useTaskActions}) the desktop view uses; this screen adds only the
- * touch surface. Task taps, toggles, adds, filters, scheduling, and archival
+ * ({@link composeVisibleTaskGroups}) and task commands the desktop view uses;
+ * this screen adds only the touch surface. Task taps, toggles, adds, filters, scheduling, and archival
  * get light haptics; tapping a row opens the quick-edit sheet (edit / schedule /
  * complete / convert / open note) instead of desktop's multi-select; the filter
  * sheet carries desktop's bucket toggles and "Show archived". Swiping a row
@@ -54,6 +52,7 @@ interface MobileTasksProps {
 export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactElement {
   const { haptics } = useMobileServices()
   const { tasks: taskService } = useCoreServices()
+  const { commands } = taskService
   const graph = useGraphInfo()
   const { arrivalSeq, arrivalFocusEditor } = useRouterState()
   const { navigate } = useRouterActions()
@@ -87,8 +86,6 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
     [taskService, filters.archived],
   )
   const ready = open !== undefined && (!filters.archived || completed !== undefined)
-
-  const actions = useTaskActions()
 
   // Defer the needle like the All tab defers its query: fast typing coalesces
   // while the input stays live. A cleared query applies immediately — the "+"
@@ -131,21 +128,16 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
   }
 
   // The group headers' "+" (V1): drop any search filter so the new row is
-  // visible, write it, then open its quick-edit sheet with the editor focused
-  // so typing starts immediately.
+  // visible, then open its quick-edit sheet with the editor focused.
   const onAdd = (target: InsertTaskTarget): void => {
     hapticImpactLight(haptics)
     onQueryChange('')
-    void actions.insert(target).then((created) => {
-      if (created !== null) {
-        editTask(created, { autoFocus: true, haptic: false })
-      }
-    })
+    editTask(commands.add(target), { autoFocus: true, haptic: false })
   }
 
   const archiveCompleted = (): void => {
     hapticImpactLight(haptics)
-    actions.archive()
+    commands.archive()
   }
 
   return (
@@ -215,10 +207,9 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
               today={today}
               onAdd={onAdd}
               onEdit={editTask}
-              onToggle={actions.checkboxToggle}
-              togglePending={actions.isPending}
+              onToggle={(task) => void commands.toggle([task])}
               onOpen={(path) => navigate(routeForPath(path))}
-              onDelete={(task) => actions.remove([task])}
+              onDelete={(task) => void commands.remove([task])}
               revealedRow={revealedRow}
             />
           ))}
@@ -231,7 +222,6 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
           open={sheetOpen}
           onOpenChange={setSheetOpen}
           today={today}
-          actions={actions}
           onOpenNote={(path) => navigate(routeForPath(path))}
           autoFocusEditor={autoFocusEditor}
         />

@@ -14,6 +14,7 @@ import { PROJECTION_VERSION } from '../indexing/indexed-note.ts'
 import { PROJECTION_VERSION_KEY } from '../indexing/indexer.ts'
 import { projectTasks } from '../markdown/index.ts'
 import { WritableStore } from '../store.ts'
+import type { OpenTask } from '../tasks/open-task.ts'
 import { createTaskService, type TaskRef, type TaskService } from '../tasks/task-service.ts'
 import { createTestClockService, type TestClockService } from './clock.ts'
 import { createTestDatabaseService, type TestDatabaseService } from './database.ts'
@@ -27,7 +28,7 @@ import { createTestIndexLifecycleService } from './index-lifecycle.ts'
 import { createTestIndexStoreService, type TestIndexStoreService } from './index-store.ts'
 import { createTestIpcBridgeService } from './ipc.ts'
 import { createTestLoggerService } from './logger.ts'
-import { createTestProgressPort } from './ports.ts'
+import { createTestProgressPort, type TestProgressPort } from './ports.ts'
 
 const FILE_GENERATION = 1
 const INDEX_GENERATION = 1
@@ -122,6 +123,7 @@ export class TaskHarness {
   readonly clock: TestClockService
   readonly documents: NoteDocumentService
   readonly tasks: TaskService
+  readonly progress: TestProgressPort
   readonly session: GraphSession
   readonly #writes = new StepGate()
   readonly #reads = new StepGate()
@@ -198,10 +200,11 @@ export class TaskHarness {
       indexLifecycle: this.index,
       logger,
     })
+    this.progress = createTestProgressPort()
     this.tasks = createTaskService({
       database: steppedDatabase,
       noteDocuments: this.documents,
-      progress: createTestProgressPort(),
+      progress: this.progress,
       clock: this.clock,
       logger,
       graphSession,
@@ -364,6 +367,14 @@ export class TaskHarness {
       await this.index.drained()
       await sleep(0)
     } while (this.#unreported.size > 0)
+  }
+
+  /**
+   * Type `markdown` into the editor of `task` and leave the row.
+   */
+  edit(task: OpenTask, markdown: string): Promise<void> {
+    this.tasks.commands.setDraft(task, markdown)
+    return this.tasks.commands.commit(task)
   }
 
   /**

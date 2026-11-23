@@ -32,9 +32,7 @@ import { createTestIpcBridgeService, type TestIpcBridgeService } from '../testin
 import { createTestLoggerService, type TestLoggerService } from '../testing/logger.ts'
 import { createTestProgressPort, type TestProgressPort } from '../testing/ports.ts'
 import { TaskHarness } from '../testing/task-harness.ts'
-import { makeOpenTask } from '../testing/tasks.ts'
 import type { OpenTask } from './open-task.ts'
-import { todaysDailyTarget } from './task-navigation.ts'
 import {
   createTaskService,
   type TaskRef,
@@ -269,144 +267,6 @@ describe('writeTask', () => {
   })
 })
 
-describe('insertTask', () => {
-  it('starts an empty note with a Tasks section and reports the new address', async () => {
-    noteFile.set('notes/a.md', '')
-
-    clock.setNow(1000)
-
-    const created = { astPath: [1], markdown: '', breadcrumbs: ['Tasks'], checked: false }
-    await expect(tasks.insertTask('notes/a.md')).resolves.toEqual({
-      created,
-      source: '## Tasks\n\n+ [ ] \n',
-      baseRevision: sha256HexSync(''),
-      revision: sha256HexSync('## Tasks\n\n+ [ ] \n'),
-      moved: [],
-      inserted: [created],
-      tasks: [created],
-      merged: false,
-      indexSeq: null,
-      updatedAt: 1000,
-    })
-    expect(noteFile.getWrites('notes/a.md')).toContain('## Tasks\n\n+ [ ] \n')
-  })
-
-  it('joins an existing Tasks section and reports the tasks it shifted', async () => {
-    noteFile.set('notes/a.md', '## Tasks\n\n+ [ ] a\n\n## Later\n\n+ [ ] b\n')
-
-    const result = await tasks.insertTask('notes/a.md')
-
-    expect(result.created).toMatchObject({ astPath: [2] })
-    expect(movedFrom(result, [1])).toMatchObject({ astPath: [1], markdown: 'a' })
-    expect(movedFrom(result, [3])).toMatchObject({ astPath: [4], markdown: 'b' })
-    expect(noteFile.getWrites('notes/a.md')).toContain(
-      '## Tasks\n\n+ [ ] a\n+ [ ] \n\n## Later\n\n+ [ ] b\n',
-    )
-  })
-
-  it('starts a note that does not exist yet', async () => {
-    await tasks.insertTask('daily/2026-06-14.md')
-    expect(noteFile.getWrites('daily/2026-06-14.md')).toContain('## Tasks\n\n+ [ ] \n')
-  })
-
-  it('appends through the live session when the note is open', async () => {
-    const session = sessionOver('## Tasks\n\n+ [ ] first\n')
-    openSession(session)
-
-    await expect(tasks.insertTask('notes/a.md')).resolves.toMatchObject({
-      created: { astPath: [2] },
-    })
-    expect(noteFile.writes()).toEqual([])
-  })
-})
-
-describe('continueTaskInContext', () => {
-  it('saves an edited task and adds the next row to the same nested context', async () => {
-    const source = [
-      '+ StartupToolbox',
-      '  + Reflections',
-      '    + [ ] first',
-      '  + Later',
-      '    + [ ] third',
-      '',
-    ].join('\n')
-    noteFile.set('notes/a.md', source)
-
-    const result = await tasks.continueTaskInContext(ref(source), 'edited first')
-
-    const written = [
-      '+ StartupToolbox',
-      '  + Reflections',
-      '    + [ ] edited first',
-      '    + [ ] ',
-      '  + Later',
-      '    + [ ] third',
-      '',
-    ].join('\n')
-    expect(noteFile.getWrites('notes/a.md')).toContain(written)
-    expect(result.created).toEqual({
-      astPath: [0, 1, 2],
-      markdown: '',
-      breadcrumbs: ['StartupToolbox', 'Reflections'],
-      checked: false,
-    })
-    expect(projectTasks(written)[1]?.breadcrumbs).toEqual(['StartupToolbox', 'Reflections'])
-    expect(movedFrom(result, [0, 1, 1])).toMatchObject({
-      astPath: [0, 1, 1],
-      markdown: 'edited first',
-    })
-    expect(movedFrom(result, [0, 2, 1])).toMatchObject({ astPath: [0, 2, 1], markdown: 'third' })
-  })
-
-  it('replaces a cleared row with one empty task at the end of its context', async () => {
-    const source = '+ Group\n  + [ ] old\n  + [ ] peer\n'
-    noteFile.set('notes/a.md', source)
-
-    const result = await tasks.continueTaskInContext(ref(source), '')
-
-    const written = '+ Group\n  + [ ] peer\n  + [ ] \n'
-    expect(noteFile.getWrites('notes/a.md')).toContain(written)
-    expect(result.created).toEqual({
-      astPath: [0, 2],
-      markdown: '',
-      breadcrumbs: ['Group'],
-      checked: false,
-    })
-    expect(movedFrom(result, [0, 1])).toBeNull()
-    expect(movedFrom(result, [0, 2])).toMatchObject({ astPath: [0, 1], markdown: 'peer' })
-  })
-
-  it('relocates a stale anchor by its content when the note grew above it', async () => {
-    const indexedSource = '+ Group\n  + [ ] \n'
-    const source = `Intro\n\n${indexedSource}`
-    noteFile.set('notes/a.md', source)
-
-    await tasks.continueTaskInContext(ref(indexedSource), 'filled')
-    expect(noteFile.getWrites('notes/a.md')).toContain(
-      'Intro\n\n+ Group\n  + [ ] filled\n  + [ ] \n',
-    )
-  })
-
-  it('continues the own list of a root-level task', async () => {
-    const source = '+ [ ] alone\n'
-    noteFile.set('notes/a.md', source)
-
-    const result = await tasks.continueTaskInContext(ref(source), null)
-
-    expect(noteFile.getWrites('notes/a.md')).toContain('+ [ ] alone\n+ [ ] \n')
-    expect(result.created).toMatchObject({ astPath: [1] })
-  })
-
-  it('returns a result shaped for the cache', async () => {
-    const source = '+ Group\n  + [ ] first\n'
-    noteFile.set('notes/a.md', source)
-
-    const result = await tasks.continueTaskInContext(ref(source), null)
-    const first = { astPath: [0, 1], markdown: 'first', breadcrumbs: ['Group'], checked: false }
-    expect(result.moved).toEqual([{ from: first, to: first }])
-  })
-})
-
 describe('rows read from the index', () => {
   /**
    * Subscribe and wait for the first read of the open tasks to land.
@@ -520,34 +380,6 @@ describe('write results', () => {
   })
 })
 
-describe('batch writes', () => {
-  it('writes in order and re-addresses the rest of the batch after each write', async () => {
-    const source = '+ [ ] one\n+ [ ] two\n+ [ ] three\n'
-    noteFile.set('notes/a.md', source)
-    const rows = projectTasks(source).map((row) => {
-      return makeOpenTask({
-        notePath: 'notes/a.md',
-        astPath: [...row.astPath],
-        markdown: row.markdown,
-      })
-    })
-
-    await tasks.deleteTasks([rows[0]!, rows[2]!])
-
-    // Removing "one" moved "three" up; its write addresses the new place.
-    expect(noteFile.getWrites('notes/a.md')).toEqual(['+ [ ] two\n+ [ ] three\n', '+ [ ] two\n'])
-  })
-
-  it('stops at the first failed write, leaving the earlier ones landed', async () => {
-    noteFile.set('notes/a.md', '+ [ ] one\n')
-    const one = makeOpenTask({ notePath: 'notes/a.md', astPath: [0], markdown: 'one' })
-    const gone = makeOpenTask({ notePath: 'notes/a.md', astPath: [5], markdown: 'gone' })
-
-    await expect(tasks.completeTasks([one, gone])).rejects.toMatchObject({ kind: 'stale' })
-    expect(noteFile.getWrites('notes/a.md')).toEqual(['+ [x] one\n'])
-  })
-})
-
 describe('snippet tasks', () => {
   const source = '+ [ ] do it\n'
   const anchors: SnippetTask[] = [
@@ -617,32 +449,6 @@ describe('no graph open', () => {
     await closed.toggleSnippetTask('notes/a.md', { locator: task, checked: false })
     expect(noteFile.writes()).toEqual([])
     expect(progress.get()).toEqual([])
-  })
-
-  it('stops a batch once its graph is replaced', async () => {
-    noteFile.set('notes/a.md', '+ [ ] one\n+ [ ] two\n')
-    const controller = new AbortController()
-    const source = new WritableStore<{ session: GraphSession | null }>({
-      session: createGraphSession(
-        { root: '/g', name: 'g', generation: 7, indexGeneration: 1 },
-        controller.signal,
-      ),
-    })
-    const switching = createTasks(source)
-    const one = makeOpenTask({ notePath: 'notes/a.md', astPath: [0], markdown: 'one' })
-    const two = makeOpenTask({ notePath: 'notes/a.md', astPath: [1], markdown: 'two' })
-    const writeTask = switching.writeTask.bind(switching)
-    vi.spyOn(switching, 'writeTask').mockImplementation(async (task, actions) => {
-      const result = await writeTask(task, actions)
-      controller.abort()
-      source.set({
-        session: createGraphSession({ root: '/h', name: 'h', generation: 8, indexGeneration: 1 }),
-      })
-      return result
-    })
-
-    await expect(switching.completeTasks([one, two])).rejects.toThrow('No graph is open.')
-    expect(noteFile.getWrites('notes/a.md')).toEqual(['+ [x] one\n+ [ ] two\n'])
   })
 })
 
@@ -741,31 +547,45 @@ describe('task list state', () => {
     expect(markdowns(tasks.get().open)).toEqual(['one changed', 'two'])
   })
 
+  /**
+   * Type `markdown` into the editor of `row` and leave the row.
+   */
+  function edit(row: OpenTask, markdown: string): Promise<void> {
+    tasks.commands.setDraft(row, markdown)
+    return tasks.commands.commit(row)
+  }
+
+  /**
+   * Fail the writes of the commands with `cause`.
+   */
+  function failWrites(cause: Error): void {
+    vi.spyOn(tasks.commands, 'write').mockRejectedValue(cause)
+  }
+
   it('shows the change before the write starts', async () => {
     const { rows } = await subscribed()
     const write = Promise.withResolvers<void>()
-    const writeTask = tasks.writeTask.bind(tasks)
-    const spy = vi.spyOn(tasks, 'writeTask').mockImplementation(async (ref, actions) => {
+    const writeNote = tasks.commands.write.bind(tasks.commands)
+    vi.spyOn(tasks.commands, 'write').mockImplementation(async (...args) => {
       await write.promise
-      return await writeTask(ref, actions)
+      return await writeNote(...args)
     })
 
-    const completing = tasks.completeTasks([rows[0]!])
+    const completing = tasks.commands.toggle([rows[0]!])
 
     expect(markdowns(tasks.get().open)).toEqual(['two'])
     expect(tasks.get().struck).toEqual([{ ...rows[0]!, checked: true }])
-    expect(spy).toHaveBeenCalledWith(rows[0], [{ kind: 'toggle' }])
     write.resolve()
     await completing
     expect(markdowns(tasks.get().open)).toEqual(['two'])
     expect(noteFile.files().get(A)).toBe('+ [x] one\n')
   })
 
-  it('puts the row back and rethrows when a single write fails', async () => {
+  it('puts the row back and reports it when a write fails', async () => {
     const { rows } = await subscribed()
-    vi.spyOn(tasks, 'writeTask').mockRejectedValue(new Error('disk full'))
+    failWrites(new Error('disk full'))
 
-    const editing = tasks.editTask(rows[0]!, 'edited [[2026-06-20]]')
+    const editing = edit(rows[0]!, 'edited [[2026-06-20]]')
     expect(tasks.get().open?.[0]).toMatchObject({
       taskId: rows[0]!.taskId,
       markdown: 'edited [[2026-06-20]]',
@@ -773,29 +593,30 @@ describe('task list state', () => {
       dueDate: '2026-06-20',
     })
 
-    await expect(editing).rejects.toThrow('disk full')
+    await editing
     expect(tasks.get().open).toEqual(rows)
+    expect(progress.findByLabel('Saving task')?.message).toBe('The task could not be saved.')
   })
 
-  it('keeps the change of another write when one write fails', async () => {
-    const { rows } = await subscribed({ [A]: '+ [ ] one\n+ [ ] two\n' })
-    const writeTask = tasks.writeTask.bind(tasks)
+  it('keeps the change of another note when one write fails', async () => {
+    const { rows } = await subscribed()
+    const writeNote = tasks.commands.write.bind(tasks.commands)
     const first = Promise.withResolvers<void>()
-    vi.spyOn(tasks, 'writeTask').mockImplementation(async (ref, actions) => {
-      if (ref.markdown === 'one') {
+    vi.spyOn(tasks.commands, 'write').mockImplementation(async (generation, notePath, edits) => {
+      if (notePath === A) {
         await first.promise
         throw new Error('disk full')
       }
-      return await writeTask(ref, actions)
+      return await writeNote(generation, notePath, edits)
     })
 
-    const failing = tasks.editTask(rows[0]!, 'one!')
-    const landing = tasks.editTask(rows[1]!, 'two!')
+    const failing = edit(rows[0]!, 'one!')
+    const landing = edit(rows[1]!, 'two!')
     expect(markdowns(tasks.get().open)).toEqual(['one!', 'two!'])
 
     await landing
     first.resolve()
-    await expect(failing).rejects.toThrow('disk full')
+    await failing
     expect(markdowns(tasks.get().open)).toEqual(['one', 'two!'])
   })
 
@@ -804,27 +625,27 @@ describe('task list state', () => {
    */
   async function struckRow(): Promise<OpenTask> {
     const { rows } = await subscribed({ [A]: '+ [ ] one\n' })
-    await tasks.completeTasks(rows)
+    await tasks.commands.toggle(rows)
     return tasks.get().struck[0]!
   }
 
   it('keeps a completed task struck, under its id, until the struck tasks are archived', async () => {
     const { rows } = await subscribed({ [A]: '+ [ ] one\n' })
-    await tasks.completeTasks(rows)
+    await tasks.commands.toggle(rows)
 
     expect(tasks.get().open).toEqual([])
     expect(tasks.get().struck).toMatchObject([
       { taskId: rows[0]!.taskId, checked: true, revision: sha256HexSync('+ [x] one\n') },
     ])
 
-    tasks.archiveRecentlyCompleted()
+    tasks.commands.archive()
     expect(tasks.get().struck).toEqual([])
   })
 
   it('shows a reopened task as open, under the same id', async () => {
     const struck = await struckRow()
 
-    await tasks.reopenTasks([struck])
+    await tasks.commands.toggle([struck])
 
     expect(tasks.get().struck).toEqual([])
     expect(tasks.get().open).toMatchObject([{ taskId: struck.taskId, checked: false }])
@@ -841,89 +662,29 @@ describe('task list state', () => {
 
   it('keeps the row struck when an edit-and-reopen write fails', async () => {
     const struck = await struckRow()
-    vi.spyOn(tasks, 'writeTask').mockRejectedValue(new Error('disk full'))
+    failWrites(new Error('disk full'))
 
-    const reopening = tasks.editAndToggleTask(struck, 'edited')
+    tasks.commands.setDraft(struck, 'edited')
+    const reopening = tasks.commands.toggle([struck])
     expect(tasks.get().struck).toEqual([])
     expect(tasks.get().open).toEqual([
       { ...struck, checked: false, markdown: 'edited', text: 'edited' },
     ])
 
-    await expect(reopening).rejects.toThrow('disk full')
+    await reopening
     expect(tasks.get().open).toEqual([])
     expect(tasks.get().struck).toEqual([struck])
-  })
-
-  it('keeps the writes of a batch that landed and puts the other rows back', async () => {
-    const { rows } = await subscribed({ [A]: '+ [ ] one\n+ [ ] two\n+ [ ] three\n' })
-    const writeTask = tasks.writeTask.bind(tasks)
-    vi.spyOn(tasks, 'writeTask').mockImplementation(async (ref, actions) => {
-      if (ref.markdown === 'two') {
-        throw new Error('stale index')
-      }
-      return await writeTask(ref, actions)
-    })
-
-    const completing = tasks.completeTasks(rows)
-    expect(tasks.get().open).toEqual([])
-
-    await expect(completing).rejects.toThrow('stale index')
-    expect(markdowns(tasks.get().open)).toEqual(['two', 'three'])
-    expect(noteFile.files().get(A)).toBe('+ [x] one\n+ [ ] two\n+ [ ] three\n')
-    expect(markdowns(tasks.get().struck)).toEqual(['one'])
   })
 
   it('keeps a checked task struck when its delete fails', async () => {
     const struck = await struckRow()
-    vi.spyOn(tasks, 'writeTask').mockRejectedValue(new Error('disk full'))
+    failWrites(new Error('disk full'))
 
-    const deleting = tasks.deleteTasks([struck])
+    const deleting = tasks.commands.remove([struck])
     expect(tasks.get().struck).toEqual([])
 
-    await expect(deleting).rejects.toThrow('disk full')
+    await deleting
     expect(tasks.get().struck).toEqual([struck])
-  })
-
-  it('adds the inserted row and keeps the ids of the rows the write moved', async () => {
-    const { rows } = await subscribed({
-      [A]: '+ [ ] loose\n\n## Tasks\n\n+ [ ] one\n\n## Later\n\n+ [ ] last\n',
-    })
-    clock.setNow(5)
-
-    const created = await tasks.addTask(rows[0]!)
-
-    expect(created).toMatchObject({ notePath: A, astPath: [3], markdown: '', updatedAt: 5 })
-    expect(tasks.get().open?.map((row) => [row.taskId, row.markdown, row.astPath])).toEqual([
-      [rows[0]!.taskId, 'loose', [0]],
-      [rows[1]!.taskId, 'one', [2]],
-      [created.taskId, '', [3]],
-      [rows[2]!.taskId, 'last', [5]],
-    ])
-  })
-
-  it('adds the first task of a note that has no file', async () => {
-    await subscribed({})
-    const target = todaysDailyTarget('2026-06-14')
-
-    const created = await tasks.addTask(target)
-
-    expect(tasks.get().open).toEqual([created])
-    expect(created).toMatchObject({ ...target, markdown: '', breadcrumbs: ['Tasks'] })
-  })
-
-  it('resolves the anchor and adds the next row in one write', async () => {
-    const { rows } = await subscribed({ [A]: '+ [ ] one\n+ [ ] two\n' })
-
-    const adding = tasks.addTaskAfter(rows[0]!, 'one!')
-    expect(markdowns(tasks.get().open)).toEqual(['one!', 'two'])
-    const created = await adding
-
-    expect(noteFile.getWrites(A)).toEqual(['+ [ ] one!\n+ [ ] two\n+ [ ] \n'])
-    expect(tasks.get().open?.map((row) => [row.taskId, row.markdown])).toEqual([
-      [rows[0]!.taskId, 'one!'],
-      [rows[1]!.taskId, 'two'],
-      [created.taskId, ''],
-    ])
   })
 
   it('takes the rows a backlink snippet toggle left', async () => {
@@ -1055,7 +816,7 @@ describe('reads racing writes', () => {
     const [row] = await indexed('## Tasks\n\n+ [ ] \n')
     harness.holdWrites()
 
-    const editing = harness.tasks.editTask(row!, 'buy milk')
+    const editing = harness.edit(row!, 'buy milk')
     expect(harness.tasks.get().open?.[0]?.markdown).toBe('buy milk')
 
     harness.holdReads()
@@ -1068,26 +829,28 @@ describe('reads racing writes', () => {
   })
 
   it('keeps an added row when a read that started during its write lands after it', async () => {
-    const [row] = await indexed('## Tasks\n\n+ [ ] \n')
+    const [row] = await indexed('## Tasks\n\n+ [ ] first\n')
     harness.holdWrites()
 
-    const adding = harness.tasks.addTaskAfter(row!, 'buy milk')
+    const created = harness.tasks.commands.continueAfter(row!)
+    const adding = harness.edit(created, 'buy milk')
     harness.holdReads()
     void harness.tasks.refresh()
     await harness.landWrite()
-    const created = await adding
+    await adding
     await harness.landRead()
 
     const open = harness.tasks.get().open!
-    expect(open.map((row) => row.markdown)).toEqual(['buy milk', ''])
-    expect(open.some((row) => isSameTaskPath(row.astPath, created.astPath))).toBe(true)
-    expect(open.some((row) => row.taskId === created.taskId)).toBe(true)
+    expect(open.map((row) => [row.taskId, row.markdown])).toEqual([
+      [row!.taskId, 'first'],
+      [created.taskId, 'buy milk'],
+    ])
   })
 
   it('deletes an edited row after a read that started during the edit landed', async () => {
     const [row] = await indexed('## Tasks\n\n+ [ ] \n')
     harness.holdWrites()
-    const editing = harness.tasks.editTask(row!, 'buy milk')
+    const editing = harness.edit(row!, 'buy milk')
     harness.holdReads()
     void harness.tasks.refresh()
     await harness.landWrite()
@@ -1096,7 +859,7 @@ describe('reads racing writes', () => {
     await harness.drain()
 
     expect(harness.files.files().get(NOTE)).toBe('## Tasks\n\n+ [ ] buy milk\n')
-    await harness.tasks.deleteTasks([harness.tasks.get().open![0]!])
+    await harness.tasks.commands.remove([harness.tasks.get().open![0]!])
     expect(harness.files.files().get(NOTE)).toBe('## Tasks\n')
   })
 
@@ -1107,7 +870,7 @@ describe('reads racing writes', () => {
     harness.editExternally(OTHER, '+ [ ] other\n')
     await harness.deliverWatcherBatch()
 
-    await harness.tasks.editTask(row!, 'buy milk')
+    await harness.edit(row!, 'buy milk')
     expect(harness.tasks.get().open?.[0]?.markdown).toBe('buy milk')
 
     await harness.drain()

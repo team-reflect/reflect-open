@@ -20,7 +20,6 @@ import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { useNoteLinkNavigation, type ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
 import { scrollTaskIntoView } from '@/lib/tasks/task-navigation.ts'
-import { useTaskActions } from '@/lib/tasks/use-task-actions.ts'
 import { useTaskRowHandlers } from '@/lib/tasks/use-task-row-handlers.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
 import { useTaskKeyboard } from '@/lib/tasks/use-task-keyboard.ts'
@@ -72,6 +71,7 @@ function focusedSelectedKey(
  */
 export function TasksScreen(): ReactElement {
   const { tasks: taskService } = useCoreServices()
+  const { commands } = taskService
   const navigateNoteLink = useNoteLinkNavigation()
   const today = useToday()
   const { filters, toggle } = useTaskFilters()
@@ -116,13 +116,12 @@ export function TasksScreen(): ReactElement {
   if (scheduleOpen && selection.selectedCount === 0) {
     setScheduleOpen(false)
   }
-  const actions = useTaskActions()
   const scrollToKey = useCallback((key: string | null) => {
     if (key !== null) {
       scrollTaskIntoView(rootRef.current, key)
     }
   }, [])
-  const editHandlers = useTaskRowHandlers({ selection, actions, orderedTasks, scrollToKey })
+  const editHandlers = useTaskRowHandlers({ selection, orderedTasks, scrollToKey })
   const selectedTaskKeys = selection.selected
   const activeTaskKey = selection.activeKey
   // Selection opens the focused task's inline editor, often after an async insert
@@ -132,19 +131,15 @@ export function TasksScreen(): ReactElement {
     scrollToKey(focusedSelectedKey(selectedTaskKeys, activeTaskKey))
   }, [activeTaskKey, orderedKeys, scrollToKey, selectedTaskKeys])
   // The group headers' "+ Add" (V1): drop any search filter so the new row is
-  // visible, write it, then select it so its editor opens focused.
+  // visible, then select it so its editor opens focused.
   const onAdd = useCallback(
     (target: InsertTaskTarget) => {
       setQuery('')
-      void actions.insert(target).then((created) => {
-        if (created !== null) {
-          const key = getTaskKey(created)
-          selection.clickSelect(key, { metaKey: false, ctrlKey: false, shiftKey: false })
-          scrollToKey(key)
-        }
-      })
+      const key = getTaskKey(commands.add(target))
+      selection.clickSelect(key, { metaKey: false, ctrlKey: false, shiftKey: false })
+      scrollToKey(key)
     },
-    [actions, selection, scrollToKey],
+    [commands, selection, scrollToKey],
   )
   // The tasks behind the current selection's keys, in selection order — what the
   // toolbar actions (schedule, convert) act on. A row whose key no longer
@@ -154,45 +149,45 @@ export function TasksScreen(): ReactElement {
       .map((key) => tasksByKey.get(key))
       .filter((task): task is OpenTask => task !== undefined)
   }, [selection, tasksByKey])
+  // A checkbox click toggles its row, with the text typed into it, and ends the edit.
+  const onCheckboxToggle = useCallback(
+    (task: OpenTask) => {
+      void commands.toggle([task])
+      if (selection.isSoleSelected(getTaskKey(task))) {
+        selection.clear()
+      }
+    },
+    [commands, selection],
+  )
   const onSelectionCheckboxToggle = useCallback(
     (task: OpenTask) => {
       const tasks = selectedTasks()
       if (tasks.length <= 1 || !tasks.some((selectedTask) => isSameTask(selectedTask, task))) {
-        actions.checkboxToggle(task)
+        onCheckboxToggle(task)
         return
       }
       if (task.checked) {
-        actions.toggle(tasks.filter((selectedTask) => selectedTask.checked))
+        void commands.toggle(tasks.filter((selectedTask) => selectedTask.checked))
       } else {
-        actions.complete(tasks)
+        void commands.complete(tasks)
       }
     },
-    [actions, selectedTasks],
+    [commands, onCheckboxToggle, selectedTasks],
   )
   // Schedule the current selection (the calendar / ⌘⇧S), then deselect (V1).
   const onSchedule = useCallback(
     (isoDate: string | null) => {
-      actions.schedule(selectedTasks(), isoDate)
+      void commands.schedule(selectedTasks(), isoDate)
       selection.clear()
     },
-    [actions, selection, selectedTasks],
+    [commands, selection, selectedTasks],
   )
   // Convert the current selection to plain bullets (the toolbar / ⌘⇧K): the rows
-  // leave the Tasks view, so deselect after, like scheduling. When a single row is
-  // being inline-edited it holds a flush-then-convert trigger here — route through
-  // it so the unsaved draft is saved first, never written stale by the convert
-  // landing ahead of the editor's commit (the keyboard ⌘⇧K hits the editor's own
-  // keymap; this covers the toolbar button and an unfocused sole selection).
-  const convertControllerRef = useRef<(() => void) | null>(null)
+  // leave the Tasks view, so deselect after, like scheduling.
   const onConvertToBullet = useCallback(() => {
-    const convertEditing = convertControllerRef.current
-    if (convertEditing !== null) {
-      convertEditing()
-    } else {
-      actions.convertToBullet(selectedTasks())
-      selection.clear()
-    }
-  }, [actions, selection, selectedTasks])
+    void commands.convert(selectedTasks())
+    selection.clear()
+  }, [commands, selection, selectedTasks])
   const openNote = useCallback(
     (path: string, event?: ModClickEvent) => {
       navigateNoteLink({
@@ -204,7 +199,7 @@ export function TasksScreen(): ReactElement {
   )
   useTaskKeyboard({
     selection,
-    actions,
+    commands,
     tasksByKey,
     orderedTasks,
     query,
@@ -283,7 +278,7 @@ export function TasksScreen(): ReactElement {
             type="button"
             variant="ghost"
             aria-label={`Archive ${struck.length}`}
-            onClick={actions.archive}
+            onClick={() => commands.archive()}
             className="window-drag-control text-xs text-text-muted"
           >
             <Archive aria-hidden className="size-3.5" />
@@ -311,12 +306,10 @@ export function TasksScreen(): ReactElement {
                 group={group}
                 selection={selection}
                 editHandlers={editHandlers}
-                taskActionPending={actions.isPending}
-                onCheckboxToggle={actions.checkboxToggle}
+                onCheckboxToggle={onCheckboxToggle}
                 onSelectionCheckboxToggle={onSelectionCheckboxToggle}
                 today={today}
                 onAdd={onAdd}
-                convertControllerRef={convertControllerRef}
                 onOpen={openNote}
               />
             ))}

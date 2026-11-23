@@ -6,11 +6,13 @@ import {
   encodeTaskPath,
   isSameTaskPath,
   renderInlineText,
+  type TaskEdit,
+  type TaskEditItem,
   type TaskMove,
   type TaskSnapshot,
 } from '../markdown/index.ts'
 import type { OpenTask } from '../tasks/open-task.ts'
-import type { InsertedTask, TaskAction, TaskRef, TaskWriteResult } from '../tasks/task-service.ts'
+import type { TaskWriteResult } from '../tasks/task-commands.ts'
 
 /**
  * An open-task row with sensible defaults for tests; override only what a
@@ -44,8 +46,8 @@ function hasPath(task: TaskSnapshot, astPath: MarkdownAstPath): boolean {
 }
 
 /**
- * Stands in for the index and the note files behind a `TaskService` whose
- * write methods a test replaces. It answers the `index_tasks` reads of
+ * Stands in for the index and the note files behind a `TaskCommands` whose
+ * `write` a test replaces. It answers the `index_tasks` reads of
  * `database` with the rows the test supplies, and it makes the result of a
  * write over the tasks it last served. A read that started before a write
  * carries an older index seq than the write.
@@ -80,71 +82,44 @@ export class TestTaskIndex {
   }
 
   /**
-   * The result of applying `actions` to `task`, with every other task in its place.
+   * The result of applying `edits` to the tasks of `notePath` it last served.
+   * A new task lands as a root item after every other task.
    */
-  write(task: TaskRef, actions: readonly TaskAction[]): TaskWriteResult {
-    const before = this.#tasksOf(task.notePath)
+  write(notePath: string, edits: readonly TaskEdit[]): TaskWriteResult {
+    const before = this.#notes.get(notePath) ?? []
     const moved = before.map((from): TaskMove => {
-      const to = hasPath(from, task.astPath) ? actions.reduce(applyAction, from) : from
+      const to = edits.reduce<TaskSnapshot | null>((task, edit) => {
+        return edit.kind !== 'insert' && hasPath(from, edit.task.astPath)
+          ? applyItemEdit(task, edit)
+          : task
+      }, from)
       return { from, to }
     })
-    return this.#land(task, moved, [])
-  }
-
-  /**
-   * The result of an insert that added `created` and moved the other tasks as `moved` says.
-   */
-  insert(notePath: string, created: TaskSnapshot, moved: readonly TaskMove[] = []): InsertedTask {
-    const before = this.#tasksOf(notePath)
-    const moves = before.map((from): TaskMove => {
-      const move = moved.find((candidate) => hasPath(candidate.from, from.astPath))
-      return move ?? { from, to: from }
+    let next = Math.max(-1, ...before.map((task) => task.astPath[0] ?? 0)) + 1
+    const inserted = edits.flatMap((edit): TaskSnapshot[] => {
+      if (edit.kind !== 'insert') {
+        return []
+      }
+      const astPath = [next]
+      next += 1
+      return [
+        {
+          astPath,
+          markdown: edit.markdown.trim(),
+          breadcrumbs: [],
+          checked: edit.checked === true,
+        },
+      ]
     })
-    const revision = this.#revisions.get(notePath) ?? ''
-    return { ...this.#land({ notePath, revision }, moves, [created]), created }
-  }
-
-  /**
-   * The result of an insert after `task` that added `created`, resolved the
-   * draft `content` of `task`, and moved the other tasks as `moved` says.
-   */
-  continue(
-    task: TaskRef,
-    content: string | null,
-    created: TaskSnapshot,
-    moved: readonly TaskMove[] = [],
-  ): InsertedTask {
-    const actions: TaskAction[] =
-      content === null
-        ? []
-        : content === ''
-          ? [{ kind: 'remove' }]
-          : [{ kind: 'setMarkdown', markdown: content }]
-    const moves = this.#tasksOf(task.notePath).map((from): TaskMove => {
-      const move = moved.find((candidate) => hasPath(candidate.from, from.astPath))
-      const to = move === undefined ? from : move.to
-      return { from, to: hasPath(from, task.astPath) ? actions.reduce(applyAction, to) : to }
-    })
-    return { ...this.#land(task, moves, [created]), created }
-  }
-
-  #tasksOf(notePath: string): TaskSnapshot[] {
-    return this.#notes.get(notePath) ?? []
-  }
-
-  #land(
-    note: Pick<TaskRef, 'notePath' | 'revision'>,
-    moved: readonly TaskMove[],
-    inserted: readonly TaskSnapshot[],
-  ): TaskWriteResult {
     const tasks = [...moved.flatMap((move) => (move.to === null ? [] : [move.to])), ...inserted]
-    const revision = `${note.revision}+`
+    const baseRevision = this.#revisions.get(notePath) ?? ''
+    const revision = `${baseRevision}+`
     this.#seq += 1
-    this.#notes.set(note.notePath, tasks)
-    this.#revisions.set(note.notePath, revision)
+    this.#notes.set(notePath, tasks)
+    this.#revisions.set(notePath, revision)
     return {
       source: '',
-      baseRevision: note.revision,
+      baseRevision,
       revision,
       moved,
       inserted,
@@ -169,25 +144,28 @@ export class TestTaskIndex {
       }
     }
     for (const { notePath, revision, astPath, markdown, breadcrumbs, checked } of rows) {
-      const tasks = this.#tasksOf(notePath).filter((task) => !hasPath(task, astPath))
+      const tasks = (this.#notes.get(notePath) ?? []).filter((task) => !hasPath(task, astPath))
       this.#notes.set(notePath, [...tasks, { astPath, markdown, breadcrumbs, checked }])
       this.#revisions.set(notePath, revision)
     }
   }
 }
 
-function applyAction(task: TaskSnapshot | null, action: TaskAction): TaskSnapshot | null {
+function applyItemEdit(task: TaskSnapshot | null, edit: TaskEditItem): TaskSnapshot | null {
   if (task === null) {
     return null
   }
-  switch (action.kind) {
-    case 'toggle':
+  switch (edit.kind) {
+    case 'toggle': {
       return { ...task, checked: !task.checked }
-    case 'setMarkdown':
-      return { ...task, markdown: action.markdown.trim() }
+    }
+    case 'setMarkdown': {
+      return { ...task, markdown: edit.markdown.trim() }
+    }
     case 'remove':
-    case 'toBullet':
+    case 'toBullet': {
       return null
+    }
   }
 }
 

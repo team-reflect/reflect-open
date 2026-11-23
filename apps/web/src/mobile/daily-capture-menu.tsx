@@ -41,7 +41,6 @@ export function useDailyCapture(): { plus: ChromePlus; sheet: ReactElement | nul
           open={newTask.open}
           onOpenChange={newTask.setOpen}
           today={newTask.today}
-          actions={newTask.actions}
           onOpenNote={(path) => navigate(routeForPath(path))}
           autoFocusEditor
         />
