@@ -226,15 +226,6 @@ export interface NoteSession {
    */
   commitFrontmatter(patch: FrontmatterPatch): Promise<boolean>
   /**
-   * Append a markdown block to the end of the body (own paragraph, blank-line
-   * separated — `appendBlock`) from an out-of-editor action like the
-   * suggested-contact card's Add, applied to the live buffer so unsaved edits
-   * survive, reflected in the open editor, and flushed now. Same gating,
-   * `false`-when-busy, and transactional revert as {@link commitSourceEdit}.
-   * A blank block is refused (`false`) — there is nothing to write.
-   */
-  commitBodyAppend(block: string): Promise<boolean>
-  /**
    * Apply a synchronous full-source transform to the live buffer (so unsaved
    * edits survive), reflect it in the open editor, and flush now. The Tasks
    * view routes its edits here whenever the note is open: the buffer is read

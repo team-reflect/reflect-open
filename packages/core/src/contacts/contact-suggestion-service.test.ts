@@ -73,8 +73,6 @@ function contactSuggestionsOver(deps?: {
       indexLifecycle: createTestIndexLifecycleService(),
       logger: createTestLoggerService(),
     }),
-    openDocuments,
-    noteFile,
     settings: deps?.settings ?? createTestSettingsService(),
     graphSession: deps?.graphSession ?? createTestGraphSessionService({ graph: { generation: 3 } }),
     logger: createTestLoggerService(),
@@ -177,7 +175,7 @@ describe('addToNote', () => {
 
     await service.addToNote(PATH, ADA)
 
-    expect(session.getCalls('commitBodyAppend')).toEqual([[ADA_BLOCK]])
+    expect(session.content()).toBe(`# Ada Lovelace\n\n${ADA_BLOCK}\n`)
     // No frontmatter mark: the appended details suppress the card by content.
     expect(session.getCalls('commitFrontmatter')).toEqual([])
     expect(noteFile.writes()).toEqual([])
@@ -208,7 +206,7 @@ describe('addToNote', () => {
     const session = openNote('# Grace Hopper\n')
 
     await expect(service.addToNote(PATH, ADA)).rejects.toThrow(/no longer matches/)
-    expect(session.getCalls('commitBodyAppend')).toEqual([])
+    expect(session.content()).toBe('# Grace Hopper\n')
     expect(noteFile.writes()).toEqual([])
   })
 
@@ -217,9 +215,9 @@ describe('addToNote', () => {
 
     await service.addToNote(PATH, ADA)
 
-    expect(session.getCalls('commitBodyAppend')).toEqual([
-      ['- Email: ada@example.com\n- Phone: +1 555 0100'],
-    ])
+    expect(session.content()).toBe(
+      '# Ada Lovelace\n\n- Type: #person\n\n- Email: ada@example.com\n- Phone: +1 555 0100\n',
+    )
   })
 
   it('is retry-idempotent: a body already carrying the block writes nothing', async () => {
@@ -237,7 +235,7 @@ describe('addToNote', () => {
 
     await service.addToNote(PATH, ADA)
 
-    expect(session.getCalls('commitBodyAppend')).toEqual([])
+    expect(session.content()).toBe('# Ada Lovelace\n\nWork mail ada@work.com\n')
     expect(noteFile.writes()).toEqual([])
   })
 
@@ -273,7 +271,6 @@ describe('ignore', () => {
     await service.ignore(PATH, ADA)
 
     expect(session.getCalls('commitFrontmatter')).toEqual([[{ ignoredContacts: ['Ada Lovelace'] }]])
-    expect(session.getCalls('commitBodyAppend')).toEqual([])
     expect(noteFile.writes()).toEqual([])
   })
 

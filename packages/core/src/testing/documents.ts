@@ -16,7 +16,6 @@ import type {
   NoteSourceTransform,
   NoteSessionEditor,
 } from '../documents/note-session-types.ts'
-import { appendBlock } from '../markdown/append-section.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { createTestLoggerService } from './logger.ts'
 import { createTestIndexStoreService } from './index-store.ts'
@@ -53,8 +52,8 @@ export interface TestNoteSessionOptions {
    */
   unpersisted?: boolean
   /**
-   * False makes `updateFrontmatter`, `commitFrontmatter`, `commitSourceEdit`
-   * and `commitBodyAppend` refuse. Defaults to true.
+   * False makes `updateFrontmatter`, `commitFrontmatter` and
+   * `commitSourceEdit` refuse. Defaults to true.
    */
   accepts?: boolean
 }
@@ -158,17 +157,6 @@ class TestNoteSessionImpl implements TestNoteSession {
         return false
       }
       this.#content = upsertFrontmatter(this.#content, frontmatterPatchToYaml(patch))
-      return true
-    })
-  }
-
-  commitBodyAppend(block: string): Promise<boolean> {
-    return Promise.try(() => {
-      this.#record('commitBodyAppend', block)
-      if (!this.#accepts || block.trim() === '') {
-        return false
-      }
-      this.#content = appendBlock(this.#content, block)
       return true
     })
   }

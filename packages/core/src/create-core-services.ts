@@ -1175,8 +1175,6 @@ export function composeCoreServices(
     contactSuggestions: create.contactSuggestions({
       contacts,
       noteDocuments,
-      openDocuments,
-      noteFile,
       settings,
       graphSession,
       logger,

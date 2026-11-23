@@ -3,7 +3,6 @@ import { writeGenerationFor, type GraphSessionSource } from '../graph/graph-sess
 import type { LoggerService } from '../ports/logger-service.ts'
 import { errorMessage, isAppError, AppError } from '../errors.ts'
 import type { NoteFileService, NoteRead, NoteWriteResult } from '../graph/note-file-service.ts'
-import { appendBlock } from '../markdown/append-section.ts'
 import { hasAuthoredTitle, parseNote } from '../markdown/extract.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { notePrivate } from '../privacy/privacy-service.ts'
@@ -677,15 +676,6 @@ class NoteSessionImpl implements NoteSession {
       throw new Error(message)
     }
     return { content: this.#disk, revision: this.#diskHash, merged: this.#disk !== edited }
-  }
-
-  commitBodyAppend(block: string): Promise<boolean> {
-    if (block.trim() === '') {
-      return Promise.resolve(false)
-    }
-    return this.commitSourceEdit((full) => appendBlock(full, block)).then(
-      (commit) => commit !== null,
-    )
   }
 
   dispose(): void {
