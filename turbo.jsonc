@@ -5,10 +5,10 @@
     "experimentalCargoWorkspaces": true,
     "experimentalTaskCommand": true,
   },
-  // sccache reads its config and the GitHub Actions cache token from these.
+  // The GitHub Actions cache token is in ACTIONS_*.
   // mise's `cargo` wrapper reads MISE_* (for example the trusted config paths
   // that mise-action sets) and the Rust toolchain from RUSTUP_* and CARGO_HOME.
-  // mbx reads its settings from MBX_*.
+  // mbx reads its settings from MBX_* and its S3 key from AWS_*.
   "globalPassThroughEnv": [
     "CI",
     "GITHUB_ACTIONS",
@@ -16,6 +16,8 @@
     "ACTIONS_*",
     "MISE_*",
     "MBX_*",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
     "RUSTUP_*",
     "CARGO_HOME",
   ],
