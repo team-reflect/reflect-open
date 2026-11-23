@@ -535,7 +535,8 @@ describe('task list state', () => {
     expect(reads.filters()).toEqual([false, null])
 
     release()
-    await tasks.refresh()
+    emitCommitted(null)
+    await flushMicrotasks()
     expect(reads.filters()).toEqual([false, null, false])
   })
 
@@ -557,12 +558,12 @@ describe('task list state', () => {
     seedNotes(database, [{ path: A, markdown: '+ [ ] one changed\n' }])
     const read = vi.spyOn(database, 'read').mockRejectedValueOnce(new Error('no index'))
 
-    const refreshing = tasks.refresh()
+    emitCommitted(null)
     await flushMicrotasks()
     expect(markdowns(tasks.get().open)).toEqual(['one', 'two'])
 
     await clock.advance(250)
-    await refreshing
+    await flushMicrotasks()
     expect(read).toHaveBeenCalledTimes(2)
     expect(markdowns(tasks.get().open)).toEqual(['one changed', 'two'])
   })
@@ -684,7 +685,8 @@ describe('task list state', () => {
   it('shows a struck task as open when the index reports it open again', async () => {
     const struck = await struckRow()
 
-    await tasks.refresh()
+    emitCommitted(null)
+    await flushMicrotasks()
 
     expect(tasks.get().struck).toEqual([])
     expect(tasks.get().open).toMatchObject([{ taskId: struck.taskId, markdown: 'one' }])
@@ -810,7 +812,8 @@ describe('task list state', () => {
     const listener = vi.fn()
     tasks.subscribe(listener)
 
-    await tasks.refresh()
+    emitCommitted(null)
+    await flushMicrotasks()
     expect(tasks.get()).toBe(state)
     expect(listener).not.toHaveBeenCalled()
   })
@@ -834,7 +837,8 @@ describe('task list state', () => {
 
     source.set({ session: null })
     expect(switching.get().open).toBeUndefined()
-    await switching.refresh()
+    emitCommitted(null)
+    await flushMicrotasks()
     expect(reads.count()).toBe(2)
   })
 })
@@ -864,7 +868,7 @@ describe('reads racing writes', () => {
     expect(harness.tasks.get().open?.[0]?.markdown).toBe('buy milk')
 
     harness.holdReads()
-    void harness.tasks.refresh()
+    harness.reportCommit()
     await harness.landWrite()
     await editing
     await harness.landRead()
@@ -879,7 +883,7 @@ describe('reads racing writes', () => {
     const created = harness.tasks.commands.continueAfter(row!)
     const adding = harness.edit(created, 'buy milk')
     harness.holdReads()
-    void harness.tasks.refresh()
+    harness.reportCommit()
     await harness.landWrite()
     await adding
     await harness.landRead()
@@ -896,7 +900,7 @@ describe('reads racing writes', () => {
     harness.holdWrites()
     const editing = harness.edit(row!, 'buy milk')
     harness.holdReads()
-    void harness.tasks.refresh()
+    harness.reportCommit()
     await harness.landWrite()
     await editing
     await harness.landRead()

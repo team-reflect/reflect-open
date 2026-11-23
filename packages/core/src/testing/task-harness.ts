@@ -26,7 +26,7 @@ import {
 } from './graph.ts'
 import { createTestIndexLifecycleService } from './index-lifecycle.ts'
 import { createTestIndexStoreService, type TestIndexStoreService } from './index-store.ts'
-import { createTestIpcBridgeService } from './ipc.ts'
+import { createTestIpcBridgeService, type TestIpcBridgeService } from './ipc.ts'
 import { createTestLoggerService } from './logger.ts'
 import { createTestProgressPort, type TestProgressPort } from './ports.ts'
 
@@ -129,6 +129,7 @@ export class TaskHarness {
   readonly #reads = new StepGate()
   readonly #scans = new StepGate()
   readonly #unreported = new Set<string>()
+  readonly #ipc: TestIpcBridgeService
   #externalModifiedMs = EXTERNAL_MODIFIED_MS_START
 
   constructor(options: TaskHarnessOptions) {
@@ -150,6 +151,7 @@ export class TaskHarness {
     })
     const logger = createTestLoggerService()
     const ipc = createTestIpcBridgeService()
+    this.#ipc = ipc
     this.indexStore = createTestIndexStoreService({
       database: this.database,
       ipc,
@@ -220,6 +222,13 @@ export class TaskHarness {
     await this.index.settled()
     this.tasks.subscribe(noop)
     await sleep(0)
+  }
+
+  /**
+   * Broadcast an index commit that names no note: the task list reads every note again.
+   */
+  reportCommit(): void {
+    this.#ipc.emit('index:committed', { seq: 0, paths: null })
   }
 
   /**

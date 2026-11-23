@@ -1421,7 +1421,7 @@ describe('TasksScreen', () => {
         updatedAt: 200,
       }),
     ])
-    await core.tasks.refresh()
+    core.ipc.emit('index:committed', { seq: 1, paths: null })
 
     await view.findByRole('button', { name: 'Complete: project task' })
     expect(view.queryByRole('button', { name: 'Reopen: project task' })).toBeNull()

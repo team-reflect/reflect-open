@@ -71,13 +71,6 @@ export interface TaskService extends Store<TaskStoreView> {
    */
   subscribe: (listener: VoidFunction) => Unlisten
   /**
-   * Re-read the open tasks, and the completed tasks while
-   * {@link TaskService.includeCompleted} holds them, through the database. A
-   * failed read is tried again until it lands; the rows stay as they are
-   * meanwhile.
-   */
-  refresh(): Promise<void>
-  /**
    * Read the completed tasks too, and keep them fresh, until the returned
    * function runs.
    */
@@ -170,7 +163,7 @@ class TaskServiceImpl implements TaskService {
     this.#sources ??= this.#startSources()
     this.#syncSession()
     if (this.#stale) {
-      void this.refresh()
+      void this.#refresh()
     }
     return () => {
       unlisten()
@@ -181,7 +174,12 @@ class TaskServiceImpl implements TaskService {
     }
   }
 
-  refresh(): Promise<void> {
+  /**
+   * Read the open tasks again, and the completed tasks while
+   * {@link TaskService.includeCompleted} holds them. A failed read is tried
+   * again until it lands; the rows stay as they are meanwhile.
+   */
+  #refresh(): Promise<void> {
     this.#syncSession()
     if (this.#sessionKey === null) {
       return Promise.resolve()
@@ -203,7 +201,7 @@ class TaskServiceImpl implements TaskService {
   includeCompleted(): Unlisten {
     this.#completedHolds += 1
     if (this.#completedHolds === 1) {
-      void this.refresh()
+      void this.#refresh()
     }
     let held = true
     return () => {
@@ -270,12 +268,12 @@ class TaskServiceImpl implements TaskService {
       this.#deps.graphSession.subscribe(() => {
         if (this.#adoptSession()) {
           this.#publish()
-          void this.refresh()
+          void this.#refresh()
         }
       }),
       this.#reader.subscribe(({ paths }) => {
         if (paths === null) {
-          void this.refresh()
+          void this.#refresh()
         } else {
           void this.#readPaths(paths)
         }
