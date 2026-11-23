@@ -19,7 +19,6 @@ import { isMobilePlatform } from '../ports/platform-facts.ts'
 import { isSilentStop, type ReconcileStop } from '../reconcile/reconcile.ts'
 import type { WebFetchService } from '../link-preview/web-fetch-service.ts'
 import type { NoteDocumentService } from '../documents/note-document-service.ts'
-import type { OpenDocumentsService } from '../documents/open-documents-service.ts'
 import { NoteBusyError } from '../tasks/task-errors.ts'
 import { errorMessage, toAppError } from '../errors.ts'
 import type { AssetStoreService } from '../graph/asset-store-service.ts'
@@ -79,7 +78,6 @@ export interface CaptureServiceDeps {
   readonly captureInbox: CaptureInboxService
   readonly noteFile: NoteFileService
   readonly assetStore: AssetStoreService
-  readonly openDocuments: OpenDocumentsService
   readonly noteDocuments: NoteDocumentService
   readonly backlinkTarget: BacklinkTargetService
   readonly xArchive: XArchiveService
@@ -352,7 +350,7 @@ class CaptureServiceImpl implements CaptureService {
     })
     this.#linkRepair = createCaptureLinkRepairService({
       noteFile,
-      openDocuments: deps.openDocuments,
+      noteDocuments: deps.noteDocuments,
       clock: deps.clock,
       logger: deps.logger,
     })

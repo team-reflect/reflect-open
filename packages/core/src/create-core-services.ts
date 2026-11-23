@@ -1348,7 +1348,6 @@ export function composeCoreServices(
       captureInbox,
       noteFile,
       assetStore,
-      openDocuments,
       noteDocuments,
       backlinkTarget,
       xArchive,

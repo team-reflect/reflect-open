@@ -74,7 +74,6 @@ function setup(options: { mobile?: boolean; settings?: Partial<Settings> } = {})
     captureInbox,
     noteFile,
     assetStore: createTestAssetStoreService(),
-    openDocuments,
     noteDocuments: createTestNoteDocumentService({ openDocuments, noteFile }),
     backlinkTarget: { ensure: (title) => title },
     xArchive: createTestXArchiveService(),
