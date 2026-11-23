@@ -16,7 +16,7 @@ import type { IndexedFileFacts, IndexQueryService } from './index-query-service.
 import {
   INDEX_APPLY_BATCH_SIZE,
   type IndexCommit,
-  type IndexStoreService,
+  type WritableIndexStoreService,
 } from './index-store-service.ts'
 import { buildIndexedNote, type IndexedNote } from './indexed-note.ts'
 import { createMoveHealing, type MoveHealing } from './move-healing.ts'
@@ -26,7 +26,7 @@ import { INDEX_PASS_YIELD_EVERY, yieldToEventLoop } from './pacing.ts'
  * The services the indexing components read from and write through.
  */
 export interface IndexingDeps {
-  readonly indexStore: IndexStoreService
+  readonly indexStore: WritableIndexStoreService
   readonly noteFile: NoteFileService
   readonly indexQuery: IndexQueryService
   readonly database: DatabaseService

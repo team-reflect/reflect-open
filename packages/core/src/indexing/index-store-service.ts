@@ -50,6 +50,37 @@ export interface IndexStoreService {
    */
   open(): MaybePromise<number>
   /**
+   * Move a note file and its index rows in one Rust transaction. Pinned
+   * state, conflict flags, and embedding vectors survive the rename. Unlike
+   * the other writes, `fileGeneration` is the graph generation (the
+   * `note_write` gate).
+   */
+  moveIndexed(from: string, to: string, fileGeneration: number): Promise<void>
+  /**
+   * Compute the open-path reconcile delta natively: the files that need a
+   * read (with their stored facts) and the rows whose files vanished. A stale
+   * `generation` reports an empty scan.
+   */
+  reconcileScan(generation: number): MaybePromise<ReconcileScan>
+  /**
+   * Broadcast `index:committed` to every window; a stale generation broadcasts nothing.
+   */
+  announce(commit: IndexCommitted, generation: number): Promise<void>
+  /**
+   * One `index_meta` value, or `null` when the key has never been written.
+   */
+  getMeta(key: string): Promise<string | null>
+  /**
+   * Upsert one `index_meta` key; a stale generation drops the write.
+   */
+  setMeta(key: string, value: string, generation: number): Promise<void>
+}
+
+/**
+ * An {@link IndexStoreService} that can also write the note projections.
+ */
+export interface WritableIndexStoreService extends IndexStoreService {
+  /**
    * Apply many notes' projections in one Rust transaction. Every index write
    * resolves with its commit `seq`, `null` when `generation` is stale. An
    * empty batch never reaches the backend and resolves with a `null` seq.
@@ -65,19 +96,6 @@ export interface IndexStoreService {
    */
   move(from: string, to: string, generation: number): Promise<IndexCommit>
   /**
-   * Move a note file and its index rows in one Rust transaction. Pinned
-   * state, conflict flags, and embedding vectors survive the rename. Unlike
-   * the other writes, `fileGeneration` is the graph generation (the
-   * `note_write` gate).
-   */
-  moveIndexed(from: string, to: string, fileGeneration: number): Promise<void>
-  /**
-   * Compute the open-path reconcile delta natively: the files that need a
-   * read (with their stored facts) and the rows whose files vanished. A stale
-   * `generation` reports an empty scan.
-   */
-  reconcileScan(generation: number): MaybePromise<ReconcileScan>
-  /**
    * Re-stamp stored mtimes for notes whose content already matches disk. One
    * Rust transaction per call; an empty batch never reaches the backend and
    * resolves with a `null` seq.
@@ -87,18 +105,6 @@ export interface IndexStoreService {
    * Wipe all derived tables (precedes a full rebuild); `chat_*`, `note_visits`, and `index_meta` stay.
    */
   clear(generation: number): Promise<IndexCommit>
-  /**
-   * Broadcast `index:committed` to every window; a stale generation broadcasts nothing.
-   */
-  announce(commit: IndexCommitted, generation: number): Promise<void>
-  /**
-   * One `index_meta` value, or `null` when the key has never been written.
-   */
-  getMeta(key: string): Promise<string | null>
-  /**
-   * Upsert one `index_meta` key; a stale generation drops the write.
-   */
-  setMeta(key: string, value: string, generation: number): Promise<void>
 }
 
 /**
@@ -120,7 +126,7 @@ export interface IndexStoreServiceDeps {
   readonly database: DatabaseService
 }
 
-class IndexStoreServiceImpl implements IndexStoreService {
+class IndexStoreServiceImpl implements WritableIndexStoreService {
   readonly #deps: IndexStoreServiceDeps
 
   constructor(deps: IndexStoreServiceDeps) {
@@ -194,6 +200,6 @@ class IndexStoreServiceImpl implements IndexStoreService {
 /**
  * An {@link IndexStoreService} over the `index_*` commands, reading `index_meta` through `database`.
  */
-export function createIndexStoreService(deps: IndexStoreServiceDeps): IndexStoreService {
+export function createIndexStoreService(deps: IndexStoreServiceDeps): WritableIndexStoreService {
   return new IndexStoreServiceImpl(deps)
 }

@@ -245,7 +245,7 @@ export function createTestGraphSessionService<Services = never>(
       },
     })
   }
-  const indexStore = options?.indexStore ?? createTestIndexStoreService()
+  const defaultIndexStore = createTestIndexStoreService()
   const noteFile = options?.noteFile ?? createTestNoteFileService()
   const fileChanges = createTestFileChangeService()
   const logger = options?.logger ?? createTestLoggerService()
@@ -255,8 +255,13 @@ export function createTestGraphSessionService<Services = never>(
     ipc: options?.ipc ?? createDefaultIpc(),
     indexLifecycle:
       options?.indexLifecycle ??
-      createTestIndexLifecycleService({ indexStore, noteFile, fileChanges, logger }),
-    indexStore,
+      createTestIndexLifecycleService({
+        indexStore: defaultIndexStore,
+        noteFile,
+        fileChanges,
+        logger,
+      }),
+    indexStore: options?.indexStore ?? defaultIndexStore,
     noteFile,
     id: options?.id ?? createTestIdService(),
     fileChanges: options?.fileChanges ?? fileChanges,

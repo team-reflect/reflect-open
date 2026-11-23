@@ -8,13 +8,13 @@ import type {
   IndexCommit,
   IndexCommitted,
   IndexTouch,
-  IndexStoreService,
+  WritableIndexStoreService,
   ReconcileScan,
 } from '../indexing/index-store-service.ts'
 import type { TestDatabaseService } from './database.ts'
 
 /**
- * One recorded {@link IndexStoreService} call.
+ * One recorded {@link WritableIndexStoreService} call.
  */
 export type IndexStoreCall =
   | { readonly method: 'open' }
@@ -81,7 +81,7 @@ export interface TestIndexStoreServiceOptions {
   fail?: (call: IndexStoreCall) => Error | undefined
 }
 
-export interface TestIndexStoreService extends IndexStoreService {
+export interface TestIndexStoreService extends WritableIndexStoreService {
   /**
    * Every call, in order, including calls that `fail` rejected.
    */
@@ -320,7 +320,7 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
 }
 
 /**
- * An in-memory {@link IndexStoreService} that records every call.
+ * An in-memory {@link WritableIndexStoreService} that records every call.
  */
 export function createTestIndexStoreService(
   options?: TestIndexStoreServiceOptions,

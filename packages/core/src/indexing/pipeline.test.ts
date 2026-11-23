@@ -15,7 +15,7 @@ import {
 import { createTestLoggerService } from '../testing/logger.ts'
 import type { FileChange } from './file-change-service.ts'
 import { createIndexQueryService } from './index-query-service.ts'
-import type { IndexStoreService } from './index-store-service.ts'
+import type { WritableIndexStoreService } from './index-store-service.ts'
 import { buildIndexedNote, PROJECTION_VERSION } from './indexed-note.ts'
 import { createDirtySet } from './dirty-set.ts'
 import { createIndexWriter, type ChangesAppliedEmitter, type IndexWriter } from './index-writer.ts'
@@ -56,7 +56,7 @@ const PROJECTION_WRITES: ReadonlySet<string | symbol> = new Set([
 /**
  * `store` without its projection writes: each one throws.
  */
-function withoutProjectionWrites(store: IndexStoreService): IndexStoreService {
+function withoutProjectionWrites(store: WritableIndexStoreService): WritableIndexStoreService {
   return new Proxy(store, {
     get(target, key) {
       if (PROJECTION_WRITES.has(key)) {

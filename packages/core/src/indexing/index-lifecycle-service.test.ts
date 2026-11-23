@@ -27,7 +27,7 @@ import {
   type IndexReconciledEvent,
 } from './index-lifecycle-service.ts'
 import { createIndexQueryService } from './index-query-service.ts'
-import type { IndexStoreService, ReconcileScan } from './index-store-service.ts'
+import type { WritableIndexStoreService, ReconcileScan } from './index-store-service.ts'
 import { buildIndexedNote, PROJECTION_VERSION } from './indexed-note.ts'
 import { PROJECTION_VERSION_KEY } from './indexer.ts'
 import { sleep, noop } from '@ocavue/utils'
@@ -1263,7 +1263,7 @@ describe('index projection writes', () => {
    * `store`, with each projection write recorded as its method and whether
    * `index-writer.ts` is on the stack of the call.
    */
-  function traceProjectionWrites(store: IndexStoreService) {
+  function traceProjectionWrites(store: WritableIndexStoreService) {
     const writes: Array<{ method: string; fromWriter: boolean }> = []
     const traced = new Proxy(store, {
       get(target, key) {
