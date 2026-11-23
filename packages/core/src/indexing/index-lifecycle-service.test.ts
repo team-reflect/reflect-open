@@ -985,6 +985,57 @@ describe('applyChanges', () => {
   })
 })
 
+describe('markDirty', () => {
+  it('writes the marked notes without a live subscription and reports them', async () => {
+    const { index, store, applied, steps } = setup({
+      files: { 'notes/pulled.md': '# Pulled\n' },
+    })
+
+    index.markDirty(
+      [
+        { path: 'notes/pulled.md', kind: 'upsert', modifiedMs: 5 },
+        { path: 'audio-memos/memo.m4a', kind: 'upsert', modifiedMs: 6 },
+      ],
+      4,
+      FILE_GENERATION,
+    )
+    await index.drained()
+
+    expect(store.applied().map((note) => [note.path, note.mtime])).toEqual([['notes/pulled.md', 5]])
+    expect(applied).toEqual([
+      { generation: 4, changes: [{ path: 'notes/pulled.md', kind: 'upsert', modifiedMs: 5 }] },
+    ])
+    expect(steps).not.toContain('subscribe')
+  })
+
+  it('ignores a generation older than the one it writes at', async () => {
+    const { index, store } = setup({ files: { 'notes/a.md': '# A', 'notes/b.md': '# B' } })
+
+    index.markDirty([{ path: 'notes/a.md', kind: 'upsert' }], 4, FILE_GENERATION)
+    index.markDirty([{ path: 'notes/b.md', kind: 'upsert' }], 3, FILE_GENERATION)
+    await index.drained()
+
+    expect(store.applied().map((note) => note.path)).toEqual(['notes/a.md'])
+  })
+
+  it('keeps a note marked while the app is hidden and writes it once visible', async () => {
+    const { index, store, activity } = setup({
+      appPlatform: 'ios',
+      files: { 'notes/pulled.md': '# Pulled\n' },
+    })
+    index.followActivity()
+    activity.emitHidden()
+
+    index.markDirty([{ path: 'notes/pulled.md', kind: 'upsert' }], 7, FILE_GENERATION)
+    await index.drained()
+    expect(store.applied()).toEqual([])
+
+    activity.emitVisible()
+    await index.drained()
+    expect(store.applied().map((note) => note.path)).toEqual(['notes/pulled.md'])
+  })
+})
+
 describe('indexNote', () => {
   it('reads, parses, and writes the note at its generation', async () => {
     const { index, store } = setup({ files: { 'notes/a.md': '# Hello\n\n[[World]]' } })

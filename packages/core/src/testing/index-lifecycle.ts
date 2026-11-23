@@ -182,6 +182,10 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
     return this.#inner.onReconciled(listener)
   }
 
+  markDirty(changes: readonly FileChange[], generation: number, fileGeneration: number): void {
+    this.#inner.markDirty(changes, generation, fileGeneration)
+  }
+
   drained(): Promise<void> {
     return this.#inner.drained()
   }

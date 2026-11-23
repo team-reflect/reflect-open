@@ -17,7 +17,7 @@ import {
   type IndexWriter,
   type IndexWriterDeps,
 } from './index-writer.ts'
-import { followFileChanges } from './live.ts'
+import { followFileChanges, markFileChanges } from './live.ts'
 import { noop } from '@ocavue/utils'
 
 /**
@@ -216,8 +216,17 @@ export interface IndexLifecycleService {
    */
   onReconciled(listener: (event: IndexReconciledEvent) => MaybePromise<void>): Unlisten
   /**
-   * Resolve once the index writer has no reported change left to write: each
-   * one is written, or the index is suspended.
+   * Mark the note and asset files of `changes` dirty for the index session
+   * at `generation`, without waiting for the watcher: files a pull wrote must
+   * reach the index even before the watcher runs. The index writer reads the
+   * notes at `fileGeneration` and writes their rows in the background;
+   * {@link IndexLifecycleService.drained} resolves once it has. Marking a
+   * file the watcher also reports is idempotent.
+   */
+  markDirty(changes: readonly FileChange[], generation: number, fileGeneration: number): void
+  /**
+   * Resolve once the index writer has no dirty file left to write: each one
+   * is written, or the index is suspended.
    */
   drained(): Promise<void>
   /**
@@ -606,6 +615,13 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     }
     const outcomes = await Promise.all(notes.map((change) => writer.settled(change.path)))
     return outcomes.filter((outcome) => outcome.status === 'applied').length
+  }
+
+  markDirty(changes: readonly FileChange[], generation: number, fileGeneration: number): void {
+    const writer = this.#writerAt(generation, fileGeneration)
+    if (writer !== null) {
+      markFileChanges(writer.dirty, changes)
+    }
   }
 
   async drained(): Promise<void> {

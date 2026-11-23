@@ -92,11 +92,11 @@ function jsonResponse(body: unknown, status = 200): Response {
 interface FakeOptions {
   auth?: string | null
   /**
-   * Hold the direct index write until `releaseIndexApply()` (the convergence barrier).
+   * Hold the first wait for the index writer until `releaseIndexApply()` (the convergence barrier).
    */
   gateIndexApply?: boolean
   /**
-   * Make every direct index write throw (the projection-failure path).
+   * Make every wait for the index writer throw (the projection-failure path).
    */
   failIndexApply?: boolean
   /**
@@ -160,7 +160,7 @@ interface FakeOptions {
 
 /**
  * Build the git sync factory over fakes with a mutable repo status, recording
- * every git command and direct index write by method name.
+ * every git command and each batch marked dirty for the index by method name.
  */
 function fakeServices(options: FakeOptions = {}) {
   const calls: string[] = []
@@ -267,22 +267,18 @@ function fakeServices(options: FakeOptions = {}) {
   }
 
   const indexLifecycle = createTestIndexLifecycleService()
-  vi.spyOn(indexLifecycle, 'applyChanges').mockImplementation(
-    async (changes, generation, _fileGeneration, canApply) => {
-      if (canApply?.() === false) {
-        return 0
-      }
-      record('applyChanges', { paths: changes.map((change) => change.path), generation })
-      indexApplyCount += 1
-      if (options.failIndexApply === true) {
-        throw new AppError('io', 'index write failed')
-      }
-      if (options.gateIndexApply === true && indexApplyCount === 1) {
-        await indexApplyGate.promise
-      }
-      return changes.length
-    },
-  )
+  vi.spyOn(indexLifecycle, 'markDirty').mockImplementation((changes, generation) => {
+    record('markDirty', { paths: changes.map((change) => change.path), generation })
+  })
+  vi.spyOn(indexLifecycle, 'drained').mockImplementation(async () => {
+    indexApplyCount += 1
+    if (options.failIndexApply === true) {
+      throw new AppError('io', 'index write failed')
+    }
+    if (options.gateIndexApply === true && indexApplyCount === 1) {
+      await indexApplyGate.promise
+    }
+  })
 
   const progress = createTestProgressPort()
   const githubAuth = createTestGithubAuthService({ secretStore, http, clock })
@@ -1363,7 +1359,7 @@ describe('createGitSyncService', () => {
     gitSync.dispose()
   })
 
-  it('fans retry-merge batches immediately while serializing direct indexing', async () => {
+  it('fans retry-merge batches immediately while serializing index writes', async () => {
     const firstChange: ChangedFile = {
       path: 'notes/from-remote-1.md',
       kind: 'upsert',
@@ -1397,9 +1393,9 @@ describe('createGitSyncService', () => {
         expect(calls.filter((command) => command === 'push')).toHaveLength(2)
         expect(batches).toEqual([[firstChange], [secondChange]])
       })
-      // The second callback already fanned out synchronously, but its direct
-      // index write is queued behind the first gated batch.
-      expect(calls.filter((command) => command === 'applyChanges')).toHaveLength(1)
+      // The second callback already fanned out synchronously, but its index
+      // write is queued behind the first gated batch.
+      expect(calls.filter((command) => command === 'markDirty')).toHaveLength(1)
       expect(gitSync.get()).toMatchObject({
         phase: 'connected',
         status: { state: 'syncing' },
@@ -1407,7 +1403,7 @@ describe('createGitSyncService', () => {
 
       releaseIndexApply()
       await vi.waitFor(() => {
-        expect(calls.filter((command) => command === 'applyChanges')).toHaveLength(2)
+        expect(calls.filter((command) => command === 'markDirty')).toHaveLength(2)
         expect(gitSync.get()).toMatchObject({
           phase: 'connected',
           status: { state: 'idle' },
@@ -1419,7 +1415,7 @@ describe('createGitSyncService', () => {
     }
   })
 
-  it('does not start queued direct indexing after backup teardown', async () => {
+  it('does not start queued index writes after backup teardown', async () => {
     const { calls, releaseIndexApply } = fakeServices({
       gateIndexApply: true,
       pullOutcomes: [
@@ -1446,20 +1442,20 @@ describe('createGitSyncService', () => {
 
     await vi.waitFor(() => {
       expect(calls.filter((command) => command === 'push')).toHaveLength(2)
-      expect(calls.filter((command) => command === 'applyChanges')).toHaveLength(1)
+      expect(calls.filter((command) => command === 'markDirty')).toHaveLength(1)
     })
 
     gitSync.dispose()
     releaseIndexApply()
-    // The first, already-running apply can finish. The second task then reaches
+    // The first, already-running wait can finish. The second task then reaches
     // the backup-owned tail, observes the teardown epoch, and must exit
     // before touching the index bridge.
     await flush()
 
-    expect(calls.filter((command) => command === 'applyChanges')).toHaveLength(1)
+    expect(calls.filter((command) => command === 'markDirty')).toHaveLength(1)
   })
 
-  it('keeps launch sync active until pulled notes finish direct indexing', async () => {
+  it('keeps launch sync active until pulled notes finish indexing', async () => {
     const { calls, releaseIndexApply } = fakeServices({
       gateIndexApply: true,
       pullOutcome: {
@@ -1473,7 +1469,7 @@ describe('createGitSyncService', () => {
     await gitSync.start()
 
     await vi.waitFor(() => {
-      expect(calls).toContain('applyChanges')
+      expect(calls).toContain('markDirty')
     })
     expect(gitSync.get()).toMatchObject({
       phase: 'connected',
@@ -1490,7 +1486,7 @@ describe('createGitSyncService', () => {
     gitSync.dispose()
   })
 
-  it('still settles to idle when direct indexing fails — projection health never blocks backup', async () => {
+  it('still settles to idle when indexing fails — projection health never blocks backup', async () => {
     const { calls } = fakeServices({
       failIndexApply: true,
       pullOutcome: {
@@ -1509,64 +1505,12 @@ describe('createGitSyncService', () => {
         status: { state: 'idle' },
       })
     })
-    expect(calls).toContain('applyChanges')
+    expect(calls).toContain('markDirty')
     // The failure is reported, never thrown into the sync cycle — the
     // projection is rebuildable, the push is not.
     expect(logger.getErrors().map((entry) => entry.message)).toEqual([
-      'pulled-note direct index apply failed:',
+      'pulled-note index write failed:',
     ])
     gitSync.dispose()
-  })
-
-  it('defers a pulled note direct-index apply while the mobile app is hidden', async () => {
-    const { calls } = fakeServices({
-      mobile: true,
-      pullOutcome: {
-        ...PULLED,
-        committed: false,
-        ahead: 1,
-        changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
-      },
-    })
-    activity.setHidden(true)
-    const gitSync = createGitSync({ indexGeneration: 1 })
-    await gitSync.start()
-    await flush()
-
-    expect(calls).not.toContain('applyChanges')
-    gitSync.dispose()
-  })
-
-  it('skips the direct-index apply when the mobile app went hidden mid-pull', async () => {
-    const { calls, releasePull } = fakeServices({
-      mobile: true,
-      gatePull: true,
-      pullOutcome: {
-        ...PULLED,
-        committed: false,
-        ahead: 1,
-        changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
-      },
-    })
-    const batches: FileChange[][] = []
-    const unlisten = fileChanges.subscribe(({ changes }) => {
-      batches.push(changes)
-    })
-    const gitSync = createGitSync({ indexGeneration: 1 })
-    await gitSync.start()
-    await vi.waitFor(() => {
-      expect(calls).toContain('pull')
-    })
-
-    activity.setHidden(true)
-    releasePull()
-    await vi.waitFor(() => {
-      expect(batches).toHaveLength(1) // the landed merge still fans out
-    })
-    await flush()
-
-    expect(calls).not.toContain('applyChanges')
-    gitSync.dispose()
-    unlisten()
   })
 })

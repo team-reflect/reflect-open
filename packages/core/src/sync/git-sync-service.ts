@@ -435,7 +435,7 @@ class GitSyncServiceImpl implements GitSyncService {
   }
 
   #onRemoteChanges(changes: ChangedFile[]): MaybePromise<void> {
-    const { fileChanges, indexLifecycle, activity, logger } = this.#deps
+    const { fileChanges, indexLifecycle, logger } = this.#deps
     if (changes.length === 0) {
       return
     }
@@ -447,8 +447,8 @@ class GitSyncServiceImpl implements GitSyncService {
     // directly. The whole batch goes to the local file-changes channel —
     // every subscriber filters by path (open editors match their own note,
     // the index and embeddings take markdown notes, the audio-memo
-    // reconciler takes recordings) — and the index additionally gets a
-    // direct apply (idempotent if a live watcher subscription double-applies).
+    // reconciler takes recordings) — and the notes are additionally marked
+    // dirty for the index (idempotent if the live subscription also marks them).
     const fileChangeBatch = changes.map(({ path, kind, modifiedMs }) => {
       return modifiedMs === null || modifiedMs === undefined
         ? { path, kind }
@@ -465,18 +465,14 @@ class GitSyncServiceImpl implements GitSyncService {
         if (this.#disposed || notificationEpoch !== this.#remoteIndexEpoch) {
           return
         }
-        await indexLifecycle.applyChanges(
-          indexable,
-          indexGeneration,
-          this.#generation,
-          () => !this.#mobile || !activity.isHidden(),
-        )
+        indexLifecycle.markDirty(indexable, indexGeneration, this.#generation)
+        await indexLifecycle.drained()
       })
-      // Direct index writes remain ordered across retry merges. Their handled
+      // The index writes of successive merges stay ordered. Their handled
       // promise is what the engine joins before idle; failure is logged but
       // never prevents the already-concurrent Git push of Markdown truth.
       this.#remoteIndexTail = task.catch((cause) => {
-        logger.error('pulled-note direct index apply failed:', cause)
+        logger.error('pulled-note index write failed:', cause)
       })
       return this.#remoteIndexTail
     }
