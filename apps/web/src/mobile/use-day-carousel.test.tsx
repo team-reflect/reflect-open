@@ -339,6 +339,20 @@ describe('useDayCarousel', () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 
+  it('stays on the same day when the engine moves the scroller while the page is hidden', async () => {
+    const { scroller, onSelect } = await mountCarousel()
+
+    document.dispatchEvent(new Event('visibilitychange'))
+    await scrollElement({ element: scroller, left: 2 * CENTER * WIDTH })
+
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe(CENTER * WIDTH))
+    expect(onSelect).not.toHaveBeenCalled()
+
+    await scrollElement({ element: scroller, left: (CENTER + 1) * WIDTH, touch: true })
+
+    await vi.waitFor(() => expect(onSelect).toHaveBeenCalledExactlyOnceWith('2026-06-13'))
+  })
+
   it('leaves the scroller to a finger that is down when the page width changes', async () => {
     const { scroller, resize } = await mountCarousel()
     scroller.style.scrollSnapType = 'none'
