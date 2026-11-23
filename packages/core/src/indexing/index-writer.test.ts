@@ -313,13 +313,23 @@ describe('createIndexWriter', () => {
   })
 
   it('lets the last kind of a path win: an upsert then a remove only removes', async () => {
-    const { writer, dirty, writes } = setup({ files: { 'notes/x.md': '# recreated' } })
+    const { writer, dirty, writes } = setup()
 
     dirty.add('notes/x.md', { modifiedMs: 42 })
     dirty.add('notes/x.md', { kind: 'remove' })
     await writer.drained()
 
     expect(writes()).toEqual(['remove:notes/x.md'])
+  })
+
+  it('writes a note reported as removed when its file exists', async () => {
+    const { writer, dirty, writes, reports } = setup({ files: { 'notes/x.md': '# recreated' } })
+
+    dirty.add('notes/x.md', { kind: 'remove' })
+    await writer.drained()
+
+    expect(writes()).toEqual(['apply:notes/x.md'])
+    expect(reports).toEqual([[{ path: 'notes/x.md', kind: 'upsert' }]])
   })
 
   it('writes a queued upsert before a later remove of the same run', async () => {

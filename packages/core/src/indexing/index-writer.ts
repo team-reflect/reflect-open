@@ -88,7 +88,8 @@ export interface IndexWriterOptions {
 /**
  * The one writer of the index projection. It applies the dirty set in serial
  * runs: each run takes every dirty path, reads the files then (unless a hint
- * carries the content), and writes the rows that differ.
+ * carries the content), and writes the rows that differ. The file decides
+ * whether a note is removed: a `remove` hint for a file that exists is an upsert.
  */
 export interface IndexWriter {
   readonly dirty: DirtySet
@@ -320,7 +321,10 @@ class IndexWriterImpl implements IndexWriter {
    */
   async #write(run: WriterRun, entries: readonly DirtyEntry[]): Promise<void> {
     const { indexStore, noteFile, clock } = this.#deps
-    const notes = entries.filter((entry) => isNotePath(entry.path))
+    const notes = await this.#checkRemoves(
+      run,
+      entries.filter((entry) => isNotePath(entry.path)),
+    )
     await this.#healMoves(run, notes)
     if (this.#isStopped()) {
       return
@@ -409,6 +413,23 @@ class IndexWriterImpl implements IndexWriter {
     for (const entry of run.open.values()) {
       this.#settle(run, entry, { status: 'unchanged' })
     }
+  }
+
+  /**
+   * Turn each remove of a note whose file exists into an upsert.
+   */
+  async #checkRemoves(run: WriterRun, notes: readonly DirtyEntry[]): Promise<DirtyEntry[]> {
+    const { noteFile } = this.#deps
+    return await Promise.all(
+      notes.map(async (entry) => {
+        if (entry.kind !== 'remove' || !(await noteFile.exists(entry.path).catch(() => false))) {
+          return entry
+        }
+        const upsert: DirtyEntry = { ...entry, kind: 'upsert' }
+        run.open.set(entry.path, upsert)
+        return upsert
+      }),
+    )
   }
 
   /**
