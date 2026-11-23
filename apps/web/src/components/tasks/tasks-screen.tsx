@@ -80,7 +80,7 @@ export function TasksScreen(): ReactElement {
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
-  const { open, completed, struck: recentlyCompleted } = useStore(taskService)
+  const { open, completed, struck } = useStore(taskService)
   useEffect(
     () => (filters.archived ? taskService.includeCompleted() : undefined),
     [taskService, filters.archived],
@@ -98,8 +98,8 @@ export function TasksScreen(): ReactElement {
 
   const needle = query.trim().toLowerCase()
   const groups = useMemo(
-    () => composeVisibleTaskGroups({ open, completed, recentlyCompleted, filters, needle, today }),
-    [open, completed, recentlyCompleted, filters, needle, today],
+    () => composeVisibleTaskGroups({ open, completed, struck, filters, needle, today }),
+    [open, completed, struck, filters, needle, today],
   )
 
   // The flat, render-order list of tasks the selection and its shortcuts act on.
@@ -278,17 +278,17 @@ export function TasksScreen(): ReactElement {
             <TaskToolbarCountBadge count={selection.selectedCount} />
           </Button>
         ) : null}
-        {recentlyCompleted.length > 0 ? (
+        {struck.length > 0 ? (
           <Button
             type="button"
             variant="ghost"
-            aria-label={`Archive ${recentlyCompleted.length}`}
+            aria-label={`Archive ${struck.length}`}
             onClick={actions.archive}
             className="window-drag-control text-xs text-text-muted"
           >
             <Archive aria-hidden className="size-3.5" />
             Archive
-            <TaskToolbarCountBadge count={recentlyCompleted.length} />
+            <TaskToolbarCountBadge count={struck.length} />
           </Button>
         ) : null}
         <TaskFiltersMenu

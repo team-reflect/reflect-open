@@ -81,7 +81,7 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
     selectText: true,
   })
 
-  const { open, completed, struck: recentlyCompleted } = useStore(taskService)
+  const { open, completed, struck } = useStore(taskService)
   useEffect(
     () => (filters.archived ? taskService.includeCompleted() : undefined),
     [taskService, filters.archived],
@@ -97,8 +97,8 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
   const deferredQuery = useDeferredValue(query)
   const needle = (query === '' ? '' : deferredQuery).trim().toLowerCase()
   const groups = useMemo(
-    () => composeVisibleTaskGroups({ open, completed, recentlyCompleted, filters, needle, today }),
-    [open, completed, recentlyCompleted, filters, needle, today],
+    () => composeVisibleTaskGroups({ open, completed, struck, filters, needle, today }),
+    [open, completed, struck, filters, needle, today],
   )
 
   // The task list scroller renders only while there are rows to show.
@@ -160,11 +160,11 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
           ref: searchInputRef,
         }}
         trailing={[
-          ...(recentlyCompleted.length > 0
+          ...(struck.length > 0
             ? [
                 {
                   id: 'archive',
-                  title: `Archive ${recentlyCompleted.length} completed`,
+                  title: `Archive ${struck.length} completed`,
                   icon: 'archive',
                 } as const,
               ]
