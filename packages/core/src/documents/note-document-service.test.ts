@@ -101,6 +101,19 @@ describe('commitFrontmatter', () => {
     expect(noteFile.writes()).toEqual([])
   })
 
+  it('writes a session patch through to the index', async () => {
+    const { noteDocuments, indexNote } = setup({
+      files: { 'notes/a.md': '# A\n' },
+      session: { content: '# A\n' },
+    })
+
+    await noteDocuments.commitFrontmatter('notes/a.md', { pinned: true }, 3)
+
+    expect(indexNote.mock.calls).toEqual([
+      ['notes/a.md', { generation: 5, fileGeneration: 3, note: undefined, mtime: undefined }],
+    ])
+  })
+
   it('falls back to a disk patch when the session declines the patch', async () => {
     const { noteDocuments, noteFile } = setup({
       files: { 'notes/a.md': '# A\n' },

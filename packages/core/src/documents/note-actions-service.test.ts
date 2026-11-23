@@ -81,13 +81,12 @@ function createNoteActions(deps: {
     noteDocuments: createNoteDocumentService({
       openDocuments,
       noteFile,
-      graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
-      indexLifecycle: createTestIndexLifecycleService(),
+      graphSession: graph,
+      indexLifecycle: deps.indexLifecycle ?? recordingIndexLifecycle(indexLog),
       logger: createTestLoggerService(),
     }),
     noteFile,
     openDocuments,
-    indexLifecycle: deps.indexLifecycle ?? recordingIndexLifecycle(indexLog),
     indexQuery:
       deps.indexQuery ?? createIndexQueryService({ database: createTestDatabaseService() }),
     noteRows: deps.noteRows ?? createNoteRowService({ graphSession: graph }),

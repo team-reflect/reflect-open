@@ -1279,7 +1279,6 @@ export function composeCoreServices(
       noteDocuments,
       noteFile,
       openDocuments,
-      indexLifecycle,
       indexQuery,
       noteRows,
       progress,

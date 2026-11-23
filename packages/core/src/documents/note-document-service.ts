@@ -46,7 +46,8 @@ export interface NoteDocumentService {
    * Routes through the live session when one can take the patch; otherwise
    * patches the file, and creates a missing one, with the disk rules of
    * {@link NoteDocumentService.commitSourceEdit}. A patch that changes
-   * nothing is a no-op. A {@link FrontmatterPatcher} makes the patch from
+   * nothing is a no-op. The index holds the patched note before the promise
+   * resolves. A {@link FrontmatterPatcher} makes the patch from
    * the text it lands on.
    */
   commitFrontmatter(
@@ -193,7 +194,11 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
       const live = typeof patch === 'function' ? (owner?.liveContent() ?? null) : ''
       if (owner !== null && live !== null) {
         const livePatch = patchOf(live)
-        if (livePatch === null || (await owner.commitFrontmatter(livePatch))) {
+        if (livePatch === null) {
+          return
+        }
+        if (await owner.commitFrontmatter(livePatch)) {
+          await this.#indexCommit(path, generation, undefined)
           return
         }
       }
@@ -324,13 +329,14 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
   }
 
   /**
-   * Write `note`, the text a commit left in the note file, to the index of
-   * the graph session that `generation` belongs to.
+   * Write the text a commit left in the note file to the index of the graph
+   * session that `generation` belongs to. `note` is that text, or `undefined`
+   * to read it from the file.
    */
   async #indexCommit(
     path: string,
     generation: number,
-    note: NoteRead,
+    note: NoteRead | undefined,
     mtime?: number,
   ): Promise<number | null> {
     const { graphSession, indexLifecycle, logger } = this.#deps
