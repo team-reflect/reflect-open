@@ -19,9 +19,9 @@ reflect-index = { workspace = true }
 reflect-index-schema = { workspace = true }
 reflect-types = { workspace = true }
 reflect-graph-paths = { workspace = true }
+reflect-utils = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 jiff = { workspace = true, features = ["default"] }
-sha2 = { workspace = true }
 pulldown-cmark = { workspace = true }
 saphyr = { workspace = true }
 

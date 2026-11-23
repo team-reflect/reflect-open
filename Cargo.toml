@@ -13,6 +13,7 @@ members = [
   "crates/index-schema",
   "crates/index-wasm",
   "crates/types",
+  "crates/utils",
   "xtask",
 ]
 
@@ -39,6 +40,7 @@ reflect-git = { path = "crates/git" }
 reflect-index = { path = "crates/index", default-features = false }
 reflect-index-schema = { path = "crates/index-schema", default-features = false }
 reflect-types = { path = "crates/types" }
+reflect-utils = { path = "crates/utils" }
 
 # Third-party crates
 apple-native-keyring-store = "1.0.2"

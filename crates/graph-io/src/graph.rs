@@ -14,9 +14,9 @@ use std::sync::Mutex;
 
 use reflect_graph_paths::eviction_placeholder;
 use reflect_types::{AppError, AppResult, FileMeta, GraphInfo, NoteWriteOutcome};
+use reflect_utils::note_hash;
 
 use crate::graph_lock::with_graph_lock;
-use crate::hash::note_hash;
 use crate::io::{self, atomic_write, modified_ms};
 use crate::own_writes;
 use crate::resolve::resolve;
@@ -692,7 +692,7 @@ mod note_revision_tests {
         )
         .unwrap();
         assert_eq!(outcome.merged, None);
-        assert_eq!(outcome.hash, crate::hash::sha256_hex(b"a\nb!\n"));
+        assert_eq!(outcome.hash, reflect_utils::sha256_hex(b"a\nb!\n"));
         assert_eq!(fs::read_to_string(target).unwrap(), "a\nb!\n");
     }
 
@@ -745,7 +745,7 @@ mod note_revision_tests {
         )
         .unwrap();
         assert_eq!(outcome.merged, Some("A\nb\nc\nd\n".to_string()));
-        assert_eq!(outcome.hash, crate::hash::sha256_hex(b"A\nb\nc\nd\n"));
+        assert_eq!(outcome.hash, reflect_utils::sha256_hex(b"A\nb\nc\nd\n"));
         assert_eq!(fs::read_to_string(&target).unwrap(), "A\nb\nc\nd\n");
         assert_eq!(
             outcome.modified_ms,

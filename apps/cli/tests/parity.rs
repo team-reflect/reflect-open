@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
-use reflect_cli::hash::hash_content;
 use reflect_cli::note_file::{parse_note_meta, read_note_text, walk_notes};
 use reflect_index::text::fts::build_fts_match;
 use reflect_index::text::keys::fold_key;
@@ -90,7 +89,7 @@ fn note_derivations_match_the_ts_pipeline() {
             "{rel_path}: private"
         );
         assert_eq!(
-            hash_content(&content),
+            reflect_utils::note_hash(&content),
             want["fileHash"].as_str().unwrap(),
             "{rel_path}: fileHash"
         );
