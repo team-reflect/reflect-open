@@ -211,7 +211,7 @@ function contentEnd(children: readonly MarkdownBlock[]): number {
 }
 
 /** After the last block that is not a blank line, so trailing blank lines stay below the entry. */
-export function bodyEndSlot(document: MarkdownDocument): SlotTarget {
+function bodyEndSlot(document: MarkdownDocument): SlotTarget {
   const anchor = document.children[contentEnd(document.children) - 1]
   return anchor === undefined ? { kind: 'end', container: document } : { kind: 'after', anchor }
 }

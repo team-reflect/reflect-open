@@ -114,7 +114,7 @@ describe('reconcileNoteTasks with moves', () => {
         ['t1', 't2'],
         [
           { kind: 'remove', task: locate(source, 0) },
-          { kind: 'insert', at: { kind: 'documentEnd' }, markdown: 'a' },
+          { kind: 'insert', at: { kind: 'tasksSection' }, markdown: 'a' },
         ],
       ),
     ).toEqual(['t2', 'new1'])

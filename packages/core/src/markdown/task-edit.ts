@@ -7,7 +7,6 @@ import {
 } from '@meowdown/markdown'
 import { NoteEditError } from '../tasks/task-errors.ts'
 import {
-  bodyEndSlot,
   createListItem,
   endOfListRun,
   insertItem,
@@ -23,7 +22,6 @@ import { compareTaskPaths, isSameTaskPath } from './task-path.ts'
 import { getRoundTasks, toTaskSnapshot, type TaskEntry } from './task-project.ts'
 
 export type InsertPosition =
-  | { kind: 'documentEnd' }
   /** The end of the task's context: its parent list item, or at the root the end of its own list. */
   | { kind: 'contextEnd'; task: TaskLocator }
   /** The end of the first `+` list in the top-level `## Tasks` section, created after the note's last content when missing. */
@@ -97,11 +95,7 @@ export function applyTaskEdits(
       const item = createListItem(bullet ? 'bullet' : 'task', '+', markdown)
       item.checked = !bullet && edit.checked === true
       return () => {
-        let slot =
-          contextSlot ??
-          (at.kind === 'tasksSection'
-            ? sectionSlot(document, TASKS_SECTION, 'task')
-            : bodyEndSlot(document))
+        let slot = contextSlot ?? sectionSlot(document, TASKS_SECTION, 'task')
         while (slot.kind === 'after') {
           const tail = tails.get(slot.anchor)
           if (tail === undefined) {

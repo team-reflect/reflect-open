@@ -1,4 +1,4 @@
-import { compareTaskPaths, type TaskRow } from '../markdown/index.ts'
+import type { TaskRow } from '../markdown/index.ts'
 
 /**
  * One task plus the note context the Tasks view (Plan 18) groups and renders
@@ -29,14 +29,4 @@ export interface OpenTask extends TaskRow {
    * last changed, or when the last task write of the note landed.
    */
   updatedAt: number
-}
-
-/**
- * Note path first, then the task's place in that note.
- */
-export function compareTasksByNote(left: OpenTask, right: OpenTask): number {
-  if (left.notePath !== right.notePath) {
-    return left.notePath < right.notePath ? -1 : 1
-  }
-  return compareTaskPaths(left.astPath, right.astPath)
 }

@@ -236,27 +236,6 @@ describe('applyTaskEdits: toBullet', () => {
 })
 
 describe('applyTaskEdits: insert', () => {
-  const empty = { kind: 'insert', at: { kind: 'documentEnd' }, markdown: '' } as const
-
-  it('starts an empty note with a single empty task', () => {
-    const result = applyEdits('', [empty])
-    expect(result.source).toBe('+ [ ] \n')
-    expect(result.inserted).toEqual([
-      { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
-    ])
-  })
-
-  it('continues a trailing task list and follows prose after a blank line', () => {
-    expect(applyEdits('+ [ ] a\n', [empty]).source).toBe('+ [ ] a\n+ [ ] \n')
-    expect(applyEdits('para\n', [empty]).source).toBe('para\n\n+ [ ] \n')
-    expect(applyEdits('# T\n', [empty]).source).toBe('# T\n\n+ [ ] \n')
-  })
-
-  it('appends after frontmatter and a missing final newline', () => {
-    expect(applyEdits('---\nid: x\n---\n', [empty]).source).toBe('---\nid: x\n---\n+ [ ] \n')
-    expect(applyEdits('# T\n\n+ [ ] x', [empty]).source).toBe('# T\n\n+ [ ] x\n+ [ ] \n')
-  })
-
   it('adds a sibling at the end of the task context', () => {
     const source = '- Shopping\n  + [ ] milk\n  + [ ] eggs\n- Other\n'
     const result = applyEdits(source, [
