@@ -95,12 +95,13 @@ export class TaskCommands {
    * Save the text typed into `task`. Text equal to the task's writes nothing.
    */
   commit(task: OpenTask): Promise<void> {
-    return this.#apply([task], () => [])
+    return this.#apply([task], () => [], true)
   }
 
   /**
    * Save every typed text, for an app that is about to stop. A task whose
-   * typed text is blank keeps that text for the command that names it.
+   * typed text is blank keeps that text for the command that names it. A
+   * failed write shows no line.
    */
   commitDrafts(): Promise<void> {
     const store = this.#deps.store()
@@ -108,7 +109,7 @@ export class TaskCommands {
       const row = store.rows(task.notePath).find((candidate) => candidate.taskId === task.taskId)
       return row === undefined ? [] : [row]
     })
-    return this.#apply(tasks, () => [])
+    return this.#apply(tasks, () => [], false)
   }
 
   /**
@@ -120,7 +121,7 @@ export class TaskCommands {
     const store = this.#deps.store()
     return store.batch(() => {
       store.strike(open.map((task) => task.taskId))
-      return this.#apply(open, ({ taskId }) => [{ kind: 'toggle', taskId, checked: true }])
+      return this.#apply(open, ({ taskId }) => [{ kind: 'toggle', taskId, checked: true }], true)
     })
   }
 
@@ -132,35 +133,39 @@ export class TaskCommands {
   toggle(tasks: readonly OpenTask[]): Promise<void> {
     return tasks.some((task) => !task.checked)
       ? this.complete(tasks)
-      : this.#apply(tasks, ({ taskId }) => [{ kind: 'toggle', taskId, checked: false }])
+      : this.#apply(tasks, ({ taskId }) => [{ kind: 'toggle', taskId, checked: false }], true)
   }
 
   /**
    * Remove `tasks` from their notes. Nested items move up.
    */
   remove(tasks: readonly OpenTask[]): Promise<void> {
-    return this.#apply(tasks, ({ taskId }) => [{ kind: 'remove', taskId }])
+    return this.#apply(tasks, ({ taskId }) => [{ kind: 'remove', taskId }], true)
   }
 
   /**
    * Turn `tasks` into plain bullets: they stay in their notes and leave the rows.
    */
   convert(tasks: readonly OpenTask[]): Promise<void> {
-    return this.#apply(tasks, ({ taskId }) => [{ kind: 'toBullet', taskId }])
+    return this.#apply(tasks, ({ taskId }) => [{ kind: 'toBullet', taskId }], true)
   }
 
   /**
    * Set the due date of `tasks` to `isoDate`, or clear it for `null`.
    */
   schedule(tasks: readonly OpenTask[], isoDate: string | null): Promise<void> {
-    return this.#apply(tasks, ({ taskId }, markdown) => [
-      {
-        kind: 'setMarkdown',
-        taskId,
-        markdown: withDraftDueDate(markdown, isoDate),
-        typed: false,
-      },
-    ])
+    return this.#apply(
+      tasks,
+      ({ taskId }, markdown) => [
+        {
+          kind: 'setMarkdown',
+          taskId,
+          markdown: withDraftDueDate(markdown, isoDate),
+          typed: false,
+        },
+      ],
+      true,
+    )
   }
 
   /**
@@ -258,10 +263,12 @@ export class TaskCommands {
   /**
    * Save the text typed into each of `tasks`, then apply the ops that
    * `opsFor` gives for the task and its Markdown, in one write per note.
+   * With `reports`, a failed write shows its line.
    */
   #apply(
     tasks: readonly OpenTask[],
     opsFor: (task: OpenTask, markdown: string) => readonly TaskItemOp[],
+    reports: boolean,
   ): Promise<void> {
     const { session } = this.#deps.graphSession.get()
     if (session === null) {
@@ -276,7 +283,9 @@ export class TaskCommands {
           byNote.set(task.notePath, [...(byNote.get(task.notePath) ?? []), ...ops])
         }
       }
-      return [...byNote].map(([notePath, ops]) => this.#queue(session, store, notePath, ops))
+      return [...byNote].map(([notePath, ops]) =>
+        this.#queue(session, store, notePath, ops, reports),
+      )
     })
     return Promise.all(writes).then(noop)
   }
@@ -330,6 +339,7 @@ export class TaskCommands {
     store: TaskStore,
     notePath: string,
     ops: readonly TaskOp[],
+    reports: boolean,
   ): Promise<void> {
     let pending = store.begin(notePath, ops)
     const run = async (): Promise<void> => {
@@ -346,7 +356,11 @@ export class TaskCommands {
       } catch (cause) {
         store.fail(pending)
         if (!session.signal.aborted) {
-          this.#report(cause)
+          this.#deps.logger.error('tasks: write failed:', cause)
+          const message = reports ? describeFailure(cause) : null
+          if (message !== null) {
+            this.#deps.progress.fail('Saving task', message)
+          }
         }
       }
     }
@@ -432,14 +446,5 @@ export class TaskCommands {
       }
     })
     return edits.length === 0 ? null : await this.write(session.generation, notePath, edits)
-  }
-
-  #report(cause: unknown): void {
-    const { logger, progress } = this.#deps
-    logger.error('tasks: write failed:', cause)
-    const message = describeFailure(cause)
-    if (message !== null) {
-      progress.fail('Saving task', message)
-    }
   }
 }

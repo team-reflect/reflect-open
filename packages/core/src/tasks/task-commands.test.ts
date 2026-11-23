@@ -268,6 +268,17 @@ describe('typed text', () => {
     )
   })
 
+  it('shows the line once while the app stops again with the same text', async () => {
+    const rows = await start({ [A]: '+ [ ] one\n' })
+
+    commands.setDraft(rows[0]!, 'one\n\ntwo')
+    await commands.commit(rows[0]!)
+    await commands.commitDrafts()
+
+    expect(harness.progress.get()).toHaveLength(1)
+    expect(shown()).toEqual([[rows[0]!.taskId, 'one\n\ntwo']])
+  })
+
   it('keeps the text in the row when its write fails, and writes it later', async () => {
     const rows = await start({ [A]: '+ [ ] one\n' })
     const write = vi.spyOn(commands, 'write').mockRejectedValueOnce(new Error('disk full'))
