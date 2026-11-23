@@ -196,7 +196,7 @@ export class TaskStore {
     for (const note of read.notes) {
       seen.add(note.path)
       if (this.#isCurrent(note.path, read.seq)) {
-        this.#setNote(toNoteContext(note), note.hash, note.tasks, completed, null, [])
+        this.#setNote(toNoteContext(note), note.hash, note.tasks, completed, null, [], [])
         this.#seqs.set(note.path, read.seq)
       }
     }
@@ -222,7 +222,7 @@ export class TaskStore {
     for (const note of read.notes) {
       seen.add(note.path)
       if (this.#isCurrent(note.path, read.seq)) {
-        this.#setNote(toNoteContext(note), note.hash, note.tasks, true, null, [])
+        this.#setNote(toNoteContext(note), note.hash, note.tasks, true, null, [], [])
         this.#seqs.set(note.path, read.seq)
       }
     }
@@ -347,7 +347,9 @@ export class TaskStore {
   /**
    * End `write` with the tasks it left in its note, or take the tasks of a
    * write that showed no ops. A task keeps its id through the moves of the
-   * edit, and an inserted task takes the id of its insert op. The tasks of a
+   * edit, and an inserted task takes the id of its insert op. Without the
+   * moves, an insert op gives its id to the first task with its content that
+   * is no task of the rows before. The tasks of a
    * note the store has no row context for are left to the next read. A note
    * that the store learned at a later index seq keeps its rows.
    */
@@ -374,6 +376,7 @@ export class TaskStore {
               const insert = inserts[i]
               return insert === undefined ? [] : [[encodeTaskPath(task.astPath), insert.taskId]]
             }),
+        commit.moves === null ? inserts : [],
       )
       if (commit.indexSeq !== null) {
         this.#seqs.set(notePath, commit.indexSeq)
@@ -457,6 +460,7 @@ export class TaskStore {
     complete: boolean,
     moves: readonly TaskMove[] | null,
     insertedIds: ReadonlyArray<readonly [path: string, taskId: string]>,
+    unplaced: readonly TaskInsertOp[],
   ): void {
     const { notePath } = context
     const previous = this.#notes.get(notePath)
@@ -475,6 +479,20 @@ export class TaskStore {
     }
     const ordered = tasks.toSorted((left, right) => compareTaskPaths(left.astPath, right.astPath))
     const ids = reconcileNoteTasks(previous?.rows ?? [], ordered, moves, this.createTaskId)
+    const known = new Set(previous?.rows.map((row) => row.taskId))
+    for (const op of unplaced) {
+      const index = ordered.findIndex((task, i) => {
+        return (
+          !known.has(ids[i]!) &&
+          task.markdown === op.markdown.trim() &&
+          task.checked === (op.checked === true)
+        )
+      })
+      if (index !== -1) {
+        ids[index] = op.taskId
+        known.add(op.taskId)
+      }
+    }
     const inserted = new Map(insertedIds)
     const rows = ordered.map((task, i): OpenTask => ({
       ...context,

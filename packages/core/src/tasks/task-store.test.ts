@@ -291,6 +291,23 @@ describe('TaskStore writes', () => {
     expect(labels(store.view().open)).toEqual(['t2:theirs', 't0:a', 't1:b'])
   })
 
+  it('gives an inserted task the id of its op when the note text is not the output of the edit', () => {
+    const { store, a } = loaded()
+    const note = { notePath: A, noteTitle: A, dailyDate: null, isPinned: false, pinnedOrder: null }
+    const write = store.push(A, [
+      { kind: 'insert', taskId: 'draft', note, after: 't0', markdown: 'c', updatedAt: 3 },
+    ])
+    const edit: TaskEdit = {
+      kind: 'insert',
+      at: { kind: 'contextEnd', task: locate(a) },
+      markdown: 'c',
+    }
+    const merged = projectTasks('+ [ ] theirs\n+ [ ] a\n+ [ ] b\n+ [ ] c\n')
+
+    store.landCommit({ ...commitOf(A, source, [edit], 2), tasks: merged, moves: null }, write)
+    expect(labels(store.view().open)).toEqual(['t2:theirs', 't0:a', 't1:b', 'draft:c'])
+  })
+
   it('ignores a read from before the index seq of a commit', () => {
     const { store, a } = loaded()
     const commit = commitOf(
