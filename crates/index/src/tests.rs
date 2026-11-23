@@ -1237,6 +1237,11 @@ fn repair_resets_a_corrupt_index_once_per_open() {
     assert!(!session.repair(generation + 1, &err), "another generation");
     assert!(session.repair(generation, &err));
     assert_eq!(read().unwrap(), None);
+    let journal_mode: String = Connection::open(root.join(".reflect/index.sqlite"))
+        .unwrap()
+        .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(journal_mode, "wal");
     // The repair of this open is spent; a new open allows one again.
     assert!(!session.repair(generation, &err));
     let generation = session.open(root, &FileIndexConnections).unwrap();

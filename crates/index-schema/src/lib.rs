@@ -277,13 +277,17 @@ mod schema {
 
     /// Empties the database file in place and migrates it to the latest
     /// schema. It works on a corrupt file and keeps the file in place, so
-    /// other connections and processes see the new empty database.
+    /// other connections and processes see the new empty database. Some
+    /// SQLite builds set the journal mode back to `delete` on a reset, so
+    /// this turns WAL on again.
     pub fn reset(conn: &mut Connection) -> Result<(), SchemaError> {
         use rusqlite::config::DbConfig;
         conn.set_db_config(DbConfig::SQLITE_DBCONFIG_RESET_DATABASE, true)?;
         let vacuumed = conn.execute_batch("VACUUM");
-        conn.set_db_config(DbConfig::SQLITE_DBCONFIG_RESET_DATABASE, false)?;
+        let reset_off = conn.set_db_config(DbConfig::SQLITE_DBCONFIG_RESET_DATABASE, false);
         vacuumed?;
+        reset_off?;
+        conn.execute_batch("PRAGMA journal_mode=WAL")?;
         migrate(conn)
     }
 
