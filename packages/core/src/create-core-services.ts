@@ -1276,8 +1276,6 @@ export function composeCoreServices(
       clock,
       logger,
       graphSession,
-      indexLifecycle,
-      role: adapters.role,
       ipc,
     }),
     noteActions: create.noteActions({

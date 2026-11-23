@@ -1,5 +1,4 @@
 import { sha256HexSync } from '@reflect/utils'
-import type { MaybePromise } from '@reflect/utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createOpenDocumentsService,
@@ -16,10 +15,6 @@ import {
   type TaskEditResult,
   type TaskSnapshot,
 } from '../markdown/index.ts'
-import type {
-  IndexAppliedEvent,
-  IndexReconciledEvent,
-} from '../indexing/index-lifecycle-service.ts'
 import { buildIndexedNote } from '../indexing/indexed-note.ts'
 import type { SnippetTask } from '../indexing/snippet-tasks.ts'
 import { WritableStore } from '../store.ts'
@@ -96,28 +91,10 @@ let ipc: TestIpcBridgeService
 let clock: TestClockService
 let logger: TestLoggerService
 let tasks: TaskService
-let appliedListeners: Set<(event: IndexAppliedEvent) => void>
-let reconciledListeners: Set<(event: IndexReconciledEvent) => MaybePromise<void>>
 
 const openGraph = createGraphSession({ root: '/g', name: 'g', generation: 7, indexGeneration: 1 })
 
-function createTasks(
-  graphSession: TaskServiceDeps['graphSession'],
-  role: TaskServiceDeps['role'] = 'main',
-): TaskService {
-  const indexLifecycle = createTestIndexLifecycleService()
-  vi.spyOn(indexLifecycle, 'onApplied').mockImplementation((listener) => {
-    appliedListeners.add(listener)
-    return () => {
-      appliedListeners.delete(listener)
-    }
-  })
-  vi.spyOn(indexLifecycle, 'onReconciled').mockImplementation((listener) => {
-    reconciledListeners.add(listener)
-    return () => {
-      reconciledListeners.delete(listener)
-    }
-  })
+function createTasks(graphSession: TaskServiceDeps['graphSession']): TaskService {
   return createTaskService({
     database,
     noteDocuments: createNoteDocumentService({
@@ -131,16 +108,15 @@ function createTasks(
     clock,
     logger,
     graphSession,
-    indexLifecycle,
-    role,
     ipc,
   })
 }
 
-function emitApplied(): void {
-  for (const listener of appliedListeners) {
-    listener({ generation: 1, changes: [] })
-  }
+/**
+ * Broadcast a commit of the index that wrote the notes at `paths`, or every note for `null`.
+ */
+function emitCommitted(paths: string[] | null): void {
+  ipc.emit('index:committed', { seq: 1, paths })
 }
 
 function openSession(session: TestNoteSession): void {
@@ -155,8 +131,6 @@ beforeEach(() => {
   ipc = createTestIpcBridgeService()
   clock = createTestClockService()
   logger = createTestLoggerService()
-  appliedListeners = new Set()
-  reconciledListeners = new Set()
   tasks = createTasks(new WritableStore({ session: openGraph }))
 })
 
@@ -697,12 +671,21 @@ describe('task list state', () => {
   /**
    * How many times the tasks were read from the index, and with which filter.
    */
-  function watchReads(): { count: () => number; filters: () => unknown[] } {
+  function watchReads(): {
+    count: () => number
+    filters: () => unknown[]
+    paths: () => unknown[]
+  } {
     const read = vi.spyOn(database, 'read')
-    const calls = () => read.mock.calls.filter(([command]) => command === 'index_tasks')
+    const calls = () => {
+      return read.mock.calls
+        .filter(([command]) => command === 'index_tasks')
+        .map(([, args]) => args as { checked: boolean | null; paths: string[] | null })
+    }
     return {
       count: () => calls().length,
-      filters: () => calls().map(([, args]) => (args as { checked: boolean | null }).checked),
+      filters: () => calls().map((args) => args.checked),
+      paths: () => calls().map((args) => args.paths),
     }
   }
 
@@ -951,30 +934,43 @@ describe('task list state', () => {
     expect(markdowns(tasks.get().open)).toEqual(['two'])
   })
 
-  it('re-reads on index changes while subscribed, at most once per throttle window', async () => {
+  it('reads the tasks of the notes a commit names, and of every note when it names none', async () => {
     const reads = watchReads()
-    const { unsubscribe } = await subscribed()
+    await subscribed()
+    seedNotes(database, [
+      { path: A, markdown: '+ [ ] one changed\n' },
+      { path: B, markdown: '+ [ ] two changed\n' },
+    ])
 
-    emitApplied()
-    emitApplied()
-    emitApplied()
+    emitCommitted([A])
     await flushMicrotasks()
-    expect(reads.count()).toBe(2)
+    expect(reads.paths()).toEqual([null, [A]])
+    expect(markdowns(tasks.get().open)).toEqual(['one changed', 'two'])
 
-    await clock.advance(3_000)
+    emitCommitted(null)
+    await flushMicrotasks()
+    expect(reads.paths()).toEqual([null, [A], null])
+    expect(markdowns(tasks.get().open)).toEqual(['one changed', 'two changed'])
+  })
+
+  it('drops the rows of a committed note that has no task left', async () => {
+    await subscribed()
+    seedNotes(database, [{ path: A, markdown: 'no task\n' }])
+
+    emitCommitted([A])
+    await flushMicrotasks()
+    expect(markdowns(tasks.get().open)).toEqual(['two'])
+  })
+
+  it('reads once more after a read of every note that a commit overtook', async () => {
+    const reads = watchReads()
+    await subscribed()
+
+    emitCommitted(null)
+    emitCommitted(null)
+    emitCommitted(null)
+    await flushMicrotasks()
     expect(reads.count()).toBe(3)
-
-    // Unsubscribed, the service stops listening and the next subscriber reads again.
-    unsubscribe()
-    expect(appliedListeners.size).toBe(0)
-    expect(reconciledListeners.size).toBe(0)
-    await clock.advance(3_000)
-    emitApplied()
-    await flushMicrotasks()
-    expect(reads.count()).toBe(3)
-    tasks.subscribe(noop)
-    await flushMicrotasks()
-    expect(reads.count()).toBe(4)
   })
 
   it('keeps reading while one subscription is left, however often another unsubscribes', async () => {
@@ -984,7 +980,21 @@ describe('task list state', () => {
     unsubscribe()
     unsubscribe()
 
-    emitApplied()
+    emitCommitted(null)
+    await flushMicrotasks()
+    expect(reads.count()).toBe(2)
+  })
+
+  it('reads again on the next subscription after the last one ended', async () => {
+    const reads = watchReads()
+    const { unsubscribe } = await subscribed()
+
+    unsubscribe()
+    emitCommitted(null)
+    await flushMicrotasks()
+    expect(reads.count()).toBe(1)
+
+    tasks.subscribe(noop)
     await flushMicrotasks()
     expect(reads.count()).toBe(2)
   })
@@ -998,41 +1008,6 @@ describe('task list state', () => {
     await tasks.refresh()
     expect(tasks.get()).toBe(state)
     expect(listener).not.toHaveBeenCalled()
-  })
-
-  it('re-reads on an index:committed broadcast in a note window only', async () => {
-    for (const [role, count] of [
-      ['main', 1],
-      ['note-window', 2],
-    ] as const) {
-      tasks = createTasks(new WritableStore({ session: openGraph }), role)
-      const reads = watchReads()
-      tasks.subscribe(noop)
-      await flushMicrotasks()
-
-      ipc.emit('index:committed', { seq: 1, paths: null })
-      await flushMicrotasks()
-
-      expect(reads.count()).toBe(count)
-      vi.restoreAllMocks()
-    }
-  })
-
-  it('re-reads after a requested rebuild but not after a sync pass', async () => {
-    const reads = watchReads()
-    await subscribed()
-
-    for (const listener of reconciledListeners) {
-      void listener({ generation: 1, fileGeneration: 1, source: 'sync' })
-    }
-    await flushMicrotasks()
-    expect(reads.count()).toBe(1)
-
-    for (const listener of reconciledListeners) {
-      void listener({ generation: 1, fileGeneration: 1, source: 'rebuild' })
-    }
-    await flushMicrotasks()
-    expect(reads.count()).toBe(2)
   })
 
   it('drops the rows on a graph switch and reads the new graph', async () => {
@@ -1125,22 +1100,18 @@ describe('reads racing writes', () => {
     expect(harness.files.files().get(NOTE)).toBe('## Tasks\n')
   })
 
-  it('keeps an edit when the trailing throttled read lands before the index has it', async () => {
+  it('keeps an edit when a read for a commit of another note lands after it', async () => {
     const OTHER = 'notes/other.md'
     const [row] = await indexed('## Tasks\n\n+ [ ] \n')
-    harness.editExternally(OTHER, 'one\n')
-    await harness.deliverWatcherBatch()
-    await harness.clock.advance(1_000)
-    harness.editExternally(OTHER, 'two\n')
+    harness.holdReads()
+    harness.editExternally(OTHER, '+ [ ] other\n')
     await harness.deliverWatcherBatch()
 
-    await harness.clock.advance(1_900)
     await harness.tasks.editTask(row!, 'buy milk')
     expect(harness.tasks.get().open?.[0]?.markdown).toBe('buy milk')
 
-    await harness.clock.advance(100)
-    await flushMicrotasks()
-    expect(harness.tasks.get().open?.[0]?.markdown).toBe('buy milk')
+    await harness.drain()
+    expect(harness.tasks.get().open?.map((row) => row.markdown)).toEqual(['buy milk', 'other'])
   })
 
   it('lands an edit whose stale path matches two identical tasks on one of them', async () => {

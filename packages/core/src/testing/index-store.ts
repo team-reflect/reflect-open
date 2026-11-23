@@ -1,3 +1,5 @@
+import { INDEX_COMMITTED_EVENT } from '../ipc/ipc-service.ts'
+import type { TestIpcBridgeService } from './ipc.ts'
 import { isIsoDate, type MaybePromise } from '@reflect/utils'
 import { noteBasenameKey } from '../graph/note-reference.ts'
 import { dateFromDailyPath, foldGraphPath } from '../graph/paths.ts'
@@ -69,6 +71,10 @@ export interface TestIndexStoreServiceOptions {
    */
   meta?: Readonly<Record<string, string>>
   /**
+   * Where `announce` emits `index:committed`, as the native index does to every window.
+   */
+  ipc?: TestIpcBridgeService
+  /**
    * Called after a call is recorded and before it takes effect. A returned
    * `Error` rejects the call with it.
    */
@@ -103,6 +109,7 @@ const EMPTY_SCAN: ReconcileScan = { total: 0, candidates: [], orphans: [], stale
 class TestIndexStoreServiceImpl implements TestIndexStoreService {
   readonly #database: TestDatabaseService | undefined
   readonly #generation: number
+  readonly #ipc: TestIpcBridgeService | undefined
   readonly #scan: ReconcileScan | (() => MaybePromise<ReconcileScan>)
   readonly #fail: ((call: IndexStoreCall) => Error | undefined) | undefined
   readonly #meta: Map<string, string>
@@ -117,6 +124,7 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
   constructor(options: TestIndexStoreServiceOptions | undefined) {
     this.#database = options?.database
     this.#generation = options?.generation ?? 1
+    this.#ipc = options?.ipc
     this.#scan = options?.scan ?? EMPTY_SCAN
     this.#fail = options?.fail
     this.#meta = new Map(Object.entries(options?.meta ?? {}))
@@ -196,6 +204,7 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
 
   announce(commit: IndexCommitted): Promise<void> {
     this.#announcements.push(commit)
+    this.#ipc?.emit(INDEX_COMMITTED_EVENT, commit)
     return Promise.resolve()
   }
 

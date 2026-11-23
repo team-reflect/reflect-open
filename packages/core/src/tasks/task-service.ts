@@ -1,13 +1,12 @@
 import { isShallowEqual } from '@ocavue/utils'
-import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
-import { requireGraphSession, type GraphRole, type GraphSession } from '../graph/graph-session.ts'
+import type { ClockService } from '../ports/clock-service.ts'
+import { requireGraphSession, type GraphSession } from '../graph/graph-session.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import type { NoteDocumentService } from '../documents/note-document-service.ts'
 import { AppError } from '../errors.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
-import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
-import { INDEX_COMMITTED_EVENT, listenNow, type IpcBridgeService } from '../ipc/ipc-service.ts'
+import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 import type { SnippetTask } from '../indexing/snippet-tasks.ts'
 import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
@@ -41,11 +40,6 @@ export interface TaskServiceDeps {
   readonly clock: ClockService
   readonly logger: LoggerService
   readonly graphSession: Store<{ readonly session: GraphSession | null }>
-  readonly indexLifecycle: IndexLifecycleService
-  /**
-   * Which window this webview is; only a note window follows {@link INDEX_COMMITTED_EVENT}.
-   */
-  readonly role: GraphRole
   readonly ipc: IpcBridgeService
 }
 
@@ -146,8 +140,9 @@ export interface TaskService extends Store<TaskListState> {
   get: () => TaskListState
   /**
    * Call `listener` whenever {@link TaskService.get} changes. The first
-   * subscription reads the open tasks; while any listener is subscribed, an
-   * index change re-reads them. While nothing is subscribed, the service does
+   * subscription reads the open tasks; while any listener is subscribed, a
+   * commit to the index re-reads the tasks of the notes it names, or of every
+   * note when it names none. While nothing is subscribed, the service does
    * not follow the index, and the next subscription reads the rows again.
    */
   subscribe: (listener: VoidFunction) => Unlisten
@@ -312,11 +307,6 @@ function toOps(taskId: string, actions: readonly TaskAction[]): TaskItemOp[] {
   return actions.map((action) => ({ ...action, taskId }))
 }
 
-/**
- * Spacing between index-change re-reads while the index applies batch after batch.
- */
-const REFRESH_THROTTLE_MS = 3_000
-
 function sessionKey(session: GraphSession | null): string | null {
   return session === null ? null : `${session.generation}:${session.root}`
 }
@@ -360,8 +350,6 @@ class TaskServiceImpl implements TaskService {
   #stale = true
   #completedHolds = 0
   #sources: Unlisten | null = null
-  #lastRefreshAt = -Infinity
-  #trailingRefresh: TimerHandle | null = null
 
   constructor(deps: TaskServiceDeps) {
     this.#deps = deps
@@ -570,44 +558,28 @@ class TaskServiceImpl implements TaskService {
   }
 
   /**
-   * Listen for index changes and graph switches. The returned function stops
-   * listening and marks the rows stale, since later changes go unseen.
+   * Listen for committed note rows and graph switches. The returned function
+   * stops listening and marks the rows stale, since later changes go unseen.
    */
   #startSources(): Unlisten {
-    const { graphSession, indexLifecycle, role, ipc, logger, clock } = this.#deps
     const unlisteners = [
-      graphSession.subscribe(() => {
+      this.#deps.graphSession.subscribe(() => {
         if (this.#adoptSession()) {
           this.#publish()
           void this.refresh()
         }
       }),
-      indexLifecycle.onApplied(() => this.#throttledInvalidate()),
-      // A manual rebuild skips the watcher pipeline and its applied events.
-      indexLifecycle.onReconciled((event) => {
-        if (event.source !== 'sync') {
-          this.#invalidate()
+      this.#reader.subscribe(({ paths }) => {
+        if (paths === null) {
+          void this.refresh()
+        } else {
+          void this.#readPaths(paths)
         }
       }),
     ]
-    if (role !== 'main') {
-      // A note window runs no indexer; the main window's committed writes reach it here.
-      unlisteners.push(
-        listenNow(
-          () => ipc.listen(INDEX_COMMITTED_EVENT, () => this.#throttledInvalidate()),
-          (cause) => {
-            logger.error(`${INDEX_COMMITTED_EVENT} listener failed:`, cause)
-          },
-        ),
-      )
-    }
     return () => {
       for (const unlisten of unlisteners) {
         unlisten()
-      }
-      if (this.#trailingRefresh !== null) {
-        clock.clearTimeout(this.#trailingRefresh)
-        this.#trailingRefresh = null
       }
       this.#stale = true
     }
@@ -664,36 +636,16 @@ class TaskServiceImpl implements TaskService {
   }
 
   /**
-   * Re-read the rows when a screen shows them, else mark them stale for the next one.
+   * Read every task of the notes at `paths` into the store.
    */
-  #invalidate(): void {
-    if (this.#state.subscribed()) {
-      void this.refresh()
-    } else {
-      this.#stale = true
+  async #readPaths(paths: readonly string[]): Promise<void> {
+    this.#syncSession()
+    const store = this.#store
+    const read = await this.#reader.readPaths(paths, this.#reads.signal)
+    if (read !== null) {
+      store.landPaths(read, paths)
+      this.#publish()
     }
-  }
-
-  /**
-   * {@link TaskServiceImpl.#invalidate}, at most once per {@link REFRESH_THROTTLE_MS}:
-   * an isolated change re-reads at once, and a burst ends with one trailing re-read.
-   */
-  #throttledInvalidate(): void {
-    const { clock } = this.#deps
-    const elapsed = clock.monotonicNow() - this.#lastRefreshAt
-    if (elapsed >= REFRESH_THROTTLE_MS) {
-      this.#lastRefreshAt = clock.monotonicNow()
-      this.#invalidate()
-      return
-    }
-    if (this.#trailingRefresh !== null) {
-      return
-    }
-    this.#trailingRefresh = clock.setTimeout(() => {
-      this.#trailingRefresh = null
-      this.#lastRefreshAt = clock.monotonicNow()
-      this.#invalidate()
-    }, REFRESH_THROTTLE_MS - elapsed)
   }
 
   #publish(): void {

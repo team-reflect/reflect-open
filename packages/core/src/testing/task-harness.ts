@@ -147,8 +147,10 @@ export class TaskHarness {
       session: this.session,
     })
     const logger = createTestLoggerService()
+    const ipc = createTestIpcBridgeService()
     this.indexStore = createTestIndexStoreService({
       database: this.database,
+      ipc,
       generation: INDEX_GENERATION,
       meta: { [PROJECTION_VERSION_KEY]: String(PROJECTION_VERSION) },
       scan: async () => {
@@ -203,9 +205,7 @@ export class TaskHarness {
       clock: this.clock,
       logger,
       graphSession,
-      indexLifecycle: this.index,
-      role: 'main',
-      ipc: createTestIpcBridgeService(),
+      ipc,
     })
   }
 

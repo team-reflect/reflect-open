@@ -230,7 +230,7 @@ describe('DailyCaptureMenu', () => {
     getOpenTasks.mockResolvedValue([makeOpenTask({ ...today, markdown: '' })])
     const view = await renderMenu()
     // The Daily screen leaves the graph's task rows alone until a sheet needs them.
-    core.indexLifecycle.emitApplied(null, 1)
+    core.ipc.emit('index:committed', { seq: 1, paths: null })
     expect(getOpenTasks).not.toHaveBeenCalled()
     await view.getByRole('button', { name: 'Show capture actions' }).click()
     await view.getByRole('button', { name: 'New task' }).click()
@@ -241,7 +241,7 @@ describe('DailyCaptureMenu', () => {
     getOpenTasks.mockResolvedValue([
       makeOpenTask({ ...today, revision: 'synced', markdown: 'synced from another device' }),
     ])
-    core.indexLifecycle.emitApplied(null, 1)
+    core.ipc.emit('index:committed', { seq: 1, paths: null })
     await vi.waitFor(() => expect(getOpenTasks).toHaveBeenCalledTimes(readsBefore + 1))
     await act(async () => {
       await getOpenTasks.mock.results.at(-1)?.value
