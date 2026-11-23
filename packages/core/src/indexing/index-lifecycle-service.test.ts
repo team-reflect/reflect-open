@@ -206,6 +206,7 @@ function setup(options?: {
     files,
     fileChanges,
     logger,
+    clock,
     operations,
     steps,
     progress,
@@ -612,6 +613,42 @@ describe('createIndexLifecycleService', () => {
     held.settles[0]!()
     await index.settled()
     expect(progress).toEqual(['reconciling', 'idle'])
+  })
+
+  it('retries a failed pass after a wait that doubles, until one goes live', async () => {
+    let fail = true
+    const { index, clock, passes, progress } = setup({
+      failStore: (call) => {
+        return fail && call.method === 'reconcileScan' ? new Error('boom') : undefined
+      },
+    })
+    index.sync(sessionAt(5))
+    await index.settled()
+    expect(progress).toEqual(['reconciling', 'idle'])
+
+    await clock.advance(2_000)
+    await index.settled()
+    expect(passes()).toBe(2)
+
+    fail = false
+    await clock.advance(2_000)
+    expect(passes()).toBe(2)
+    await clock.advance(2_000)
+    await index.settled()
+    expect(passes()).toBe(3)
+    expect(progress.at(-1)).toBe('live')
+    expect(clock.pendingTimers()).toBe(0)
+  })
+
+  it('close() cancels the retry of a failed pass', async () => {
+    const { index, clock, passes } = setup({
+      failStore: (call) => (call.method === 'reconcileScan' ? new Error('boom') : undefined),
+    })
+    index.sync(sessionAt(5))
+    await index.settled()
+    await index.close()
+    await clock.advance(60_000)
+    expect(passes()).toBe(1)
   })
 
   it('refresh() bails without a rerun when superseded', async () => {

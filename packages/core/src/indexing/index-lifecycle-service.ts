@@ -3,6 +3,7 @@ import type { GraphRole, GraphSession } from '../graph/graph-session.ts'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { isMobilePlatform } from '../ports/platform-facts.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
+import type { TimerHandle } from '../ports/clock-service.ts'
 import type { OperationHandle, ProgressPort } from '../ports/progress-port.ts'
 import { errorMessage, toAppError } from '../errors.ts'
 import { WritableStore, type Store } from '../store.ts'
@@ -18,6 +19,16 @@ import {
 } from './index-writer.ts'
 import { followFileChanges, markFileChanges } from './live.ts'
 import { noop } from '@ocavue/utils'
+
+/**
+ * The wait before the first retry of a failed sync pass. Each further failure doubles it.
+ */
+const PASS_RETRY_MIN_MS = 2_000
+
+/**
+ * The longest wait between retries of a failed sync pass.
+ */
+const PASS_RETRY_MAX_MS = 5 * 60_000
 
 /**
  * Stage of the index lifecycle that failed.
@@ -122,6 +133,7 @@ export interface IndexLifecycleService {
    * writer of the session writes them, so index writes never run concurrently
    * and a change reported during a pass is written. The pass bails between
    * steps once `session.signal` aborts; a session without an index runs none.
+   * A pass that failed runs again after a wait that doubles with each failure.
    * Call only after the graph row is committed.
    */
   sync(session: GraphSession): void
@@ -323,6 +335,8 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
   #refreshQueued = false
   #rebuildInFlight: { generation: number; promise: Promise<void> } | null = null
   #tooNewNotice: OperationHandle | null = null
+  #retryTimer: TimerHandle | null = null
+  #retryDelayMs = PASS_RETRY_MIN_MS
 
   constructor(deps: IndexLifecycleDeps) {
     this.#deps = deps
@@ -362,6 +376,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
       this.#dropWriter()
       return
     }
+    this.#cancelRetry()
     if (this.#isSuspended()) {
       return
     }
@@ -446,9 +461,17 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
         if (controller.signal.aborted || isStale() || this.#isSuspended()) {
           return
         }
+        this.#retryDelayMs = PASS_RETRY_MIN_MS
         this.#emitProgress('live')
       } catch (error) {
         this.#reportError('sync', error)
+        if (this.#abort === controller && !isStale() && !this.#isSuspended()) {
+          this.#retryTimer = clock.setTimeout(() => {
+            this.#retryTimer = null
+            this.refresh(session)
+          }, this.#retryDelayMs)
+          this.#retryDelayMs = Math.min(this.#retryDelayMs * 2, PASS_RETRY_MAX_MS)
+        }
       } finally {
         if (this.#abort === controller && this.#progress.get() === 'reconciling') {
           this.#emitProgress('idle')
@@ -496,6 +519,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
 
   async close(): Promise<void> {
     await this.stop()
+    this.#cancelRetry()
     this.#dropWriter()
     this.#suspended = false
     this.#emitProgress('idle')
@@ -509,6 +533,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
 
   suspend(): void {
     this.#suspended = true
+    this.#cancelRetry()
     this.#abort?.abort()
     this.#writer?.pause()
     this.#unfollow()
@@ -680,6 +705,13 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
 
   #reportError(stage: IndexLifecycleStage, error: unknown): void {
     this.#deps.logger.error(`index ${stage} failed:`, errorMessage(error))
+  }
+
+  #cancelRetry(): void {
+    if (this.#retryTimer !== null) {
+      this.#deps.clock.clearTimeout(this.#retryTimer)
+      this.#retryTimer = null
+    }
   }
 
   #isSuspended(): boolean {
