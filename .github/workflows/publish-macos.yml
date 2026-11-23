@@ -95,9 +95,11 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
+      # Both entries restore one cache. Only the universal build saves it,
+      # because it also compiles the arm64 slice.
       - uses: ./.github/actions/setup-rust
         with:
-          cache-scope: publish-macos-${{ matrix.name }}
+          cache-save: ${{ matrix.name == 'universal' }}
 
       # The universal build also compiles the x86_64 slice on this arm64 runner.
       - name: Add the x86_64 macOS target
