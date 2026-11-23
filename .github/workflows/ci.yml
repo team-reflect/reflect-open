@@ -385,14 +385,15 @@ jobs:
       - name: Debug cache state
         shell: bash
         run: |
-          env | grep -E 'CARGO|RUST|MBX' | sort || true
-          ls -la --time-style=full-iso ~/.cargo/registry/src/*/ 2>/dev/null | head -20 || ls -laT ~/.cargo/registry/src/*/ | head -20
+          set +e +o pipefail
+          env | grep -E 'CARGO|RUST|MBX|CC|CXX' | sort
           for c in serde_core thiserror rustix; do
-            for d in ~/.cargo/registry/src/*/$c-*; do stat "$d/build.rs" "$d/Cargo.toml" 2>/dev/null; done
-            for d in target/debug/build/$c-*; do ls -la --time-style=full-iso "$d" 2>/dev/null || ls -laT "$d"; head -c 600 "$d/output" 2>/dev/null; done
+            for d in ~/.cargo/registry/src/*/$c-*; do stat -c '%y %n' "$d" "$d"/build.rs "$d"/Cargo.toml; done
+            for d in target/debug/build/$c-*; do ls -la --time-style=full-iso "$d"; head -c 600 "$d/output"; echo; done
             for f in target/debug/.fingerprint/$c-*/*.json; do echo "== $f"; head -c 1500 "$f"; echo; done
           done
-          ls -la ~/.cargo/bin 2>/dev/null | head; command -v cargo rustc; ls -la target/debug | head -20
+          command -v cargo rustc
+          ls -la --time-style=full-iso target/debug
 
       - name: Test
         env:
