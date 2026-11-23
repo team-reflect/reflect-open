@@ -23,33 +23,48 @@ pub trait IndexEvents {
 
     /// The rows of the note at `from` moved to `to`.
     fn note_moved(&self, from: &str, to: &str);
+
+    /// A corrupt index file was reset to an empty index: every row must be
+    /// rebuilt.
+    fn index_reset(&self);
 }
 
 /// The index commands of one session.
 pub struct IndexCommands<'a> {
     session: &'a IndexSession,
     events: &'a dyn IndexEvents,
-    read_generation: u64,
+    generation: u64,
 }
 
 impl<'a> IndexCommands<'a> {
-    /// `read_generation` is the reader generation that a read command is
-    /// pinned to: [`IndexSession::read_generation`] at the time the command
-    /// was issued.
-    pub fn new(
-        session: &'a IndexSession,
-        events: &'a dyn IndexEvents,
-        read_generation: u64,
-    ) -> Self {
+    /// `generation` is [`IndexSession::read_generation`] at the time the
+    /// command was issued: a read command is pinned to it, and a repair resets
+    /// only that session.
+    pub fn new(session: &'a IndexSession, events: &'a dyn IndexEvents, generation: u64) -> Self {
         Self {
             session,
             events,
-            read_generation,
+            generation,
         }
     }
 
+    /// Runs `command` with `args_json`, a JSON object of camelCase arguments.
+    /// The reply is JSON text. A command that finds the file corrupt resets it
+    /// (see [`IndexSession::repair`]) and reports [`IndexEvents::index_reset`];
+    /// the command itself still fails.
+    pub fn dispatch(&self, command: &str, args_json: &[u8]) -> AppResult<String> {
+        let reply = self.run(command, args_json);
+        #[cfg(any(feature = "native", test))]
+        if let Err(err) = &reply
+            && matches!(self.session.repair(self.generation, err), Ok(true))
+        {
+            self.events.index_reset();
+        }
+        reply
+    }
+
     fn read<T>(&self, body: impl FnOnce(&Connection) -> AppResult<T>) -> AppResult<T> {
-        self.session.read(self.read_generation, body)
+        self.session.read(self.generation, body)
     }
 
     fn announce(&self, applied: Applied) {
@@ -383,7 +398,7 @@ impl<'a> IndexCommands<'a> {
     }
 }
 
-/// Defines the command lists and [`IndexCommands::dispatch`] from the
+/// Defines the command lists and the router of [`IndexCommands::dispatch`] from the
 /// `index_write` and `index_read` rows of the command table.
 macro_rules! index_dispatch {
     (
@@ -400,9 +415,8 @@ macro_rules! index_dispatch {
         pub const INDEX_READ_COMMANDS: &[&str] = &[$( stringify!($read) ),*];
 
         impl IndexCommands<'_> {
-            /// Runs `command` with `args_json`, a JSON object of camelCase
-            /// arguments. The reply is JSON text.
-            pub fn dispatch(&self, command: &str, args_json: &[u8]) -> AppResult<String> {
+            /// Routes `command` to its method.
+            fn run(&self, command: &str, args_json: &[u8]) -> AppResult<String> {
                 match command {
                     $( stringify!($write) => {
                         let reflect_types::commands::$write::Args { $( $write_arg ),* } =

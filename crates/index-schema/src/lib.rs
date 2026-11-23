@@ -172,6 +172,19 @@ mod schema {
 
     impl std::error::Error for SchemaError {}
 
+    impl SchemaError {
+        /// Whether SQLite reports the database file as damaged.
+        pub fn is_corrupt(&self) -> bool {
+            let SchemaError::Sqlite(err) = self else {
+                return false;
+            };
+            matches!(
+                err.sqlite_error_code(),
+                Some(rusqlite::ErrorCode::DatabaseCorrupt | rusqlite::ErrorCode::NotADatabase)
+            )
+        }
+    }
+
     impl From<rusqlite::Error> for SchemaError {
         fn from(err: rusqlite::Error) -> Self {
             SchemaError::Sqlite(err)
@@ -255,6 +268,9 @@ mod schema {
                     })
                 }
             }
+            Err(rusqlite_migration::Error::RusqliteError { err, .. }) => {
+                Err(SchemaError::Sqlite(err))
+            }
             Err(err) => Err(SchemaError::Migration(err.to_string())),
         }
     }
@@ -280,6 +296,7 @@ mod schema {
     }
 
     /// Open (creating if needed) and migrate `<root>/.reflect/index.sqlite`.
+    /// A file that is corrupt at open is reset to an empty index once.
     #[cfg(not(target_family = "wasm"))]
     pub fn open_index_at(root: &Path) -> Result<Connection, SchemaError> {
         register_sqlite_vec()?;
@@ -292,9 +309,22 @@ mod schema {
         // Wait briefly for a cross-process lock to clear instead of failing
         // writes instantly with SQLITE_BUSY ("database is locked").
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
-        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
-        migrate(&mut conn)?;
+        if let Err(err) = prepare(&mut conn) {
+            if !err.is_corrupt() {
+                return Err(err);
+            }
+            tracing::warn!(%err, "the index file is corrupt at open; resetting it");
+            reset(&mut conn)?;
+            prepare(&mut conn)?;
+        }
         Ok(conn)
+    }
+
+    /// Turns on WAL and foreign keys, then migrates.
+    #[cfg(not(target_family = "wasm"))]
+    fn prepare(conn: &mut Connection) -> Result<(), SchemaError> {
+        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
+        migrate(conn)
     }
 
     /// Open `<root>/.reflect/index.sqlite` **read-only** (no create, no

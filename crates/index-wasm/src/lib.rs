@@ -87,6 +87,10 @@ impl IndexEvents for EventQueue {
             serde_json::json!({ "from": from, "to": to }),
         );
     }
+
+    fn index_reset(&self) {
+        self.push(EventName::IndexReconcile, serde_json::Value::Null);
+    }
 }
 
 /// The arguments of `index_reconcile_scan` on this host: the caller lists the

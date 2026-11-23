@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
-use rusqlite::{Connection, ErrorCode};
+use rusqlite::Connection;
 use sea_query::{OnConflict, Query};
 
 use reflect_types::{
@@ -14,7 +14,7 @@ use reflect_types::{
 
 use crate::chat_write;
 #[cfg(any(feature = "native", test))]
-use crate::connections::reset_corrupt;
+use crate::connections::{is_corrupt, reset_corrupt};
 use crate::embed_write;
 use crate::scan;
 use crate::schema::IndexMeta;
@@ -59,6 +59,8 @@ struct WriterInner {
     /// scan could otherwise walk a freshly swapped root and diff another
     /// graph's files against this index.
     root: Option<PathBuf>,
+    /// [`IndexSession::repair`] already ran for this generation.
+    repaired: bool,
 }
 
 /// The query reader: a second, **read-only** connection under its own lock,
@@ -116,6 +118,7 @@ impl IndexSession {
         // lock, so a generation can never pair with another graph's root.
         writer.conn = None;
         writer.root = None;
+        writer.repaired = false;
         {
             let mut reader = self.lock_reader()?;
             reader.conn = None;
@@ -338,10 +341,29 @@ impl IndexSession {
     pub fn clear(&self, generation: u64) -> AppResult<Applied> {
         Self::applied(
             self.write(generation, |conn| match write::clear_index(conn) {
-                Err(err) if is_corrupt(&err) => reset_corrupt(conn, err),
-                result => Ok(result?),
+                #[cfg(any(feature = "native", test))]
+                Err(err) if is_corrupt(&err) => reset_corrupt(conn, &err),
+                result => result,
             }),
         )
+    }
+
+    /// Resets the index file after a command found it corrupt (`err`), at most
+    /// once per [`open`]: a repair never starts another open, so a file that
+    /// stays corrupt cannot cycle through reset and rebuild. Returns whether it
+    /// reset.
+    ///
+    /// [`open`]: IndexSession::open
+    #[cfg(any(feature = "native", test))]
+    pub fn repair(&self, generation: u64, err: &AppError) -> AppResult<bool> {
+        let mut writer = self.lock_writer()?;
+        if writer.generation != generation || writer.repaired || !is_corrupt(err) {
+            return Ok(false);
+        }
+        writer.repaired = true;
+        let conn = writer.conn.as_mut().ok_or_else(AppError::no_graph)?;
+        reset_corrupt(conn, err)?;
+        Ok(true)
     }
 
     /// Upsert one chat message and its conversation row in a single
@@ -444,21 +466,6 @@ impl IndexSession {
             body(&tx)
         })
     }
-}
-
-/// Whether SQLite reports the database file as damaged.
-fn is_corrupt(err: &rusqlite::Error) -> bool {
-    matches!(
-        err.sqlite_error_code(),
-        Some(ErrorCode::DatabaseCorrupt | ErrorCode::NotADatabase)
-    )
-}
-
-/// A host without the schema crate cannot recreate the schema, so the error
-/// stands.
-#[cfg(not(any(feature = "native", test)))]
-fn reset_corrupt(_conn: &mut Connection, err: rusqlite::Error) -> AppResult<()> {
-    Err(err.into())
 }
 
 /// One committed row-move transaction (the rename pipeline's halves).

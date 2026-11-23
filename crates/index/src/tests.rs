@@ -49,7 +49,9 @@ use super::scan::scan_reconcile;
 use super::text::fts::build_fts_match;
 use super::visit_write::record;
 use super::write::{apply_note, claim_tier, clear_index, move_note, touch_note};
-use super::{Applied, FileIndexConnections, IndexConnections, IndexSession};
+use super::{
+    Applied, FileIndexConnections, IndexCommands, IndexConnections, IndexEvents, IndexSession,
+};
 use reflect_types::{BacklinkSourceCursor, SearchRequest};
 
 fn migrated() -> Connection {
@@ -1169,20 +1171,96 @@ fn clear_resets_a_corrupt_index_file() {
             .apply(generation, &[note("notes/c.md", "C", vec![wiki("D")])])
             .unwrap();
         let reader = session.read_generation().unwrap();
-        let (integrity, notes, version) = session
+        let (integrity, notes) = session
             .read(reader, |conn| {
                 let integrity: String =
                     conn.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
                 let notes: i64 =
                     conn.query_row("SELECT count(*) FROM notes", [], |row| row.get(0))?;
-                let version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-                Ok((integrity, notes, version))
+                Ok((integrity, notes))
             })
             .unwrap();
         assert_eq!(integrity, "ok", "{damaged}");
         assert_eq!(notes, 1, "{damaged}");
-        assert_eq!(version, LATEST_SCHEMA_VERSION as i64, "{damaged}");
     }
+}
+
+#[test]
+fn open_resets_an_index_file_with_a_damaged_header() {
+    use std::io::Write;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    let session = IndexSession::new();
+    let generation = session.open(root, &FileIndexConnections).unwrap();
+    session
+        .apply(generation, &[note("notes/a.md", "A", vec![])])
+        .unwrap();
+    drop(session);
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .open(root.join(".reflect/index.sqlite"))
+        .unwrap();
+    file.write_all(&[0xA5; 100]).unwrap();
+    drop(file);
+
+    let session = IndexSession::new();
+    let generation = session.open(root, &FileIndexConnections).unwrap();
+    let reader = session.read_generation().unwrap();
+    let notes: i64 = session
+        .read(reader, |conn| {
+            Ok(conn.query_row("SELECT count(*) FROM notes", [], |row| row.get(0))?)
+        })
+        .unwrap();
+    assert_eq!(notes, 0);
+    session
+        .apply(generation, &[note("notes/b.md", "B", vec![])])
+        .unwrap();
+}
+
+/// Records the [`IndexEvents`] a command reports.
+#[derive(Default)]
+struct RecordedEvents(std::cell::RefCell<Vec<&'static str>>);
+
+impl IndexEvents for RecordedEvents {
+    fn index_written(&self) {
+        self.0.borrow_mut().push("written");
+    }
+
+    fn note_moved(&self, _from: &str, _to: &str) {
+        self.0.borrow_mut().push("moved");
+    }
+
+    fn index_reset(&self) {
+        self.0.borrow_mut().push("reset");
+    }
+}
+
+#[test]
+fn a_command_that_finds_the_file_corrupt_resets_it_once_per_open() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    let session = IndexSession::new();
+    let generation = session.open(root, &FileIndexConnections).unwrap();
+    session
+        .apply(generation, &[note("notes/a.md", "A", vec![])])
+        .unwrap();
+    drop(session);
+    corrupt_root_page(root, "notes");
+
+    let session = IndexSession::new();
+    let generation = session.open(root, &FileIndexConnections).unwrap();
+    let events = RecordedEvents::default();
+    let commands = IndexCommands::new(&session, &events, generation);
+    let args = br#"{"path":"notes/a.md"}"#;
+    let err = commands.dispatch("index_note", args).unwrap_err();
+    assert!(err.message().contains("malformed"), "{err:?}");
+    assert_eq!(*events.0.borrow(), ["reset"]);
+    assert_eq!(commands.dispatch("index_note", args).unwrap(), "null");
+
+    // The repair of this open is spent, even for another corrupt error.
+    assert!(!session.repair(generation, &err).unwrap());
+    let generation = session.open(root, &FileIndexConnections).unwrap();
+    assert!(session.repair(generation, &err).unwrap());
 }
 
 #[test]

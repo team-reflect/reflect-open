@@ -346,22 +346,11 @@ fn claim_unless_held(conn: &Connection, path: &str, key: &str, tier: i64) -> App
 /// Wipe every derived table (for a full rebuild driven by TS). Deleting `notes`
 /// cascades to every child table; `search_fts` (a virtual table, no FK) is
 /// cleared explicitly. `index_meta` is intentionally preserved across a rebuild.
-/// Returns the SQLite error unchanged, with its result code.
-pub(super) fn clear_index(conn: &Connection) -> rusqlite::Result<()> {
-    for statement in [
-        Query::delete().from_table(Notes::Table).to_owned(),
-        Query::delete().from_table(SearchFts::Table).to_owned(),
-        Query::delete()
-            .from_table(EmbeddingVectors::Table)
-            .to_owned(),
-        Query::delete()
-            .from_table(EmbeddingChunks::Table)
-            .to_owned(),
-    ] {
-        let (sql, params) = sql::build(&statement);
-        conn.prepare_cached(&sql)?
-            .execute(rusqlite::params_from_iter(params))?;
-    }
+pub(super) fn clear_index(conn: &Connection) -> AppResult<()> {
+    sql::execute(conn, Query::delete().from_table(Notes::Table))?;
+    sql::execute(conn, Query::delete().from_table(SearchFts::Table))?;
+    sql::execute(conn, Query::delete().from_table(EmbeddingVectors::Table))?;
+    sql::execute(conn, Query::delete().from_table(EmbeddingChunks::Table))?;
     Ok(())
 }
 

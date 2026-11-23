@@ -4971,6 +4971,7 @@ dependencies = [
  "rusqlite_migration",
  "sqlite-vec",
  "sqlite-wasm-vec",
+ "tracing",
 ]
 
 [[package]]

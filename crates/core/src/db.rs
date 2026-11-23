@@ -30,6 +30,15 @@ impl IndexEvents for Core {
     fn note_moved(&self, from: &str, to: &str) {
         self.emit_note_moved(from, to);
     }
+
+    /// A reset file has no projection stamp, so the requested reconcile
+    /// rebuilds every row.
+    fn index_reset(&self) {
+        self.host().emit(
+            reflect_types::events::EventName::IndexReconcile.as_str(),
+            Value::Null,
+        );
+    }
 }
 
 impl Core {
@@ -61,7 +70,7 @@ impl Core {
         }
         let _background_task = background_task::scoped(&self.background_tasks, command);
         // A write takes no reader lock: a long query never delays it.
-        IndexCommands::new(&self.index, self.as_ref(), 0)
+        IndexCommands::new(&self.index, self.as_ref(), self.index.read_generation()?)
             .dispatch(command, args_json)
             .map(Reply::Json)
     }
