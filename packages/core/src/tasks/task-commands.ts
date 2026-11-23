@@ -283,9 +283,9 @@ export class TaskCommands {
           byNote.set(task.notePath, [...(byNote.get(task.notePath) ?? []), ...ops])
         }
       }
-      return [...byNote].map(([notePath, ops]) =>
-        this.#queue(session, store, notePath, ops, reports),
-      )
+      return [...byNote].map(([notePath, ops]) => {
+        return this.#queue(session, store, notePath, ops, reports)
+      })
     })
     return Promise.all(writes).then(noop)
   }

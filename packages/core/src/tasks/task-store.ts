@@ -349,7 +349,7 @@ export class TaskStore {
    */
   dropEmptyNewTasks(): void {
     this.batch(() => {
-      for (const taskId of [...this.#unwritten.keys()]) {
+      for (const taskId of this.#unwritten.keys()) {
         const text = this.#drafts.get(taskId)?.markdown ?? this.findNewTask(taskId)?.markdown
         if (text?.trim() === '' && this.#takeNewTask(taskId) !== undefined) {
           this.#drafts.delete(taskId)

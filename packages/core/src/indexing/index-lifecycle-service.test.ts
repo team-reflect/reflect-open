@@ -612,7 +612,7 @@ describe('createIndexLifecycleService', () => {
     })
     held.settles[1]!()
     await index.settled()
-    await sleep(10)
+    await index.drained()
 
     expect(store.applied().map((note) => note.path)).toEqual(['a.md'])
   })
