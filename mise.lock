@@ -43,6 +43,12 @@ url = "https://github.com/Boshen/cargo-shear/releases/download/v1.14.0/cargo-she
 url_api = "https://api.github.com/repos/Boshen/cargo-shear/releases/assets/580851834"
 provenance = "github-attestations"
 
+[tools."github:Boshen/cargo-shear"."platforms.windows-arm64"]
+checksum = "sha256:892baa0618bceaf00e27dddcb5c38435d084874f25b44928357a860a5275421f"
+url = "https://github.com/Boshen/cargo-shear/releases/download/v1.14.0/cargo-shear-aarch64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/Boshen/cargo-shear/releases/assets/580851817"
+provenance = "github-attestations"
+
 [tools."github:Boshen/cargo-shear"."platforms.windows-x64"]
 checksum = "sha256:1f81bdb905cb2cfbc95cb412ab4c1506136686b8d20b90b9ca1aa1ceded46760"
 url = "https://github.com/Boshen/cargo-shear/releases/download/v1.14.0/cargo-shear-x86_64-pc-windows-msvc.zip"
@@ -84,6 +90,12 @@ checksum = "sha256:45520df8680978a6e7c4023ace0e3f311c73efc208cd68e5a7f4ed4822fa0
 checksum_source = "mise-versions"
 url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.3/cargo-about-0.9.3-aarch64-apple-darwin.tar.gz"
 url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/677829608"
+
+[tools."github:EmbarkStudios/cargo-about"."platforms.windows-arm64"]
+checksum = "sha256:f05a79c38eeffa45098091f6325682ef0801a1078b4e706e024585fa2bfb641b"
+checksum_source = "mise-versions"
+url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.3/cargo-about-0.9.3-aarch64-pc-windows-msvc.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/677833880"
 
 [tools."github:EmbarkStudios/cargo-about"."platforms.windows-x64"]
 checksum = "sha256:9e2942533ef1c592c4a70bdb384cae1550a3f5fc9ae40379b6662e3d2f16fe02"
@@ -136,6 +148,12 @@ repository_ids = { repository = "1340721957" }
 [tools.mr-boxington."platforms.macos-arm64"]
 checksum = "sha256:d5b957216c8b61c2df91c9e7aaf5febd45ec74274a60d3714ebe316edc144543"
 url = "https://github.com/jdx/mr-boxington/releases/download/v1.30.0/mbx-aarch64-apple-darwin.tar.gz"
+signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
+repository_ids = { repository = "1340721957" }
+
+[tools.mr-boxington."platforms.windows-arm64"]
+checksum = "sha256:6c8420ce91e80d43a599bebb733103791dc9aee183d10389bf609fd57a23047a"
+url = "https://github.com/jdx/mr-boxington/releases/download/v1.30.0/mbx-aarch64-pc-windows-msvc.zip"
 signer = "sigstore-oidc:https://github.com/jdx/mr-boxington/.github/workflows/release.yml"
 repository_ids = { repository = "1340721957" }
 
