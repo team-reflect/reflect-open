@@ -227,7 +227,6 @@ jobs:
     needs: [classify, test-chromium]
     if: needs.classify.outputs.test-webkit == 'true'
     runs-on: xcode-27
-    cache-mode: read
     env:
       REFLECT_TEST_BROWSER: webkit
       # Suspected workaround, root cause unknown: WebContent sometimes
@@ -246,8 +245,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-        with:
-          cache-scope: rust
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:webkit
