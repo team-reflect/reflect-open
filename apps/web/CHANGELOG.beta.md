@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.20.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.20.0-beta.3...v0.20.0-beta.4) (2026-11-23)
+
+
+### Bug Fixes
+
+* **cli:** keep private paths out of the ambiguity note ([#2306](https://github.com/team-reflect/reflect-open/issues/2306)) ([a2c2995](https://github.com/team-reflect/reflect-open/commit/a2c2995191fe6ef8e2610c9784b595e0f02ce459))
+* **cli:** treat an older index as unusable ([#2303](https://github.com/team-reflect/reflect-open/issues/2303)) ([0ab9153](https://github.com/team-reflect/reflect-open/commit/0ab91536eeba41d6a279eecb784d7eea67672695))
+* **mobile:** keep the daily page after the app is hidden ([#2314](https://github.com/team-reflect/reflect-open/issues/2314)) ([0d0f3a0](https://github.com/team-reflect/reflect-open/commit/0d0f3a02b3c61a5e0e290f58eadfb97ad5c6c26e))
+
 ## [0.20.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.20.0-beta.2...v0.20.0-beta.3) (2026-11-23)
 
 
