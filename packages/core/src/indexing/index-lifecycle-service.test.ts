@@ -498,7 +498,7 @@ describe('createIndexLifecycleService', () => {
     // replacement pass; only `close` stops it.
     expect(harness.subscriptions()).toBe(1)
     expect(harness.fileChanges.watcherRunning()).toBe(true)
-    expect(harness.progress).toEqual(['reconciling'])
+    expect(harness.progress).toEqual(['reconciling', 'idle'])
   })
 
   it('logs a sync failure but stop() still settles', async () => {
@@ -601,6 +601,17 @@ describe('createIndexLifecycleService', () => {
     await sleep(10)
 
     expect(store.applied().map((note) => note.path)).toEqual(['a.md'])
+  })
+
+  it('reports idle when a newer generation replaces the writer of the running pass', async () => {
+    const held = heldScans()
+    const { index, progress } = setup({ onScan: held.onScan })
+    index.sync(sessionAt(5))
+    await vi.waitFor(() => expect(held.settles).toHaveLength(1))
+    index.markDirty([], 6, FILE_GENERATION)
+    held.settles[0]!()
+    await index.settled()
+    expect(progress).toEqual(['reconciling', 'idle'])
   })
 
   it('refresh() bails without a rerun when superseded', async () => {

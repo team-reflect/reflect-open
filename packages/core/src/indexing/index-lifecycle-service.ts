@@ -176,8 +176,8 @@ export interface IndexLifecycleService {
    */
   followActivity(): Unlisten
   /**
-   * How far the sync pass has progressed. A bailed (superseded) pass changes
-   * nothing further: the newer open's pass owns the indicator.
+   * How far the sync pass has progressed: `reconciling` while the latest pass
+   * runs, `live` once it completed, `idle` when it ended any other way.
    */
   readonly progress: Store<IndexLifecycleProgress>
   /**
@@ -357,7 +357,6 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
   sync(session: GraphSession): void {
     const { clock, logger, fileChanges } = this.#deps
     const { indexGeneration: generation, generation: fileGeneration } = session
-    const isStale = (): boolean => session.signal.aborted
     if (generation === null) {
       // No index: a writer of the previous graph must not stay bound to the stream.
       this.#dropWriter()
@@ -370,6 +369,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     if (writer === null) {
       return
     }
+    const isStale = (): boolean => session.signal.aborted || this.#writer !== writer
     session.signal.addEventListener(
       'abort',
       () => {
@@ -449,7 +449,8 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
         this.#emitProgress('live')
       } catch (error) {
         this.#reportError('sync', error)
-        if (!isStale()) {
+      } finally {
+        if (this.#abort === controller && this.#progress.get() === 'reconciling') {
           this.#emitProgress('idle')
         }
       }
