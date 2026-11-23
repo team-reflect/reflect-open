@@ -395,6 +395,15 @@ jobs:
           command -v cargo rustc
           ls -la --time-style=full-iso target/debug
 
+      - name: Fingerprint probe
+        shell: bash
+        env:
+          CARGO_LOG: cargo::core::compiler::fingerprint=info
+        run: |
+          set +e
+          env | sort | cut -c1-120
+          cargo test --workspace --locked --no-run 2>&1 | grep -v '^\s*$' | head -c 3000000
+
       - name: Test
         env:
           CARGO_LOG: cargo::core::compiler::fingerprint=info
