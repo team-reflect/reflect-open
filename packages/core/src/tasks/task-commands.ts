@@ -412,11 +412,10 @@ export class TaskCommands {
           return
         }
         // Text that was not written stays in its row until a later write takes it.
-        const gone = cause instanceof NoteEditError && cause.kind === 'stale'
         for (const op of ops) {
           if (op.kind === 'insert') {
             store.addNewTask({ ...op, checked: false, bullet: false })
-          } else if (op.kind === 'setMarkdown' && !gone) {
+          } else if (op.kind === 'setMarkdown' && store.find(notePath, op.taskId) !== undefined) {
             store.holdText(notePath, op.taskId, op.markdown)
           }
         }

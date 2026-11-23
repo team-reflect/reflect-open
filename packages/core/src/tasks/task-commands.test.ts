@@ -136,6 +136,21 @@ describe('a task that changed under a command', () => {
     expect(harness.progress.get()).toEqual([])
   })
 
+  it('keeps the typed text in the row while the index is behind the file', async () => {
+    const rows = await start({ [A]: '+ [ ] one\n' })
+    harness.editExternally(A, '+ [ ] one changed\n')
+
+    commands.setDraft(rows[0]!, 'one more')
+    await commands.commit(rows[0]!)
+    expect(file(A)).toBe('+ [ ] one changed\n')
+    expect(shown()).toEqual([[rows[0]!.taskId, 'one more']])
+    expect(harness.progress.get()).toEqual([])
+
+    await harness.deliverWatcherBatch()
+    await commands.commitDrafts()
+    expect(file(A)).toBe('+ [ ] one more\n')
+  })
+
   it('writes nothing and shows no failure when the task left the note', async () => {
     const rows = await start({ [A]: '+ [ ] one\n' })
     await changeBehindRows('gone\n')
