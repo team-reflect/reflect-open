@@ -60,6 +60,7 @@ runs:
     # The ort-sys build script downloads ONNX Runtime only when it runs, and
     # mbx replays a cached build-script run instead of running it.
     # https://github.com/jdx/mr-boxington/blob/v1.30.0/docs/limits.md#build-script-execution-follows-cargos-freshness-inputs
+    # Remove this step once https://github.com/pykeio/ort/issues/676 is fixed.
     - name: Run build scripts without the mbx cache
       if: inputs.cache == 'true' && steps.ort.outputs.cache-hit != 'true'
       shell: bash
@@ -82,6 +83,7 @@ runs:
     # The ort-sys build script declares no input for the downloaded binaries,
     # so Cargo reuses its output from the restored target directory.
     # Removing its build directories makes Cargo run it again.
+    # Remove this step once https://github.com/pykeio/ort/issues/676 is fixed.
     - name: Run the ort-sys build script again
       if: inputs.cache == 'true' && steps.ort.outputs.cache-hit != 'true'
       shell: bash
