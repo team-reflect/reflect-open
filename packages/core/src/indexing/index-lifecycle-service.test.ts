@@ -110,7 +110,7 @@ function setup(options?: {
   vi.spyOn(store, 'clear').mockImplementation(async (generation) => {
     steps.push('clear')
     await options?.onClear?.()
-    await clear(generation)
+    return await clear(generation)
   })
   const subscribe = fileChanges.subscribe.bind(fileChanges)
   vi.spyOn(fileChanges, 'subscribe').mockImplementation((listener) => {

@@ -5,10 +5,16 @@ import { dateFromDailyPath, foldGraphPath } from '../graph/paths.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 import type { DatabaseService } from './database-service.ts'
 
-import type { IndexTouch, ReconcileScan, ScanCandidate, ScanOrphan } from '@reflect/types'
+import type {
+  IndexCommit,
+  IndexTouch,
+  ReconcileScan,
+  ScanCandidate,
+  ScanOrphan,
+} from '@reflect/types'
 import type { IndexedNote } from './indexed-note.ts'
 
-export type { IndexTouch, ReconcileScan, ScanCandidate, ScanOrphan }
+export type { IndexCommit, IndexTouch, ReconcileScan, ScanCandidate, ScanOrphan }
 
 /**
  * Notes per `index_apply_batch` transaction in the bulk passes (rebuild,
@@ -80,22 +86,24 @@ export interface IndexStoreService {
    */
   open(): MaybePromise<number>
   /**
-   * Apply one note's projection in a single Rust transaction.
+   * Apply one note's projection in a single Rust transaction. Every index
+   * write resolves with its commit `seq`, `null` when `generation` is stale.
    */
-  apply(note: IndexedNote, generation: number): Promise<void>
+  apply(note: IndexedNote, generation: number): Promise<IndexCommit>
   /**
-   * Apply many notes' projections in one Rust transaction. An empty batch never reaches the backend.
+   * Apply many notes' projections in one Rust transaction. An empty batch
+   * never reaches the backend and resolves with a `null` seq.
    */
-  applyBatch(notes: IndexedNote[], generation: number): Promise<void>
+  applyBatch(notes: IndexedNote[], generation: number): Promise<IndexCommit>
   /**
    * Remove a note (deleted on disk) from the index.
    */
-  remove(path: string, generation: number): Promise<void>
+  remove(path: string, generation: number): Promise<IndexCommit>
   /**
    * Move a note's index rows only: the file already lives at `to` (an external
    * rename observed after the fact). Embeddings ride along.
    */
-  move(from: string, to: string, generation: number): Promise<void>
+  move(from: string, to: string, generation: number): Promise<IndexCommit>
   /**
    * Move a note file and its index rows in one Rust transaction. Pinned
    * state, conflict flags, and embedding vectors survive the rename. Unlike
@@ -111,13 +119,14 @@ export interface IndexStoreService {
   reconcileScan(generation: number): MaybePromise<ReconcileScan>
   /**
    * Re-stamp stored mtimes for notes whose content already matches disk. One
-   * Rust transaction per call; an empty batch never reaches the backend.
+   * Rust transaction per call; an empty batch never reaches the backend and
+   * resolves with a `null` seq.
    */
-  touch(entries: readonly IndexTouch[], generation: number): MaybePromise<void>
+  touch(entries: readonly IndexTouch[], generation: number): MaybePromise<IndexCommit>
   /**
    * Wipe all derived tables (precedes a full rebuild); `chat_*`, `note_visits`, and `index_meta` stay.
    */
-  clear(generation: number): Promise<void>
+  clear(generation: number): Promise<IndexCommit>
   /**
    * One `index_meta` value, or `null` when the key has never been written.
    */
@@ -261,23 +270,23 @@ class IndexStoreServiceImpl implements IndexStoreService {
     return this.#deps.ipc.call('index_open', {})
   }
 
-  async apply(note: IndexedNote, generation: number): Promise<void> {
-    await this.#deps.ipc.call('index_apply', { note, generation })
+  async apply(note: IndexedNote, generation: number): Promise<IndexCommit> {
+    return await this.#deps.ipc.call('index_apply', { note, generation })
   }
 
-  async applyBatch(notes: IndexedNote[], generation: number): Promise<void> {
+  async applyBatch(notes: IndexedNote[], generation: number): Promise<IndexCommit> {
     if (notes.length === 0) {
-      return
+      return { seq: null }
     }
-    await this.#deps.ipc.call('index_apply_batch', { notes, generation })
+    return await this.#deps.ipc.call('index_apply_batch', { notes, generation })
   }
 
-  async remove(path: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('index_remove', { path, generation })
+  async remove(path: string, generation: number): Promise<IndexCommit> {
+    return await this.#deps.ipc.call('index_remove', { path, generation })
   }
 
-  async move(from: string, to: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('index_move', {
+  async move(from: string, to: string, generation: number): Promise<IndexCommit> {
+    return await this.#deps.ipc.call('index_move', {
       from,
       to,
       generation,
@@ -301,15 +310,15 @@ class IndexStoreServiceImpl implements IndexStoreService {
     return this.#deps.ipc.call('index_reconcile_scan', { generation })
   }
 
-  async touch(entries: readonly IndexTouch[], generation: number): Promise<void> {
+  async touch(entries: readonly IndexTouch[], generation: number): Promise<IndexCommit> {
     if (entries.length === 0) {
-      return
+      return { seq: null }
     }
-    await this.#deps.ipc.call('index_touch', { entries, generation })
+    return await this.#deps.ipc.call('index_touch', { entries, generation })
   }
 
-  async clear(generation: number): Promise<void> {
-    await this.#deps.ipc.call('index_clear', { generation })
+  async clear(generation: number): Promise<IndexCommit> {
+    return await this.#deps.ipc.call('index_clear', { generation })
   }
 
   async getMeta(key: string): Promise<string | null> {

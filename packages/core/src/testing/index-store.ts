@@ -6,6 +6,7 @@ import {
   createIndexApplyBatchWriter,
   createMtimeTouchBatchWriter,
   type IndexApplyBatch,
+  type IndexCommit,
   type IndexTouch,
   type IndexStoreService,
   type MtimeTouchBatch,
@@ -55,8 +56,8 @@ export type IndexStoreCall =
 
 export interface TestIndexStoreServiceOptions {
   /**
-   * Mirror applies, removes, moves, clears and `index_meta` into this
-   * database, so reads through it see what the store wrote.
+   * Mirror applies, removes, moves, touches, clears and `index_meta` into
+   * this database, so reads through it see what the store wrote.
    */
   database?: TestDatabaseService
   /**
@@ -111,6 +112,7 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
   readonly #removedPaths: string[] = []
   readonly #moves: { from: string; to: string }[] = []
   #metaSeeded: boolean
+  #seq = 0
 
   constructor(options: TestIndexStoreServiceOptions | undefined) {
     this.#database = options?.database
@@ -128,33 +130,38 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
     })
   }
 
-  apply(note: IndexedNote, writeGeneration: number): Promise<void> {
+  apply(note: IndexedNote, writeGeneration: number): Promise<IndexCommit> {
     return Promise.try(() => {
       this.#record({ method: 'apply', note, generation: writeGeneration })
-      this.#writeNotes([note])
+      return this.#writeNotes([note])
     })
   }
 
-  applyBatch(notes: IndexedNote[], writeGeneration: number): Promise<void> {
+  applyBatch(notes: IndexedNote[], writeGeneration: number): Promise<IndexCommit> {
     return Promise.try(() => {
       this.#record({ method: 'applyBatch', notes: [...notes], generation: writeGeneration })
-      this.#writeNotes(notes)
+      return this.#writeNotes(notes)
     })
   }
 
-  remove(path: string, writeGeneration: number): Promise<void> {
+  remove(path: string, writeGeneration: number): Promise<IndexCommit> {
     return Promise.try(() => {
       this.#record({ method: 'remove', path, generation: writeGeneration })
-      this.#database?.invoke('index_remove', { path, generation: this.#database.generation() })
+      const commit = this.#database?.invoke('index_remove', {
+        path,
+        generation: this.#database.generation(),
+      })
       this.#removedPaths.push(path)
+      return commit ?? this.#commit()
     })
   }
 
-  move(from: string, to: string, writeGeneration: number): Promise<void> {
+  move(from: string, to: string, writeGeneration: number): Promise<IndexCommit> {
     return Promise.try(() => {
       this.#record({ method: 'move', from, to, generation: writeGeneration })
-      this.#moveRows(from, to)
+      const commit = this.#moveRows(from, to)
       this.#moves.push({ from, to })
+      return commit
     })
   }
 
@@ -173,16 +180,24 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
     })
   }
 
-  touch(entries: readonly IndexTouch[], writeGeneration: number): Promise<void> {
+  touch(entries: readonly IndexTouch[], writeGeneration: number): Promise<IndexCommit> {
     return Promise.try(() => {
       this.#record({ method: 'touch', entries: [...entries], generation: writeGeneration })
+      const commit = this.#database?.invoke('index_touch', {
+        entries: [...entries],
+        generation: this.#database.generation(),
+      })
+      return commit ?? this.#commit()
     })
   }
 
-  clear(writeGeneration: number): Promise<void> {
+  clear(writeGeneration: number): Promise<IndexCommit> {
     return Promise.try(() => {
       this.#record({ method: 'clear', generation: writeGeneration })
-      this.#database?.invoke('index_clear', { generation: this.#database.generation() })
+      const commit = this.#database?.invoke('index_clear', {
+        generation: this.#database.generation(),
+      })
+      return commit ?? this.#commit()
     })
   }
 
@@ -268,20 +283,33 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
     })
   }
 
-  #writeNotes(notes: readonly IndexedNote[]): void {
-    const database = this.#database
-    for (const note of notes) {
-      if (database !== undefined) {
-        database.applyProjection(note)
-      }
-      this.#appliedNotes.push(note)
-    }
+  /**
+   * The next commit of a store without a database.
+   */
+  #commit(): IndexCommit {
+    this.#seq += 1
+    return { seq: this.#seq }
   }
 
-  #moveRows(from: string, to: string): void {
+  #writeNotes(notes: readonly IndexedNote[]): IndexCommit {
+    const database = this.#database
+    this.#appliedNotes.push(...notes)
+    if (notes.length === 0) {
+      return { seq: null }
+    }
+    if (database === undefined) {
+      return this.#commit()
+    }
+    return database.invoke('index_apply_batch', {
+      notes: [...notes],
+      generation: database.generation(),
+    })
+  }
+
+  #moveRows(from: string, to: string): IndexCommit {
     const database = this.#database
     if (database === undefined) {
-      return
+      return this.#commit()
     }
     const date = dateFromDailyPath(to)
     const toAddress = {
@@ -289,7 +317,12 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
       basenameKey: noteBasenameKey(to),
       dailyDate: date !== null && isIsoDate(date) ? date : null,
     }
-    database.invoke('index_move', { from, to, generation: database.generation(), toAddress })
+    return database.invoke('index_move', {
+      from,
+      to,
+      generation: database.generation(),
+      toAddress,
+    })
   }
 }
 
