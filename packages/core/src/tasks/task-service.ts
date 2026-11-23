@@ -8,13 +8,11 @@ import { AppError } from '../errors.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
 import { INDEX_WRITTEN_EVENT, listenNow, type IpcBridgeService } from '../ipc/ipc-service.ts'
-import { decodeTaskBreadcrumbs } from '../indexing/indexed-note.ts'
 import type { SnippetTask } from '../indexing/snippet-tasks.ts'
 import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import {
   applyTaskEdits,
-  decodeTaskPath,
   renderTaskSnapshot,
   type TaskEdit,
   type TaskEditResult,
@@ -376,9 +374,9 @@ function isReopenedAfter(struck: OpenTask, live: OpenTask): boolean {
 
 interface TaskRecord {
   notePath: string
-  astPath: string
+  astPath: number[]
   markdown: string
-  breadcrumbs: string
+  breadcrumbs: string[]
   checked: boolean
   noteTitle: string
   dailyDate: string | null
@@ -823,38 +821,21 @@ class TaskServiceImpl implements TaskService {
     }
   }
 
-  /**
-   * Map stored rows to their domain shape. A row whose address or breadcrumbs
-   * do not decode is skipped and reported instead of failing the whole read: the
-   * projection is rebuilt from Markdown, so such a row is a bug, not data.
-   */
   #toTaskRows(rows: readonly TaskRecord[]): OpenTask[] {
-    const tasks: OpenTask[] = []
-    for (const row of rows) {
-      const { astPath, markdown, breadcrumbs, checked } = row
-      try {
-        tasks.push({
-          notePath: row.notePath,
-          noteTitle: row.noteTitle,
-          dailyDate: row.dailyDate,
-          isPinned: row.isPinned,
-          pinnedOrder: row.pinnedOrder,
-          updatedAt: row.updatedAt,
-          ...renderTaskSnapshot({
-            astPath: decodeTaskPath(astPath),
-            markdown,
-            breadcrumbs: decodeTaskBreadcrumbs(breadcrumbs),
-            checked,
-          }),
-        })
-      } catch (cause) {
-        this.#deps.logger.error(
-          `tasks: skipping an unreadable row in ${row.notePath} (${astPath})`,
-          cause,
-        )
-      }
-    }
-    return tasks
+    return rows.map((row) => ({
+      notePath: row.notePath,
+      noteTitle: row.noteTitle,
+      dailyDate: row.dailyDate,
+      isPinned: row.isPinned,
+      pinnedOrder: row.pinnedOrder,
+      updatedAt: row.updatedAt,
+      ...renderTaskSnapshot({
+        astPath: row.astPath,
+        markdown: row.markdown,
+        breadcrumbs: row.breadcrumbs,
+        checked: row.checked,
+      }),
+    }))
   }
 
   /**

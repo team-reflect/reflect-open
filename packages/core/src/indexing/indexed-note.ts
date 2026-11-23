@@ -9,7 +9,6 @@ import type {
   IndexedTask,
   NoteKind,
 } from '@reflect/types'
-import { z } from 'zod'
 import {
   markdownNoteReference,
   noteBasenameKey,
@@ -131,19 +130,12 @@ export type {
   NoteKind,
 }
 
-const taskBreadcrumbsSchema = z.array(z.string()).readonly()
-
 /**
  * The `tasks.breadcrumbs` column's format: the ordered label array as one JSON
- * string. Every writer and reader of the column goes through this pair (or,
- * in Rust, `write.rs`'s `serde_json` mirror — the db tests pin that parity).
+ * string.
  */
 export function encodeTaskBreadcrumbs(breadcrumbs: readonly string[]): string {
   return JSON.stringify(breadcrumbs)
-}
-
-export function decodeTaskBreadcrumbs(column: string): readonly string[] {
-  return taskBreadcrumbsSchema.parse(JSON.parse(column))
 }
 
 /**

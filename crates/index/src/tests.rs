@@ -2660,12 +2660,28 @@ fn tasks_split_by_checked_and_skip_templates() {
     let open = tasks(&conn, false).unwrap().rows;
     assert_eq!(open.len(), 1);
     assert_eq!(open[0].markdown, "open one");
+    assert_eq!(open[0].ast_path, [0]);
     assert_eq!(open[0].note_title, "A");
     assert!(open[0].is_pinned && !open[0].checked);
     assert_eq!(open[0].note_hash, "h");
     let done = tasks(&conn, true).unwrap().rows;
     assert_eq!(done.len(), 1);
     assert_eq!(done[0].markdown, "done one");
+}
+
+#[test]
+fn a_tasks_read_leaves_out_a_row_with_an_unreadable_address() {
+    let conn = migrated();
+    let mut with_tasks = note("notes/a.md", "A", vec![]);
+    with_tasks.tasks = vec![task(0, "kept", false), task(1, "dropped", false)];
+    with_tasks.tasks[0].breadcrumbs = vec!["Heading".to_string()];
+    with_tasks.tasks[1].ast_path = "[]".to_string();
+    apply_note(&conn, &with_tasks).unwrap();
+
+    let open = tasks(&conn, false).unwrap().rows;
+    assert_eq!(open.len(), 1);
+    assert_eq!(open[0].markdown, "kept");
+    assert_eq!(open[0].breadcrumbs, ["Heading"]);
 }
 
 #[test]

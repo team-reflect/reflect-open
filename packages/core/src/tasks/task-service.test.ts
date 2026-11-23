@@ -477,10 +477,6 @@ describe('getOpenTasks', () => {
 
     const rows = await tasks.getOpenTasks()
     expect(rows.map((row) => row.astPath)).toEqual([[1]])
-    expect(logger.getErrors().map((entry) => entry.message)).toEqual([
-      'tasks: skipping an unreadable row in notes/a.md (not json)',
-      'tasks: skipping an unreadable row in notes/a.md ([])',
-    ])
   })
 
   it('never surfaces template checkboxes — boilerplate, not real tasks', async () => {

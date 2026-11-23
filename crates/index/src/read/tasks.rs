@@ -11,10 +11,11 @@ use crate::sql::{self, lit};
 
 /// The open (`checked = false`) or the completed tasks of every note but
 /// templates, in no fixed order, with the commit sequence of the index. The
-/// caller runs this in one read transaction, so both come from one state.
+/// caller runs this in one read transaction, so both come from one state. A
+/// row whose address or breadcrumbs do not decode is logged and left out.
 pub(crate) fn tasks(conn: &Connection, checked: bool) -> AppResult<TaskRows> {
     let seq = commit_seq(conn)?;
-    let rows = sql::query(
+    let rows: Vec<Option<TaskRow>> = sql::query(
         conn,
         Query::select()
             .columns([
@@ -41,11 +42,20 @@ pub(crate) fn tasks(conn: &Connection, checked: bool) -> AppResult<TaskRows> {
             // In the text, so the partial indexes on `checked` apply.
             .and_where(Expr::col((Tasks::Table, Tasks::Checked)).eq(lit(i32::from(checked)))),
         |row| {
-            Ok(TaskRow {
-                note_path: row.get(0)?,
-                ast_path: row.get(1)?,
+            let note_path: String = row.get(0)?;
+            let ast_path: String = row.get(1)?;
+            let breadcrumbs: String = row.get(3)?;
+            let (Some(ast_path), Ok(breadcrumbs)) =
+                (decode_ast_path(&ast_path), serde_json::from_str(&breadcrumbs))
+            else {
+                tracing::error!(note_path, ast_path, "skipping an unreadable task row");
+                return Ok(None);
+            };
+            Ok(Some(TaskRow {
+                note_path,
+                ast_path,
                 markdown: row.get(2)?,
-                breadcrumbs: row.get(3)?,
+                breadcrumbs,
                 checked: row.get(4)?,
                 note_title: row.get(5)?,
                 daily_date: row.get(6)?,
@@ -53,8 +63,18 @@ pub(crate) fn tasks(conn: &Connection, checked: bool) -> AppResult<TaskRows> {
                 pinned_order: row.get(8)?,
                 updated_at: row.get(9)?,
                 note_hash: row.get(10)?,
-            })
+            }))
         },
     )?;
-    Ok(TaskRows { seq, rows })
+    Ok(TaskRows {
+        seq,
+        rows: rows.into_iter().flatten().collect(),
+    })
+}
+
+/// The address in the stored JSON text: a non-empty array of indexes.
+fn decode_ast_path(column: &str) -> Option<Vec<u32>> {
+    serde_json::from_str::<Vec<u32>>(column)
+        .ok()
+        .filter(|path| !path.is_empty())
 }

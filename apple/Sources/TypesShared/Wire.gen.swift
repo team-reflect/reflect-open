@@ -4998,9 +4998,9 @@ public struct TagFacet: Codable, Sendable, Equatable {
 /// One task row with the fields of its note that the task list shows.
 public struct TaskRow: Codable, Sendable, Equatable {
     public let notePath: String
-    public let astPath: String
+    public let astPath: [UInt32]
     public let markdown: String
-    public let breadcrumbs: String
+    public let breadcrumbs: [String]
     public let checked: Bool
     public let noteTitle: String
     public let dailyDate: String?
@@ -5023,7 +5023,7 @@ public struct TaskRow: Codable, Sendable, Equatable {
         case noteHash = "noteHash"
     }
 
-    public init(notePath: String, astPath: String, markdown: String, breadcrumbs: String, checked: Bool, noteTitle: String, dailyDate: String?, isPinned: Bool, pinnedOrder: Double?, updatedAt: Int64, noteHash: String) {
+    public init(notePath: String, astPath: [UInt32], markdown: String, breadcrumbs: [String], checked: Bool, noteTitle: String, dailyDate: String?, isPinned: Bool, pinnedOrder: Double?, updatedAt: Int64, noteHash: String) {
         self.notePath = notePath
         self.astPath = astPath
         self.markdown = markdown
@@ -5040,9 +5040,9 @@ public struct TaskRow: Codable, Sendable, Equatable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.notePath = try container.decode(String.self, forKey: .notePath)
-        self.astPath = try container.decode(String.self, forKey: .astPath)
+        self.astPath = try container.decode([UInt32].self, forKey: .astPath)
         self.markdown = try container.decode(String.self, forKey: .markdown)
-        self.breadcrumbs = try container.decode(String.self, forKey: .breadcrumbs)
+        self.breadcrumbs = try container.decode([String].self, forKey: .breadcrumbs)
         self.checked = try container.decode(Bool.self, forKey: .checked)
         self.noteTitle = try container.decode(String.self, forKey: .noteTitle)
         self.dailyDate = try container.decodeIfPresent(String.self, forKey: .dailyDate)

@@ -7,7 +7,6 @@ export {
 export {
   buildIndexedNote,
   CLAIM_TIER,
-  decodeTaskBreadcrumbs,
   encodeTaskBreadcrumbs,
   PROJECTION_VERSION,
   type IndexedNote,

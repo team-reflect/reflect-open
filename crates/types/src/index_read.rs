@@ -159,11 +159,13 @@ pub struct VisitedNote {
 #[serde(rename_all = "camelCase")]
 pub struct TaskRow {
     pub note_path: String,
-    /// The stored address of the task: JSON text that the frontend decodes.
-    pub ast_path: String,
+    /// The address of the task: the child indexes from the root of the note's
+    /// Markdown tree down to the task's list item.
+    pub ast_path: Vec<u32>,
     pub markdown: String,
-    /// The stored breadcrumbs: JSON text that the frontend decodes.
-    pub breadcrumbs: String,
+    /// The headings above the task, then the labels of its ancestor list
+    /// items, outermost first, as Markdown.
+    pub breadcrumbs: Vec<String>,
     pub checked: bool,
     pub note_title: String,
     pub daily_date: Option<String>,

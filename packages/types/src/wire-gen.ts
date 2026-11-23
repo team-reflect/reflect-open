@@ -2580,11 +2580,17 @@ export type TagFacet = {
 /**  One task row with the fields of its note that the task list shows. */
 export type TaskRow = {
   notePath: string
-  /**  The stored address of the task: JSON text that the frontend decodes. */
-  astPath: string
+  /**
+   *  The address of the task: the child indexes from the root of the note's
+   *  Markdown tree down to the task's list item.
+   */
+  astPath: number[]
   markdown: string
-  /**  The stored breadcrumbs: JSON text that the frontend decodes. */
-  breadcrumbs: string
+  /**
+   *  The headings above the task, then the labels of its ancestor list
+   *  items, outermost first, as Markdown.
+   */
+  breadcrumbs: string[]
   checked: boolean
   noteTitle: string
   dailyDate: string | null
