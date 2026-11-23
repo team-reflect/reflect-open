@@ -76,4 +76,10 @@ export {
   type TaskEntry,
   type TaskRow,
 } from './task-project.ts'
-export type { ParsedTask, TaskLocator, TaskSnapshot } from './task-model.ts'
+export {
+  hasSameTaskContent,
+  toTaskLocator,
+  type ParsedTask,
+  type TaskLocator,
+  type TaskSnapshot,
+} from './task-model.ts'

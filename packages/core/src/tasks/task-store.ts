@@ -8,7 +8,7 @@ import {
   type TaskSnapshot,
 } from '../markdown/index.ts'
 import type { OpenTask } from './open-task.ts'
-import type { InsertTaskTarget } from './task-insert-target.ts'
+import { toInsertTarget } from './task-insert-target.ts'
 import { applyTaskOp, type TaskInsertOp, type TaskOp } from './task-ops.ts'
 import { reconcileNoteTasks } from './task-reconcile.ts'
 
@@ -116,11 +116,6 @@ function toNoteContext(note: NoteTasks): NoteContext {
     pinnedOrder: note.pinnedOrder,
     updatedAt: note.updatedAt,
   }
-}
-
-function toContext(source: OpenTask | InsertTaskTarget): Omit<NoteContext, 'updatedAt'> {
-  const { notePath, noteTitle, dailyDate, isPinned, pinnedOrder } = source
-  return { notePath, noteTitle, dailyDate, isPinned, pinnedOrder }
 }
 
 function hasSameContext(row: OpenTask | undefined, context: NoteContext): boolean {
@@ -362,7 +357,7 @@ export class TaskStore {
       const exact =
         moves !== null && (previous === undefined || previous.revision === result.baseRevision)
       this.#setNote(
-        { ...toContext(context), notePath, updatedAt: result.updatedAt },
+        { ...toInsertTarget(context), notePath, updatedAt: result.updatedAt },
         result.revision,
         result.tasks,
         true,

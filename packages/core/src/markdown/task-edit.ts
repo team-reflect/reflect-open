@@ -17,7 +17,7 @@ import {
   TASKS_SECTION,
   type SlotTarget,
 } from './list-insert.ts'
-import type { TaskLocator, TaskSnapshot } from './task-model.ts'
+import { hasSameTaskContent, type TaskLocator, type TaskSnapshot } from './task-model.ts'
 import { compareTaskPaths, isSameTaskPath } from './task-path.ts'
 import { getRoundTasks, toTaskSnapshot, type TaskEntry } from './task-project.ts'
 
@@ -147,12 +147,6 @@ export function applyTaskEdits(
   }
 }
 
-type TaskContent = Pick<TaskSnapshot, 'markdown' | 'checked'>
-
-function hasSameContent(entry: TaskContent, locator: TaskContent): boolean {
-  return entry.checked === locator.checked && entry.markdown === locator.markdown
-}
-
 /**
  * The entry a locator names, among `before` in document order. A locator
  * read at `revision`, the hash of the text the entries come from, names the
@@ -166,7 +160,10 @@ function locateTask(
   locator: TaskLocator,
 ): TaskEntry {
   const atPath = before.find((entry) => isSameTaskPath(entry.astPath, locator.astPath))
-  if (atPath !== undefined && (locator.revision === revision || hasSameContent(atPath, locator))) {
+  if (
+    atPath !== undefined &&
+    (locator.revision === revision || hasSameTaskContent(atPath, locator))
+  ) {
     return atPath
   }
   const position = before.filter((entry) => {
@@ -177,7 +174,7 @@ function locateTask(
   if (locator.revision !== revision) {
     for (const [i, entry] of before.entries()) {
       const distance = Math.abs(i - position)
-      if (distance < nearestDistance && hasSameContent(entry, locator)) {
+      if (distance < nearestDistance && hasSameTaskContent(entry, locator)) {
         nearest = entry
         nearestDistance = distance
       }
@@ -270,7 +267,7 @@ function assertTasksSurvive(body: string, expected: readonly TaskEntry[]): void 
       return (
         wanted !== undefined &&
         isSameTaskPath(entry.astPath, wanted.astPath) &&
-        hasSameContent(entry, wanted)
+        hasSameTaskContent(entry, wanted)
       )
     })
   if (!survives) {

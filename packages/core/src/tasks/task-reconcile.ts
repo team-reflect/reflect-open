@@ -1,5 +1,6 @@
 import {
   encodeTaskPath,
+  hasSameTaskContent,
   isSameTaskPath,
   type TaskMove,
   type TaskSnapshot,
@@ -12,10 +13,6 @@ type TaskShape = Pick<TaskSnapshot, 'astPath' | 'markdown' | 'checked'>
  */
 export interface IdentifiedTask extends TaskShape {
   taskId: string
-}
-
-function hasSameContent(left: TaskShape, right: TaskShape): boolean {
-  return left.checked === right.checked && left.markdown === right.markdown
 }
 
 /**
@@ -48,7 +45,7 @@ export function reconcileNoteTasks(
   const unclaimed = new Set(previous)
   const inPlace = next.map((task) => {
     const match = previous.find((candidate) => {
-      return isSameTaskPath(candidate.astPath, task.astPath) && hasSameContent(candidate, task)
+      return isSameTaskPath(candidate.astPath, task.astPath) && hasSameTaskContent(candidate, task)
     })
     if (match !== undefined) {
       unclaimed.delete(match)
@@ -59,9 +56,9 @@ export function reconcileNoteTasks(
     if (inPlace[i] !== undefined) {
       return inPlace[i]
     }
-    const candidates = [...unclaimed].filter((candidate) => hasSameContent(candidate, task))
+    const candidates = [...unclaimed].filter((candidate) => hasSameTaskContent(candidate, task))
     const rivals = next.filter(
-      (other, j) => inPlace[j] === undefined && hasSameContent(other, task),
+      (other, j) => inPlace[j] === undefined && hasSameTaskContent(other, task),
     )
     if (candidates.length !== 1 || rivals.length !== 1) {
       return

@@ -10,7 +10,7 @@ import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 import type { SnippetTask } from '../indexing/snippet-tasks.ts'
 import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
-import type { TaskLocator } from '../markdown/index.ts'
+import { toTaskLocator, type TaskLocator } from '../markdown/index.ts'
 import { TaskCommands, type TaskAction } from './task-commands.ts'
 import { createTaskReader, type TaskReader } from './task-reader.ts'
 import { TaskStore, type TaskStoreView, type TaskWriteResult } from './task-store.ts'
@@ -111,18 +111,6 @@ export interface TaskService extends Store<TaskStoreView> {
     notePath: string,
     task: { locator: TaskLocator; checked: boolean },
   ): Promise<void>
-}
-
-/**
- * Only the locator goes to the core edit: the note path merely picks the owner.
- */
-function toLocator(task: TaskRef): TaskLocator {
-  return {
-    revision: task.revision,
-    astPath: task.astPath,
-    markdown: task.markdown,
-    checked: task.checked,
-  }
 }
 
 function sessionKey(session: GraphSession | null): string | null {
@@ -230,7 +218,7 @@ class TaskServiceImpl implements TaskService {
     const { generation } = requireGraphSession(this.#deps.graphSession)
     this.#syncSession()
     const store = this.#store
-    const locator = toLocator(task)
+    const locator = toTaskLocator(task)
     const result = await this.commands.write(
       generation,
       task.notePath,

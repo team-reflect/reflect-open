@@ -9,14 +9,14 @@ import { splitFrontmatter } from '../markdown/frontmatter.ts'
 import {
   applyTaskEdits,
   projectTasks,
+  toTaskLocator,
   type TaskEdit,
   type TaskEditResult,
-  type TaskLocator,
 } from '../markdown/index.ts'
 import type { OpenTask } from './open-task.ts'
 import { resolveTaskEdit } from './task-content.ts'
 import { NoteEditError } from './task-errors.ts'
-import type { InsertTaskTarget } from './task-insert-target.ts'
+import { toInsertTarget, type InsertTaskTarget } from './task-insert-target.ts'
 import type { TaskInsertOp, TaskOp } from './task-ops.ts'
 import { withDraftDueDate } from './task-schedule-content.ts'
 import type { TaskStore, TaskWriteResult } from './task-store.ts'
@@ -49,20 +49,6 @@ export interface TaskCommandsDeps {
    * one try. A failed read rejects.
    */
   readonly reread: (store: TaskStore, notePath: string) => Promise<void>
-}
-
-function toLocator(task: TaskLocator): TaskLocator {
-  return {
-    revision: task.revision,
-    astPath: task.astPath,
-    markdown: task.markdown,
-    checked: task.checked,
-  }
-}
-
-function toInsertTarget(task: InsertTaskTarget): InsertTaskTarget {
-  const { notePath, noteTitle, dailyDate, isPinned, pinnedOrder } = task
-  return { notePath, noteTitle, dailyDate, isPinned, pinnedOrder }
 }
 
 /**
@@ -477,7 +463,7 @@ export class TaskCommands {
             at:
               anchor === undefined
                 ? { kind: 'tasksSection' }
-                : { kind: 'contextEnd', task: toLocator(anchor) },
+                : { kind: 'contextEnd', task: toTaskLocator(anchor) },
             markdown: op.markdown,
             checked: op.checked,
             bullet: op.bullet,
@@ -489,7 +475,7 @@ export class TaskCommands {
       if (row === undefined) {
         return []
       }
-      const task = toLocator(row)
+      const task = toTaskLocator(row)
       if (action.kind !== 'toggle') {
         return [{ ...action, task }]
       }

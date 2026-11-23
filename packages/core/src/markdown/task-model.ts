@@ -21,3 +21,21 @@ export interface ParsedTask extends TaskSnapshot {
    */
   dueDate: string | null
 }
+
+/**
+ * Whether two tasks have the same Markdown and the same checked state.
+ */
+export function hasSameTaskContent(
+  left: Pick<TaskSnapshot, 'markdown' | 'checked'>,
+  right: Pick<TaskSnapshot, 'markdown' | 'checked'>,
+): boolean {
+  return left.checked === right.checked && left.markdown === right.markdown
+}
+
+/**
+ * The address fields of `task`, without the other fields it carries.
+ */
+export function toTaskLocator(task: TaskLocator): TaskLocator {
+  const { revision, astPath, markdown, checked } = task
+  return { revision, astPath, markdown, checked }
+}

@@ -6,7 +6,7 @@ import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.
 import type { LoggerService } from '../ports/logger-service.ts'
 import { splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter.ts'
-import type { NoteSourceTransform } from './note-session-types.ts'
+import type { NoteSessionCommit, NoteSourceTransform } from './note-session-types.ts'
 import type { OpenDocumentsService } from './open-documents-service.ts'
 import { noop } from '@ocavue/utils'
 
@@ -102,19 +102,7 @@ const COMMIT_ATTEMPT_LIMIT = 3
 /**
  * What {@link NoteDocumentService.commitSourceEdit} left on disk.
  */
-export interface NoteCommitResult {
-  /**
-   * The full note text on disk after the commit.
-   */
-  readonly content: string
-  /**
-   * Lowercase hex SHA-256 of `content`; `null` when the note has no file.
-   */
-  readonly revision: string | null
-  /**
-   * Whether `content` differs from the text `transform` returned.
-   */
-  readonly merged: boolean
+export interface NoteCommitResult extends NoteSessionCommit {
   /**
    * The seq of an index commit that holds `content`. `null` when the commit
    * wrote nothing, the index is closed or suspended, or the index write failed.
