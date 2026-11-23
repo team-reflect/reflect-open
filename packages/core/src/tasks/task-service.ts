@@ -145,14 +145,10 @@ class TaskServiceImpl implements TaskService {
     this.commands = new TaskCommands({
       ...deps,
       store: () => {
-        this.#syncSession()
+        this.#adoptSession()
         return this.#store
       },
-      publish: () => this.#publish(),
-      reread: async (store, notePath) => {
-        store.landPaths(await this.#reader.readPathsOnce([notePath]), [notePath])
-        this.#publish()
-      },
+      reader: this.#reader,
     })
   }
 
@@ -161,7 +157,7 @@ class TaskServiceImpl implements TaskService {
   readonly subscribe = (listener: VoidFunction): Unlisten => {
     const unlisten = this.#state.subscribe(listener)
     this.#sources ??= this.#startSources()
-    this.#syncSession()
+    this.#adoptSession()
     if (this.#stale) {
       void this.#refresh()
     }
@@ -180,7 +176,7 @@ class TaskServiceImpl implements TaskService {
    * again until it lands; the rows stay as they are meanwhile.
    */
   #refresh(): Promise<void> {
-    this.#syncSession()
+    this.#adoptSession()
     if (this.#sessionKey === null) {
       return Promise.resolve()
     }
@@ -214,7 +210,7 @@ class TaskServiceImpl implements TaskService {
 
   async writeTask(task: TaskRef, actions: readonly TaskAction[]): Promise<TaskWriteResult> {
     const { generation } = requireGraphSession(this.#deps.graphSession)
-    this.#syncSession()
+    this.#adoptSession()
     const store = this.#store
     const locator = toTaskLocator(task)
     const result = await this.commands.write(
@@ -223,7 +219,6 @@ class TaskServiceImpl implements TaskService {
       actions.map((action) => ({ ...action, task: locator })),
     )
     store.landCommit(task.notePath, result, null)
-    this.#publish()
     return result
   }
 
@@ -253,10 +248,14 @@ class TaskServiceImpl implements TaskService {
   }
 
   #createStore(): TaskStore {
-    return new TaskStore(() => {
+    const store = new TaskStore(() => {
       this.#nextTaskId += 1
       return `task-${this.#nextTaskId}`
     })
+    store.subscribe(() => {
+      this.#publish()
+    })
+    return store
   }
 
   /**
@@ -267,7 +266,6 @@ class TaskServiceImpl implements TaskService {
     const unlisteners = [
       this.#deps.graphSession.subscribe(() => {
         if (this.#adoptSession()) {
-          this.#publish()
           void this.#refresh()
         }
       }),
@@ -288,8 +286,8 @@ class TaskServiceImpl implements TaskService {
   }
 
   /**
-   * Start an empty store for a graph that replaced the open one; `true` when
-   * it did. An index that was opened again counts its seqs from zero.
+   * Start an empty store for a graph that replaced the open one, and show
+   * it; `true` when it did. An index that was opened again counts its seqs from zero.
    */
   #adoptSession(): boolean {
     const { session } = this.#deps.graphSession.get()
@@ -309,13 +307,8 @@ class TaskServiceImpl implements TaskService {
     this.#readAgain = false
     this.#stale = true
     this.#store = this.#createStore()
+    this.#publish()
     return true
-  }
-
-  #syncSession(): void {
-    if (this.#adoptSession()) {
-      this.#publish()
-    }
   }
 
   /**
@@ -334,7 +327,6 @@ class TaskServiceImpl implements TaskService {
         return
       }
       const unread = store.landAll(read, completed)
-      this.#publish()
       if (unread.length > 0) {
         await this.#readPathsInto(store, unread)
       }
@@ -345,7 +337,7 @@ class TaskServiceImpl implements TaskService {
    * Read every task of the notes at `paths` into the store.
    */
   async #readPaths(paths: readonly string[]): Promise<void> {
-    this.#syncSession()
+    this.#adoptSession()
     await this.#readPathsInto(this.#store, paths)
   }
 
@@ -353,7 +345,6 @@ class TaskServiceImpl implements TaskService {
     const read = await this.#reader.readPaths(paths, this.#reads.signal)
     if (read !== null) {
       store.landPaths(read, paths)
-      this.#publish()
     }
   }
 

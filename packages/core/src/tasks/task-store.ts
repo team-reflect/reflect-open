@@ -7,6 +7,7 @@ import {
   type TaskMove,
   type TaskSnapshot,
 } from '../markdown/index.ts'
+import type { Unlisten } from '../unlisten.ts'
 import type { OpenTask } from './open-task.ts'
 import { toInsertTarget, type InsertTaskTarget } from './task-insert-target.ts'
 import { applyTaskOp, type TaskInsertOp, type TaskOp } from './task-ops.ts'
@@ -168,6 +169,15 @@ export class TaskStore {
   #loaded = false
   #completedLoaded = false
   #view: TaskStoreView | null = null
+  readonly #listeners = new Set<VoidFunction>()
+  /**
+   * How many {@link TaskStore.batch} calls are running.
+   */
+  #batches = 0
+  /**
+   * The view changed during the batches that are running.
+   */
+  #changed = false
 
   constructor(createTaskId: () => string) {
     this.#createTaskId = createTaskId
@@ -181,29 +191,31 @@ export class TaskStore {
    * of every task of them.
    */
   landAll(read: TaskRead, completed: boolean): string[] {
-    const seen = new Set<string>()
-    const unread: string[] = []
-    for (const note of read.notes) {
-      seen.add(note.path)
-      if (!completed && this.#losesStruck(note)) {
-        unread.push(note.path)
-      } else if (this.#isCurrent(note.path, read.seq)) {
-        this.#setNote(toNoteContext(note), note.hash, note.tasks, completed, null, [], [])
-        this.#seqs.set(note.path, read.seq)
+    return this.batch(() => {
+      const seen = new Set<string>()
+      const unread: string[] = []
+      for (const note of read.notes) {
+        seen.add(note.path)
+        if (!completed && this.#losesStruck(note)) {
+          unread.push(note.path)
+        } else if (this.#isCurrent(note.path, read.seq)) {
+          this.#setNote(toNoteContext(note), note.hash, note.tasks, completed, null, [], [])
+          this.#seqs.set(note.path, read.seq)
+        }
       }
-    }
-    for (const path of this.#notes.keys()) {
-      if (!seen.has(path) && this.#isCurrent(path, read.seq)) {
-        this.#clearNote(path, completed)
-        this.#seqs.set(path, read.seq)
+      for (const path of this.#notes.keys()) {
+        if (!seen.has(path) && this.#isCurrent(path, read.seq)) {
+          this.#clearNote(path, completed)
+          this.#seqs.set(path, read.seq)
+        }
       }
-    }
-    if (!this.#loaded || this.#completedLoaded !== completed) {
-      this.#loaded = true
-      this.#completedLoaded = completed
-      this.#view = null
-    }
-    return unread
+      if (!this.#loaded || this.#completedLoaded !== completed) {
+        this.#loaded = true
+        this.#completedLoaded = completed
+        this.#invalidate()
+      }
+      return unread
+    })
   }
 
   /**
@@ -211,20 +223,22 @@ export class TaskStore {
    * from the read has no task.
    */
   landPaths(read: TaskRead, paths: readonly string[]): void {
-    const seen = new Set<string>()
-    for (const note of read.notes) {
-      seen.add(note.path)
-      if (this.#isCurrent(note.path, read.seq)) {
-        this.#setNote(toNoteContext(note), note.hash, note.tasks, true, null, [], [])
-        this.#seqs.set(note.path, read.seq)
+    this.batch(() => {
+      const seen = new Set<string>()
+      for (const note of read.notes) {
+        seen.add(note.path)
+        if (this.#isCurrent(note.path, read.seq)) {
+          this.#setNote(toNoteContext(note), note.hash, note.tasks, true, null, [], [])
+          this.#seqs.set(note.path, read.seq)
+        }
       }
-    }
-    for (const path of paths) {
-      if (!seen.has(path) && this.#isCurrent(path, read.seq)) {
-        this.#clearNote(path, true)
-        this.#seqs.set(path, read.seq)
+      for (const path of paths) {
+        if (!seen.has(path) && this.#isCurrent(path, read.seq)) {
+          this.#clearNote(path, true)
+          this.#seqs.set(path, read.seq)
+        }
       }
-    }
+    })
   }
 
   /**
@@ -234,7 +248,7 @@ export class TaskStore {
   begin(notePath: string, ops: readonly TaskOp[]): PendingWrite {
     const write = { notePath, ops }
     this.#pending.push(write)
-    this.#view = null
+    this.#invalidate()
     return write
   }
 
@@ -243,40 +257,44 @@ export class TaskStore {
    * folded into the insert of that task, which the returned write holds.
    */
   fold(write: PendingWrite): PendingWrite {
-    const { notePath, ops } = write
-    const kept: TaskOp[] = []
-    const inserts = new Map<string, TaskInsertOp>()
-    for (const op of ops) {
-      const insert =
-        op.kind === 'insert' ? undefined : (inserts.get(op.taskId) ?? this.#takeNewTask(op.taskId))
-      if (op.kind === 'insert' || insert === undefined) {
-        kept.push(op)
-        continue
+    return this.batch(() => {
+      const { notePath, ops } = write
+      const kept: TaskOp[] = []
+      const inserts = new Map<string, TaskInsertOp>()
+      for (const op of ops) {
+        const insert =
+          op.kind === 'insert'
+            ? undefined
+            : (inserts.get(op.taskId) ?? this.#takeNewTask(op.taskId))
+        if (op.kind === 'insert' || insert === undefined) {
+          kept.push(op)
+          continue
+        }
+        switch (op.kind) {
+          case 'setMarkdown': {
+            inserts.set(op.taskId, { ...insert, markdown: op.markdown })
+            break
+          }
+          case 'toggle': {
+            inserts.set(op.taskId, { ...insert, checked: op.checked })
+            break
+          }
+          case 'toBullet': {
+            inserts.set(op.taskId, { ...insert, bullet: true })
+            break
+          }
+          case 'remove': {
+            inserts.delete(op.taskId)
+            break
+          }
+        }
       }
-      switch (op.kind) {
-        case 'setMarkdown': {
-          inserts.set(op.taskId, { ...insert, markdown: op.markdown })
-          break
-        }
-        case 'toggle': {
-          inserts.set(op.taskId, { ...insert, checked: op.checked })
-          break
-        }
-        case 'toBullet': {
-          inserts.set(op.taskId, { ...insert, bullet: true })
-          break
-        }
-        case 'remove': {
-          inserts.delete(op.taskId)
-          break
-        }
+      if (kept.length === ops.length) {
+        return write
       }
-    }
-    if (kept.length === ops.length) {
-      return write
-    }
-    this.#drop(write)
-    return this.begin(notePath, [...kept, ...inserts.values()])
+      this.#drop(write)
+      return this.begin(notePath, [...kept, ...inserts.values()])
+    })
   }
 
   /**
@@ -286,15 +304,20 @@ export class TaskStore {
    * of the note shows as held text.
    */
   fail(write: PendingWrite): void {
-    this.#drop(write)
-    for (const op of write.ops) {
-      if (op.kind === 'insert') {
-        this.#showNewTask({ ...op, checked: false, bullet: false })
-      } else if (op.kind === 'setMarkdown' && this.find(write.notePath, op.taskId) !== undefined) {
-        this.#takeUnwritten(op.taskId)
-        this.#unwritten.set(op.taskId, this.begin(write.notePath, [op]))
+    this.batch(() => {
+      this.#drop(write)
+      for (const op of write.ops) {
+        if (op.kind === 'insert') {
+          this.#showNewTask({ ...op, checked: false, bullet: false })
+        } else if (
+          op.kind === 'setMarkdown' &&
+          this.find(write.notePath, op.taskId) !== undefined
+        ) {
+          this.#takeUnwritten(op.taskId)
+          this.#unwritten.set(op.taskId, this.begin(write.notePath, [op]))
+        }
       }
-    }
+    })
   }
 
   /**
@@ -395,36 +418,38 @@ export class TaskStore {
    * learned at a later index seq keeps its rows.
    */
   landCommit(notePath: string, result: TaskWriteResult, write: PendingWrite | null): void {
-    const previous = this.#notes.get(notePath)
-    const inserts =
-      write?.ops.filter((op) => op.kind === 'insert').filter((op) => op.bullet !== true) ?? []
-    const context = previous?.rows[0] ?? inserts[0]?.note
-    const current = result.indexSeq === null || this.#isCurrent(notePath, result.indexSeq)
-    if (context !== undefined && current) {
-      const moves = result.merged ? null : result.moved
-      const exact =
-        moves !== null && (previous === undefined || previous.revision === result.baseRevision)
-      this.#setNote(
-        { ...toInsertTarget(context), notePath, updatedAt: result.updatedAt },
-        result.revision,
-        result.tasks,
-        true,
-        exact ? moves : null,
-        moves === null
-          ? []
-          : result.inserted.flatMap((task, i) => {
-              const insert = inserts[i]
-              return insert === undefined ? [] : [[encodeTaskPath(task.astPath), insert.taskId]]
-            }),
-        moves === null ? inserts : [],
-      )
-      if (result.indexSeq !== null) {
-        this.#seqs.set(notePath, result.indexSeq)
+    this.batch(() => {
+      const previous = this.#notes.get(notePath)
+      const inserts =
+        write?.ops.filter((op) => op.kind === 'insert').filter((op) => op.bullet !== true) ?? []
+      const context = previous?.rows[0] ?? inserts[0]?.note
+      const current = result.indexSeq === null || this.#isCurrent(notePath, result.indexSeq)
+      if (context !== undefined && current) {
+        const moves = result.merged ? null : result.moved
+        const exact =
+          moves !== null && (previous === undefined || previous.revision === result.baseRevision)
+        this.#setNote(
+          { ...toInsertTarget(context), notePath, updatedAt: result.updatedAt },
+          result.revision,
+          result.tasks,
+          true,
+          exact ? moves : null,
+          moves === null
+            ? []
+            : result.inserted.flatMap((task, i) => {
+                const insert = inserts[i]
+                return insert === undefined ? [] : [[encodeTaskPath(task.astPath), insert.taskId]]
+              }),
+          moves === null ? inserts : [],
+        )
+        if (result.indexSeq !== null) {
+          this.#seqs.set(notePath, result.indexSeq)
+        }
       }
-    }
-    if (write !== null) {
-      this.#drop(write)
-    }
+      if (write !== null) {
+        this.#drop(write)
+      }
+    })
   }
 
   /**
@@ -434,7 +459,7 @@ export class TaskStore {
     for (const taskId of taskIds) {
       this.#struck.add(taskId)
     }
-    this.#view = null
+    this.#invalidate()
   }
 
   /**
@@ -442,7 +467,7 @@ export class TaskStore {
    */
   archive(): void {
     this.#struck = new Set()
-    this.#view = null
+    this.#invalidate()
   }
 
   /**
@@ -481,9 +506,50 @@ export class TaskStore {
     return this.#view
   }
 
+  /**
+   * Call `listener` after each change of {@link TaskStore.view}.
+   */
+  subscribe(listener: VoidFunction): Unlisten {
+    this.#listeners.add(listener)
+    return () => {
+      this.#listeners.delete(listener)
+    }
+  }
+
+  /**
+   * Run `change` and call the listeners once after it, when the view changed.
+   */
+  batch<Result>(change: () => Result): Result {
+    this.#batches += 1
+    try {
+      return change()
+    } finally {
+      this.#batches -= 1
+      if (this.#batches === 0 && this.#changed) {
+        this.#changed = false
+        this.#notify()
+      }
+    }
+  }
+
+  #invalidate(): void {
+    this.#view = null
+    if (this.#batches > 0) {
+      this.#changed = true
+    } else {
+      this.#notify()
+    }
+  }
+
+  #notify(): void {
+    for (const listener of this.#listeners) {
+      listener()
+    }
+  }
+
   #drop(write: PendingWrite): void {
     this.#pending = this.#pending.filter((pending) => pending !== write)
-    this.#view = null
+    this.#invalidate()
   }
 
   #showNewTask(op: TaskInsertOp): void {
@@ -545,7 +611,7 @@ export class TaskStore {
     ) {
       return
     }
-    this.#view = null
+    this.#invalidate()
     if (tasks.length === 0) {
       this.#notes.delete(notePath)
       return
@@ -589,7 +655,7 @@ export class TaskStore {
     if (rows.length === previous.rows.length) {
       return
     }
-    this.#view = null
+    this.#invalidate()
     if (rows.length === 0) {
       this.#notes.delete(path)
     } else {

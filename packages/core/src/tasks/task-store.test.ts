@@ -1,6 +1,6 @@
 import type { NoteTasks, TaskRead } from '@reflect/types'
 import { sha256HexSync } from '@reflect/utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { applyTaskEdits, projectTasks, type TaskEdit, type TaskLocator } from '../markdown/index.ts'
 import type { OpenTask } from './open-task.ts'
 import type { TaskOp } from './task-ops.ts'
@@ -100,6 +100,21 @@ describe('TaskStore reads', () => {
 
     store.landAll(openRead(2, files), false)
     expect(store.view().completed).toBeUndefined()
+  })
+
+  it('notifies once for a read of several notes, and once for a batch', () => {
+    const store = createStore()
+    const listener = vi.fn()
+    store.subscribe(listener)
+
+    store.landAll(openRead(1, { [A]: '+ [ ] a\n', [B]: '+ [ ] b\n' }), false)
+    expect(listener).toHaveBeenCalledTimes(1)
+
+    store.batch(() => {
+      store.begin(A, [{ kind: 'toggle', taskId: 't0', checked: true }])
+      store.begin(B, [{ kind: 'toggle', taskId: 't1', checked: true }])
+    })
+    expect(listener).toHaveBeenCalledTimes(2)
   })
 
   it('keeps the rows and their ids through an equal read', () => {

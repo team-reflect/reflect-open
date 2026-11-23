@@ -19,6 +19,7 @@ import { NoteEditError } from '../documents/note-edit-error.ts'
 import type { InsertTaskTarget } from './task-insert-target.ts'
 import type { TaskOp } from './task-ops.ts'
 import { withDraftDueDate } from './task-schedule-content.ts'
+import type { TaskReader } from './task-reader.ts'
 import type { TaskStore, TaskWriteResult } from './task-store.ts'
 
 /**
@@ -40,15 +41,7 @@ export interface TaskCommandsDeps {
    * The store of the open graph.
    */
   readonly store: () => TaskStore
-  /**
-   * Show the rows of the store.
-   */
-  readonly publish: () => void
-  /**
-   * Read the tasks of the note at `notePath` from the index into `store`, in
-   * one try. A failed read rejects.
-   */
-  readonly reread: (store: TaskStore, notePath: string) => Promise<void>
+  readonly reader: TaskReader
 }
 
 /**
@@ -131,8 +124,11 @@ export class TaskCommands {
    */
   complete(tasks: readonly OpenTask[]): Promise<void> {
     const open = tasks.filter((task) => !task.checked)
-    this.#deps.store().strike(open.map((task) => task.taskId))
-    return this.#apply(open, () => [{ kind: 'toggle' }])
+    const store = this.#deps.store()
+    return store.batch(() => {
+      store.strike(open.map((task) => task.taskId))
+      return this.#apply(open, () => [{ kind: 'toggle' }])
+    })
   }
 
   /**
@@ -174,7 +170,6 @@ export class TaskCommands {
    */
   archive(): void {
     this.#deps.store().archive()
-    this.#deps.publish()
   }
 
   /**
@@ -193,10 +188,12 @@ export class TaskCommands {
    */
   continueAfter(task: OpenTask): OpenTask {
     const store = this.#deps.store()
-    const replaced = store.findNewTask(task.taskId)
-    void this.commit(task)
-    const kept = store.rows(task.notePath).some((row) => row.taskId === task.taskId)
-    return this.#addNewTask(task, kept ? task.taskId : (replaced?.after ?? null))
+    return store.batch(() => {
+      const replaced = store.findNewTask(task.taskId)
+      void this.commit(task)
+      const kept = store.rows(task.notePath).some((row) => row.taskId === task.taskId)
+      return this.#addNewTask(task, kept ? task.taskId : (replaced?.after ?? null))
+    })
   }
 
   /**
@@ -239,10 +236,7 @@ export class TaskCommands {
   }
 
   #addNewTask(target: InsertTaskTarget, after: string | null): OpenTask {
-    const { clock, publish } = this.#deps
-    const row = this.#deps.store().addNewTask(target, after, clock.now())
-    publish()
-    return row
+    return this.#deps.store().addNewTask(target, after, this.#deps.clock.now())
   }
 
   /**
@@ -258,15 +252,16 @@ export class TaskCommands {
       return Promise.resolve()
     }
     const store = this.#deps.store()
-    const byNote = new Map<string, TaskOp[]>()
-    for (const task of tasks) {
-      const ops = this.#takeOps(store, task, actionsFor)
-      if (ops.length > 0) {
-        byNote.set(task.notePath, [...(byNote.get(task.notePath) ?? []), ...ops])
+    const writes = store.batch(() => {
+      const byNote = new Map<string, TaskOp[]>()
+      for (const task of tasks) {
+        const ops = this.#takeOps(store, task, actionsFor)
+        if (ops.length > 0) {
+          byNote.set(task.notePath, [...(byNote.get(task.notePath) ?? []), ...ops])
+        }
       }
-    }
-    const writes = [...byNote].map(([notePath, ops]) => this.#queue(session, store, notePath, ops))
-    this.#deps.publish()
+      return [...byNote].map(([notePath, ops]) => this.#queue(session, store, notePath, ops))
+    })
     return Promise.all(writes).then(noop)
   }
 
@@ -324,7 +319,6 @@ export class TaskCommands {
     notePath: string,
     ops: readonly TaskOp[],
   ): Promise<void> {
-    const { publish } = this.#deps
     let pending = store.begin(notePath, ops)
     const run = async (): Promise<void> => {
       pending = store.fold(pending)
@@ -343,7 +337,6 @@ export class TaskCommands {
           this.#report(cause)
         }
       }
-      publish()
     }
     const queued = (this.#queues.get(notePath) ?? Promise.resolve()).then(run)
     this.#queues.set(notePath, queued)
@@ -376,7 +369,7 @@ export class TaskCommands {
       stale = cause
     }
     try {
-      await this.#deps.reread(store, notePath)
+      store.landPaths(await this.#deps.reader.readPathsOnce([notePath]), [notePath])
     } catch (cause) {
       this.#deps.logger.error('tasks: read failed:', cause)
       throw stale
