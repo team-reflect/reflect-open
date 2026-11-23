@@ -12,7 +12,7 @@ import {
   type TaskSnapshot,
 } from '../markdown/index.ts'
 import type { OpenTask } from '../tasks/open-task.ts'
-import type { TaskWriteResult } from '../tasks/task-commands.ts'
+import type { TaskWriteResult } from '../tasks/task-store.ts'
 
 /**
  * An open-task row with sensible defaults for tests; override only what a

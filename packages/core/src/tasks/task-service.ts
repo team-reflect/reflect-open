@@ -16,14 +16,9 @@ import {
   toggleSnippetTask,
   type SnippetTaskClick,
 } from './snippet-task-toggle.ts'
-import {
-  TaskCommands,
-  toTaskCommit,
-  type TaskAction,
-  type TaskWriteResult,
-} from './task-commands.ts'
+import { TaskCommands, type TaskAction } from './task-commands.ts'
 import { createTaskReader, type TaskReader } from './task-reader.ts'
-import { TaskStore, type TaskStoreView } from './task-store.ts'
+import { TaskStore, type TaskStoreView, type TaskWriteResult } from './task-store.ts'
 
 export interface TaskServiceDeps {
   readonly database: DatabaseService
@@ -262,7 +257,7 @@ class TaskServiceImpl implements TaskService {
       task.notePath,
       actions.map((action) => ({ ...action, task: locator })),
     )
-    store.landCommit(toTaskCommit(task.notePath, result), null)
+    store.landCommit(task.notePath, result, null)
     this.#publish()
     return result
   }

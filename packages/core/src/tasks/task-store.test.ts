@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { applyTaskEdits, projectTasks, type TaskEdit, type TaskLocator } from '../markdown/index.ts'
 import type { OpenTask } from './open-task.ts'
 import type { TaskOp } from './task-ops.ts'
-import { TaskStore, type TaskCommit } from './task-store.ts'
+import { TaskStore, type TaskWriteResult } from './task-store.ts'
 
 const A = 'notes/a.md'
 const B = 'notes/b.md'
@@ -56,22 +56,18 @@ function locate(row: OpenTask): TaskLocator {
 }
 
 /**
- * The commit of `edits` over `source` at index seq `indexSeq`.
+ * The result of writing `edits` over `source` at index seq `indexSeq`.
  */
-function commitOf(
-  path: string,
+function resultOf(
   source: string,
   edits: readonly TaskEdit[],
   indexSeq: number | null,
-): TaskCommit {
+): TaskWriteResult {
   const edit = applyTaskEdits(source, sha256HexSync(source), edits)
   return {
-    notePath: path,
+    ...edit,
     revision: sha256HexSync(edit.source),
-    tasks: edit.tasks,
-    baseRevision: edit.baseRevision,
-    moves: edit.moved,
-    inserted: edit.inserted,
+    merged: false,
     indexSeq,
     updatedAt: 9,
   }
@@ -228,7 +224,7 @@ describe('TaskStore writes', () => {
     const ops: TaskOp[] = [{ kind: 'remove', taskId: 't0' }]
     const write = store.push(A, ops)
 
-    store.landCommit(commitOf(A, source, [{ kind: 'remove', task: locate(a) }], 2), write)
+    store.landCommit(A, resultOf(source, [{ kind: 'remove', task: locate(a) }], 2), write)
     expect(store.view().open).toMatchObject([
       {
         taskId: 't1',
@@ -253,7 +249,7 @@ describe('TaskStore writes', () => {
       at: { kind: 'contextEnd', task: locate(a) },
       markdown: '',
     }
-    store.landCommit(commitOf(A, source, [edit], 2), write)
+    store.landCommit(A, resultOf(source, [edit], 2), write)
     expect(labels(store.view().open)).toEqual(['t0:a', 't1:b', 'draft:'])
     expect(store.find(A, 'draft')).toMatchObject({ astPath: [2] })
   })
@@ -276,7 +272,7 @@ describe('TaskStore writes', () => {
     ])
 
     const edit: TaskEdit = { kind: 'insert', at: { kind: 'tasksSection' }, markdown: 'x' }
-    store.landCommit(commitOf(B, '', [edit], 2), write)
+    store.landCommit(B, resultOf('', [edit], 2), write)
     expect(store.view().open).toMatchObject([
       { taskId: 'draft', dailyDate: '2026-11-23', breadcrumbs: ['Tasks'], updatedAt: 9 },
     ])
@@ -284,10 +280,10 @@ describe('TaskStore writes', () => {
 
   it('aligns without the moves when the note text is not the output of the edit', () => {
     const { store, a } = loaded()
-    const commit = commitOf(A, source, [{ kind: 'remove', task: locate(a) }], 2)
+    const result = resultOf(source, [{ kind: 'remove', task: locate(a) }], 2)
     const merged = projectTasks('+ [ ] theirs\n+ [ ] a\n+ [ ] b\n')
 
-    store.landCommit({ ...commit, tasks: merged, moves: null }, null)
+    store.landCommit(A, { ...result, tasks: merged, merged: true }, null)
     expect(labels(store.view().open)).toEqual(['t2:theirs', 't0:a', 't1:b'])
   })
 
@@ -304,19 +300,14 @@ describe('TaskStore writes', () => {
     }
     const merged = projectTasks('+ [ ] theirs\n+ [ ] a\n+ [ ] b\n+ [ ] c\n')
 
-    store.landCommit({ ...commitOf(A, source, [edit], 2), tasks: merged, moves: null }, write)
+    store.landCommit(A, { ...resultOf(source, [edit], 2), tasks: merged, merged: true }, write)
     expect(labels(store.view().open)).toEqual(['t2:theirs', 't0:a', 't1:b', 'draft:c'])
   })
 
   it('ignores a read from before the index seq of a commit', () => {
     const { store, a } = loaded()
-    const commit = commitOf(
-      A,
-      source,
-      [{ kind: 'setMarkdown', task: locate(a), markdown: 'a!' }],
-      4,
-    )
-    store.landCommit(commit, null)
+    const result = resultOf(source, [{ kind: 'setMarkdown', task: locate(a), markdown: 'a!' }], 4)
+    store.landCommit(A, result, null)
 
     store.landAll(openRead(3, { [A]: source }), false)
     expect(labels(store.view().open)).toEqual(['t0:a!', 't1:b'])
@@ -324,15 +315,10 @@ describe('TaskStore writes', () => {
 
   it('keeps the rows of a read from after the index seq of a commit', () => {
     const { store, a } = loaded()
-    const commit = commitOf(
-      A,
-      source,
-      [{ kind: 'setMarkdown', task: locate(a), markdown: 'a!' }],
-      2,
-    )
+    const result = resultOf(source, [{ kind: 'setMarkdown', task: locate(a), markdown: 'a!' }], 2)
     store.landPaths(fullRead(3, { [A]: '+ [ ] a!\n+ [ ] b\n+ [ ] later\n' }), [A])
 
-    store.landCommit(commit, null)
+    store.landCommit(A, result, null)
     expect(labels(store.view().open)).toEqual(['t0:a!', 't1:b', 't2:later'])
   })
 })

@@ -3,6 +3,7 @@ import {
   compareTaskPaths,
   encodeTaskPath,
   renderTaskSnapshot,
+  type TaskEditResult,
   type TaskMove,
   type TaskSnapshot,
 } from '../markdown/index.ts'
@@ -55,37 +56,28 @@ interface TaskDraft {
 }
 
 /**
- * The tasks a note write left in its note.
+ * What a task write left in its note.
  */
-export interface TaskCommit {
-  readonly notePath: string
+export interface TaskWriteResult extends TaskEditResult {
   /**
    * The hash of the note text the write left.
    */
   readonly revision: string
   /**
-   * Every round task of that text.
+   * Every round task of the note text the write left, in document order.
    */
   readonly tasks: readonly TaskSnapshot[]
   /**
-   * The hash of the text the edit was applied to, when the writer knew it.
+   * Whether the note holds another text than `source`: the write merged with
+   * a newer text. `moved` and `inserted` then describe `source` only.
    */
-  readonly baseRevision: string | null
+  readonly merged: boolean
   /**
-   * Where the edit left each task of the text at `baseRevision`; `null` when
-   * the note holds another text than the output of the edit.
-   */
-  readonly moves: readonly TaskMove[] | null
-  /**
-   * The tasks the edit inserted, in the order of the insert ops of the write.
-   */
-  readonly inserted: readonly TaskSnapshot[]
-  /**
-   * The seq of an index commit that holds the text, when one is known.
+   * The seq of an index commit that holds the note text, when one is known.
    */
   readonly indexSeq: number | null
   /**
-   * Epoch milliseconds when the write landed.
+   * Epoch milliseconds read right after the write, to order the rows of the note.
    */
   readonly updatedAt: number
 }
@@ -351,41 +343,40 @@ export class TaskStore {
   }
 
   /**
-   * End `write` with the tasks it left in its note, or take the tasks of a
+   * End `write` with the tasks it left in `notePath`, or take the tasks of a
    * write that showed no ops. A task keeps its id through the moves of the
-   * edit, and an inserted task takes the id of its insert op. Without the
-   * moves, an insert op gives its id to the first task with its content that
-   * is no task of the rows before. The tasks of a
-   * note the store has no row context for are left to the next read. A note
-   * that the store learned at a later index seq keeps its rows.
+   * edit, and an inserted task takes the id of its insert op. A merged write
+   * has no moves: an insert op then gives its id to the first task with its
+   * content that is no task of the rows before. The tasks of a note the store
+   * has no row context for are left to the next read. A note that the store
+   * learned at a later index seq keeps its rows.
    */
-  landCommit(commit: TaskCommit, write: PendingWrite | null): void {
-    const { notePath } = commit
+  landCommit(notePath: string, result: TaskWriteResult, write: PendingWrite | null): void {
     const previous = this.#notes.get(notePath)
     const inserts =
       write?.ops.filter((op) => op.kind === 'insert').filter((op) => op.bullet !== true) ?? []
     const context = previous?.rows[0] ?? inserts[0]?.note
-    const current = commit.indexSeq === null || this.#isCurrent(notePath, commit.indexSeq)
+    const current = result.indexSeq === null || this.#isCurrent(notePath, result.indexSeq)
     if (context !== undefined && current) {
+      const moves = result.merged ? null : result.moved
       const exact =
-        commit.moves !== null &&
-        (previous === undefined || previous.revision === commit.baseRevision)
+        moves !== null && (previous === undefined || previous.revision === result.baseRevision)
       this.#setNote(
-        { ...toContext(context), notePath, updatedAt: commit.updatedAt },
-        commit.revision,
-        commit.tasks,
+        { ...toContext(context), notePath, updatedAt: result.updatedAt },
+        result.revision,
+        result.tasks,
         true,
-        exact ? commit.moves : null,
-        commit.moves === null
+        exact ? moves : null,
+        moves === null
           ? []
-          : commit.inserted.flatMap((task, i) => {
+          : result.inserted.flatMap((task, i) => {
               const insert = inserts[i]
               return insert === undefined ? [] : [[encodeTaskPath(task.astPath), insert.taskId]]
             }),
-        commit.moves === null ? inserts : [],
+        moves === null ? inserts : [],
       )
-      if (commit.indexSeq !== null) {
-        this.#seqs.set(notePath, commit.indexSeq)
+      if (result.indexSeq !== null) {
+        this.#seqs.set(notePath, result.indexSeq)
       }
     }
     if (write !== null) {

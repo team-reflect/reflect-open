@@ -12,7 +12,6 @@ import {
   type TaskEdit,
   type TaskEditResult,
   type TaskLocator,
-  type TaskSnapshot,
 } from '../markdown/index.ts'
 import type { OpenTask } from './open-task.ts'
 import { resolveTaskEdit } from './task-content.ts'
@@ -20,34 +19,7 @@ import { NoteEditError } from './task-errors.ts'
 import type { InsertTaskTarget } from './task-insert-target.ts'
 import type { TaskInsertOp, TaskOp } from './task-ops.ts'
 import { withDraftDueDate } from './task-schedule-content.ts'
-import type { TaskCommit, TaskStore } from './task-store.ts'
-
-/**
- * What a task write left in its note.
- */
-export interface TaskWriteResult extends TaskEditResult {
-  /**
-   * The hash of the note text the write left.
-   */
-  readonly revision: string
-  /**
-   * Every round task of the note text the write left, in document order.
-   */
-  readonly tasks: readonly TaskSnapshot[]
-  /**
-   * Whether the note holds another text than `source`: the write merged with
-   * a newer text. `moved` and `inserted` then describe `source` only.
-   */
-  readonly merged: boolean
-  /**
-   * The seq of an index commit that holds the note text, when one is known.
-   */
-  readonly indexSeq: number | null
-  /**
-   * Epoch milliseconds read right after the write, to order the rows of the note.
-   */
-  readonly updatedAt: number
-}
+import type { TaskStore, TaskWriteResult } from './task-store.ts'
 
 /**
  * One change to a task.
@@ -85,22 +57,6 @@ function toLocator(task: TaskLocator): TaskLocator {
     astPath: task.astPath,
     markdown: task.markdown,
     checked: task.checked,
-  }
-}
-
-/**
- * The tasks `result` left in `notePath`, for the store.
- */
-export function toTaskCommit(notePath: string, result: TaskWriteResult): TaskCommit {
-  return {
-    notePath,
-    revision: result.revision,
-    tasks: result.tasks,
-    baseRevision: result.baseRevision,
-    moves: result.merged ? null : result.moved,
-    inserted: result.inserted,
-    indexSeq: result.indexSeq,
-    updatedAt: result.updatedAt,
   }
 }
 
@@ -411,7 +367,7 @@ export class TaskCommands {
         if (result === null) {
           store.drop(pending)
         } else {
-          store.landCommit(toTaskCommit(notePath, result), pending)
+          store.landCommit(notePath, result, pending)
         }
       } catch (cause) {
         store.drop(pending)
