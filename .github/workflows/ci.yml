@@ -398,20 +398,20 @@ jobs:
       - name: Fingerprint probe
         shell: bash
         env:
-          CARGO_LOG: cargo::core::compiler::fingerprint=info
+          CARGO_LOG: cargo::compiler::fingerprint=info
         run: |
           set +e
           env | sort | cut -c1-120
-          cargo test --workspace --locked --no-run 2>&1 | grep -v '^\s*$' | head -c 3000000
+          cargo test --workspace --locked --no-run 2>&1 | sed -E 's/^.*cargo::compiler::fingerprint: /FP: /' | cut -c1-1200 | head -c 5000000
 
       - name: Test
         env:
-          CARGO_LOG: cargo::core::compiler::fingerprint=info
+          CARGO_LOG: cargo::compiler::fingerprint=info
         run: pnpm turbo run test --filter=reflect-workspace --force
 
       - name: Clippy
         env:
-          CARGO_LOG: cargo::core::compiler::fingerprint=info
+          CARGO_LOG: cargo::compiler::fingerprint=info
         run: pnpm turbo run lint --filter=reflect-workspace --force
 
       # The iOS app links the core crates through `reflect-ffi`.
