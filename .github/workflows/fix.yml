@@ -45,7 +45,7 @@ jobs:
         if: steps.changes.outputs.rust == 'true' || steps.changes.outputs.licenses == 'true'
         uses: ./.github/actions/setup-rust
         with:
-          cache-save: 'false'
+          cache-save: false
 
       - name: Generate WXT types
         run: pnpm gen:wxt

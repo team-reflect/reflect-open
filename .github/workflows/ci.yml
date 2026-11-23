@@ -161,7 +161,7 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
         with:
-          cache-scope: cache_scope_node
+          cache-scope: node
 
       - name: Verify the generated iOS CSP is current
         run: |
@@ -210,8 +210,8 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
         with:
-          cache-scope: cache_scope_node
-          cache-save: 'false'
+          cache-scope: node
+          cache-save: false
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:chromium
@@ -246,8 +246,8 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
         with:
-          cache-scope: cache_scope_rust
-          cache-save: 'false'
+          cache-scope: rust
+          cache-save: false
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:webkit
@@ -384,7 +384,7 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
         with:
-          cache-scope: cache_scope_rust
+          cache-scope: rust
 
       - uses: ./.github/actions/setup-node
 
