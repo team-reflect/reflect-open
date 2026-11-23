@@ -90,8 +90,8 @@ export function attachSnapPager({
   // The gesture count at the last page visibility change. Until the next
   // gesture the position is stale: iOS lays a hidden page out at other sizes
   // for its app switcher snapshots, and the engine re-snaps to another page.
-  let staleAt: number | undefined
-  const isStale = (): boolean => staleAt === watch.gestures()
+  let gesturesAtVisibilityChange: number | undefined
+  const isStale = (): boolean => gesturesAtVisibilityChange === watch.gestures()
 
   const setIndex = (next: number, byScroll: boolean): void => {
     if (next !== index) {
@@ -163,7 +163,7 @@ export function attachSnapPager({
   document.addEventListener(
     'visibilitychange',
     () => {
-      staleAt = watch.gestures()
+      gesturesAtVisibilityChange = watch.gestures()
     },
     { signal },
   )
