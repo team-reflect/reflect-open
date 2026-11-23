@@ -59,7 +59,6 @@ export {
 } from './list-insert.ts'
 export {
   applyTaskEdits,
-  findTaskMove,
   type InsertPosition,
   type TaskEdit,
   type TaskEditInsert,

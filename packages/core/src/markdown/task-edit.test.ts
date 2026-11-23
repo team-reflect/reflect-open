@@ -1,7 +1,7 @@
 import { sha256HexSync } from '@reflect/utils'
 import { describe, expect, it } from 'vitest'
 import { splitFrontmatter } from './frontmatter.ts'
-import { applyTaskEdits, findTaskMove, type TaskEdit, type TaskEditResult } from './task-edit.ts'
+import { applyTaskEdits, type TaskEdit, type TaskEditResult } from './task-edit.ts'
 import type { TaskLocator, TaskSnapshot } from './task-model.ts'
 import { isSameTaskPath } from './task-path.ts'
 import { projectTasks } from './task-project.ts'
@@ -420,43 +420,6 @@ describe('applyTaskEdits: batches', () => {
         { kind: 'remove', task },
       ])
     }).toThrow(expect.objectContaining({ kind: 'stale' }))
-  })
-})
-
-describe('findTaskMove', () => {
-  const source = 'Intro\n\n+ [ ] a\n+ [ ] b\n'
-  const edit = applyEdits(source, [{ kind: 'toggle', task: locate(source, 0) }])
-
-  it('follows a locator read at the base revision by its path', () => {
-    expect(findTaskMove(edit, locate(source, 0))?.to).toMatchObject({
-      astPath: [1],
-      checked: true,
-    })
-  })
-
-  it('follows a stale locator by its content, not by whatever sits at its path', () => {
-    // Indexed before the intro paragraph was added: `b` was at [1], where `a` is now.
-    expect(
-      findTaskMove(edit, { revision: '', astPath: [1], markdown: 'b', checked: false })?.to,
-    ).toMatchObject({
-      astPath: [2],
-      markdown: 'b',
-    })
-  })
-
-  it('returns undefined for a locator that names no task', () => {
-    expect(
-      findTaskMove(edit, { revision: '', astPath: [1], markdown: 'c', checked: false }),
-    ).toBeUndefined()
-  })
-
-  it('takes the path among identical tasks', () => {
-    const twins = '+ [ ] same\n+ [ ] same\n'
-    const result = applyEdits(twins, [{ kind: 'toggle', task: locate(twins, 1) }])
-    expect(findTaskMove(result, locate(twins, 1))?.to).toMatchObject({ checked: true })
-    expect(findTaskMove(result, { ...locate(twins, 0), revision: 'older' })?.from).toMatchObject({
-      astPath: [0],
-    })
   })
 })
 

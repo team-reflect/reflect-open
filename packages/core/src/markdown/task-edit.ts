@@ -62,17 +62,6 @@ export interface TaskEditResult {
 }
 
 /**
- * Where a write left the task a locator names, or undefined when the locator
- * names none.
- */
-export function findTaskMove(
-  edit: Pick<TaskEditResult, 'baseRevision' | 'moved'>,
-  task: TaskLocator,
-): TaskMove | undefined {
-  return resolveTaskLocator(edit.moved, (move) => move.from, edit.baseRevision, task)
-}
-
-/**
  * Apply `edits` to a note and serialize its body once. `revision` is the hash
  * of `source`, or `null` when no file holds that text. Every locator describes
  * the note as the caller last saw it: all addresses are resolved against the
@@ -140,55 +129,42 @@ function hasSameContent(entry: TaskContent, locator: TaskContent): boolean {
 }
 
 /**
- * The entry a locator names, among `entries` in document order. A locator
+ * The entry a locator names, among `before` in document order. A locator
  * read at `revision`, the hash of the text the entries come from, names the
  * entry at its path. Any other locator names the entry at its path when that
  * entry has its content, else the entry with its content that is nearest to
  * its path in document order, the earlier one of two equally near.
  */
-function resolveTaskLocator<T>(
-  entries: readonly T[],
-  locatorOf: (entry: T) => TaskSnapshot,
-  revision: string | null,
-  locator: TaskLocator,
-): T | undefined {
-  const atPath = entries.find((entry) => {
-    return isSameTaskPath(locatorOf(entry).astPath, locator.astPath)
-  })
-  if (
-    locator.revision === revision ||
-    (atPath !== undefined && hasSameContent(locatorOf(atPath), locator))
-  ) {
-    return atPath
-  }
-  const position = entries.filter((entry) => {
-    return compareTaskPaths(locatorOf(entry).astPath, locator.astPath) < 0
-  }).length
-  let nearest: T | undefined
-  let nearestDistance = Infinity
-  for (const [i, entry] of entries.entries()) {
-    const distance = Math.abs(i - position)
-    if (distance < nearestDistance && hasSameContent(locatorOf(entry), locator)) {
-      nearest = entry
-      nearestDistance = distance
-    }
-  }
-  return nearest
-}
-
 function locateTask(
   before: readonly TaskEntry[],
   revision: string | null,
   locator: TaskLocator,
 ): TaskEntry {
-  const match = resolveTaskLocator(before, (entry) => entry, revision, locator)
-  if (match === undefined) {
+  const atPath = before.find((entry) => isSameTaskPath(entry.astPath, locator.astPath))
+  if (atPath !== undefined && (locator.revision === revision || hasSameContent(atPath, locator))) {
+    return atPath
+  }
+  const position = before.filter((entry) => {
+    return compareTaskPaths(entry.astPath, locator.astPath) < 0
+  }).length
+  let nearest: TaskEntry | undefined
+  let nearestDistance = Infinity
+  if (locator.revision !== revision) {
+    for (const [i, entry] of before.entries()) {
+      const distance = Math.abs(i - position)
+      if (distance < nearestDistance && hasSameContent(entry, locator)) {
+        nearest = entry
+        nearestDistance = distance
+      }
+    }
+  }
+  if (nearest === undefined) {
     throw new NoteEditError(
       'stale',
       `task is no longer in the note: ${JSON.stringify(locator.markdown)}`,
     )
   }
-  return match
+  return nearest
 }
 
 function resolveInsertPosition(

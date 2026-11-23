@@ -1,11 +1,4 @@
-import {
-  findTaskMove,
-  isSameTaskPath,
-  renderInlineText,
-  renderTaskSnapshot,
-  type TaskEditResult,
-  type TaskSnapshot,
-} from '../markdown/index.ts'
+import { renderInlineText } from '../markdown/index.ts'
 import type { OpenTask } from './open-task.ts'
 import { getTaskKey, isSameTask } from './task-identity.ts'
 
@@ -21,16 +14,6 @@ import { getTaskKey, isSameTask } from './task-identity.ts'
  */
 
 /**
- * Where a note write left each of its tasks, and the note revisions before and after it.
- */
-export interface TaskMoves extends Pick<TaskEditResult, 'baseRevision' | 'moved'> {
-  /**
-   * The hash of the note text the write left.
-   */
-  revision: string
-}
-
-/**
  * Drop every row matching one of `tasks` from a cached list.
  */
 export function withoutTasks(
@@ -38,57 +21,6 @@ export function withoutTasks(
   tasks: readonly OpenTask[],
 ): readonly OpenTask[] | undefined {
   return rows?.filter((row) => !tasks.some((task) => isSameTask(row, task)))
-}
-
-function isSameLabels(left: readonly string[], right: readonly string[]): boolean {
-  return left.length === right.length && left.every((label, i) => label === right[i])
-}
-
-/**
- * The row as the write left its task; the row itself when nothing differs.
- */
-function withSnapshot(task: OpenTask, to: TaskSnapshot, revision: string): OpenTask {
-  const next = { ...task, ...renderTaskSnapshot(to), revision }
-  const same =
-    next.revision === task.revision &&
-    isSameTaskPath(next.astPath, task.astPath) &&
-    next.checked === task.checked &&
-    next.markdown === task.markdown &&
-    isSameLabels(next.breadcrumbs, task.breadcrumbs)
-  return same ? task : next
-}
-
-/**
- * Re-key the cached rows of `notePath` after a write moved its tasks: a row
- * whose task was removed (or is no longer a task) is dropped, one whose task
- * moved takes its new address and content, and untouched rows are kept as is.
- * Returns the same array when nothing changed.
- */
-export function withRelocatedTasks(
-  rows: readonly OpenTask[] | undefined,
-  notePath: string,
-  edit: TaskMoves,
-): readonly OpenTask[] | undefined {
-  if (rows === undefined || edit.moved.length === 0) {
-    return rows
-  }
-  let changed = false
-  const relocated = rows.flatMap((task) => {
-    const move = task.notePath === notePath ? findTaskMove(edit, task) : undefined
-    if (move === undefined) {
-      return [task]
-    }
-    if (move.to === null) {
-      changed = true
-      return []
-    }
-    const next = withSnapshot(task, move.to, edit.revision)
-    if (next !== task) {
-      changed = true
-    }
-    return [next]
-  })
-  return changed ? relocated : rows
 }
 
 /**
