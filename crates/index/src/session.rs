@@ -7,8 +7,8 @@ use std::sync::{Mutex, MutexGuard};
 use rusqlite::{Connection, Transaction};
 
 use reflect_types::{
-    AppError, AppResult, ChatConversation, ChatMessageRow, EmbeddedChunk, FileMeta, IndexTouch,
-    IndexedNote, MovedNoteAddress, NoteMoveRequest, ReconcileScan,
+    AppError, AppResult, ChatConversation, ChatMessageRow, EmbeddedChunk, FileMeta, IndexCommit,
+    IndexTouch, IndexedNote, MovedNoteAddress, NoteMoveRequest, ReconcileScan,
 };
 
 use crate::chat_write;
@@ -178,6 +178,17 @@ impl IndexSession {
         body(conn).map(Some)
     }
 
+    /// Run `body` on the writer in one transaction that counts as one index
+    /// commit, when `generation` is current.
+    fn commit(
+        &self,
+        generation: u64,
+        body: impl FnOnce(&Transaction) -> AppResult<()>,
+    ) -> AppResult<IndexCommit> {
+        let seq = self.write(generation, |conn| commit(conn, body))?;
+        Ok(IndexCommit { seq })
+    }
+
     fn applied(outcome: AppResult<Option<()>>) -> AppResult<Applied> {
         outcome.map(|committed| match committed {
             Some(()) => Applied::Committed,
@@ -188,33 +199,27 @@ impl IndexSession {
     /// Apply note projections in one transaction. One transaction plus cached
     /// statements keeps a full rebuild cheap; an empty batch commits a no-op
     /// transaction.
-    pub fn apply(&self, generation: u64, notes: &[IndexedNote]) -> AppResult<Applied> {
-        Self::applied(self.write(generation, |conn| {
-            commit(conn, |tx| {
-                for note in notes {
-                    write::apply_note(tx, note)?;
-                }
-                Ok(())
-            })
-            .map(drop)
-        }))
+    pub fn apply(&self, generation: u64, notes: &[IndexedNote]) -> AppResult<IndexCommit> {
+        self.commit(generation, |tx| {
+            for note in notes {
+                write::apply_note(tx, note)?;
+            }
+            Ok(())
+        })
     }
 
     /// Remove a note (e.g. deleted on disk) from the index. This is the
     /// *genuine deletion* entry point, so embedding rows go too; `apply_note`'s
     /// internal remove must NOT do this (it runs on every upsert and would
     /// destroy the chunk hash-skip).
-    pub fn remove(&self, generation: u64, path: &str) -> AppResult<Applied> {
-        Self::applied(self.write(generation, |conn| {
-            // One transaction: a half-removed note (row gone, chunks left)
-            // would let a later note at the same path surface stale chunk text
-            // in semantic search until a re-embed.
-            commit(conn, |tx| {
-                write::remove_note(tx, path)?;
-                embed_write::remove_chunks(tx, path)
-            })
-            .map(drop)
-        }))
+    pub fn remove(&self, generation: u64, path: &str) -> AppResult<IndexCommit> {
+        // One transaction: a half-removed note (row gone, chunks left) would
+        // let a later note at the same path surface stale chunk text in
+        // semantic search until a re-embed.
+        self.commit(generation, |tx| {
+            write::remove_note(tx, path)?;
+            embed_write::remove_chunks(tx, path)
+        })
     }
 
     /// Move a note's projection rows **only** (the id-based reconcile, Plan
@@ -227,8 +232,9 @@ impl IndexSession {
         from: &str,
         to: &str,
         address: &MovedNoteAddress,
-    ) -> AppResult<Applied> {
-        Self::applied(self.write(generation, |conn| move_rows(conn, from, to, address)))
+    ) -> AppResult<IndexCommit> {
+        let seq = self.write(generation, |conn| move_rows(conn, from, to, address))?;
+        Ok(IndexCommit { seq })
     }
 
     /// Move a note's rows and then let `rename` move the file (Plan 17): the
@@ -294,16 +300,13 @@ impl IndexSession {
     /// Re-stamp stored mtimes for notes whose content already matches disk
     /// (the reconcile's hash-match skip). One transaction for the batch; a
     /// path whose row vanished in between updates nothing.
-    pub fn touch(&self, generation: u64, entries: &[IndexTouch]) -> AppResult<Applied> {
-        Self::applied(self.write(generation, |conn| {
-            commit(conn, |tx| {
-                for entry in entries {
-                    write::touch_note(tx, &entry.path, entry.mtime)?;
-                }
-                Ok(())
-            })
-            .map(drop)
-        }))
+    pub fn touch(&self, generation: u64, entries: &[IndexTouch]) -> AppResult<IndexCommit> {
+        self.commit(generation, |tx| {
+            for entry in entries {
+                write::touch_note(tx, &entry.path, entry.mtime)?;
+            }
+            Ok(())
+        })
     }
 
     /// Upsert one `index_meta` key. The table is bookkeeping the TS policy
@@ -321,10 +324,8 @@ impl IndexSession {
     /// Wipe all derived tables (the TS layer then re-applies every note). The
     /// `chat_*` and `note_visits` tables are deliberately untouched: they are
     /// durable, not a rebuildable projection.
-    pub fn clear(&self, generation: u64) -> AppResult<Applied> {
-        Self::applied(self.write(generation, |conn| {
-            commit(conn, |tx| write::clear_index(tx)).map(drop)
-        }))
+    pub fn clear(&self, generation: u64) -> AppResult<IndexCommit> {
+        self.commit(generation, |tx| write::clear_index(tx))
     }
 
     /// Upsert one chat message and its conversation row in a single
@@ -429,13 +430,14 @@ impl IndexSession {
     }
 }
 
-/// One committed row-move transaction (the rename pipeline's halves).
+/// One committed row-move transaction (the rename pipeline's halves). Returns
+/// the commit sequence after it.
 fn move_rows(
     conn: &mut Connection,
     from: &str,
     to: &str,
     address: &MovedNoteAddress,
-) -> AppResult<()> {
+) -> AppResult<u64> {
     commit(conn, |tx| {
         // Child tables FK `notes(path)`; deferring lets the parent key move
         // first and the constraint re-check at commit, when the children have
@@ -443,7 +445,6 @@ fn move_rows(
         tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;
         write::move_note(tx, from, to, address)
     })
-    .map(drop)
 }
 
 /// Run `body` in one transaction that counts as one index commit. Returns the

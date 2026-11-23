@@ -277,7 +277,7 @@ mod tests {
         let index = Index::default();
         let generation = open(&index);
         let args = format!(r#"{{"note":{NOTE},"generation":{generation}}}"#);
-        assert_eq!(index.call("index_apply", &args).unwrap(), "null");
+        assert_eq!(index.call("index_apply", &args).unwrap(), r#"{"seq":1}"#);
         assert_eq!(paths(&index), r#"[{"path":"notes/a.md"}]"#);
         let hits = index
             .call(

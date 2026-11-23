@@ -106,12 +106,12 @@ macro_rules! commands {
                 x_syndication_fetch(post_id: String).await -> Option<serde_json::Value>,
             }
             index_write {
-                index_apply(note: IndexedNote, generation: u64) -> (),
-                index_apply_batch(notes: Vec<IndexedNote>, generation: u64) -> (),
-                index_remove(path: String, generation: u64) -> (),
-                index_clear(generation: u64) -> (),
-                index_move(from: String, to: String, generation: u64, to_address: MovedNoteAddress) -> (),
-                index_touch(entries: Vec<IndexTouch>, generation: u64) -> (),
+                index_apply(note: IndexedNote, generation: u64) -> IndexCommit,
+                index_apply_batch(notes: Vec<IndexedNote>, generation: u64) -> IndexCommit,
+                index_remove(path: String, generation: u64) -> IndexCommit,
+                index_clear(generation: u64) -> IndexCommit,
+                index_move(from: String, to: String, generation: u64, to_address: MovedNoteAddress) -> IndexCommit,
+                index_touch(entries: Vec<IndexTouch>, generation: u64) -> IndexCommit,
                 index_meta_set(key: String, value: String, generation: u64) -> (),
                 chat_message_save(conversation: ChatConversation, message: ChatMessageRow, generation: u64) -> (),
                 chat_conversation_delete(id: String, generation: u64) -> (),

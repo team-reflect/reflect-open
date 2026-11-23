@@ -5,9 +5,9 @@
 use expect_test::{Expect, expect};
 use reflect_index_schema::LATEST_SCHEMA_VERSION;
 use reflect_types::{
-    ChatConversation, ChatMessageRow, EmbeddedChunk, IndexTouch, IndexedAlias, IndexedClaim,
-    IndexedEmail, IndexedLink, IndexedNote, IndexedTag, IndexedTask, LinkKind, MovedNoteAddress,
-    NoteKind, TagFacet, VisitedNote,
+    ChatConversation, ChatMessageRow, EmbeddedChunk, IndexCommit, IndexTouch, IndexedAlias,
+    IndexedClaim, IndexedEmail, IndexedLink, IndexedNote, IndexedTag, IndexedTask, LinkKind,
+    MovedNoteAddress, NoteKind, TagFacet, VisitedNote,
 };
 use rusqlite::Connection;
 use sea_query::{QueryStatementWriter, SqliteQueryBuilder};
@@ -2018,7 +2018,7 @@ fn stale_generation_writes_are_dropped_end_to_end() {
         session
             .apply(stale, &[note("notes/a.md", "A", vec![])])
             .unwrap(),
-        Applied::Committed
+        IndexCommit { seq: Some(1) }
     );
     assert_eq!(note_count(&session), Value::from(1));
 
@@ -2032,10 +2032,13 @@ fn stale_generation_writes_are_dropped_end_to_end() {
         session
             .apply(stale, &[note("notes/b.md", "B", vec![])])
             .unwrap(),
-        Applied::Stale
+        IndexCommit { seq: None }
     );
     assert_eq!(note_count(&session), Value::from(1));
-    assert_eq!(session.remove(stale, "notes/a.md").unwrap(), Applied::Stale);
+    assert_eq!(
+        session.remove(stale, "notes/a.md").unwrap(),
+        IndexCommit { seq: None }
+    );
     assert_eq!(note_count(&session), Value::from(1));
     assert_eq!(
         session.record_visit(stale, "notes/a.md", 1).unwrap(),
@@ -2045,7 +2048,7 @@ fn stale_generation_writes_are_dropped_end_to_end() {
         session
             .apply(fresh, &[note("notes/b.md", "B", vec![])])
             .unwrap(),
-        Applied::Committed
+        IndexCommit { seq: Some(2) }
     );
     assert_eq!(note_count(&session), Value::from(2));
 
@@ -2129,7 +2132,7 @@ fn each_committed_index_write_adds_one_to_the_commit_seq() {
     let (session, generation) = file_session(graph_dir.path());
     assert_eq!(commit_seq_of(&session), 0);
 
-    session
+    let applied = session
         .apply(
             generation,
             &[
@@ -2138,18 +2141,14 @@ fn each_committed_index_write_adds_one_to_the_commit_seq() {
             ],
         )
         .unwrap();
-    assert_eq!(commit_seq_of(&session), 1);
-    session
-        .touch(
-            generation,
-            &[IndexTouch {
-                path: "notes/a.md".to_string(),
-                mtime: 5,
-            }],
-        )
-        .unwrap();
-    assert_eq!(commit_seq_of(&session), 2);
-    session
+    assert_eq!(applied, IndexCommit { seq: Some(1) });
+    let touch = IndexTouch {
+        path: "notes/a.md".to_string(),
+        mtime: 5,
+    };
+    let touched = session.touch(generation, &[touch]).unwrap();
+    assert_eq!(touched, IndexCommit { seq: Some(2) });
+    let moved = session
         .move_rows(
             generation,
             "notes/a.md",
@@ -2157,10 +2156,11 @@ fn each_committed_index_write_adds_one_to_the_commit_seq() {
             &moved_address("notes/c.md"),
         )
         .unwrap();
-    assert_eq!(commit_seq_of(&session), 3);
-    session.remove(generation, "notes/b.md").unwrap();
-    assert_eq!(commit_seq_of(&session), 4);
-    session.clear(generation).unwrap();
+    assert_eq!(moved, IndexCommit { seq: Some(3) });
+    let removed = session.remove(generation, "notes/b.md").unwrap();
+    assert_eq!(removed, IndexCommit { seq: Some(4) });
+    let cleared = session.clear(generation).unwrap();
+    assert_eq!(cleared, IndexCommit { seq: Some(5) });
     assert_eq!(commit_seq_of(&session), 5);
     assert_eq!(note_count(&session), Value::from(0));
 }
@@ -2182,7 +2182,7 @@ fn a_write_that_does_not_commit_keeps_the_commit_seq() {
         session
             .apply(generation + 1, &[note("notes/b.md", "B", vec![])])
             .unwrap(),
-        Applied::Stale
+        IndexCommit { seq: None }
     );
     session
         .set_meta(generation, "commit_seq", "0")

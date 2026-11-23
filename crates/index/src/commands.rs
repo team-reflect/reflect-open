@@ -6,15 +6,15 @@ use rusqlite::Connection;
 
 use reflect_types::{
     AppError, AppResult, Backlink, BacklinkPage, BacklinkSourceCursor, ChatConversation,
-    ChatMessageRow, ChunkHash, ChunkHit, DailyNoteRow, EmbeddedChunk, GraphStats, IndexTouch,
-    IndexedNote, MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry, NotePrivacy, NoteRow,
-    PinnedNoteRow, RecentNoteRow, SearchHitRow, SearchRequest, TagFacet, TaskRow, TemplateEntry,
-    VisitedNote, WikiCandidates, WikiClaimMatch, WikiKeyWinner, WikiTitleCandidate,
+    ChatMessageRow, ChunkHash, ChunkHit, DailyNoteRow, EmbeddedChunk, GraphStats, IndexCommit,
+    IndexTouch, IndexedNote, MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry, NotePrivacy,
+    NoteRow, PinnedNoteRow, RecentNoteRow, SearchHitRow, SearchRequest, TagFacet, TaskRow,
+    TemplateEntry, VisitedNote, WikiCandidates, WikiClaimMatch, WikiKeyWinner, WikiTitleCandidate,
     WikiWinningAlias,
 };
 
 use crate::read;
-use crate::session::{Applied, IndexSession};
+use crate::session::IndexSession;
 
 /// Where a committed write is announced.
 pub trait IndexEvents {
@@ -52,38 +52,39 @@ impl<'a> IndexCommands<'a> {
         self.session.read(self.read_generation, body)
     }
 
-    fn announce(&self, applied: Applied) {
-        if applied == Applied::Committed {
+    fn announce(&self, commit: IndexCommit) -> IndexCommit {
+        if commit.seq.is_some() {
             self.events.index_written();
         }
+        commit
     }
 
     /// Applies one note's projection in one transaction. A stale generation
     /// writes nothing.
-    fn index_apply(&self, note: IndexedNote, generation: u64) -> AppResult<()> {
-        self.announce(
-            self.session
-                .apply(generation, std::slice::from_ref(&note))?,
-        );
-        Ok(())
+    fn index_apply(&self, note: IndexedNote, generation: u64) -> AppResult<IndexCommit> {
+        let commit = self
+            .session
+            .apply(generation, std::slice::from_ref(&note))?;
+        Ok(self.announce(commit))
     }
 
     /// Applies many notes' projections in one transaction.
-    fn index_apply_batch(&self, notes: Vec<IndexedNote>, generation: u64) -> AppResult<()> {
-        self.announce(self.session.apply(generation, &notes)?);
-        Ok(())
+    fn index_apply_batch(
+        &self,
+        notes: Vec<IndexedNote>,
+        generation: u64,
+    ) -> AppResult<IndexCommit> {
+        Ok(self.announce(self.session.apply(generation, &notes)?))
     }
 
     /// Removes a note and its embedding rows.
-    fn index_remove(&self, path: String, generation: u64) -> AppResult<()> {
-        self.announce(self.session.remove(generation, &path)?);
-        Ok(())
+    fn index_remove(&self, path: String, generation: u64) -> AppResult<IndexCommit> {
+        Ok(self.announce(self.session.remove(generation, &path)?))
     }
 
     /// Wipes all derived tables. Chat history and note visits stay.
-    fn index_clear(&self, generation: u64) -> AppResult<()> {
-        self.announce(self.session.clear(generation)?);
-        Ok(())
+    fn index_clear(&self, generation: u64) -> AppResult<IndexCommit> {
+        Ok(self.announce(self.session.clear(generation)?))
     }
 
     /// Moves a note's projection rows only.
@@ -93,21 +94,20 @@ impl<'a> IndexCommands<'a> {
         to: String,
         generation: u64,
         to_address: MovedNoteAddress,
-    ) -> AppResult<()> {
-        if self
+    ) -> AppResult<IndexCommit> {
+        let commit = self
             .session
-            .move_rows(generation, &from, &to, &to_address)?
-            == Applied::Committed
-        {
+            .move_rows(generation, &from, &to, &to_address)?;
+        if commit.seq.is_some() {
             self.events.index_written();
             self.events.note_moved(&from, &to);
         }
-        Ok(())
+        Ok(commit)
     }
 
     /// Re-stamps stored mtimes for notes whose content already matches disk.
-    fn index_touch(&self, entries: Vec<IndexTouch>, generation: u64) -> AppResult<()> {
-        self.session.touch(generation, &entries).map(drop)
+    fn index_touch(&self, entries: Vec<IndexTouch>, generation: u64) -> AppResult<IndexCommit> {
+        self.session.touch(generation, &entries)
     }
 
     /// Upserts one `index_meta` key.

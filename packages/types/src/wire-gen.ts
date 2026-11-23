@@ -988,27 +988,27 @@ export type Commands = {
       note: IndexedNote
       generation: number
     }
-    result: null
+    result: IndexCommit
   }
   index_apply_batch: {
     args: {
       notes: IndexedNote[]
       generation: number
     }
-    result: null
+    result: IndexCommit
   }
   index_remove: {
     args: {
       path: string
       generation: number
     }
-    result: null
+    result: IndexCommit
   }
   index_clear: {
     args: {
       generation: number
     }
-    result: null
+    result: IndexCommit
   }
   index_move: {
     args: {
@@ -1017,14 +1017,14 @@ export type Commands = {
       generation: number
       toAddress: MovedNoteAddress
     }
-    result: null
+    result: IndexCommit
   }
   index_touch: {
     args: {
       entries: IndexTouch[]
       generation: number
     }
-    result: null
+    result: IndexCommit
   }
   index_meta_set: {
     args: {
@@ -1831,6 +1831,16 @@ export type IcloudSweepOutcome = {
   copies: string[]
   /**  Conflicts resolved without user interaction. */
   autoResolved: number
+}
+
+/**  What a write of the index projection committed. */
+export type IndexCommit = {
+  /**
+   *  The commit sequence of the index after the write: the number of
+   *  projection write transactions committed to this database file. Absent
+   *  when the generation was stale, so nothing was written.
+   */
+  seq: number | null
 }
 
 /**

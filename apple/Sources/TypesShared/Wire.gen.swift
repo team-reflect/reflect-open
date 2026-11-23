@@ -2597,6 +2597,29 @@ public struct IcloudSweepOutcome: Codable, Sendable, Equatable {
     }
 }
 
+/// What a write of the index projection committed.
+public struct IndexCommit: Codable, Sendable, Equatable {
+    public let seq: UInt64?
+
+    private enum CodingKeys: String, CodingKey {
+        case seq = "seq"
+    }
+
+    public init(seq: UInt64?) {
+        self.seq = seq
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.seq = try container.decodeIfPresent(UInt64.self, forKey: .seq)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(seq, forKey: .seq)
+    }
+}
+
 /// One `touch` entry: re-stamp `path`'s stored mtime to `mtime` (epoch ms, as
 /// listed by the file walk).
 public struct IndexTouch: Codable, Sendable, Equatable {
