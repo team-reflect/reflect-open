@@ -1,4 +1,5 @@
 import { isShallowEqual } from '@ocavue/utils'
+import { errorMessage } from '../errors.ts'
 import type { ClockService } from '../ports/clock-service.ts'
 import { requireGraphSession, type GraphSession } from '../graph/graph-session.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
@@ -10,11 +11,6 @@ import type { SnippetTask } from '../indexing/snippet-tasks.ts'
 import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { TaskLocator } from '../markdown/index.ts'
-import {
-  resolveSnippetTask,
-  toggleSnippetTask,
-  type SnippetTaskClick,
-} from './snippet-task-toggle.ts'
 import { TaskCommands, type TaskAction } from './task-commands.ts'
 import { createTaskReader, type TaskReader } from './task-reader.ts'
 import { TaskStore, type TaskStoreView, type TaskWriteResult } from './task-store.ts'
@@ -27,6 +23,15 @@ export interface TaskServiceDeps {
   readonly logger: LoggerService
   readonly graphSession: Store<{ readonly session: GraphSession | null }>
   readonly ipc: IpcBridgeService
+}
+
+/**
+ * A click on the `index`th checkbox of a rendered snippet, as the view reports it.
+ */
+interface SnippetTaskClick {
+  index: number
+  checked: boolean
+  text: string
 }
 
 /**
@@ -237,20 +242,28 @@ class TaskServiceImpl implements TaskService {
   }
 
   resolveSnippetTask(tasks: readonly SnippetTask[], click: SnippetTaskClick): SnippetTask | null {
-    return resolveSnippetTask(this.#deps.progress, tasks, click)
+    const anchor = tasks[click.index]
+    if (anchor === undefined || anchor.checked !== click.checked || anchor.text !== click.text) {
+      this.#deps.progress.fail('Updating task', 'The note has changed — try again in a moment.')
+      return null
+    }
+    return anchor
   }
 
   async toggleSnippetTask(
     notePath: string,
     task: { locator: TaskLocator; checked: boolean },
   ): Promise<void> {
-    await toggleSnippetTask(
-      this.#deps.graphSession,
-      this.#deps.progress,
-      (ref) => this.writeTask(ref, [{ kind: 'toggle' }]),
-      notePath,
-      task,
-    )
+    const { graphSession, progress } = this.#deps
+    if (graphSession.get().session === null) {
+      return
+    }
+    try {
+      await this.writeTask({ notePath, ...task.locator }, [{ kind: 'toggle' }])
+    } catch (cause) {
+      progress.fail(task.checked ? 'Reopening task' : 'Completing task', errorMessage(cause))
+      throw cause
+    }
   }
 
   #createStore(): TaskStore {
