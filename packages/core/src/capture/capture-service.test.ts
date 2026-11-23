@@ -583,13 +583,12 @@ describe('CaptureService (X posts)', () => {
 
     const session = kit.capture.openSession({ generation: 3 })
     session.start()
-    await flush()
+    await vi.waitFor(() => expect(kit.captureInbox.files().size).toBe(0))
 
     expect(daily.content()).toBe(
       'Unsaved draft\n\n## X bookmarks\n\n![](https://x.com/i/status/20)\n',
     )
     expect(kit.noteFile.writes()).toEqual([])
-    expect(kit.captureInbox.files().size).toBe(0)
     session.dispose()
   })
 
@@ -601,11 +600,10 @@ describe('CaptureService (X posts)', () => {
 
     const session = kit.capture.openSession({ generation: 3 })
     session.start()
-    await flush()
+    await vi.waitFor(() => expect(kit.captureInbox.files().size).toBe(0))
 
     expect(daily.content()).toBe('Unsaved draft\n\n- call the bank\n')
     expect(kit.noteFile.writes()).toEqual([])
-    expect(kit.captureInbox.files().size).toBe(0)
     session.dispose()
   })
 
