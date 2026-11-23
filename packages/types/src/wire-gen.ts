@@ -2590,6 +2590,11 @@ export type TaskRow = {
   pinnedOrder: number | null
   /**  When the note's row last changed (epoch ms). */
   updatedAt: number
+  /**
+   *  Lowercase hex SHA-256 of the note text that the task was projected
+   *  from, read with `\n` line endings.
+   */
+  noteHash: string
 }
 
 /**  The result of one read of the task rows. */

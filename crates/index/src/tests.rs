@@ -2662,6 +2662,7 @@ fn tasks_split_by_checked_and_skip_templates() {
     assert_eq!(open[0].markdown, "open one");
     assert_eq!(open[0].note_title, "A");
     assert!(open[0].is_pinned && !open[0].checked);
+    assert_eq!(open[0].note_hash, "h");
     let done = tasks(&conn, true).unwrap().rows;
     assert_eq!(done.len(), 1);
     assert_eq!(done[0].markdown, "done one");

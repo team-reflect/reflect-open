@@ -30,6 +30,7 @@ pub(crate) fn tasks(conn: &Connection, checked: bool) -> AppResult<TaskRows> {
                 (Notes::Table, Notes::IsPinned),
                 (Notes::Table, Notes::PinnedOrder),
                 (Notes::Table, Notes::UpdatedAt),
+                (Notes::Table, Notes::FileHash),
             ])
             .from(Tasks::Table)
             .inner_join(
@@ -51,6 +52,7 @@ pub(crate) fn tasks(conn: &Connection, checked: bool) -> AppResult<TaskRows> {
                 is_pinned: row.get(7)?,
                 pinned_order: row.get(8)?,
                 updated_at: row.get(9)?,
+                note_hash: row.get(10)?,
             })
         },
     )?;

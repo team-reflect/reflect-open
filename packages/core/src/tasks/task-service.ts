@@ -824,10 +824,15 @@ class TaskServiceImpl implements TaskService {
   #toTaskRows(rows: readonly TaskRecord[]): OpenTask[] {
     const tasks: OpenTask[] = []
     for (const row of rows) {
-      const { astPath, markdown, breadcrumbs, checked, ...rest } = row
+      const { astPath, markdown, breadcrumbs, checked } = row
       try {
         tasks.push({
-          ...rest,
+          notePath: row.notePath,
+          noteTitle: row.noteTitle,
+          dailyDate: row.dailyDate,
+          isPinned: row.isPinned,
+          pinnedOrder: row.pinnedOrder,
+          updatedAt: row.updatedAt,
           ...renderTaskSnapshot({
             astPath: decodeTaskPath(astPath),
             markdown,

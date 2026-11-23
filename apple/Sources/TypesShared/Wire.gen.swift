@@ -5007,6 +5007,7 @@ public struct TaskRow: Codable, Sendable, Equatable {
     public let isPinned: Bool
     public let pinnedOrder: Double?
     public let updatedAt: Int64
+    public let noteHash: String
 
     private enum CodingKeys: String, CodingKey {
         case notePath = "notePath"
@@ -5019,9 +5020,10 @@ public struct TaskRow: Codable, Sendable, Equatable {
         case isPinned = "isPinned"
         case pinnedOrder = "pinnedOrder"
         case updatedAt = "updatedAt"
+        case noteHash = "noteHash"
     }
 
-    public init(notePath: String, astPath: String, markdown: String, breadcrumbs: String, checked: Bool, noteTitle: String, dailyDate: String?, isPinned: Bool, pinnedOrder: Double?, updatedAt: Int64) {
+    public init(notePath: String, astPath: String, markdown: String, breadcrumbs: String, checked: Bool, noteTitle: String, dailyDate: String?, isPinned: Bool, pinnedOrder: Double?, updatedAt: Int64, noteHash: String) {
         self.notePath = notePath
         self.astPath = astPath
         self.markdown = markdown
@@ -5032,6 +5034,7 @@ public struct TaskRow: Codable, Sendable, Equatable {
         self.isPinned = isPinned
         self.pinnedOrder = pinnedOrder
         self.updatedAt = updatedAt
+        self.noteHash = noteHash
     }
 
     public init(from decoder: Decoder) throws {
@@ -5046,6 +5049,7 @@ public struct TaskRow: Codable, Sendable, Equatable {
         self.isPinned = try container.decode(Bool.self, forKey: .isPinned)
         self.pinnedOrder = try container.decodeIfPresent(Double.self, forKey: .pinnedOrder)
         self.updatedAt = try container.decode(Int64.self, forKey: .updatedAt)
+        self.noteHash = try container.decode(String.self, forKey: .noteHash)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -5060,6 +5064,7 @@ public struct TaskRow: Codable, Sendable, Equatable {
         try container.encode(isPinned, forKey: .isPinned)
         try container.encode(pinnedOrder, forKey: .pinnedOrder)
         try container.encode(updatedAt, forKey: .updatedAt)
+        try container.encode(noteHash, forKey: .noteHash)
     }
 }
 

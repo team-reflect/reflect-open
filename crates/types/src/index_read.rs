@@ -172,6 +172,9 @@ pub struct TaskRow {
     pub pinned_order: Option<f64>,
     /// When the note's row last changed (epoch ms).
     pub updated_at: i64,
+    /// Lowercase hex SHA-256 of the note text that the task was projected
+    /// from, read with `\n` line endings.
+    pub note_hash: String,
 }
 
 /// The result of one read of the task rows.
