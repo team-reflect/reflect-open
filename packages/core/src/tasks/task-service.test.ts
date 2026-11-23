@@ -683,6 +683,20 @@ describe('task list state', () => {
     expect(tasks.get().open).toMatchObject([{ taskId: struck.taskId, markdown: 'one' }])
   })
 
+  it('keeps a task struck when its note changed before a return', async () => {
+    const reads = watchReads()
+    const { rows, unsubscribe } = await subscribed({ [A]: '+ [ ] one\n' })
+    await tasks.commands.toggle(rows)
+    unsubscribe()
+    seedNotes(database, [{ path: A, markdown: '+ [x] one\n+ [ ] two\n' }])
+
+    tasks.subscribe(noop)
+    await flushMicrotasks()
+    expect(reads.paths()).toEqual([null, null, [A]])
+    expect(tasks.get().struck).toMatchObject([{ taskId: rows[0]!.taskId, checked: true }])
+    expect(markdowns(tasks.get().open)).toEqual(['two'])
+  })
+
   it('keeps the row struck when an edit-and-reopen write fails', async () => {
     const struck = await struckRow()
     failWrites(new Error('disk full'))

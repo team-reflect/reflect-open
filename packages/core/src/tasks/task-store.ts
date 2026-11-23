@@ -189,13 +189,18 @@ export class TaskStore {
   /**
    * Take a read of every note: of the unchecked tasks, or with `completed` of
    * the checked tasks too. A note that the store learned at a later index seq
-   * keeps its rows.
+   * keeps its rows. So does a changed note with a struck task when the read
+   * holds no checked task: the paths of these notes are returned, for a read
+   * of every task of them.
    */
-  landAll(read: TaskRead, completed: boolean): void {
+  landAll(read: TaskRead, completed: boolean): string[] {
     const seen = new Set<string>()
+    const unread: string[] = []
     for (const note of read.notes) {
       seen.add(note.path)
-      if (this.#isCurrent(note.path, read.seq)) {
+      if (!completed && this.#losesStruck(note)) {
+        unread.push(note.path)
+      } else if (this.#isCurrent(note.path, read.seq)) {
         this.#setNote(toNoteContext(note), note.hash, note.tasks, completed, null, [], [])
         this.#seqs.set(note.path, read.seq)
       }
@@ -211,6 +216,7 @@ export class TaskStore {
       this.#completedLoaded = completed
       this.#view = null
     }
+    return unread
   }
 
   /**
@@ -447,6 +453,19 @@ export class TaskStore {
       this.#unwritten.delete(taskId)
       this.drop(write)
     }
+  }
+
+  /**
+   * Whether the rows of the note hold a struck task that the tasks of
+   * `note`, read from another text without its checked tasks, would drop.
+   */
+  #losesStruck(note: NoteTasks): boolean {
+    const previous = this.#notes.get(note.path)
+    return (
+      previous !== undefined &&
+      previous.revision !== note.hash &&
+      previous.rows.some((row) => row.checked && this.#struck.has(row.taskId))
+    )
   }
 
   #isCurrent(path: string, seq: number): boolean {

@@ -349,7 +349,8 @@ class TaskServiceImpl implements TaskService {
 
   /**
    * Read the tasks of every note into the store, again while the index
-   * changed during the read.
+   * changed during the read. A note that the store keeps for its struck
+   * task is read on its own.
    */
   async #readAll(): Promise<void> {
     const store = this.#store
@@ -361,8 +362,11 @@ class TaskServiceImpl implements TaskService {
       if (read === null) {
         return
       }
-      store.landAll(read, completed)
+      const unread = store.landAll(read, completed)
       this.#publish()
+      if (unread.length > 0) {
+        await this.#readPathsInto(store, unread)
+      }
     } while (this.#readAgain && !signal.aborted)
   }
 
