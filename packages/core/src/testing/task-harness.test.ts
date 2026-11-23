@@ -58,3 +58,41 @@ describe('createTaskHarness', () => {
     expect(harness.view().map((row) => row.markdown)).toEqual(['two', 'four'])
   })
 })
+
+describe('drained task view', () => {
+  it('equals the open tasks of the files after writes, external edits, a pass, and a suspend', async () => {
+    const harness = await start({
+      'notes/a.md': '## Tasks\n\n+ [ ] one\n+ [ ] two\n',
+      'notes/b.md': '+ [ ] three\n',
+    })
+    const row = (markdown: string) => {
+      return harness.tasks.get().open!.find((task) => task.markdown === markdown)!
+    }
+
+    await harness.tasks.editTask(row('one'), 'one, edited')
+    await harness.deliverWatcherBatch()
+    harness.editExternally('notes/b.md', '+ [ ] zero\n+ [ ] three\n')
+    await harness.deliverWatcherBatch()
+    await harness.drain()
+    expect(harness.view()).toEqual(harness.projectFiles())
+
+    await harness.tasks.completeTasks([row('two')])
+    await harness.startPass()
+    await harness.endPass()
+    await harness.tasks.addTaskAfter(row('three'), 'four')
+    harness.suspend()
+    harness.editExternally('notes/c.md', '+ [ ] five\n')
+    await harness.deliverWatcherBatch()
+    await harness.resume()
+    await harness.drain()
+
+    expect(harness.view().map((task) => task.markdown)).toEqual([
+      'one, edited',
+      'zero',
+      'four',
+      '',
+      'five',
+    ])
+    expect(harness.view()).toEqual(harness.projectFiles())
+  })
+})
