@@ -39,7 +39,7 @@ export interface TaskEditorHandlers {
    */
   onContinue: () => void
   /**
-   * Escape: leave the row without saving the typed text.
+   * Escape: leave the row.
    */
   onCancel: () => void
   /**

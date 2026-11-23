@@ -182,16 +182,6 @@ export class TaskCommands {
   }
 
   /**
-   * Forget the text typed into `task`. A new task keeps its text.
-   */
-  cancel(task: OpenTask): void {
-    const store = this.#deps.store()
-    if (store.findNewTask(task.taskId) === undefined) {
-      store.takeDraft(task.taskId)
-    }
-  }
-
-  /**
    * Check the open tasks of `tasks`. A task that becomes checked stays in
    * the active list, struck.
    */

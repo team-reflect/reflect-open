@@ -43,7 +43,6 @@ export function useTaskRowHandlers({
         selectExclusively(getTaskKey(commands.continueAfter(task)))
       },
       onCancel: () => {
-        commands.cancel(task)
         selection.clear()
       },
       onComplete: () => {

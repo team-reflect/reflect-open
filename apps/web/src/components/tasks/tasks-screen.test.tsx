@@ -526,7 +526,7 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
-  it('saves typed text when the row is left, discards it on Escape, and deletes', async () => {
+  it('saves typed text when the row is left or on Escape, and deletes', async () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/p.md', astPath: [2], markdown: 'first', noteTitle: 'P' }),
       task({ notePath: 'notes/p.md', astPath: [3], markdown: 'second', noteTitle: 'P' }),
@@ -545,15 +545,20 @@ describe('TasksScreen', () => {
     })
     await view.findByText('editing: second')
 
-    // Type and press Escape: no further write, edit mode exits.
+    // Type and press Escape: edit mode exits and the text is written.
     await userEvent.click(view.getByText('type-edit'))
     await userEvent.click(view.getByText('cancel-edit'))
     expect(view.queryByTestId('task-editor')).toBeNull()
-    expect(view.getByRole('button', { name: 'second' })).toBeDefined()
-    expect(writeTask).toHaveBeenCalledTimes(1)
+    await waitFor(() => {
+      expect(writeTask).toHaveBeenCalledWith(
+        expect.objectContaining({ notePath: 'notes/p.md', astPath: [3] }),
+        [{ kind: 'setMarkdown', markdown: 'edited content' }],
+      )
+    })
+    expect(writeTask).toHaveBeenCalledTimes(2)
 
     // Re-select and delete: a remove write, row gone.
-    await userEvent.click(view.getByRole('button', { name: 'edited content' }))
+    await userEvent.click(view.getByRole('button', { name: 'edited content' }).first())
     await userEvent.click(view.getByText('delete-edit'))
     await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
     await view.unmount()
@@ -1768,7 +1773,7 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
-  it('restores the struck row when an edit-and-reopen write fails', async () => {
+  it('keeps the row struck, with its typed text, when an edit-and-reopen write fails', async () => {
     failWrites(['setMarkdown', 'toggle'], new Error('disk full'))
     getOpenTasks.mockResolvedValue([
       task({
@@ -1798,8 +1803,7 @@ describe('TasksScreen', () => {
         }),
       )
     })
-    await view.findByRole('button', { name: 'Reopen: project task' })
-    expect(view.queryByText('edited content')).toBeNull()
+    await view.findByRole('button', { name: 'Reopen: edited content' })
     await view.unmount()
   })
 
