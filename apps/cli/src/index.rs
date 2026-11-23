@@ -14,7 +14,9 @@ use std::time::Duration;
 
 use rusqlite::{Connection, OpenFlags};
 
-use reflect_index_schema::{INDEX_FILE, REFLECT_DIR, is_compatible_schema, read_user_version};
+use reflect_index_schema::{
+    INDEX_FILE, LATEST_SCHEMA_VERSION, REFLECT_DIR, is_compatible_schema, read_user_version,
+};
 
 use crate::error::CliError;
 use crate::note_file::{read_note_text, walk_notes};
@@ -32,7 +34,8 @@ pub enum IndexOpen {
     Opened(OpenIndex),
     /// No `.reflect/index.sqlite` on disk.
     Missing,
-    /// Present but unopenable/unreadable (e.g. WAL recovery needs a writer).
+    /// Present but unopenable/unreadable (e.g. WAL recovery needs a writer),
+    /// or older than the schema this CLI reads.
     Unusable(String),
 }
 
@@ -62,6 +65,12 @@ pub fn open_read_only(root: &Path) -> IndexOpen {
     };
     if version == 0 {
         return IndexOpen::Unusable("the index exists but has no schema yet".to_string());
+    }
+    if version < LATEST_SCHEMA_VERSION {
+        // The CLI never migrates, and its queries need the latest schema.
+        return IndexOpen::Unusable(
+            "the index is older than this CLI — open the graph in Reflect to update it".to_string(),
+        );
     }
     let compatible = match is_compatible_schema(&conn) {
         Ok(compatible) => compatible,
