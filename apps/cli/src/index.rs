@@ -17,7 +17,6 @@ use rusqlite::{Connection, OpenFlags};
 use reflect_index_schema::{INDEX_FILE, REFLECT_DIR, is_compatible_schema, read_user_version};
 
 use crate::error::CliError;
-use crate::hash::hash_content;
 use crate::note_file::{read_note_text, walk_notes};
 
 /// A successfully-opened read-only index.
@@ -115,7 +114,7 @@ pub fn detect_staleness(conn: &Connection, root: &Path) -> Result<Staleness, Cli
                 }
                 if note.mtime_ms as i64 != mtime {
                     let changed = match read_note_text(&root.join(&note.rel_path)) {
-                        Ok(content) => hash_content(&content) != file_hash,
+                        Ok(content) => reflect_utils::note_hash(&content) != file_hash,
                         Err(_) => true,
                     };
                     if changed {

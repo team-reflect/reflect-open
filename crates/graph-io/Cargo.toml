@@ -14,7 +14,6 @@ test-support = []
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
-sha2 = { workspace = true }
 tempfile = { workspace = true }
 tracing = { workspace = true }
 infer = { workspace = true }
@@ -30,6 +29,7 @@ reqwest = { workspace = true }
 tokio = { workspace = true, features = ["rt", "sync", "fs", "io-util"] }
 reflect-graph-paths = { workspace = true }
 reflect-types = { workspace = true, features = ["git2"] }
+reflect-utils = { workspace = true }
 reflect-index-schema = { workspace = true }
 
 # Sync-exclusion marking on `.reflect/` and `.git/` (iCloud and backup resource

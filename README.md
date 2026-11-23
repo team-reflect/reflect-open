@@ -130,6 +130,7 @@ reflect-open/
 ├── crates/index/          # SQLite index of a graph
 ├── crates/index-schema/   # Shared index schema
 ├── crates/types/          # Wire types shared by Rust and TypeScript
+├── crates/utils/          # Small helpers shared by the Rust crates
 ├── design-system/         # Tokens and UI primitives
 └── docs/                  # Product, architecture, and contributor docs
 ```

@@ -7,7 +7,6 @@ pub mod conflict;
 mod graph;
 pub mod graph_gitignore;
 mod graph_lock;
-pub mod hash;
 pub mod import;
 pub mod import_assets;
 pub mod io;
