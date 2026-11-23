@@ -650,7 +650,8 @@ class NoteSessionImpl implements NoteSession {
     const previousHeader = this.#header
     const previousBuffer = this.#buffer
     const previousInitialContent = this.#initialContent
-    const edited = transform(this.#header + this.#buffer, this.#dirty ? null : this.#diskHash)
+    const source = this.#header + this.#buffer
+    const edited = transform(source, source === this.#disk ? this.#diskHash : null)
     const doc = splitDoc(edited)
     this.#header = doc.header
     this.#buffer = doc.body

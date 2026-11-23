@@ -1252,7 +1252,7 @@ describe('commitSourceEdit', () => {
     const transform = vi.fn(toggleTransform(taskAt(loose, 1)))
     await h.session.commitSourceEdit(transform)
 
-    expect(transform).toHaveBeenCalledWith('+ [ ] same\n+ [ ] same\n', sha256HexSync(loose))
+    expect(transform).toHaveBeenCalledWith('+ [ ] same\n+ [ ] same\n', null)
     expect(h.disk()).toBe('+ [ ] same\n+ [x] same\n')
   })
 
