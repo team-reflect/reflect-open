@@ -348,7 +348,8 @@ export class TaskStore {
    * End `write` with the tasks it left in its note, or take the tasks of a
    * write that showed no ops. A task keeps its id through the moves of the
    * edit, and an inserted task takes the id of its insert op. The tasks of a
-   * note the store has no row context for are left to the next read.
+   * note the store has no row context for are left to the next read. A note
+   * that the store learned at a later index seq keeps its rows.
    */
   landCommit(commit: TaskCommit, write: PendingWrite | null): void {
     const { notePath } = commit
@@ -356,7 +357,8 @@ export class TaskStore {
     const inserts =
       write?.ops.filter((op) => op.kind === 'insert').filter((op) => op.bullet !== true) ?? []
     const context = previous?.rows[0] ?? inserts[0]?.note
-    if (context !== undefined) {
+    const current = commit.indexSeq === null || this.#isCurrent(notePath, commit.indexSeq)
+    if (context !== undefined && current) {
       const exact =
         commit.moves !== null &&
         (previous === undefined || previous.revision === commit.baseRevision)
@@ -373,7 +375,7 @@ export class TaskStore {
               return insert === undefined ? [] : [[encodeTaskPath(task.astPath), insert.taskId]]
             }),
       )
-      if (commit.indexSeq !== null && this.#isCurrent(notePath, commit.indexSeq)) {
+      if (commit.indexSeq !== null) {
         this.#seqs.set(notePath, commit.indexSeq)
       }
     }

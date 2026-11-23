@@ -304,4 +304,18 @@ describe('TaskStore writes', () => {
     store.landAll(openRead(3, { [A]: source }), false)
     expect(labels(store.view().open)).toEqual(['t0:a!', 't1:b'])
   })
+
+  it('keeps the rows of a read from after the index seq of a commit', () => {
+    const { store, a } = loaded()
+    const commit = commitOf(
+      A,
+      source,
+      [{ kind: 'setMarkdown', task: locate(a), markdown: 'a!' }],
+      2,
+    )
+    store.landPaths(fullRead(3, { [A]: '+ [ ] a!\n+ [ ] b\n+ [ ] later\n' }), [A])
+
+    store.landCommit(commit, null)
+    expect(labels(store.view().open)).toEqual(['t0:a!', 't1:b', 't2:later'])
+  })
 })
