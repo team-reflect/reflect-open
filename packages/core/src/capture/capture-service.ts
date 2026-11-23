@@ -339,6 +339,7 @@ class CaptureServiceImpl implements CaptureService {
     })
     this.#enrichment = createCaptureEnrichmentService({
       noteFile,
+      noteDocuments: deps.noteDocuments,
       assetStore,
       webFetch,
       pageMeta: createPageMetaService({ webFetch }),

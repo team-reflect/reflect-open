@@ -9,6 +9,7 @@ import {
 } from './capture-note.ts'
 import { notePrivate } from '../privacy/privacy-service.ts'
 import { isAppError } from '../errors.ts'
+import type { NoteDocumentService } from '../documents/note-document-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { dailyPath } from '../graph/paths.ts'
 import { parseNote } from '../markdown/extract.ts'
@@ -20,6 +21,7 @@ import type { AiProviderConfig } from '../settings/schema.ts'
  */
 export interface CaptureWriteContext {
   noteFile: NoteFileService
+  noteDocuments: NoteDocumentService
 }
 
 export interface PendingCaptureSnapshot {
@@ -62,7 +64,7 @@ export async function readPendingCaptureSnapshot(
 ): Promise<PendingCaptureSnapshot | null> {
   let source: string
   try {
-    source = await ctx.noteFile.read(identity.notePath, generation)
+    source = await ctx.noteDocuments.readExisting(identity.notePath, generation)
   } catch (cause) {
     if (isAppError(cause) && cause.kind === 'notFound') {
       return null
@@ -83,6 +85,29 @@ export async function readPendingCaptureSnapshot(
     isPrivate: frontmatter.private,
     meta,
   }
+}
+
+/**
+ * Replace the text of the note at `path` with `next` while the note still
+ * holds `expected`. Answers whether it did.
+ */
+async function replaceNoteSource(
+  ctx: CaptureWriteContext,
+  path: string,
+  expected: string,
+  next: string,
+  generation: number,
+): Promise<boolean> {
+  let replaced = false
+  await ctx.noteDocuments.commitSourceEdit(
+    path,
+    (source) => {
+      replaced = source === expected
+      return replaced ? next : source
+    },
+    { generation },
+  )
+  return replaced
 }
 
 function captureWriteTransaction(meta: CaptureNoteMeta): CaptureWriteTransaction | null {
@@ -128,15 +153,12 @@ export async function finishCaptureWrite(
   ) {
     return null
   }
-  const retitled = retitleDailyEntry(
-    dailySource,
-    identity.base,
-    transaction.fromTitle,
-    snapshot.title,
+  const { title } = snapshot
+  await ctx.noteDocuments.commitSourceEdit(
+    dailyNotePath,
+    (source) => retitleDailyEntry(source, identity.base, transaction.fromTitle, title),
+    { generation, createIfMissing: true },
   )
-  if (retitled !== dailySource) {
-    await ctx.noteFile.write(dailyNotePath, retitled, generation)
-  }
 
   snapshot = await readPendingCaptureSnapshot(ctx, identity, generation)
   dailySource = await noteSource(ctx.noteFile, dailyNotePath, generation)
@@ -152,8 +174,10 @@ export async function finishCaptureWrite(
   ) {
     return null
   }
-  await ctx.noteFile.write(
+  const finished = await replaceNoteSource(
+    ctx,
     identity.notePath,
+    snapshot.source,
     upsertFrontmatter(snapshot.source, {
       captureStatus: transaction.status,
       captureDailyFromTitle: undefined,
@@ -161,7 +185,7 @@ export async function finishCaptureWrite(
     }),
     generation,
   )
-  return transaction.status
+  return finished ? transaction.status : null
 }
 
 /**
@@ -191,8 +215,10 @@ export async function persistCaptureEnrichment(
   }
   const reassembled = snapshot.source.slice(0, snapshot.bodyOffset) + input.body
   const titleChanged = input.toTitle !== input.fromTitle
-  await ctx.noteFile.write(
+  const persisted = await replaceNoteSource(
+    ctx,
     input.identity.notePath,
+    snapshot.source,
     upsertFrontmatter(reassembled, {
       captureStatus: titleChanged ? 'pending' : input.status,
       captureMetadataStatus: 'done',
@@ -205,6 +231,9 @@ export async function persistCaptureEnrichment(
     }),
     input.generation,
   )
+  if (!persisted) {
+    return null
+  }
   if (titleChanged && (await finishCaptureWrite(ctx, input.identity, input.generation)) === null) {
     return null
   }

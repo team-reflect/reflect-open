@@ -346,8 +346,6 @@ describe('direct note file writes', () => {
     'capture/capture-drain-service.ts',
     'graph/onboarding.ts',
     // Edits of an existing note with a read and a write of their own.
-    'capture/capture-enrichment-service.ts',
-    'capture/capture-enrichment-write.ts',
     'documents/template-service.ts',
   ]
 

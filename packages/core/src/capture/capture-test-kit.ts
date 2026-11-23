@@ -237,6 +237,7 @@ class CaptureTestKitImpl implements CaptureTestKit {
     await settings.whenLoaded()
     const enrichment = createCaptureEnrichmentService({
       noteFile: this.noteFile,
+      noteDocuments: createTestNoteDocumentService({ noteFile: this.noteFile }),
       assetStore: this.#assetStore,
       webFetch: this.#webFetch,
       pageMeta: { scrape: this.scrapeMock },
