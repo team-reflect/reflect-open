@@ -81,4 +81,5 @@ hf-hub = { workspace = true, features = ["ureq", "native-tls"] }
 
 [dev-dependencies]
 reflect-graph-io = { workspace = true, features = ["test-support"] }
+rusqlite = { workspace = true }
 tokio = { workspace = true, features = ["time"] }

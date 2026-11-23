@@ -49,9 +49,7 @@ use super::scan::scan_reconcile;
 use super::text::fts::build_fts_match;
 use super::visit_write::record;
 use super::write::{apply_note, claim_tier, clear_index, move_note, touch_note};
-use super::{
-    Applied, FileIndexConnections, IndexCommands, IndexConnections, IndexEvents, IndexSession,
-};
+use super::{Applied, FileIndexConnections, IndexConnections, IndexSession};
 use reflect_types::{BacklinkSourceCursor, SearchRequest};
 
 fn migrated() -> Connection {
@@ -1217,26 +1215,8 @@ fn open_resets_an_index_file_with_a_damaged_header() {
         .unwrap();
 }
 
-/// Records the [`IndexEvents`] a command reports.
-#[derive(Default)]
-struct RecordedEvents(std::cell::RefCell<Vec<&'static str>>);
-
-impl IndexEvents for RecordedEvents {
-    fn index_written(&self) {
-        self.0.borrow_mut().push("written");
-    }
-
-    fn note_moved(&self, _from: &str, _to: &str) {
-        self.0.borrow_mut().push("moved");
-    }
-
-    fn index_reset(&self) {
-        self.0.borrow_mut().push("reset");
-    }
-}
-
 #[test]
-fn a_command_that_finds_the_file_corrupt_resets_it_once_per_open() {
+fn repair_resets_a_corrupt_index_once_per_open() {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path();
     let session = IndexSession::new();
@@ -1249,18 +1229,18 @@ fn a_command_that_finds_the_file_corrupt_resets_it_once_per_open() {
 
     let session = IndexSession::new();
     let generation = session.open(root, &FileIndexConnections).unwrap();
-    let events = RecordedEvents::default();
-    let commands = IndexCommands::new(&session, &events, generation);
-    let args = br#"{"path":"notes/a.md"}"#;
-    let err = commands.dispatch("index_note", args).unwrap_err();
-    assert!(err.message().contains("malformed"), "{err:?}");
-    assert_eq!(*events.0.borrow(), ["reset"]);
-    assert_eq!(commands.dispatch("index_note", args).unwrap(), "null");
-
-    // The repair of this open is spent, even for another corrupt error.
-    assert!(!session.repair(generation, &err).unwrap());
+    let read = || {
+        let reader = session.read_generation().unwrap();
+        session.read(reader, |conn| note_row(conn, "notes/a.md"))
+    };
+    let err = read().unwrap_err();
+    assert!(!session.repair(generation + 1, &err), "another generation");
+    assert!(session.repair(generation, &err));
+    assert_eq!(read().unwrap(), None);
+    // The repair of this open is spent; a new open allows one again.
+    assert!(!session.repair(generation, &err));
     let generation = session.open(root, &FileIndexConnections).unwrap();
-    assert!(session.repair(generation, &err).unwrap());
+    assert!(session.repair(generation, &err));
 }
 
 #[test]

@@ -30,15 +30,6 @@ impl IndexEvents for Core {
     fn note_moved(&self, from: &str, to: &str) {
         self.emit_note_moved(from, to);
     }
-
-    /// A reset file has no projection stamp, so the requested reconcile
-    /// rebuilds every row.
-    fn index_reset(&self) {
-        self.host().emit(
-            reflect_types::events::EventName::IndexReconcile.as_str(),
-            Value::Null,
-        );
-    }
 }
 
 impl Core {
@@ -62,17 +53,38 @@ impl Core {
             let args_json = args_json.to_vec();
             return self
                 .spawn_blocking(move || {
-                    IndexCommands::new(&core.index, core.as_ref(), read_generation)
-                        .dispatch(&command, &args_json)
+                    core.repair_index(
+                        read_generation,
+                        IndexCommands::new(&core.index, core.as_ref(), read_generation)
+                            .dispatch(&command, &args_json),
+                    )
                 })
                 .await
                 .map(Reply::Json);
         }
         let _background_task = background_task::scoped(&self.background_tasks, command);
         // A write takes no reader lock: a long query never delays it.
-        IndexCommands::new(&self.index, self.as_ref(), self.index.read_generation()?)
-            .dispatch(command, args_json)
-            .map(Reply::Json)
+        let generation = self.index.current_generation()?.unwrap_or(0);
+        self.repair_index(
+            generation,
+            IndexCommands::new(&self.index, self.as_ref(), 0).dispatch(command, args_json),
+        )
+        .map(Reply::Json)
+    }
+
+    /// Resets the index file when `result` failed because the file of
+    /// `generation` is corrupt (see [`reflect_index::IndexSession::repair`]),
+    /// then emits `index:reconcile`.
+    fn repair_index<T>(&self, generation: u64, result: AppResult<T>) -> AppResult<T> {
+        if let Err(err) = &result
+            && self.index.repair(generation, err)
+        {
+            self.host().emit(
+                reflect_types::events::EventName::IndexReconcile.as_str(),
+                Value::Null,
+            );
+        }
+        result
     }
 
     fn emit_index_written(&self) {
@@ -117,12 +129,14 @@ impl Core {
     pub fn note_move_indexed(&self, request: NoteMoveRequest, generation: u64) -> AppResult<()> {
         let _background_task = background_task::scoped(&self.background_tasks, "Reflect note move");
         let root = reflect_graph_io::root_for_generation(&self.graph, generation)?;
-        reflect_graph_io::with_graph_lock(&root, || {
+        let index_generation = self.index.current_generation()?.unwrap_or(0);
+        let moved = reflect_graph_io::with_graph_lock(&root, || {
             reflect_graph_io::root_for_generation(&self.graph, generation)?;
             self.index.move_note(&root, &request, || {
                 reflect_graph_io::move_note_file(&root, &request.from, &request.to)
             })
-        })?;
+        });
+        self.repair_index(index_generation, moved)?;
         reflect_graph_io::invalidate_file_catalog(&self.graph, &root);
         self.emit_index_written();
         self.emit_note_moved(&request.from, &request.to);
@@ -150,7 +164,10 @@ impl Core {
             let walk_started = std::time::Instant::now();
             let files = reflect_graph_io::note_files(&root);
             let walk_ms = walk_started.elapsed().as_millis() as u64;
-            let scan = core.index.reconcile_scan(generation, &files, now_ms())?;
+            let scan = core.repair_index(
+                generation,
+                core.index.reconcile_scan(generation, &files, now_ms()),
+            )?;
             tracing::info!(
                 files = scan.total,
                 candidates = scan.candidates.len(),
@@ -231,5 +248,61 @@ mod tests {
                 Reply::Json("null".into())
             );
         });
+    }
+
+    #[test]
+    fn a_corrupt_index_is_reset_once_and_reconciled() {
+        let dir = tempfile::tempdir().unwrap();
+        let open = |host: &Arc<RecordingHost>| {
+            let core = Arc::new(Core::new(CoreConfig::default(), host.clone()).unwrap());
+            reflect_graph_io::activate(&core.graph, dir.path()).unwrap();
+            let Reply::Json(generation) = core
+                .runtime
+                .block_on(core.dispatch("index_open", b"{}", b"{}", None))
+                .unwrap()
+            else {
+                panic!("expected JSON");
+            };
+            (core, generation)
+        };
+        let host = Arc::new(RecordingHost::default());
+        let (core, generation) = open(&host);
+        let args = format!(r#"{{"key":"k","value":"v","generation":{generation}}}"#);
+        core.runtime
+            .block_on(core.dispatch("index_meta_set", args.as_bytes(), b"{}", None))
+            .unwrap();
+        drop(core);
+        // Damage the root page of `index_meta` only, so the open still succeeds.
+        let path = dir.path().join(".reflect/index.sqlite");
+        let (page, page_size): (u32, u32) = rusqlite::Connection::open(&path)
+            .unwrap()
+            .query_row(
+                "SELECT rootpage, (SELECT page_size FROM pragma_page_size()) FROM sqlite_master \
+                 WHERE name = 'index_meta'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        let mut bytes = std::fs::read(&path).unwrap();
+        let (page, page_size) = (page as usize, page_size as usize);
+        bytes[(page - 1) * page_size..page * page_size].fill(0xA5);
+        std::fs::write(&path, bytes).unwrap();
+
+        let host = Arc::new(RecordingHost::default());
+        let (core, _) = open(&host);
+        let get = || {
+            core.runtime
+                .block_on(core.dispatch("index_meta_get", br#"{"key":"k"}"#, b"{}", None))
+        };
+        assert!(get().is_err());
+        assert_eq!(get().unwrap(), Reply::Json("null".into()));
+        let reconciles = host
+            .events
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(event, _)| event == reflect_types::events::EventName::IndexReconcile.as_str())
+            .count();
+        assert_eq!(reconciles, 1);
     }
 }

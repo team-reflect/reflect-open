@@ -348,22 +348,34 @@ impl IndexSession {
         )
     }
 
-    /// Resets the index file after a command found it corrupt (`err`), at most
-    /// once per [`open`]: a repair never starts another open, so a file that
-    /// stays corrupt cannot cycle through reset and rebuild. Returns whether it
-    /// reset.
+    /// Resets the index file of `generation` after `err` showed that it is
+    /// corrupt. It tries at most once per [`open`], even when the reset fails:
+    /// a repair never starts another open, so a file that stays corrupt cannot
+    /// cycle through reset and rebuild. Returns whether it reset.
     ///
     /// [`open`]: IndexSession::open
     #[cfg(any(feature = "native", test))]
-    pub fn repair(&self, generation: u64, err: &AppError) -> AppResult<bool> {
-        let mut writer = self.lock_writer()?;
+    pub fn repair(&self, generation: u64, err: &AppError) -> bool {
+        let Ok(mut writer) = self.lock_writer() else {
+            return false;
+        };
         if writer.generation != generation || writer.repaired || !is_corrupt(err) {
-            return Ok(false);
+            return false;
         }
         writer.repaired = true;
-        let conn = writer.conn.as_mut().ok_or_else(AppError::no_graph)?;
-        reset_corrupt(conn, err)?;
-        Ok(true)
+        let Some(conn) = writer.conn.as_mut() else {
+            return false;
+        };
+        match reset_corrupt(conn, err) {
+            Ok(()) => true,
+            Err(reset_err) => {
+                tracing::error!(
+                    error = reset_err.message(),
+                    "resetting the corrupt index file failed"
+                );
+                false
+            }
+        }
     }
 
     /// Upsert one chat message and its conversation row in a single
