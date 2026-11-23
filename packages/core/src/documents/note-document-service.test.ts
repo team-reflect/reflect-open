@@ -135,6 +135,15 @@ describe('commitFrontmatter', () => {
     expect(noteFile.writes()).toEqual([])
   })
 
+  it('patches the text of a concurrent external write instead of overwriting it', async () => {
+    const { noteDocuments, noteFile, externalWrites } = setup({ files: { 'notes/a.md': '# A\n' } })
+    externalWrites.push('# A\n\ntheirs\n')
+
+    await noteDocuments.commitFrontmatter('notes/a.md', { pinned: true }, 3)
+
+    expect(noteFile.files().get('notes/a.md')).toBe('---\npinned: true\n---\n\n# A\n\ntheirs\n')
+  })
+
   it('creates a missing file from the patch', async () => {
     const { noteDocuments, noteFile } = setup()
 

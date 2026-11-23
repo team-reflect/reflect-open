@@ -45,7 +45,9 @@ export interface NoteDocumentService {
   /**
    * Land `patch` on the note's frontmatter, returning once it has persisted.
    * Routes through the live session when one can take the patch; otherwise
-   * patches disk directly. A patch that changes nothing is a no-op.
+   * patches the file, and creates a missing one, with the disk rules of
+   * {@link NoteDocumentService.commitSourceEdit}. A patch that changes
+   * nothing is a no-op.
    */
   commitFrontmatter(path: string, patch: FrontmatterPatch, generation: number): Promise<void>
   /**
@@ -179,21 +181,20 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
     return await noteFile.read(path, generation)
   }
 
-  async commitFrontmatter(
-    path: string,
-    patch: FrontmatterPatch,
-    generation: number,
-  ): Promise<void> {
-    const { openDocuments, noteFile } = this.#deps
-    const owner = openDocuments.sessionFor(path)
-    if (owner !== null && (await owner.commitFrontmatter(patch))) {
-      return
-    }
-    const onDisk = await this.#readOrEmpty(path, generation)
-    const patched = upsertFrontmatter(onDisk, frontmatterPatchToYaml(patch))
-    if (patched !== onDisk) {
-      await noteFile.write(path, patched, generation)
-    }
+  commitFrontmatter(path: string, patch: FrontmatterPatch, generation: number): Promise<void> {
+    const { openDocuments } = this.#deps
+    return this.#serializeByPath(path, async () => {
+      const owner = openDocuments.sessionFor(path)
+      if (owner !== null && (await owner.commitFrontmatter(patch))) {
+        return
+      }
+      await this.#commitToDisk(
+        path,
+        (source) => upsertFrontmatter(source ?? '', frontmatterPatchToYaml(patch)),
+        generation,
+        true,
+      )
+    })
   }
 
   commitSourceEdit(
@@ -201,57 +202,34 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
     transform: NoteSourceTransform,
     options: CommitSourceEditOptions,
   ): Promise<NoteCommitResult> {
-    const { openDocuments, noteFile } = this.#deps
+    const { openDocuments } = this.#deps
     // Serialize per note: a concurrent change to the same note must not read the
     // pre-write source and clobber this one.
     return this.#serializeByPath(path, async (): Promise<NoteCommitResult> => {
       const owner = openDocuments.sessionFor(path)
-      if (owner !== null) {
-        const commit = await owner.commitSourceEdit(transform)
-        if (commit === null) {
-          throw new NoteEditError(
-            'notWritable',
-            'This note can’t be updated right now — try again in a moment.',
-          )
-        }
-        const indexSeq =
-          commit.revision === null
-            ? null
-            : await this.#indexCommit(path, options.generation, {
-                content: commit.content,
-                hash: commit.revision,
-              })
-        return { ...commit, indexSeq }
-      }
-      let source = await this.#readForEdit(
-        path,
-        options.createIfMissing === true,
-        options.generation,
-      )
-      for (let attempt = 0; attempt < COMMIT_ATTEMPT_LIMIT; attempt += 1) {
-        const content = transform(source?.content ?? '', source?.hash ?? null)
-        if (content === (source?.content ?? '')) {
-          return { content, revision: source?.hash ?? null, merged: false, indexSeq: null }
-        }
-        const written = await noteFile.write(
+      if (owner === null) {
+        return await this.#commitToDisk(
           path,
-          content,
+          (source, revision) => transform(source ?? '', revision),
           options.generation,
-          source?.content ?? null,
-          'reject',
+          options.createIfMissing === true,
         )
-        if (written.merged === null) {
-          const indexSeq = await this.#indexCommit(
-            path,
-            options.generation,
-            { content, hash: written.hash },
-            written.modifiedMs,
-          )
-          return { content, revision: written.hash, merged: false, indexSeq }
-        }
-        source = { content: written.merged, hash: written.hash }
       }
-      throw new NoteEditError('conflict', `${path} kept changing on disk; the edit was not saved.`)
+      const commit = await owner.commitSourceEdit(transform)
+      if (commit === null) {
+        throw new NoteEditError(
+          'notWritable',
+          'This note can’t be updated right now — try again in a moment.',
+        )
+      }
+      const indexSeq =
+        commit.revision === null
+          ? null
+          : await this.#indexCommit(path, options.generation, {
+              content: commit.content,
+              hash: commit.revision,
+            })
+      return { ...commit, indexSeq }
     })
   }
 
@@ -260,12 +238,7 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
   }
 
   /**
-   * The note's content, where a missing file reads as an empty note — the lazy
-   * contract: dailies (and ⌘N notes) are valid frontmatter-toggle targets before
-   * their file exists, and the toggle's write is what creates the file. Covers
-   * the gap where the pane's session exists but can't take patches yet (still
-   * loading) — its post-load reconcile then adopts our write like any external
-   * change.
+   * The note's content, where a missing file reads as an empty note.
    */
   async #readOrEmpty(path: string, generation: number): Promise<string> {
     try {
@@ -276,6 +249,46 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
       }
       throw cause
     }
+  }
+
+  /**
+   * Read the note file, apply `transform`, and write only while the file
+   * still holds the text that was read; a file that changed runs `transform`
+   * again on its new text. `transform` takes `null` for a missing note, which
+   * the write creates when `createIfMissing` is set.
+   */
+  async #commitToDisk(
+    path: string,
+    transform: (source: string | null, revision: string | null) => string,
+    generation: number,
+    createIfMissing: boolean,
+  ): Promise<NoteCommitResult> {
+    const { noteFile } = this.#deps
+    let source = await this.#readForEdit(path, createIfMissing, generation)
+    for (let attempt = 0; attempt < COMMIT_ATTEMPT_LIMIT; attempt += 1) {
+      const content = transform(source?.content ?? null, source?.hash ?? null)
+      if (content === (source?.content ?? '')) {
+        return { content, revision: source?.hash ?? null, merged: false, indexSeq: null }
+      }
+      const written = await noteFile.write(
+        path,
+        content,
+        generation,
+        source?.content ?? null,
+        'reject',
+      )
+      if (written.merged === null) {
+        const indexSeq = await this.#indexCommit(
+          path,
+          generation,
+          { content, hash: written.hash },
+          written.modifiedMs,
+        )
+        return { content, revision: written.hash, merged: false, indexSeq }
+      }
+      source = { content: written.merged, hash: written.hash }
+    }
+    throw new NoteEditError('conflict', `${path} kept changing on disk; the edit was not saved.`)
   }
 
   #serializeByPath<T>(path: string, op: () => Promise<T>): Promise<T> {
