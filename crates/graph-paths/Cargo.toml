@@ -1,6 +1,6 @@
 [package]
 name = "reflect-graph-paths"
-version = "0.1.0"
+version = "0.0.0"
 description = "Shared graph-relative path classification for Reflect"
 authors.workspace = true
 edition.workspace = true

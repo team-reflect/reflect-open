@@ -1,6 +1,6 @@
 [package]
 name = "reflect-cli"
-version = "0.1.0"
+version = "0.0.0"
 description = "Read/discovery CLI over a Reflect graph (Plan 14)"
 authors.workspace = true
 edition.workspace = true

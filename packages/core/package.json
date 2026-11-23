@@ -1,6 +1,6 @@
 {
   "name": "@reflect/core",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "private": true,
   "type": "module",
   "types": "./src/index.ts",
@@ -26,12 +26,12 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@ai-sdk/provider": "^4.0.38",
+    "@ai-sdk/provider": "^4.0.39",
     "@ocavue/tsconfig": "^0.7.1",
     "@reflect/index-wasm": "workspace:*",
     "jsdom": "^31.0.1",
     "typescript": "~6.0.3",
-    "vitest": "^5.1.0",
+    "vitest": "^5.1.1",
     "vitest-fail-on-console": "^0.10.1"
   }
 }

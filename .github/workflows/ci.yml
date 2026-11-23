@@ -152,10 +152,6 @@ jobs:
     needs: [classify]
     if: needs.classify.outputs.test-node == 'true'
     runs-on: ubuntu-24.04
-    environment:
-      &sccache-environment # Only master can use `sccache_write`, which holds the read-write S3 key.
-      name: ${{ github.ref == 'refs/heads/master' && 'sccache_write' || 'sccache_read' }}
-      deployment: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -164,11 +160,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-        with: &setup-rust-s3
-          s3-endpoint: ${{ secrets.S3_SCCACHE_ENDPOINT }}
-          s3-bucket: ${{ secrets.S3_SCCACHE_BUCKET }}
-          s3-access-key-id: ${{ secrets.S3_SCCACHE_ACCESS_KEY_ID }}
-          s3-secret-access-key: ${{ secrets.S3_SCCACHE_SECRET_ACCESS_KEY }}
 
       - name: Verify the generated iOS CSP is current
         run: |
@@ -192,7 +183,6 @@ jobs:
     needs: [classify]
     if: needs.classify.outputs.test-chromium == 'true'
     runs-on: ubuntu-24.04
-    environment: *sccache-environment
     strategy:
       fail-fast: false
       matrix:
@@ -217,7 +207,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-        with: *setup-rust-s3
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:chromium
@@ -233,7 +222,6 @@ jobs:
     needs: [classify, test-chromium]
     if: needs.classify.outputs.test-webkit == 'true'
     runs-on: xcode-27
-    environment: *sccache-environment
     env:
       REFLECT_TEST_BROWSER: webkit
       # Suspected workaround, root cause unknown: WebContent sometimes
@@ -252,7 +240,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-        with: *setup-rust-s3
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:webkit
@@ -304,7 +291,6 @@ jobs:
     needs: [classify, test-swift]
     if: needs.classify.outputs.test-ios == 'true'
     runs-on: xcode-27
-    environment: *sccache-environment
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -316,11 +302,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-        with:
-          s3-endpoint: ${{ secrets.S3_SCCACHE_ENDPOINT }}
-          s3-bucket: ${{ secrets.S3_SCCACHE_BUCKET }}
-          s3-access-key-id: ${{ secrets.S3_SCCACHE_ACCESS_KEY_ID }}
-          s3-secret-access-key: ${{ secrets.S3_SCCACHE_SECRET_ACCESS_KEY }}
 
       - uses: ./.github/actions/setup-mise
 
@@ -373,7 +354,6 @@ jobs:
     if: needs.classify.outputs.test-rust == 'true'
     name: test-rust (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
-    environment: *sccache-environment
     # Clippy and the tests never run the desktop sidecars, so drop them from the
     # Tauri config instead of building them (tauri-build and tauri-codegen merge
     # this JSON into the config). `pnpm sidecar` still stages them for dev and
@@ -400,7 +380,6 @@ jobs:
         uses: ./.github/actions/setup-xcode
 
       - uses: ./.github/actions/setup-rust
-        with: *setup-rust-s3
 
       - uses: ./.github/actions/setup-node
 

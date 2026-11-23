@@ -14,8 +14,8 @@ function styleOf(className: string, property: string): number {
 describe('safe-area utilities', () => {
   afterEach(() => {
     for (const name of [
-      '--twsa-safe-area-inset-top',
-      '--twsa-safe-area-inset-right',
+      '--twsa-inset-top',
+      '--twsa-inset-right',
       '--keyboard-height',
       '--mobile-tab-bar-height',
       '--chrome-safe-bottom',
@@ -26,12 +26,12 @@ describe('safe-area utilities', () => {
 
   it('takes the larger of the inset and the floor', () => {
     expect(styleOf('pt-safe-or-6', 'padding-top')).toBe(24)
-    root.style.setProperty('--twsa-safe-area-inset-top', '40px')
+    root.style.setProperty('--twsa-inset-top', '40px')
     expect(styleOf('pt-safe-or-6', 'padding-top')).toBe(40)
   })
 
   it('adds the offset to the inset', () => {
-    root.style.setProperty('--twsa-safe-area-inset-right', '84px')
+    root.style.setProperty('--twsa-inset-right', '84px')
     expect(styleOf('px-safe-offset-4', 'padding-right')).toBe(100)
     expect(styleOf('px-safe-offset-4', 'padding-left')).toBe(16)
   })

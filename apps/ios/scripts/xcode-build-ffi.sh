@@ -33,7 +33,7 @@ keep=(
   CARGO_PROFILE_RELEASE_DEBUG
   CARGO_PROFILE_DEV_DEBUG
   ORT_CACHE_DIR
-  # sccache, set by .github/actions/setup-rust.
+  # sccache
   RUSTC_WRAPPER
   SCCACHE_BUCKET
   SCCACHE_CACHE_SIZE

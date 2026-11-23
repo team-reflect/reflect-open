@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "dependencyDashboard": true,
+  "dependencyDashboard": { "enabled": true },
   "extends": ["github>ocavue/config-renovate"],
   "packageRules": [
     {
