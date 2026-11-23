@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createTestLoggerService, type TestLoggerService } from '../testing/logger.ts'
 import { splitFrontmatter } from './frontmatter.ts'
-import { NoteNotSerializableError, TaskStaleError } from './list-insert.ts'
+import { NoteNotSerializableError, TaskStaleError } from '../tasks/task-errors.ts'
 import {
   applyTaskEdits,
   findTaskMove,

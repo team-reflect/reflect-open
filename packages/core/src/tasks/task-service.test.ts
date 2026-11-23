@@ -7,7 +7,7 @@ import {
 import { createGraphSession, type GraphSession } from '../graph/graph-session.ts'
 import type { NoteWriteResult } from '../graph/note-file-service.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
-import { createNoteDocumentService, NoteBusyError } from '../documents/note-document-service.ts'
+import { createNoteDocumentService } from '../documents/note-document-service.ts'
 import {
   isSameTaskPath,
   parseNote,
@@ -38,6 +38,7 @@ import { createTestLoggerService, type TestLoggerService } from '../testing/logg
 import { createTestProgressPort, type TestProgressPort } from '../testing/ports.ts'
 import { makeOpenTask } from '../testing/tasks.ts'
 import type { OpenTask } from './open-task.ts'
+import { NoteBusyError } from './task-errors.ts'
 import { getTaskKey } from './task-identity.ts'
 import {
   createTaskService,

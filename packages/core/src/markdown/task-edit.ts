@@ -5,18 +5,17 @@ import {
   type MarkdownNode,
 } from '@meowdown/markdown'
 import type { LoggerService } from '../ports/logger-service.ts'
+import { NoteNotSerializableError, TaskStaleError } from '../tasks/task-errors.ts'
 import {
   bodyEndSlot,
   createListItem,
   endOfListRun,
   insertItem,
-  NoteNotSerializableError,
   parseEditable,
   requireAttached,
   sectionSlot,
   serializeBody,
   TASKS_SECTION,
-  TaskStaleError,
   type SlotTarget,
 } from './list-insert.ts'
 import type { TaskLocator, TaskSnapshot } from './task-model.ts'

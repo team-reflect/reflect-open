@@ -1,6 +1,6 @@
 import type { RoundTripFidelity } from '@meowdown/markdown'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { TaskStaleError } from '../markdown/list-insert.ts'
+import { TaskStaleError } from '../tasks/task-errors.ts'
 import { applyTaskEdits } from '../markdown/task-edit.ts'
 import { projectTasks } from '../markdown/task-project.ts'
 import type { TaskLocator } from '../markdown/task-model.ts'

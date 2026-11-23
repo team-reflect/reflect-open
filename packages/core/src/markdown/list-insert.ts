@@ -10,25 +10,10 @@ import {
 import { appendBlock } from './append-section.ts'
 import { splitFrontmatter } from './frontmatter.ts'
 import { renderInlineText } from './inline-text.ts'
+import { NoteNotSerializableError, TaskStaleError } from '../tasks/task-errors.ts'
 import { foldKey } from './keys.ts'
 import { scanInlineWikiLinks } from './scan.ts'
 import { getFirstParagraphMarkdown, isBlockParent, type BlockParent } from './task-project.ts'
-
-/** The task a caller addressed is not in the note anymore: the write is refused. */
-export class TaskStaleError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'TaskStaleError'
-  }
-}
-
-/** The note cannot be rewritten through the AST without changing its content. */
-export class NoteNotSerializableError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'NoteNotSerializableError'
-  }
-}
 
 /** A slot for a new item: right after a block, or at the end of a container. */
 export type SlotTarget =

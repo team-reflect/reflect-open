@@ -3,7 +3,7 @@ import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import { requireGraphSession, type GraphRole, type GraphSession } from '../graph/graph-session.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
-import { NoteBusyError, type NoteDocumentService } from '../documents/note-document-service.ts'
+import type { NoteDocumentService } from '../documents/note-document-service.ts'
 import { errorMessage, AppError } from '../errors.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
@@ -31,6 +31,7 @@ import {
   withRelocatedTasks,
   type TaskMoves,
 } from './task-cache.ts'
+import { NoteBusyError } from './task-errors.ts'
 import { getTaskKey, isSameTask } from './task-identity.ts'
 import { createInsertedTaskRow, type InsertTaskTarget } from './task-insert-target.ts'
 import { getScheduledMarkdown } from './task-schedule-content.ts'

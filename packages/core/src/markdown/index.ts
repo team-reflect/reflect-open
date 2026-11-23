@@ -50,11 +50,10 @@ export {
 } from './resolve.ts'
 export { renderInlineText } from './inline-text.ts'
 export { compareTaskPaths, decodeTaskPath, encodeTaskPath, isSameTaskPath } from './task-path.ts'
+export { NoteNotSerializableError, TaskStaleError } from '../tasks/task-errors.ts'
 export {
   appendListItem,
   linkSectionHeading,
-  NoteNotSerializableError,
-  TaskStaleError,
   type ListItemInsert,
   type ListItemKind,
   type SectionTarget,

@@ -1,3 +1,4 @@
+import { NoteBusyError } from '../tasks/task-errors.ts'
 import { requireGraphSession, type GraphSessionSource } from '../graph/graph-session.ts'
 import { isAppError } from '../errors.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
@@ -79,20 +80,6 @@ export interface CommitSourceEditOptions {
    * Treat a missing note as empty: the edit creates it (today's daily).
    */
   readonly createIfMissing?: boolean | undefined
-}
-
-/**
- * A note couldn't be written because it is open with unsaved edits that
- * the session can't persist right now: it's read-only/protected or disposed.
- * Distinct from `TaskStaleError` (a stale index): the
- * recovery is "save or resolve the note", not "reindex". We refuse rather than
- * write to disk, which would clobber the live buffer.
- */
-export class NoteBusyError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'NoteBusyError'
-  }
 }
 
 /**
