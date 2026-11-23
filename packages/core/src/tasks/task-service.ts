@@ -106,7 +106,7 @@ export interface TaskRef extends TaskLocator {
  */
 export interface TaskWriteResult extends TaskEditResult {
   /**
-   * Epoch milliseconds read right after the write, for optimistic rows.
+   * Epoch milliseconds read right after the write, to order optimistic rows.
    */
   readonly updatedAt: number
 }
@@ -124,7 +124,7 @@ export interface InsertedTask {
    */
   readonly moved: TaskEditResult['moved']
   /**
-   * Epoch milliseconds read right after the write, for the optimistic row.
+   * Epoch milliseconds read right after the write, to order the optimistic row.
    */
   readonly updatedAt: number
 }
@@ -342,15 +342,11 @@ export interface TaskService extends Store<TaskListState> {
  * The struck rows not superseded by a live open row — the pure core of the
  * reconciliation, shared by the store prune
  * ({@link TaskService.reconcileRecentlyCompleted}) and the render-time view.
- * A struck task the index reports open again with a **newer** `updatedAt` was
- * reopened at the source note — its file was rewritten and reindexed since we
- * completed it — so the struck copy is dropped and the live open row shows
- * instead of a stale `[x]` shadow (whose reopen write-back would fail: the
- * `[x]` line is no longer in the note). An open row with an *unchanged*
- * `updatedAt` is the pre-completion index state — a refetch racing the
- * completion's reindex — and keeps its shadow, so a just-checked row can't
- * flicker back to open. Returns the input array itself when nothing is
- * dropped, so callers can compare by reference.
+ * A struck task that {@link isReopenedAfter} an open row of the same key was
+ * reopened at the source note, so the struck copy is dropped and the live
+ * open row shows instead of a stale `[x]` shadow (whose reopen write-back
+ * would fail: the `[x]` line is no longer in the note). Returns the input
+ * array itself when nothing is dropped, so callers can compare by reference.
  */
 export function withoutReopenedTasks(
   struck: readonly OpenTask[],
@@ -362,9 +358,20 @@ export function withoutReopenedTasks(
   const liveByKey = new Map(open.map((row) => [getTaskKey(row), row]))
   const next = struck.filter((task) => {
     const live = liveByKey.get(getTaskKey(task))
-    return live === undefined || live.updatedAt <= task.updatedAt
+    return live === undefined || !isReopenedAfter(task, live)
   })
   return next.length === struck.length ? struck : next
+}
+
+/**
+ * Whether the open row `live` comes from a note state after the one `struck`
+ * was completed in. A provisional test on `updatedAt`, the only field of a row
+ * that changes with the note: a larger value means the note was rewritten and
+ * reindexed since the completion, and an equal or smaller one is an index read
+ * from before the completion landed.
+ */
+function isReopenedAfter(struck: OpenTask, live: OpenTask): boolean {
+  return live.updatedAt > struck.updatedAt
 }
 
 interface TaskRecord {

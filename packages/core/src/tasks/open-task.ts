@@ -16,6 +16,10 @@ export interface OpenTask extends TaskRow {
    */
   isPinned: boolean
   pinnedOrder: number | null
+  /**
+   * Epoch milliseconds, for ordering rows only: when the index row of the note
+   * last changed, or when the write of an optimistic row landed.
+   */
   updatedAt: number
 }
 

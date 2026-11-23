@@ -80,8 +80,8 @@ function taskMatchesNeedle(task: OpenTask, needle: string): boolean {
  *   can briefly restore a just-completed task to the open cache before the
  *   reindex lands, and listing it both open and struck collides React keys.
  *   That shadow is only ever transient: a task genuinely reopened at its source
- *   note leaves the session set via `reconcileRecentlyCompleted` (its reindexed
- *   row carries a newer `updatedAt`), so the live open row takes over.
+ *   note leaves the session set via `reconcileRecentlyCompleted`, so the
+ *   live open row takes over.
  */
 export function composeVisibleTaskGroups({
   open,
