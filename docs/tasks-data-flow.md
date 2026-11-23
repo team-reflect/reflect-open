@@ -15,7 +15,7 @@ code is in `packages/core/src/tasks/`, `packages/core/src/documents/` and
 | pending op | A change that a write in flight is about to make. The rows show it until the write ends. |
 | draft | Text typed into the editor of a task that no write has taken yet. |
 | new task | A row with no file text. It is written when a command names it while it holds text. |
-| dirty set | The paths whose file may differ from the index. |
+| dirty set | The paths whose file may differ from the index. `IndexWriter` owns it. |
 
 ## Invariants
 

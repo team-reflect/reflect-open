@@ -1,6 +1,6 @@
 import type { KeyboardEvent, MouseEvent, ReactElement } from 'react'
 import { Circle, CircleCheck } from 'lucide-react'
-import { type OpenTask } from '@reflect/core'
+import type { OpenTask } from '@reflect/core'
 import { getIsComposing } from '@meowdown/core'
 import { cn } from '@/lib/utils.ts'
 import type { ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
