@@ -42,7 +42,7 @@ pub fn valid_hash(hash: &str) -> bool {
 }
 pub fn hash_url(source: &str) -> Result<String> {
     reqwest::Url::parse(source).map_err(|error| AppError::parse(error.to_string()))?;
-    Ok(crate::hash::sha256_hex(source.as_bytes()))
+    Ok(reflect_utils::sha256_hex(source.as_bytes()))
 }
 
 pub fn get_candidate_names(hash: &str) -> Result<Vec<String>> {

@@ -34,6 +34,7 @@ reflect-types = { workspace = true, features = ["git2", "rusqlite"] }
 reflect-index = { workspace = true, features = ["native"] }
 reflect-graph-io = { workspace = true }
 reflect-core = { workspace = true }
+reflect-utils = { workspace = true }
 tempfile = { workspace = true }
 dirs = { workspace = true }
 tauri-plugin-dialog = { workspace = true }

@@ -7,7 +7,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use pulldown_cmark::{Event, HeadingLevel, Parser, Tag};
-use reflect_graph_paths::{eviction_placeholder, normalize_line_endings};
+use reflect_graph_paths::eviction_placeholder;
+use reflect_utils::normalize_line_endings;
 
 use crate::error::CliError;
 use crate::frontmatter::{Frontmatter, parse_frontmatter, split_frontmatter};
