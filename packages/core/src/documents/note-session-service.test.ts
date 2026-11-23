@@ -21,15 +21,20 @@ import type {
 } from './note-session-types.ts'
 import { createTitleRenameTracker, type TitleRename } from './title-rename-tracker.ts'
 
-/** The first task's locator as the index records it. */
-function firstTask(source: string): TaskLocator {
-  const [task] = projectTasks(splitFrontmatter(source).body)
+/** The locator of the `index`th task as the index records it. */
+function taskAt(source: string, index: number): TaskLocator {
+  const task = projectTasks(splitFrontmatter(source).body)[index]
   return {
     revision: sha256HexSync(source),
     astPath: task!.astPath,
     markdown: task!.markdown,
     checked: task!.checked,
   }
+}
+
+/** The first task's locator as the index records it. */
+function firstTask(source: string): TaskLocator {
+  return taskAt(source, 0)
 }
 
 /** The Tasks view's open-note write: toggle `task` through the live buffer. */
@@ -1228,6 +1233,41 @@ describe('commitSourceEdit', () => {
       revision: sha256HexSync('# Todo\n\n+ [x] buy milk\n\ntheirs\n'),
       merged: true,
     })
+  })
+
+  it('toggles the second of two equal tasks in a clean buffer the editor reformatted', async () => {
+    const loose = '+ [ ] same\n\n+ [ ] same\n'
+    let target: NoteSession | null = null
+    const h = harness({
+      onApply: (markdown) => target?.editorChanged(markdown.replaceAll('\n\n+', '\n+')),
+    })
+    target = h.session
+    h.session.load()
+    await settled()
+    h.setDisk(loose)
+    h.session.externalChanged()
+    await settled()
+    expect(h.snapshots.at(-1)?.dirty).toBe(false)
+
+    const transform = vi.fn(toggleTransform(taskAt(loose, 1)))
+    await h.session.commitSourceEdit(transform)
+
+    expect(transform).toHaveBeenCalledWith('+ [ ] same\n+ [ ] same\n', sha256HexSync(loose))
+    expect(h.disk()).toBe('+ [ ] same\n+ [x] same\n')
+  })
+
+  it('gives the transform no revision while the buffer holds unsaved edits', async () => {
+    const source = '+ [ ] ship it\n'
+    const h = harness({ disk: source })
+    h.session.load()
+    await settled()
+    h.session.editorChanged('+ [ ] ship it\n\njot\n')
+
+    const transform = vi.fn(toggleTransform(firstTask(source)))
+    await h.session.commitSourceEdit(transform)
+
+    expect(transform).toHaveBeenCalledWith('+ [ ] ship it\n\njot\n', null)
+    expect(h.disk()).toBe('+ [x] ship it\n\njot\n')
   })
 
   it('keeps the frontmatter around a body transform', async () => {
