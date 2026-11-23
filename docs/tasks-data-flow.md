@@ -31,7 +31,7 @@ code is in `packages/core/src/tasks/`, `packages/core/src/documents/` and
 3. When a note commit resolves, the index holds the committed text, and the store holds the tasks the commit left.
 4. A read of an older index seq than the store knows for a note does not replace the rows of that note.
 5. The dirty set collects file changes for the whole graph session, through passes, suspends and failures.
-6. A write finds its task by address. When the text moved on, it takes the task at the same path with the same content, else the nearest task with the same content. It reports `stale` only when no such task exists.
+6. A write finds its task by address. When the text moved on, it takes the task at the same path with the same content, else the nearest task with the same content. Two tasks of one write never take the same task. It reports `stale` only when no such task exists.
 7. The rows on screen are the stored rows with every pending op applied. Nothing else changes a row.
 
 ## Flow

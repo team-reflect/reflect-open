@@ -18,7 +18,7 @@ import {
   type SlotTarget,
 } from './list-insert.ts'
 import { hasSameTaskContent, type TaskLocator, type TaskSnapshot } from './task-model.ts'
-import { compareTaskPaths, isSameTaskPath } from './task-path.ts'
+import { compareTaskPaths, encodeTaskPath, isSameTaskPath } from './task-path.ts'
 import { getRoundTasks, toTaskSnapshot, type TaskEntry } from './task-project.ts'
 
 export type InsertPosition =
@@ -107,11 +107,23 @@ export function applyTaskEdits(
   // The item this batch inserted after each block.
   const tails = new Map<MarkdownBlock, MarkdownListItem>()
   // Resolve every locator first, then mutate in order.
+  const located = locateTasks(
+    before,
+    revision,
+    edits.flatMap((edit) => {
+      if (edit.kind !== 'insert') {
+        return [edit.task]
+      }
+      return edit.at.kind === 'contextEnd' ? [edit.at.task] : []
+    }),
+  )
+  const locate = (locator: TaskLocator): TaskEntry => {
+    return located.get(encodeTaskPath(locator.astPath))!
+  }
   const mutations = edits.map((edit): (() => void) => {
     if (edit.kind === 'insert') {
       const { at } = edit
-      const contextSlot =
-        at.kind === 'contextEnd' ? resolveContextEnd(before, revision, at.task) : null
+      const contextSlot = at.kind === 'contextEnd' ? findContextEnd(locate(at.task)) : null
       const markdown = requireParagraphMarkdown(edit.markdown)
       const bullet = edit.bullet === true
       const item = createListItem(bullet ? 'bullet' : 'task', '+', markdown)
@@ -134,7 +146,7 @@ export function applyTaskEdits(
         }
       }
     }
-    const { node } = locateTask(before, revision, edit.task)
+    const { node } = locate(edit.task)
     return () => applyItemEdit(document, node, edit)
   })
   for (const mutate of mutations) {
@@ -170,57 +182,69 @@ export function applyTaskEdits(
 }
 
 /**
- * The entry a locator names, among `before` in document order. A locator
- * read at `revision`, the hash of the text the entries come from, names the
- * entry at its path. Any other locator names the entry at its path when that
- * entry has its content, else the entry with its content that is nearest to
- * its path in document order, the earlier one of two equally near.
+ * The entry each locator names, among `before` in document order, by the
+ * path of the locator. A locator read at `revision`, the hash of the text
+ * the entries come from, names the entry at its path. Any other locator
+ * names the entry at its path when that entry has its content, else the
+ * entry with its content that is nearest to its path in document order, the
+ * earlier one of two equally near. Locators with different paths name
+ * different entries: the nearest entry goes to the first locator in order.
  */
-function locateTask(
+function locateTasks(
   before: readonly TaskEntry[],
   revision: string | null,
-  locator: TaskLocator,
-): TaskEntry {
-  const atPath = before.find((entry) => isSameTaskPath(entry.astPath, locator.astPath))
-  if (
-    atPath !== undefined &&
-    (locator.revision === revision || hasSameTaskContent(atPath, locator))
-  ) {
-    return atPath
-  }
-  const position = before.filter((entry) => {
-    return compareTaskPaths(entry.astPath, locator.astPath) < 0
-  }).length
-  let nearest: TaskEntry | undefined
-  let nearestDistance = Infinity
-  if (locator.revision !== revision) {
-    for (const [i, entry] of before.entries()) {
-      const distance = Math.abs(i - position)
-      if (distance < nearestDistance && hasSameTaskContent(entry, locator)) {
-        nearest = entry
-        nearestDistance = distance
-      }
+  locators: readonly TaskLocator[],
+): Map<string, TaskEntry> {
+  const located = new Map<string, TaskEntry>()
+  const moved: TaskLocator[] = []
+  for (const locator of locators) {
+    const atPath = before.find((entry) => isSameTaskPath(entry.astPath, locator.astPath))
+    if (
+      atPath !== undefined &&
+      (locator.revision === revision || hasSameTaskContent(atPath, locator))
+    ) {
+      located.set(encodeTaskPath(locator.astPath), atPath)
+    } else {
+      moved.push(locator)
     }
   }
-  if (nearest === undefined) {
-    throw new NoteEditError(
-      'stale',
-      `task is no longer in the note: ${JSON.stringify(locator.markdown)}`,
-    )
+  const taken = new Set(located.values())
+  for (const locator of moved) {
+    const key = encodeTaskPath(locator.astPath)
+    if (located.has(key)) {
+      continue
+    }
+    const position = before.filter((entry) => {
+      return compareTaskPaths(entry.astPath, locator.astPath) < 0
+    }).length
+    let nearest: TaskEntry | undefined
+    let nearestDistance = Infinity
+    if (locator.revision !== revision) {
+      for (const [i, entry] of before.entries()) {
+        const distance = Math.abs(i - position)
+        if (distance < nearestDistance && !taken.has(entry) && hasSameTaskContent(entry, locator)) {
+          nearest = entry
+          nearestDistance = distance
+        }
+      }
+    }
+    if (nearest === undefined) {
+      throw new NoteEditError(
+        'stale',
+        `task is no longer in the note: ${JSON.stringify(locator.markdown)}`,
+      )
+    }
+    located.set(key, nearest)
+    taken.add(nearest)
   }
-  return nearest
+  return located
 }
 
 /**
- * The end of the context of the task `locator` names: its parent list item,
- * or at the root the end of its own list.
+ * The end of the context of the task at `entry`: its parent list item, or at
+ * the root the end of its own list.
  */
-function resolveContextEnd(
-  before: readonly TaskEntry[],
-  revision: string | null,
-  locator: TaskLocator,
-): SlotTarget {
-  const { parent, index } = locateTask(before, revision, locator)
+function findContextEnd({ parent, index }: TaskEntry): SlotTarget {
   if (parent.type === 'listItem') {
     return { kind: 'end', container: parent }
   }

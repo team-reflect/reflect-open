@@ -83,6 +83,18 @@ describe('applyTaskEdits: toggle', () => {
     )
   })
 
+  it('gives two stale locators of identical tasks one task each', () => {
+    const source = 'intro\n\n+ [ ] same\n+ [ ] same\n+ [ ] same\n'
+    const first = { ...locate(source, 0), revision: 'older', astPath: [0, 0] }
+    const second = { ...locate(source, 1), revision: 'older', astPath: [0, 1] }
+    expect(
+      applyEdits(source, [
+        { kind: 'toggle', task: first },
+        { kind: 'toggle', task: second },
+      ]).source,
+    ).toBe('intro\n\n+ [x] same\n+ [x] same\n+ [ ] same\n')
+  })
+
   it('edits the task at the path of a locator read at the revision of the note', () => {
     const source = '+ [ ] a\n+ [ ] b\n'
     const unsaved = { ...locate(source, 1), markdown: 'b, edited in a row' }
