@@ -5,7 +5,6 @@ import { isMobilePlatform } from '../ports/platform-facts.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { OperationHandle, ProgressPort } from '../ports/progress-port.ts'
 import { errorMessage, toAppError } from '../errors.ts'
-import { isNotePath } from '../graph/paths.ts'
 import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { FileChange, FileChangeService } from './file-change-service.ts'
@@ -187,20 +186,6 @@ export interface IndexLifecycleService {
    * `generation` other than its own.
    */
   onApplied(listener: (event: IndexAppliedEvent) => void): Unlisten
-  /**
-   * Apply `changes` to the index at `generation` now, reading the files at
-   * `fileGeneration`, without waiting for the live subscription: files a pull
-   * wrote must reach the index even before the watcher runs. Applying a batch
-   * the live subscription also applies is idempotent. Resolves with the
-   * number of changes that wrote a row, once the index writer settled them.
-   * Writes nothing when `canApply` says no, or while the index is suspended.
-   */
-  applyChanges(
-    changes: FileChange[],
-    generation: number,
-    fileGeneration: number,
-    canApply?: () => boolean,
-  ): Promise<number>
   /**
    * Listen for whole-graph passes that ran to completion. A sync pass reports
    * right after its {@link IndexLifecycleService.onApplied}; one that was
@@ -597,24 +582,6 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
 
   onApplied(listener: (event: IndexAppliedEvent) => void): Unlisten {
     return attach(this.#appliedListeners, listener)
-  }
-
-  async applyChanges(
-    changes: FileChange[],
-    generation: number,
-    fileGeneration: number,
-    canApply?: () => boolean,
-  ): Promise<number> {
-    const writer = this.#writerAt(generation, fileGeneration)
-    if (writer === null || canApply?.() === false) {
-      return 0
-    }
-    const notes = changes.filter((change) => isNotePath(change.path))
-    for (const change of notes) {
-      writer.dirty.add(change.path, { kind: change.kind, modifiedMs: change.modifiedMs })
-    }
-    const outcomes = await Promise.all(notes.map((change) => writer.settled(change.path)))
-    return outcomes.filter((outcome) => outcome.status === 'applied').length
   }
 
   markDirty(changes: readonly FileChange[], generation: number, fileGeneration: number): void {

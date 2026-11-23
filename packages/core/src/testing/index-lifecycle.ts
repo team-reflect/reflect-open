@@ -169,15 +169,6 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
     }
   }
 
-  applyChanges(
-    changes: FileChange[],
-    generation: number,
-    fileGeneration: number,
-    canApply?: () => boolean,
-  ): Promise<number> {
-    return this.#inner.applyChanges(changes, generation, fileGeneration, canApply)
-  }
-
   onReconciled(listener: (event: IndexReconciledEvent) => MaybePromise<void>): Unlisten {
     return this.#inner.onReconciled(listener)
   }

@@ -46,7 +46,7 @@ let icloud: TestICloudNativeService
 let scanResults: Array<IcloudSweepOutcome | Error | 'hang'>
 let releaseScan: (() => void) | null
 let dirtyPaths: string[]
-let indexApplies: Array<{ paths: string[]; generation: number; canApply: boolean }>
+let dirtyMarks: Array<{ paths: string[]; generation: number }>
 let active: ICloudSyncService | null = null
 
 beforeEach(() => {
@@ -59,7 +59,7 @@ beforeEach(() => {
   scanResults = []
   releaseScan = null
   dirtyPaths = []
-  indexApplies = []
+  dirtyMarks = []
   icloud.onConflictsScan(async () => {
     const scripted = scanResults.shift()
     if (scripted instanceof Error) {
@@ -88,18 +88,9 @@ afterEach(() => {
  */
 function service(overrides: { watch?: boolean } = {}) {
   const indexLifecycle = createTestIndexLifecycleService()
-  vi.spyOn(indexLifecycle, 'applyChanges').mockImplementation(
-    (changes, generation, _fileGeneration, canApply) => {
-      return Promise.try(() => {
-        indexApplies.push({
-          paths: changes.map((change) => change.path),
-          generation,
-          canApply: canApply?.() ?? true,
-        })
-        return changes.length
-      })
-    },
-  )
+  vi.spyOn(indexLifecycle, 'markDirty').mockImplementation((changes, generation) => {
+    dirtyMarks.push({ paths: changes.map((change) => change.path), generation })
+  })
   const openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
   vi.spyOn(openDocuments, 'dirtyPaths').mockImplementation(() => dirtyPaths)
   active = createICloudSyncService(
@@ -256,7 +247,7 @@ describe('createICloudSyncService', () => {
     ])
   })
 
-  it('sweep rewrites fan out to subscribers and reindex, without re-ingesting', async () => {
+  it('sweep rewrites fan out to subscribers and are marked dirty for the index, without re-ingesting', async () => {
     scanResults.push({
       changed: [
         { path: 'notes/merged.md', kind: 'upsert', modifiedMs: 5 },
@@ -279,38 +270,11 @@ describe('createICloudSyncService', () => {
         source: 'icloud-sweep',
       },
     ])
-    // …and the notes reindex directly under the index generation.
-    expect(indexApplies).toEqual([
-      { paths: ['notes/merged.md'], generation: INDEX_GENERATION, canApply: true },
-    ])
+    // …and the notes are marked dirty under the index generation.
+    expect(dirtyMarks).toEqual([{ paths: ['notes/merged.md'], generation: INDEX_GENERATION }])
     // The sweep batch itself is never an ingest.
     await settleScan(INGEST_SETTLE_MS)
     expect(scanCalls()).toHaveLength(1)
-  })
-
-  it('gates the direct reindex on visibility for mobile only', async () => {
-    const changed: IcloudSweepOutcome = {
-      ...EMPTY_OUTCOME,
-      changed: [{ path: 'notes/merged.md', kind: 'upsert', modifiedMs: 5 }],
-    }
-    // The app hides while the sweep is in flight, so its result lands hidden.
-    icloud.onConflictsScan(() => {
-      activity.setHidden(true)
-      return changed
-    })
-
-    const mobile = service({ watch: true })
-    await mobile.start()
-    await settleScan()
-    expect(indexApplies.map((apply) => apply.canApply)).toEqual([false])
-    mobile.dispose()
-
-    activity.setHidden(false)
-    indexApplies = []
-    const desktop = service()
-    await desktop.start()
-    await settleScan()
-    expect(indexApplies.map((apply) => apply.canApply)).toEqual([true])
   })
 
   it('defers mobile baseline, conflict, and ingest scans until foreground', async () => {

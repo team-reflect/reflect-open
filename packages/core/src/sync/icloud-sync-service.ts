@@ -390,22 +390,17 @@ class ICloudSyncServiceImpl implements ICloudSyncService {
 
   /**
    * Fan sweep rewrites out to every file-change subscriber (open sessions
-   * reconcile from these) *and* reindex them under the open index session,
-   * exactly like the git sync service's pull path — the sweep must never
-   * wait on the watcher to notice its own writes.
+   * reconcile from these) *and* mark the notes dirty for the open index
+   * session, exactly like the git sync service's pull path — the sweep must
+   * never wait on the watcher to notice its own writes.
    */
   #applySweepChanges(changes: FileChange[]): void {
-    const { fileChanges, indexLifecycle, activity } = this.#deps
-    const { generation, indexGeneration, metadataWatch } = this.#options
+    const { fileChanges, indexLifecycle } = this.#deps
+    const { generation, indexGeneration } = this.#options
     fileChanges.emit({ changes, source: 'icloud-sweep' })
     const indexable = changes.filter((change) => isNotePath(change.path))
     if (indexGeneration !== null && indexable.length > 0) {
-      void indexLifecycle.applyChanges(
-        indexable,
-        indexGeneration,
-        generation,
-        () => !metadataWatch || !activity.isHidden(),
-      )
+      indexLifecycle.markDirty(indexable, indexGeneration, generation)
     }
   }
 

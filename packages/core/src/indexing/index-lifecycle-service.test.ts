@@ -27,7 +27,7 @@ import {
 import { createIndexQueryService } from './index-query-service.ts'
 import { PROJECTION_VERSION } from './indexed-note.ts'
 import { PROJECTION_VERSION_KEY } from './indexer.ts'
-import { sleep, noop, returnFalse } from '@ocavue/utils'
+import { sleep, noop } from '@ocavue/utils'
 
 const databases: { close(): void }[] = []
 
@@ -934,54 +934,6 @@ describe('rebuildVisibly', () => {
     })
     await index.rebuildVisibly()
     expect(index.rebuilds()).toEqual([7])
-  })
-})
-
-describe('applyChanges', () => {
-  it('applies the changed notes without a live subscription and reports them', async () => {
-    const { index, store, applied, steps } = setup({
-      files: { 'notes/pulled.md': '# Pulled\n' },
-    })
-
-    const mutations = await index.applyChanges(
-      [
-        { path: 'notes/pulled.md', kind: 'upsert', modifiedMs: 5 },
-        { path: 'audio-memos/memo.m4a', kind: 'upsert', modifiedMs: 6 },
-      ],
-      4,
-      FILE_GENERATION,
-    )
-
-    expect(mutations).toBe(1)
-    expect(store.applied().map((note) => note.path)).toEqual(['notes/pulled.md'])
-    expect(applied).toEqual([
-      { generation: 4, changes: [{ path: 'notes/pulled.md', kind: 'upsert', modifiedMs: 5 }] },
-    ])
-    expect(steps).not.toContain('subscribe')
-  })
-
-  it('reports nothing when no index row changed', async () => {
-    const { index, applied } = setup()
-
-    expect(
-      await index.applyChanges([{ path: 'assets/a.png', kind: 'upsert' }], 4, FILE_GENERATION),
-    ).toBe(0)
-    expect(applied).toEqual([])
-  })
-
-  it('writes nothing while `canApply` says no', async () => {
-    const { index, store, applied } = setup({ files: { 'notes/pulled.md': '# Pulled\n' } })
-
-    const mutations = await index.applyChanges(
-      [{ path: 'notes/pulled.md', kind: 'upsert', modifiedMs: 5 }],
-      4,
-      FILE_GENERATION,
-      returnFalse,
-    )
-
-    expect(mutations).toBe(0)
-    expect(store.applied()).toEqual([])
-    expect(applied).toEqual([])
   })
 })
 
