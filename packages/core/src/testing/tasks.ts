@@ -47,11 +47,16 @@ function hasPath(task: TaskSnapshot, astPath: MarkdownAstPath): boolean {
  * Stands in for the index and the note files behind a `TaskService` whose
  * write methods a test replaces. It answers the `index_tasks` reads of
  * `database` with the rows the test supplies, and it makes the result of a
- * write over the tasks it last served.
+ * write over the tasks it last served. A read that started before a write
+ * carries an older index seq than the write.
  */
 export class TestTaskIndex {
   readonly #notes = new Map<string, TaskSnapshot[]>()
   readonly #revisions = new Map<string, string>()
+  /**
+   * Counts the writes: a read returns the count at its start as its index seq.
+   */
+  #seq = 0
 
   constructor(
     database: DatabaseService,
@@ -64,12 +69,13 @@ export class TestTaskIndex {
         return await read(command, args)
       }
       const { checked, paths } = args as CommandArgs<'index_tasks'>
+      const seq = this.#seq
       const rows = [
         ...(checked === true ? [] : await readOpen()),
         ...(checked === false ? [] : await readCompleted()),
       ].filter((row) => paths === null || paths.includes(row.notePath))
       this.#serve(rows, checked, paths)
-      return toTaskRead(rows)
+      return toTaskRead(rows, seq)
     }
   }
 
@@ -133,6 +139,7 @@ export class TestTaskIndex {
   ): TaskWriteResult {
     const tasks = [...moved.flatMap((move) => (move.to === null ? [] : [move.to])), ...inserted]
     const revision = `${note.revision}+`
+    this.#seq += 1
     this.#notes.set(note.notePath, tasks)
     this.#revisions.set(note.notePath, revision)
     return {
@@ -143,7 +150,7 @@ export class TestTaskIndex {
       inserted,
       tasks,
       merged: false,
-      indexSeq: null,
+      indexSeq: this.#seq,
       updatedAt: 0,
     }
   }
@@ -185,9 +192,9 @@ function applyAction(task: TaskSnapshot | null, action: TaskAction): TaskSnapsho
 }
 
 /**
- * The index read that returns `rows`: the rows grouped by note, at seq zero.
+ * The index read at `seq` that returns `rows`: the rows grouped by note.
  */
-function toTaskRead(rows: readonly OpenTask[]): TaskRead {
+function toTaskRead(rows: readonly OpenTask[], seq: number): TaskRead {
   const notes = new Map<string, NoteTasks>()
   for (const row of rows) {
     const note = notes.get(row.notePath) ?? {
@@ -208,5 +215,5 @@ function toTaskRead(rows: readonly OpenTask[]): TaskRead {
     })
     notes.set(row.notePath, note)
   }
-  return { seq: 0, notes: [...notes.values()] }
+  return { seq, notes: [...notes.values()] }
 }

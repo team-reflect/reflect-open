@@ -39,7 +39,6 @@ import { createTestProgressPort, type TestProgressPort } from '../testing/ports.
 import { TaskHarness } from '../testing/task-harness.ts'
 import { makeOpenTask } from '../testing/tasks.ts'
 import type { OpenTask } from './open-task.ts'
-import { getTaskKey } from './task-identity.ts'
 import { todaysDailyTarget } from './task-navigation.ts'
 import {
   createTaskService,
@@ -673,67 +672,6 @@ describe('no graph open', () => {
   })
 })
 
-describe('recently completed', () => {
-  const a = makeOpenTask({ notePath: 'notes/a.md', astPath: [0], markdown: 'a', updatedAt: 10 })
-  const b = makeOpenTask({ notePath: 'notes/b.md', astPath: [0], markdown: 'b', updatedAt: 10 })
-
-  it('keeps completed rows as checked copies, scoped to their graph', () => {
-    tasks.markRecentlyCompleted('/g', [a])
-    expect(tasks.recentlyCompleted.get()).toEqual({ root: '/g', tasks: [{ ...a, checked: true }] })
-    expect(tasks.hasRecentlyCompleted('/g', getTaskKey(a))).toBe(true)
-    expect(tasks.hasRecentlyCompleted('/other', getTaskKey(a))).toBe(false)
-
-    // Marking for another graph discards the previous graph's rows.
-    tasks.markRecentlyCompleted('/other', [b])
-    expect(tasks.recentlyCompleted.get()).toEqual({
-      root: '/other',
-      tasks: [{ ...b, checked: true }],
-    })
-  })
-
-  it('notifies subscribers on every change until they unsubscribe', () => {
-    let calls = 0
-    const unsubscribe = tasks.recentlyCompleted.subscribe(() => {
-      calls += 1
-    })
-    tasks.markRecentlyCompleted('/g', [a, b])
-    tasks.forgetRecentlyCompleted('/g', [getTaskKey(a)])
-    tasks.forgetRecentlyCompleted('/g', [getTaskKey(a)])
-    tasks.archiveRecentlyCompleted('/g')
-    expect(calls).toBe(3)
-
-    unsubscribe()
-    tasks.markRecentlyCompleted('/g', [a])
-    expect(calls).toBe(3)
-  })
-
-  it('drops a struck row the index reports open again with a newer updatedAt', () => {
-    tasks.markRecentlyCompleted('/g', [a, b])
-    tasks.reconcileRecentlyCompleted('/g', [
-      { ...a, checked: false, updatedAt: 11 },
-      { ...b, checked: false, updatedAt: 10 },
-    ])
-    expect(tasks.recentlyCompleted.get().tasks.map(getTaskKey)).toEqual([getTaskKey(b)])
-  })
-
-  it('re-keys struck rows a note write moved', () => {
-    tasks.markRecentlyCompleted('/g', [a])
-    const from = { astPath: [0], markdown: 'a', breadcrumbs: [], checked: true }
-    tasks.relocateRecentlyCompleted('/g', 'notes/a.md', {
-      baseRevision: '',
-      revision: '',
-      moved: [{ from, to: { ...from, astPath: [2] } }],
-    })
-    expect(tasks.recentlyCompleted.get().tasks.map((row) => row.astPath)).toEqual([[2]])
-  })
-
-  it('is separate per service', () => {
-    tasks.markRecentlyCompleted('/g', [a])
-    const other = createTasks(new WritableStore({ session: openGraph }))
-    expect(other.recentlyCompleted.get().tasks).toEqual([])
-  })
-})
-
 describe('task list state', () => {
   const A = 'notes/a.md'
   const B = 'notes/b.md'
@@ -775,7 +713,7 @@ describe('task list state', () => {
   it('reads the open tasks on the first subscription, not before', async () => {
     seedNotes(database, [{ path: A, markdown: '+ [ ] one\n+ [x] done\n' }])
     const reads = watchReads()
-    expect(tasks.get()).toEqual({ open: undefined, completed: undefined })
+    expect(tasks.get()).toEqual({ open: undefined, completed: undefined, struck: [] })
     expect(reads.count()).toBe(0)
 
     let changes = 0
@@ -832,7 +770,7 @@ describe('task list state', () => {
     const completing = tasks.completeTasks([rows[0]!])
 
     expect(markdowns(tasks.get().open)).toEqual(['two'])
-    expect(tasks.recentlyCompleted.get().tasks).toEqual([{ ...rows[0]!, checked: true }])
+    expect(tasks.get().struck).toEqual([{ ...rows[0]!, checked: true }])
     expect(spy).toHaveBeenCalledWith(rows[0], [{ kind: 'toggle' }])
     write.resolve()
     await completing
@@ -878,23 +816,59 @@ describe('task list state', () => {
     expect(markdowns(tasks.get().open)).toEqual(['one', 'two!'])
   })
 
-  it('restores the struck row when an edit-and-reopen write fails', async () => {
-    await subscribed({ [A]: '+ [x] one\n' })
-    tasks.includeCompleted()
-    await flushMicrotasks()
-    const struck = tasks.get().completed![0]!
-    tasks.markRecentlyCompleted('/g', [struck])
+  /**
+   * Complete the one task of a note, and return its struck row.
+   */
+  async function struckRow(): Promise<OpenTask> {
+    const { rows } = await subscribed({ [A]: '+ [ ] one\n' })
+    await tasks.completeTasks(rows)
+    return tasks.get().struck[0]!
+  }
+
+  it('keeps a completed task struck, under its id, until the struck tasks are archived', async () => {
+    const { rows } = await subscribed({ [A]: '+ [ ] one\n' })
+    await tasks.completeTasks(rows)
+
+    expect(tasks.get().open).toEqual([])
+    expect(tasks.get().struck).toMatchObject([
+      { taskId: rows[0]!.taskId, checked: true, revision: sha256HexSync('+ [x] one\n') },
+    ])
+
+    tasks.archiveRecentlyCompleted()
+    expect(tasks.get().struck).toEqual([])
+  })
+
+  it('shows a reopened task as open, under the same id', async () => {
+    const struck = await struckRow()
+
+    await tasks.reopenTasks([struck])
+
+    expect(tasks.get().struck).toEqual([])
+    expect(tasks.get().open).toMatchObject([{ taskId: struck.taskId, checked: false }])
+  })
+
+  it('shows a struck task as open when the index reports it open again', async () => {
+    const struck = await struckRow()
+
+    await tasks.refresh()
+
+    expect(tasks.get().struck).toEqual([])
+    expect(tasks.get().open).toMatchObject([{ taskId: struck.taskId, markdown: 'one' }])
+  })
+
+  it('keeps the row struck when an edit-and-reopen write fails', async () => {
+    const struck = await struckRow()
     vi.spyOn(tasks, 'writeTask').mockRejectedValue(new Error('disk full'))
 
     const reopening = tasks.editAndToggleTask(struck, 'edited')
-    expect(tasks.hasRecentlyCompleted('/g', getTaskKey(struck))).toBe(false)
+    expect(tasks.get().struck).toEqual([])
     expect(tasks.get().open).toEqual([
       { ...struck, checked: false, markdown: 'edited', text: 'edited' },
     ])
 
     await expect(reopening).rejects.toThrow('disk full')
     expect(tasks.get().open).toEqual([])
-    expect(tasks.recentlyCompleted.get().tasks).toEqual([struck])
+    expect(tasks.get().struck).toEqual([struck])
   })
 
   it('keeps the writes of a batch that landed and puts the other rows back', async () => {
@@ -913,24 +887,18 @@ describe('task list state', () => {
     await expect(completing).rejects.toThrow('stale index')
     expect(markdowns(tasks.get().open)).toEqual(['two', 'three'])
     expect(noteFile.files().get(A)).toBe('+ [x] one\n+ [ ] two\n+ [ ] three\n')
-    expect(tasks.recentlyCompleted.get().tasks).toEqual([])
+    expect(markdowns(tasks.get().struck)).toEqual(['one'])
   })
 
   it('keeps a checked task struck when its delete fails', async () => {
-    await subscribed({ [A]: '+ [x] one\n' })
-    tasks.includeCompleted()
-    await flushMicrotasks()
-    const struck = tasks.get().completed![0]!
-    tasks.markRecentlyCompleted('/g', [struck])
+    const struck = await struckRow()
     vi.spyOn(tasks, 'writeTask').mockRejectedValue(new Error('disk full'))
 
     const deleting = tasks.deleteTasks([struck])
-    expect(tasks.recentlyCompleted.get().tasks).toEqual([])
-    expect(tasks.get().completed).toEqual([])
+    expect(tasks.get().struck).toEqual([])
 
     await expect(deleting).rejects.toThrow('disk full')
-    expect(tasks.recentlyCompleted.get().tasks).toEqual([struck])
-    expect(tasks.get().completed).toEqual([struck])
+    expect(tasks.get().struck).toEqual([struck])
   })
 
   it('adds the inserted row and keeps the ids of the rows the write moved', async () => {
@@ -1021,19 +989,15 @@ describe('task list state', () => {
     expect(reads.count()).toBe(2)
   })
 
-  it('keeps the state on an equal read and apart from the recently-completed set', async () => {
-    const { rows } = await subscribed()
+  it('keeps the state on an equal read', async () => {
+    await subscribed()
     const state = tasks.get()
     const listener = vi.fn()
     tasks.subscribe(listener)
-    const struckListener = vi.fn()
-    tasks.recentlyCompleted.subscribe(struckListener)
 
     await tasks.refresh()
-    tasks.markRecentlyCompleted('/g', [rows[0]!])
     expect(tasks.get()).toBe(state)
     expect(listener).not.toHaveBeenCalled()
-    expect(struckListener).toHaveBeenCalledTimes(1)
   })
 
   it('re-reads on an index:committed broadcast in a note window only', async () => {

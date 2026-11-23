@@ -36,10 +36,17 @@ describe('reconcileNoteTasks without moves', () => {
     ).toEqual(['t2', 't1'])
   })
 
-  it('gives a new id to a task whose content changed', () => {
-    expect(reconcileSources('+ [ ] a\n+ [ ] b\n', ['t1', 't2'], '+ [ ] a\n+ [x] b\n')).toEqual([
+  it('keeps the id of a task that changed in place', () => {
+    expect(reconcileSources('+ [ ] a\n+ [ ] b\n', ['t1', 't2'], '+ [ ] a\n+ [x] c\n')).toEqual([
       't1',
+      't2',
+    ])
+  })
+
+  it('gives a new id to a changed task at the path of a task that moved', () => {
+    expect(reconcileSources('+ [ ] a\n+ [ ] b\n', ['t1', 't2'], '+ [ ] new\n+ [ ] a\n')).toEqual([
       'new1',
+      't1',
     ])
   })
 

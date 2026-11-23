@@ -10,7 +10,6 @@ import {
 } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
-import { useRecentlyCompleted } from '@/lib/tasks/recently-completed.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
 import { useTaskActions } from '@/lib/tasks/use-task-actions.ts'
 import { useToday } from '@/lib/use-today.ts'
@@ -82,14 +81,13 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
     selectText: true,
   })
 
-  const { open, completed } = useStore(taskService)
+  const { open, completed, struck: recentlyCompleted } = useStore(taskService)
   useEffect(
     () => (filters.archived ? taskService.includeCompleted() : undefined),
     [taskService, filters.archived],
   )
   const ready = open !== undefined && (!filters.archived || completed !== undefined)
 
-  const recentlyCompleted = useRecentlyCompleted(graph?.root ?? null, open)
   const actions = useTaskActions()
 
   // Defer the needle like the All tab defers its query: fast typing coalesces

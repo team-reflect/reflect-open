@@ -470,9 +470,7 @@ export { type InsertTaskTarget } from './tasks/task-insert-target.ts'
 export { previousTaskKey, todaysDailyTarget } from './tasks/task-navigation.ts'
 export { withDraftDueDate } from './tasks/task-schedule-content.ts'
 export {
-  withoutReopenedTasks,
   type InsertedTask,
-  type RecentlyCompleted,
   type TaskAction,
   type TaskService,
   type TaskWriteResult,

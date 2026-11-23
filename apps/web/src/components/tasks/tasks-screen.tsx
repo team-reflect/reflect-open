@@ -19,7 +19,6 @@ import {
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { useNoteLinkNavigation, type ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
-import { useRecentlyCompleted } from '@/lib/tasks/recently-completed.ts'
 import { scrollTaskIntoView } from '@/lib/tasks/task-navigation.ts'
 import { useTaskActions } from '@/lib/tasks/use-task-actions.ts'
 import { useTaskRowHandlers } from '@/lib/tasks/use-task-row-handlers.ts'
@@ -28,7 +27,6 @@ import { useTaskKeyboard } from '@/lib/tasks/use-task-keyboard.ts'
 import { useTaskSelection } from '@/lib/tasks/use-task-selection.ts'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { useToday } from '@/lib/use-today.ts'
-import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useStore } from '@/lib/use-store.ts'
 import { routeForPath } from '@reflect/app'
@@ -68,12 +66,11 @@ function focusedSelectedKey(
  * selection opens the inline editor.
  *
  * Completing a task keeps it showing (struck) in place — V1's middle state — via
- * the session-scoped {@link useRecentlyCompleted} set, until "Archive" (⌘⇧↵)
+ * the struck set of `TaskService`, until "Archive" (⌘⇧↵)
  * hides this run's completed tasks. They stay `[x]` on disk and remain under the
  * "show archived" filter, which reveals the whole completed history.
  */
 export function TasksScreen(): ReactElement {
-  const graph = useGraphInfo()
   const { tasks: taskService } = useCoreServices()
   const navigateNoteLink = useNoteLinkNavigation()
   const today = useToday()
@@ -83,7 +80,7 @@ export function TasksScreen(): ReactElement {
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
-  const { open, completed } = useStore(taskService)
+  const { open, completed, struck: recentlyCompleted } = useStore(taskService)
   useEffect(
     () => (filters.archived ? taskService.includeCompleted() : undefined),
     [taskService, filters.archived],
@@ -98,7 +95,6 @@ export function TasksScreen(): ReactElement {
   // This session's completed tasks, still showing struck until archived —
   // reconciled against the open read so a task reopened at its source note
   // sheds its struck shadow instead of masking the live row.
-  const recentlyCompleted = useRecentlyCompleted(graph?.root ?? null, open)
 
   const needle = query.trim().toLowerCase()
   const groups = useMemo(

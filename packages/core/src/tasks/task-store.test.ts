@@ -85,7 +85,7 @@ describe('TaskStore reads', () => {
   it('shows no list until a read of every note lands', () => {
     const store = createStore()
     store.landPaths(fullRead(1, { [A]: '+ [ ] a\n' }), [A])
-    expect(store.view()).toEqual({ open: undefined, completed: undefined })
+    expect(store.view()).toEqual({ open: undefined, completed: undefined, struck: [] })
 
     store.landAll(openRead(2, { [A]: '+ [ ] a\n+ [x] done\n' }), false)
     expect(labels(store.view().open)).toEqual(['t0:a'])
@@ -156,10 +156,10 @@ describe('TaskStore reads', () => {
     store.landPaths(fullRead(5, { [A]: '+ [ ] a2\n' }), [A, B])
 
     store.landAll(openRead(4, { [A]: '+ [ ] a\n', [B]: '+ [ ] b\n' }), false)
-    expect(labels(store.view().open)).toEqual(['t2:a2'])
+    expect(labels(store.view().open)).toEqual(['t0:a2'])
 
     store.landAll(openRead(5, { [A]: '+ [ ] a2\n', [B]: '+ [ ] b3\n' }), false)
-    expect(labels(store.view().open)).toEqual(['t2:a2', 't3:b3'])
+    expect(labels(store.view().open)).toEqual(['t0:a2', 't2:b3'])
   })
 
   it('takes older reads again after the index seqs are forgotten', () => {
@@ -168,7 +168,22 @@ describe('TaskStore reads', () => {
     store.forgetSeqs()
 
     store.landAll(openRead(1, { [A]: '+ [ ] rebuilt\n' }), false)
-    expect(labels(store.view().open)).toEqual(['t1:rebuilt'])
+    expect(labels(store.view().open)).toEqual(['t0:rebuilt'])
+  })
+})
+
+describe('TaskStore struck tasks', () => {
+  it('lists a struck task while it is checked, until the struck tasks are archived', () => {
+    const store = createStore()
+    store.landAll(fullRead(1, { [A]: '+ [ ] a\n+ [x] done\n' }), false)
+    store.strike(['t0', 't1'])
+    expect(labels(store.view().struck)).toEqual(['t1:done'])
+
+    store.push(A, [{ kind: 'toggle', taskId: 't0' }])
+    expect(labels(store.view().struck)).toEqual(['t0:a', 't1:done'])
+
+    store.archive()
+    expect(store.view().struck).toEqual([])
   })
 })
 
@@ -267,17 +282,13 @@ describe('TaskStore writes', () => {
     ])
   })
 
-  it('aligns by content when the note text is not the output of the edit', () => {
+  it('aligns without the moves when the note text is not the output of the edit', () => {
     const { store, a } = loaded()
-    const commit = commitOf(
-      A,
-      source,
-      [{ kind: 'setMarkdown', task: locate(a), markdown: 'a!' }],
-      2,
-    )
+    const commit = commitOf(A, source, [{ kind: 'remove', task: locate(a) }], 2)
+    const merged = projectTasks('+ [ ] theirs\n+ [ ] a\n+ [ ] b\n')
 
-    store.landCommit({ ...commit, moves: null }, null)
-    expect(labels(store.view().open)).toEqual(['t2:a!', 't1:b'])
+    store.landCommit({ ...commit, tasks: merged, moves: null }, null)
+    expect(labels(store.view().open)).toEqual(['t2:theirs', 't0:a', 't1:b'])
   })
 
   it('ignores a read from before the index seq of a commit', () => {

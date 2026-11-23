@@ -543,7 +543,7 @@ describe('TasksScreen', () => {
     const view = await renderScreen()
 
     await view.findByRole('button', { name: 'full row' })
-    const row = view.container.querySelector('[data-task-key="notes/p.md:[2]"]')
+    const row = view.container.querySelector('[data-task-key]')
     expect(row).toBeInstanceOf(HTMLElement)
     await userEvent.click(row as HTMLElement)
 
@@ -585,7 +585,7 @@ describe('TasksScreen', () => {
     const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'second' }))
-    const row = view.container.querySelector('[data-task-key="notes/p.md:[3]"]') as HTMLElement
+    const row = view.container.querySelectorAll('[data-task-key]')[1] as HTMLElement
 
     await waitFor(() => {
       const rect = row.getBoundingClientRect()
@@ -1532,31 +1532,6 @@ describe('TasksScreen', () => {
 
     await view.findByRole('button', { name: 'Complete: project task' })
     expect(view.queryByRole('button', { name: 'Reopen: project task' })).toBeNull()
-    await view.unmount()
-  })
-
-  it('keeps the struck row when a refetch races the completion’s reindex', async () => {
-    const staleRow = task({
-      notePath: 'notes/p.md',
-      astPath: [5],
-      markdown: 'project task',
-      text: 'project task',
-      noteTitle: 'Project',
-      updatedAt: 100,
-    })
-    getOpenTasks.mockResolvedValue([staleRow])
-    const view = await renderScreen()
-
-    await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
-    await view.findByRole('button', { name: 'Reopen: project task' })
-
-    // An unrelated invalidation refetches before the completion's reindex lands:
-    // the index still returns the pre-completion row (same updatedAt). The row
-    // must stay struck rather than flicker back to open.
-    await core.tasks.refresh()
-
-    await view.findByRole('button', { name: 'Reopen: project task' })
-    expect(view.queryByRole('button', { name: 'Complete: project task' })).toBeNull()
     await view.unmount()
   })
 

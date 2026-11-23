@@ -27,11 +27,9 @@ import {
   toggleSnippetTask,
   type SnippetTaskClick,
 } from './snippet-task-toggle.ts'
-import { withChecked, withRelocatedTasks, type TaskMoves } from './task-cache.ts'
 import { NoteEditError } from './task-errors.ts'
-import { getTaskKey } from './task-identity.ts'
 import { createInsertedTaskRow, type InsertTaskTarget } from './task-insert-target.ts'
-import { applyTaskOp, type TaskItemOp, type TaskOp } from './task-ops.ts'
+import type { TaskItemOp, TaskOp } from './task-ops.ts'
 import { createTaskReader, type TaskReader } from './task-reader.ts'
 import { getScheduledMarkdown } from './task-schedule-content.ts'
 import { TaskStore, type PendingWrite, type TaskCommit, type TaskStoreView } from './task-store.ts'
@@ -65,20 +63,11 @@ export interface TaskListState {
    * {@link TaskService.includeCompleted} holds the list.
    */
   readonly completed: readonly OpenTask[] | undefined
-}
-
-/**
- * The session's recently-completed tasks and the graph they belong to.
- */
-export interface RecentlyCompleted {
   /**
-   * The graph root of {@link RecentlyCompleted.tasks}.
+   * The tasks completed in this run of the app that still show, struck, in
+   * the active list. Each is checked.
    */
-  readonly root: string | null
-  /**
-   * The struck rows, each checked.
-   */
-  readonly tasks: readonly OpenTask[]
+  readonly struck: readonly OpenTask[]
 }
 
 /**
@@ -136,20 +125,17 @@ export type TaskAction =
 
 /**
  * Reads, edits and adds round-checkbox tasks across notes (Plan 18), plus the
- * session's "recently completed" set.
+ * struck set.
  *
- * The recently-completed set is V1's middle state where a checked task keeps
- * showing (struck) in the list until you archive it. It's deliberately a
- * **view-only, ephemeral** set, not durable state: a checked task is already
- * `[x]` on disk, and "archived" only means "stop showing it in the active
- * list", which the markdown can't (and shouldn't) encode. So it resets on app
- * restart; it survives navigating away from Tasks and back (it lives on the
- * service, above any one screen mount). Tracking the session's completions —
- * rather than every `[x]` task — is what keeps a fresh launch clean: only what
- * you checked *this run* lingers struck; the whole historical pile stays
- * behind the "show archived" filter. It is scoped to a graph root: switching
- * graphs (whose task paths differ) yields an empty set rather than the
- * previous graph's rows.
+ * The struck set is V1's middle state where a checked task keeps showing
+ * (struck) in the list until you archive it. It is view state, not durable
+ * state: a checked task is already `[x]` on disk, and "archived" only means
+ * "stop showing it in the active list", which the markdown does not encode.
+ * It holds the ids of the tasks this service completed, so it resets on app
+ * restart and on a graph switch, and it survives navigating away from Tasks
+ * and back. A fresh launch is clean: only what you checked in this run
+ * lingers struck, and the whole historical pile stays behind the "show
+ * archived" filter.
  */
 export interface TaskService extends Store<TaskListState> {
   /**
@@ -204,23 +190,21 @@ export interface TaskService extends Store<TaskListState> {
   insertTask(notePath: string): Promise<InsertedTask>
   /**
    * Check `tasks` one write at a time. The rows leave the open list, join the
-   * completed list as checked, and stay in the recently-completed set before
-   * the first write. A failure leaves the rows of the writes that landed,
-   * puts the other rows back, drops `tasks` from the recently-completed set,
-   * and rethrows.
+   * completed list as checked, and show struck before the first write. A
+   * failure leaves the rows of the writes that landed, puts the other rows
+   * back, and rethrows.
    */
   completeTasks(tasks: readonly OpenTask[]): Promise<void>
   /**
    * Uncheck `tasks` one write at a time. The rows return to the open list and
-   * leave the completed list and the recently-completed set before the first
-   * write. A failure puts back the rows whose write did not land and rethrows.
+   * leave the completed list before the first write. A failure puts back the
+   * rows whose write did not land and rethrows.
    */
   reopenTasks(tasks: readonly OpenTask[]): Promise<void>
   /**
-   * Remove `tasks` from their notes one write at a time. The rows leave both
-   * lists and the recently-completed set before the first write. A failure
-   * puts back the rows whose write did not land, keeps the checked ones
-   * struck again, and rethrows.
+   * Remove `tasks` from their notes one write at a time. The rows leave the
+   * lists before the first write. A failure puts back the rows whose write
+   * did not land and rethrows.
    */
   deleteTasks(tasks: readonly OpenTask[]): Promise<void>
   /**
@@ -241,16 +225,15 @@ export interface TaskService extends Store<TaskListState> {
   convertTasks(tasks: readonly OpenTask[]): Promise<void>
   /**
    * Replace one task's Markdown and turn it into a plain bullet in one write.
-   * The row leaves both lists and the recently-completed set before the
-   * write; a failure puts the row back, keeps a checked task struck again,
+   * The row leaves the lists before the write; a failure puts the row back
    * and rethrows.
    */
   editAndConvertTask(task: OpenTask, content: string): Promise<void>
   /**
    * Toggle one task's checkbox, first replacing its Markdown unless `content`
-   * is `null`, in one write. The row moves between the lists and the
-   * recently-completed set before the write; a failure puts the row and the
-   * set back, and rethrows.
+   * is `null`, in one write. The row moves between the lists before the
+   * write, and a completed row shows struck; a failure puts the row back and
+   * rethrows.
    */
   editAndToggleTask(task: OpenTask, content: string | null): Promise<void>
   /**
@@ -284,77 +267,9 @@ export interface TaskService extends Store<TaskListState> {
     task: { locator: TaskLocator; checked: boolean },
   ): Promise<void>
   /**
-   * Keep `completed` showing struck (checked) in the active list until archived.
-   * Stored as a fresh checked copy, deduped by {@link getTaskKey}. `checked` is
-   * set to match disk: these rows outlive the reindex, and the write-back guards
-   * on it, so a stale `false` would later fail a reopen/edit/delete.
+   * Archive: stop showing the struck tasks in the active list (they stay `[x]` on disk).
    */
-  markRecentlyCompleted(root: string | null, completed: readonly OpenTask[]): void
-  /**
-   * Drop these keys — a completion rolled back, or the task was deleted.
-   */
-  forgetRecentlyCompleted(root: string | null, keys: readonly string[]): void
-  /**
-   * Whether a task is currently being kept visible by the session's struck set.
-   */
-  hasRecentlyCompleted(root: string | null, key: string): boolean
-  /**
-   * Apply a note write's task moves to the session's struck rows. Unlike the
-   * query caches, this set is not rebuilt by an open-task refetch, so moved
-   * completed rows must be re-keyed explicitly.
-   */
-  relocateRecentlyCompleted(root: string | null, notePath: string, edit: TaskMoves): void
-  /**
-   * Reconcile the struck set against a fresh open-tasks read, dropping every
-   * struck copy whose task was reopened at its source note ({@link
-   * withoutReopenedTasks}) — so `hasRecentlyCompleted` and the Archive count
-   * agree with what the surfaces render.
-   */
-  reconcileRecentlyCompleted(root: string | null, open: readonly OpenTask[]): void
-  /**
-   * Archive: stop showing the session's completed tasks (they stay `[x]` on disk).
-   */
-  archiveRecentlyCompleted(root: string | null): void
-  /**
-   * The session's struck rows and the graph they belong to.
-   */
-  readonly recentlyCompleted: Store<RecentlyCompleted>
-}
-
-/**
- * The struck rows not superseded by a live open row — the pure core of the
- * reconciliation, shared by the store prune
- * ({@link TaskService.reconcileRecentlyCompleted}) and the render-time view.
- * A struck task that {@link isReopenedAfter} an open row of the same key was
- * reopened at the source note, so the struck copy is dropped and the live
- * open row shows instead of a stale `[x]` shadow (whose reopen write-back
- * would fail: the `[x]` line is no longer in the note). Returns the input
- * array itself when nothing is dropped, so callers can compare by reference.
- */
-export function withoutReopenedTasks(
-  struck: readonly OpenTask[],
-  open: readonly OpenTask[],
-): readonly OpenTask[] {
-  if (struck.length === 0 || open.length === 0) {
-    return struck
-  }
-  const liveByKey = new Map(open.map((row) => [getTaskKey(row), row]))
-  const next = struck.filter((task) => {
-    const live = liveByKey.get(getTaskKey(task))
-    return live === undefined || !isReopenedAfter(task, live)
-  })
-  return next.length === struck.length ? struck : next
-}
-
-/**
- * Whether the open row `live` comes from a note state after the one `struck`
- * was completed in. A provisional test on `updatedAt`, the only field of a row
- * that changes with the note: a larger value means the note was rewritten and
- * reindexed since the completion, and an equal or smaller one is an index read
- * from before the completion landed.
- */
-function isReopenedAfter(struck: OpenTask, live: OpenTask): boolean {
-  return live.updatedAt > struck.updatedAt
+  archiveRecentlyCompleted(): void
 }
 
 /**
@@ -397,8 +312,6 @@ function toOps(taskId: string, actions: readonly TaskAction[]): TaskItemOp[] {
   return actions.map((action) => ({ ...action, taskId }))
 }
 
-const EMPTY: readonly OpenTask[] = []
-
 /**
  * Spacing between index-change re-reads while the index applies batch after batch.
  */
@@ -408,12 +321,8 @@ function sessionKey(session: GraphSession | null): string | null {
   return session === null ? null : `${session.generation}:${session.root}`
 }
 
-function keysOf(tasks: readonly OpenTask[]): string[] {
-  return tasks.map(getTaskKey)
-}
-
 function toState(view: TaskStoreView): TaskListState {
-  return { open: view.open, completed: view.completed }
+  return { open: view.open, completed: view.completed, struck: view.struck }
 }
 
 /**
@@ -428,11 +337,6 @@ interface BatchWrite {
 class TaskServiceImpl implements TaskService {
   readonly #deps: TaskServiceDeps
   readonly #reader: TaskReader
-  readonly #recentlyCompleted = new WritableStore<RecentlyCompleted>(
-    { root: null, tasks: EMPTY },
-    isShallowEqual,
-  )
-  readonly recentlyCompleted: Store<RecentlyCompleted> = this.#recentlyCompleted
   #nextTaskId = 0
   #store = this.#createStore()
   readonly #state = new WritableStore<TaskListState>(toState(this.#store.view()), isShallowEqual)
@@ -555,24 +459,16 @@ class TaskServiceImpl implements TaskService {
 
   async completeTasks(tasks: readonly OpenTask[]): Promise<void> {
     const session = this.#begin()
-    const { root } = session
-    this.markRecentlyCompleted(root, tasks)
-    try {
-      await this.#writeEach(session, tasks, () => [{ kind: 'toggle' }])
-    } catch (cause) {
-      this.forgetRecentlyCompleted(root, keysOf(tasks))
-      throw cause
-    }
-  }
-
-  async reopenTasks(tasks: readonly OpenTask[]): Promise<void> {
-    const session = this.#begin()
-    this.forgetRecentlyCompleted(session.root, keysOf(tasks))
+    this.#store.strike(tasks.map((task) => task.taskId))
     await this.#writeEach(session, tasks, () => [{ kind: 'toggle' }])
   }
 
+  async reopenTasks(tasks: readonly OpenTask[]): Promise<void> {
+    await this.#writeEach(this.#begin(), tasks, () => [{ kind: 'toggle' }])
+  }
+
   async deleteTasks(tasks: readonly OpenTask[]): Promise<void> {
-    await this.#removeEach(tasks, 'remove')
+    await this.#writeEach(this.#begin(), tasks, () => [{ kind: 'remove' }])
   }
 
   async editTask(task: OpenTask, content: string): Promise<void> {
@@ -586,61 +482,37 @@ class TaskServiceImpl implements TaskService {
   }
 
   async convertTasks(tasks: readonly OpenTask[]): Promise<void> {
-    await this.#removeEach(tasks, 'toBullet')
+    await this.#writeEach(this.#begin(), tasks, () => [{ kind: 'toBullet' }])
   }
 
   async editAndConvertTask(task: OpenTask, content: string): Promise<void> {
-    const session = this.#begin()
-    const { root } = session
-    this.forgetRecentlyCompleted(root, [getTaskKey(task)])
-    try {
-      await this.#writeEach(session, [task], () => [
-        { kind: 'setMarkdown', markdown: content },
-        { kind: 'toBullet' },
-      ])
-    } catch (cause) {
-      if (task.checked) {
-        this.markRecentlyCompleted(root, [task])
-      }
-      throw cause
-    }
+    await this.#writeEach(this.#begin(), [task], () => [
+      { kind: 'setMarkdown', markdown: content },
+      { kind: 'toBullet' },
+    ])
   }
 
   async editAndToggleTask(task: OpenTask, content: string | null): Promise<void> {
     const session = this.#begin()
-    const { root } = session
-    const wasRecentlyCompleted = this.hasRecentlyCompleted(root, getTaskKey(task))
-    const actions: TaskAction[] =
-      content === null
+    if (!task.checked) {
+      this.#store.strike([task.taskId])
+    }
+    await this.#writeEach(session, [task], () => {
+      return content === null
         ? [{ kind: 'toggle' }]
         : [{ kind: 'setMarkdown', markdown: content }, { kind: 'toggle' }]
-    if (task.checked) {
-      this.forgetRecentlyCompleted(root, [getTaskKey(task)])
-    } else {
-      // The struck row shows the edited text.
-      this.markRecentlyCompleted(root, toOps(task.taskId, actions).reduce(applyTaskOp, [task]))
-    }
-    try {
-      await this.#writeEach(session, [task], () => actions)
-    } catch (cause) {
-      if (task.checked && wasRecentlyCompleted) {
-        this.markRecentlyCompleted(root, [task])
-      } else if (!task.checked) {
-        this.forgetRecentlyCompleted(root, [getTaskKey(task)])
-      }
-      throw cause
-    }
+    })
   }
 
   async addTask(target: InsertTaskTarget): Promise<OpenTask> {
-    const session = this.#begin()
+    this.#begin()
     const store = this.#store
     const result = await this.insertTask(target.notePath)
-    return this.#landInserted(session, store, target, null, [], result)
+    return this.#landInserted(store, target, null, [], result)
   }
 
   async addTaskAfter(task: OpenTask, content: string | null): Promise<OpenTask> {
-    const session = this.#begin()
+    this.#begin()
     const store = this.#store
     // The anchor resolves in the same write: a cleared row leaves, an edited one shows its text.
     const ops: TaskItemOp[] =
@@ -660,7 +532,7 @@ class TaskServiceImpl implements TaskService {
       throw cause
     }
     store.drop(pending)
-    return this.#landInserted(session, store, task, task.taskId, ops, result)
+    return this.#landInserted(store, task, task.taskId, ops, result)
   }
 
   resolveSnippetTask(tasks: readonly SnippetTask[], click: SnippetTaskClick): SnippetTask | null {
@@ -685,60 +557,9 @@ class TaskServiceImpl implements TaskService {
     )
   }
 
-  markRecentlyCompleted(root: string | null, completed: readonly OpenTask[]): void {
-    if (completed.length === 0) {
-      return
-    }
-    // Another graph's set is discarded.
-    const current = this.#recentlyCompleted.get()
-    const struck = root === current.root ? current.tasks : EMPTY
-    const byKey = new Map(struck.map((task) => [getTaskKey(task), task]))
-    for (const task of completed) {
-      byKey.set(getTaskKey(task), withChecked(task, true))
-    }
-    this.#recentlyCompleted.set({ root, tasks: [...byKey.values()] })
-  }
-
-  forgetRecentlyCompleted(root: string | null, keys: readonly string[]): void {
-    const current = this.#recentlyCompleted.get()
-    if (root !== current.root || keys.length === 0) {
-      return
-    }
-    const drop = new Set(keys)
-    const next = current.tasks.filter((task) => !drop.has(getTaskKey(task)))
-    if (next.length !== current.tasks.length) {
-      this.#recentlyCompleted.set({ root, tasks: next })
-    }
-  }
-
-  hasRecentlyCompleted(root: string | null, key: string): boolean {
-    const current = this.#recentlyCompleted.get()
-    return root === current.root && current.tasks.some((task) => getTaskKey(task) === key)
-  }
-
-  relocateRecentlyCompleted(root: string | null, notePath: string, edit: TaskMoves): void {
-    const current = this.#recentlyCompleted.get()
-    if (root !== current.root || edit.moved.length === 0) {
-      return
-    }
-    const next = withRelocatedTasks(current.tasks, notePath, edit) ?? []
-    this.#recentlyCompleted.set({ root, tasks: next })
-  }
-
-  reconcileRecentlyCompleted(root: string | null, open: readonly OpenTask[]): void {
-    const current = this.#recentlyCompleted.get()
-    if (root !== current.root) {
-      return
-    }
-    this.#recentlyCompleted.set({ root, tasks: withoutReopenedTasks(current.tasks, open) })
-  }
-
-  archiveRecentlyCompleted(root: string | null): void {
-    const current = this.#recentlyCompleted.get()
-    if (root !== current.root || current.tasks.length > 0) {
-      // Also switches the active graph, discarding any other graph's set.
-      this.#recentlyCompleted.set({ root, tasks: EMPTY })
-    }
+  archiveRecentlyCompleted(): void {
+    this.#store.archive()
+    this.#publish()
   }
 
   #createStore(): TaskStore {
@@ -920,7 +741,6 @@ class TaskServiceImpl implements TaskService {
         }
         const result = await this.writeTask(this.#refOf(store, task), actions)
         store.landCommit(toCommit(task.notePath, result), pending)
-        this.relocateRecentlyCompleted(session.root, task.notePath, result)
       } catch (cause) {
         for (const write of writes.slice(i)) {
           store.drop(write.pending)
@@ -933,31 +753,11 @@ class TaskServiceImpl implements TaskService {
   }
 
   /**
-   * Delete or convert `tasks`: the rows leave both lists outright.
-   */
-  async #removeEach(tasks: readonly OpenTask[], kind: 'remove' | 'toBullet'): Promise<void> {
-    const session = this.#begin()
-    const { root } = session
-    this.forgetRecentlyCompleted(root, keysOf(tasks))
-    try {
-      await this.#writeEach(session, tasks, () => [{ kind }])
-    } catch (cause) {
-      // A checked task is still `[x]` on disk: keep it struck, or it would vanish from the list.
-      this.markRecentlyCompleted(
-        root,
-        tasks.filter((task) => task.checked),
-      )
-      throw cause
-    }
-  }
-
-  /**
    * Put the tasks an insert left into `store`, with a new id for the
    * inserted task, and return that task's row. `after` and `ops` are the
    * anchor of the insert and the changes the same write made to it.
    */
   #landInserted(
-    session: GraphSession,
     store: TaskStore,
     target: InsertTaskTarget,
     after: string | null,
@@ -975,7 +775,6 @@ class TaskServiceImpl implements TaskService {
       updatedAt: result.updatedAt,
     }
     store.landCommit(toCommit(notePath, result), store.push(notePath, [insert, ...ops]))
-    this.relocateRecentlyCompleted(session.root, notePath, result)
     this.#publish()
     return (
       store.find(notePath, taskId) ??

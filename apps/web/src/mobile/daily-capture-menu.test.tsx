@@ -225,6 +225,9 @@ describe('DailyCaptureMenu', () => {
   })
 
   it('edits the live row when a reindex rewrites the task while its sheet is open', async () => {
+    const today = { notePath: TODAY, dailyDate: '2026-06-14', astPath: [0] }
+    // The index holds the new task by the time the sheet reads the rows.
+    getOpenTasks.mockResolvedValue([makeOpenTask({ ...today, markdown: '' })])
     const view = await renderMenu()
     // The Daily screen leaves the graph's task rows alone until a sheet needs them.
     core.indexLifecycle.emitApplied(null, 1)
@@ -236,12 +239,7 @@ describe('DailyCaptureMenu', () => {
     // Another device rewrites the task in place; the reindex re-reads the rows.
     const readsBefore = getOpenTasks.mock.calls.length
     getOpenTasks.mockResolvedValue([
-      makeOpenTask({
-        notePath: 'daily/2026-06-14.md',
-        dailyDate: '2026-06-14',
-        astPath: [0],
-        markdown: 'synced from another device',
-      }),
+      makeOpenTask({ ...today, revision: 'synced', markdown: 'synced from another device' }),
     ])
     core.indexLifecycle.emitApplied(null, 1)
     await vi.waitFor(() => expect(getOpenTasks).toHaveBeenCalledTimes(readsBefore + 1))

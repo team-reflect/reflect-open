@@ -87,6 +87,10 @@ export interface TaskStoreView {
    * the store does not hold the checked tasks of every note.
    */
   readonly completed: readonly OpenTask[] | undefined
+  /**
+   * The checked tasks that stay in the active list: the struck tasks.
+   */
+  readonly struck: readonly OpenTask[]
 }
 
 type NoteContext = Pick<
@@ -121,6 +125,8 @@ function hasSameContext(row: OpenTask | undefined, context: NoteContext): boolea
   )
 }
 
+const NO_TASKS: readonly OpenTask[] = []
+
 function compareByRecency(left: OpenTask, right: OpenTask): number {
   return right.updatedAt - left.updatedAt
 }
@@ -130,6 +136,7 @@ function compareByRecency(left: OpenTask, right: OpenTask): number {
  * the last read or write of that note left them, with the index seq it was
  * learned at. The view is the base with the ops of every write in flight
  * applied. A task keeps its id while reads and writes replace its note.
+ * The struck set is view state: it names tasks by id and holds no row.
  */
 export class TaskStore {
   /**
@@ -142,6 +149,10 @@ export class TaskStore {
    */
   readonly #seqs = new Map<string, number>()
   #pending: PendingWrite[] = []
+  /**
+   * The ids of the tasks that stay in the active list while they are checked.
+   */
+  #struck = new Set<string>()
   #loaded = false
   #completedLoaded = false
   #view: TaskStoreView | null = null
@@ -255,6 +266,24 @@ export class TaskStore {
   }
 
   /**
+   * Keep the tasks of `taskIds` in the active list while they are checked.
+   */
+  strike(taskIds: readonly string[]): void {
+    for (const taskId of taskIds) {
+      this.#struck.add(taskId)
+    }
+    this.#view = null
+  }
+
+  /**
+   * Archive: no checked task stays in the active list.
+   */
+  archive(): void {
+    this.#struck = new Set()
+    this.#view = null
+  }
+
+  /**
    * Forget the index seqs, for an index that counts from zero again.
    */
   forgetSeqs(): void {
@@ -346,11 +375,13 @@ export class TaskStore {
       byNote.set(notePath, ops.reduce(applyTaskOp, byNote.get(notePath) ?? []))
     }
     const rows = [...byNote.keys()].toSorted().flatMap((path) => byNote.get(path) ?? [])
+    const struck = rows.filter((row) => row.checked && this.#struck.has(row.taskId))
     return {
       open: this.#loaded ? rows.filter((row) => !row.checked) : undefined,
       completed: this.#completedLoaded
         ? rows.filter((row) => row.checked).toSorted(compareByRecency)
         : undefined,
+      struck: struck.length === 0 ? NO_TASKS : struck,
     }
   }
 }
