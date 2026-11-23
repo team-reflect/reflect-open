@@ -5,6 +5,7 @@ import { createTestNoteFileService, type TestNoteFileServiceOptions } from '../t
 import { NoteBusyError } from '../tasks/task-errors.ts'
 import { createNoteDocumentService } from './note-document-service.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
+import { sha256HexSync } from '../testing/sha256.ts'
 import { createOpenDocumentsService } from './open-documents-service.ts'
 
 function setup(options?: {
@@ -123,7 +124,14 @@ describe('commitSourceEdit', () => {
       files: { 'notes/a.md': 'disk\n' },
       session: { content: 'live\n' },
     })
-    await noteDocuments.commitSourceEdit('notes/a.md', shout, { generation: 7 })
+    await expect(
+      noteDocuments.commitSourceEdit('notes/a.md', shout, { generation: 7 }),
+    ).resolves.toEqual({
+      content: 'LIVE\n',
+      revision: sha256HexSync('LIVE\n'),
+      merged: false,
+      indexSeq: null,
+    })
     expect(session!.content()).toBe('LIVE\n')
     expect(noteFile.writes()).toEqual([])
   })
@@ -141,7 +149,14 @@ describe('commitSourceEdit', () => {
 
   it('reads, transforms and writes disk when no session is open', async () => {
     const { noteDocuments, noteFile } = setup({ files: { 'notes/a.md': 'disk\n' } })
-    await noteDocuments.commitSourceEdit('notes/a.md', shout, { generation: 7 })
+    await expect(
+      noteDocuments.commitSourceEdit('notes/a.md', shout, { generation: 7 }),
+    ).resolves.toEqual({
+      content: 'DISK\n',
+      revision: sha256HexSync('DISK\n'),
+      merged: false,
+      indexSeq: null,
+    })
     expect(noteFile.writes()).toEqual([{ path: 'notes/a.md', contents: 'DISK\n', generation: 7 }])
   })
 

@@ -6,6 +6,7 @@ import { splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter.ts'
 import type { OpenDocumentsService } from './open-documents-service.ts'
 import { noop } from '@ocavue/utils'
+import { sha256Hex } from '@reflect/utils'
 
 /**
  * The single safe way to read and write a note from an in-app action (pin,
@@ -64,11 +65,33 @@ export interface NoteDocumentService {
     path: string,
     transform: (source: string) => string,
     options: CommitSourceEditOptions,
-  ): Promise<void>
+  ): Promise<NoteCommitResult>
   /**
    * {@link isOstensiblyEmptyNoteSource}.
    */
   isOstensiblyEmpty(source: string): boolean
+}
+
+/**
+ * What {@link NoteDocumentService.commitSourceEdit} left on disk.
+ */
+export interface NoteCommitResult {
+  /**
+   * The full note text on disk after the commit.
+   */
+  readonly content: string
+  /**
+   * Lowercase hex SHA-256 of `content`.
+   */
+  readonly revision: string
+  /**
+   * Whether `content` differs from the text `transform` returned.
+   */
+  readonly merged: boolean
+  /**
+   * The index commit that holds `content`, `null` when the index did not write it.
+   */
+  readonly indexSeq: number | null
 }
 
 export interface CommitSourceEditOptions {
@@ -161,25 +184,28 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
     path: string,
     transform: (source: string) => string,
     options: CommitSourceEditOptions,
-  ): Promise<void> {
+  ): Promise<NoteCommitResult> {
     const { openDocuments, noteFile } = this.#deps
     // Serialize per note: a concurrent change to the same note must not read the
     // pre-write source and clobber this one.
-    return this.#serializeByPath(path, async (): Promise<void> => {
+    return this.#serializeByPath(path, async (): Promise<NoteCommitResult> => {
       const owner = openDocuments.sessionFor(path)
       if (owner !== null) {
-        const applied = await owner.commitSourceEdit(transform)
-        if (!applied) {
+        const commit = await owner.commitSourceEdit(transform)
+        if (commit === null) {
           throw new NoteBusyError('This note can’t be updated right now — try again in a moment.')
         }
-        return
+        const revision = await sha256Hex(commit.content)
+        return { ...commit, revision, indexSeq: null }
       }
       const source = await this.#readForEdit(
         path,
         options.createIfMissing === true,
         options.generation,
       )
-      await noteFile.write(path, transform(source), options.generation)
+      const content = transform(source)
+      const { hash } = await noteFile.write(path, content, options.generation)
+      return { content, revision: hash, merged: false, indexSeq: null }
     })
   }
 
