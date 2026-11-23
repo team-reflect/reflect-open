@@ -6,7 +6,9 @@
     "experimentalTaskCommand": true,
   },
   // sccache reads its config and the GitHub Actions cache token from these.
-  "globalPassThroughEnv": ["CI", "GITHUB_ACTIONS", "SCCACHE_*", "ACTIONS_*"],
+  // cargo reads RUSTC_WRAPPER, and kache reads its store, daemon socket and
+  // settings from KACHE_*.
+  "globalPassThroughEnv": ["CI", "GITHUB_ACTIONS", "SCCACHE_*", "ACTIONS_*", "RUSTC_WRAPPER", "KACHE_*"],
   "cacheMaxAge": "7d",
   "cacheMaxSize": "4GB",
   "tasks": {
