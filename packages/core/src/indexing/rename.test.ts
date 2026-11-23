@@ -237,7 +237,7 @@ describe('rewriteLinksForTitleChange stable-target displays', () => {
     let writeCount = 0
     io.write = (path, content) => {
       writeCount += 1
-      write(path, content)
+      return write(path, content)
     }
 
     await rewriteLinksForTitleChange({
@@ -462,8 +462,7 @@ describe('rewriteLinksForTitleChange write failures', () => {
       if (path === 'notes/fail.md') {
         return Promise.reject(new Error('write failed'))
       }
-      write(path, content)
-      return Promise.resolve()
+      return write(path, content)
     }
     const result = await rewriteLinksForTitleChange({
       path: 'notes/target.md',
