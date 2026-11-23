@@ -33,8 +33,11 @@ jobs:
           - name: ios
             os: xcode-27
             command: pnpm build:ipa --build-number=1 --flavor=stable --no-sign
-          - name: windows
+          - name: windows-x64
             os: windows-2025
+            command: pnpm build:windows
+          - name: windows-arm64
+            os: windows-11-arm
             command: pnpm build:windows
           # Ubuntu 24.04 is the oldest release that can link the prebuilt ONNX
           # Runtime, which needs glibc 2.38 and the libstdc++ of GCC 14.
