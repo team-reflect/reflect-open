@@ -1,6 +1,6 @@
 import type { KeyboardEvent, MouseEvent, ReactElement } from 'react'
 import { Circle, CircleCheck } from 'lucide-react'
-import { getTaskKey, type OpenTask } from '@reflect/core'
+import { type OpenTask } from '@reflect/core'
 import { getIsComposing } from '@meowdown/core'
 import { cn } from '@/lib/utils.ts'
 import type { ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
@@ -94,7 +94,7 @@ export function TaskRow({
 
   return (
     <li
-      data-task-key={getTaskKey(task)}
+      data-task-key={task.taskId}
       onClick={selectFromRow}
       className={cn(
         'group/task flex min-h-10 items-start gap-3 border-b border-border bg-surface-canvas px-4 py-2 lg:px-12',

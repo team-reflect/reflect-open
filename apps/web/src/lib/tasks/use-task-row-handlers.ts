@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { getTaskKey, previousTaskKey, type OpenTask } from '@reflect/core'
+import { previousTaskKey, type OpenTask } from '@reflect/core'
 import type { TaskEditorHandlers } from '@/components/tasks/task-editor.tsx'
 import type { TaskSelection } from '@/lib/tasks/use-task-selection.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
@@ -40,7 +40,7 @@ export function useTaskRowHandlers({
   return useCallback(
     (task: OpenTask): TaskEditorHandlers => ({
       onContinue: () => {
-        selectExclusively(getTaskKey(commands.continueAfter(task)))
+        selectExclusively(commands.continueAfter(task).taskId)
       },
       onCancel: () => {
         selection.clear()

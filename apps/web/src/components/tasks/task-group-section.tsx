@@ -1,7 +1,6 @@
 import { Fragment, type ReactElement } from 'react'
 import { Plus } from 'lucide-react'
 import {
-  getTaskKey,
   groupTaskContexts,
   type InsertTaskTarget,
   type OpenTask,
@@ -96,13 +95,13 @@ export function TaskGroupSection({
           contexts.map((context) => {
             const firstTask = context.tasks[0]!
             return (
-              <Fragment key={getTaskKey(firstTask)}>
+              <Fragment key={firstTask.taskId}>
                 <TaskBreadcrumbs
                   breadcrumbs={context.visibleBreadcrumbs}
-                  onSelect={() => selection.select(context.tasks.map(getTaskKey))}
+                  onSelect={() => selection.select(context.tasks.map((task) => task.taskId))}
                 />
                 {context.tasks.map((task) => {
-                  const key = getTaskKey(task)
+                  const key = task.taskId
                   const selected = selection.isSelected(key)
                   return (
                     <TaskRow

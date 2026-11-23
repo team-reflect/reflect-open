@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { ArrowRight, Circle, CircleCheck, Trash2 } from 'lucide-react'
 import { getIsComposing } from '@meowdown/core'
 import { TaskText } from '@/components/tasks/task-text.tsx'
-import { getTaskKey, type OpenTask, formatShortDate, type WritableStore } from '@reflect/core'
+import { type OpenTask, formatShortDate, type WritableStore } from '@reflect/core'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
@@ -31,7 +31,7 @@ interface MobileTaskRowProps {
    */
   onEdit: (task: OpenTask) => void
   /**
-   * The list's one revealed row, keyed by `getTaskKey`.
+   * The list's one revealed row, keyed by `taskId`.
    */
   revealedRow: WritableStore<string | null>
   /**
@@ -65,7 +65,7 @@ export function MobileTaskRow({
 }: MobileTaskRowProps): ReactElement {
   const { haptics } = useMobileServices()
   const dateFormat = useDateFormat()
-  const key = getTaskKey(task)
+  const key = task.taskId
   const { revealed, reveal, close, beginInteraction } = useRevealedRow(revealedRow, key)
   const label = task.text || 'Empty task'
   const edit = (): void => onEdit(task)

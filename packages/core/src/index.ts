@@ -464,7 +464,6 @@ export {
 } from './indexing/index.ts'
 export { groupTaskContexts, type TaskContext, type TaskGroup } from './tasks/group-tasks.ts'
 export { type OpenTask } from './tasks/open-task.ts'
-export { getTaskKey, isSameTask } from './tasks/task-identity.ts'
 export { type InsertTaskTarget } from './tasks/task-insert-target.ts'
 export { previousTaskKey, todaysDailyTarget } from './tasks/task-navigation.ts'
 export { withDraftDueDate } from './tasks/task-schedule-content.ts'

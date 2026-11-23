@@ -1,11 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react'
-import {
-  getTaskKey,
-  previousTaskKey,
-  todaysDailyTarget,
-  type OpenTask,
-  type TaskCommands,
-} from '@reflect/core'
+import { previousTaskKey, todaysDailyTarget, type OpenTask, type TaskCommands } from '@reflect/core'
 import { getIsComposing, isModEvent } from '@meowdown/core'
 import type { TaskSelection } from '@/lib/tasks/use-task-selection.ts'
 import { noop } from '@ocavue/utils'
@@ -172,7 +166,7 @@ export function useTaskKeyboard({
           active === undefined
             ? commands.add(todaysDailyTarget(today))
             : commands.continueAfter(active)
-        selectExclusively(getTaskKey(created))
+        selectExclusively(created.taskId)
       } else if (mod && event.key === 'Backspace') {
         event.preventDefault()
         void commands.remove(selectedTasks())

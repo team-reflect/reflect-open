@@ -1,7 +1,6 @@
 import { Fragment, type ReactElement } from 'react'
 import { Plus } from 'lucide-react'
 import {
-  getTaskKey,
   groupTaskContexts,
   type InsertTaskTarget,
   type OpenTask,
@@ -115,11 +114,11 @@ export function MobileTaskGroup({
       </div>
       <ul className="flex flex-col">
         {contexts.map((context) => (
-          <Fragment key={getTaskKey(context.tasks[0]!)}>
+          <Fragment key={context.tasks[0]!.taskId}>
             <TaskBreadcrumbs breadcrumbs={context.visibleBreadcrumbs} className="px-4 pb-1 pt-3" />
             {context.tasks.map((task) => (
               <MobileTaskRow
-                key={getTaskKey(task)}
+                key={task.taskId}
                 task={task}
                 showSource={showSource}
                 onEdit={onEdit}

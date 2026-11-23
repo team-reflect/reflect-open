@@ -2,7 +2,6 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactEleme
 import { CircleCheck } from 'lucide-react'
 import {
   composeVisibleTaskGroups,
-  getTaskKey,
   todaysDailyTarget,
   WritableStore,
   type InsertTaskTarget,
@@ -60,7 +59,7 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
   const { filters, toggle } = useTaskFilters()
   const searchInputRef = useRef<Focusable>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  // The one row whose swipe actions are showing (its getTaskKey), across all groups.
+  // The one row whose swipe actions are showing (its `taskId`), across all groups.
   const [revealedRow] = useState(() => new WritableStore<string | null>(null))
   // The sheet's task sticks around after close so the exit animation has
   // content; `sheetOpen` alone drives visibility.
@@ -112,10 +111,8 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
     if (editingTask === null) {
       return null
     }
-    const key = getTaskKey(editingTask)
-    return (
-      groups.flatMap((group) => group.tasks).find((row) => getTaskKey(row) === key) ?? editingTask
-    )
+    const key = editingTask.taskId
+    return groups.flatMap((group) => group.tasks).find((row) => row.taskId === key) ?? editingTask
   }, [groups, editingTask])
 
   const editTask = (task: OpenTask, options?: { autoFocus?: boolean; haptic?: boolean }): void => {
@@ -217,7 +214,7 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
       )}
       {liveEditingTask !== null ? (
         <MobileTaskEditSheet
-          key={getTaskKey(liveEditingTask)}
+          key={liveEditingTask.taskId}
           task={liveEditingTask}
           open={sheetOpen}
           onOpenChange={setSheetOpen}

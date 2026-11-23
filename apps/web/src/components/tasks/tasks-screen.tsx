@@ -10,8 +10,6 @@ import {
 import { Archive, CalendarClock, List, Search } from 'lucide-react'
 import {
   composeVisibleTaskGroups,
-  getTaskKey,
-  isSameTask,
   type InsertTaskTarget,
   type OpenTask,
   type TaskGroup,
@@ -104,9 +102,9 @@ export function TasksScreen(): ReactElement {
 
   // The flat, render-order list of tasks the selection and its shortcuts act on.
   const orderedTasks = useMemo(() => groups.flatMap((group) => group.tasks), [groups])
-  const orderedKeys = useMemo(() => orderedTasks.map(getTaskKey), [orderedTasks])
+  const orderedKeys = useMemo(() => orderedTasks.map((task) => task.taskId), [orderedTasks])
   const tasksByKey = useMemo(
-    () => new Map(orderedTasks.map((task) => [getTaskKey(task), task])),
+    () => new Map(orderedTasks.map((task) => [task.taskId, task])),
     [orderedTasks],
   )
   const selection = useTaskSelection(orderedKeys)
@@ -135,7 +133,7 @@ export function TasksScreen(): ReactElement {
   const onAdd = useCallback(
     (target: InsertTaskTarget) => {
       setQuery('')
-      const key = getTaskKey(commands.add(target))
+      const key = commands.add(target).taskId
       selection.clickSelect(key, { metaKey: false, ctrlKey: false, shiftKey: false })
       scrollToKey(key)
     },
@@ -153,7 +151,7 @@ export function TasksScreen(): ReactElement {
   const onCheckboxToggle = useCallback(
     (task: OpenTask) => {
       void commands.toggle([task])
-      if (selection.isSoleSelected(getTaskKey(task))) {
+      if (selection.isSoleSelected(task.taskId)) {
         selection.clear()
       }
     },
@@ -162,7 +160,7 @@ export function TasksScreen(): ReactElement {
   const onSelectionCheckboxToggle = useCallback(
     (task: OpenTask) => {
       const tasks = selectedTasks()
-      if (tasks.length <= 1 || !tasks.some((selectedTask) => isSameTask(selectedTask, task))) {
+      if (tasks.length <= 1 || !tasks.some((selectedTask) => selectedTask.taskId === task.taskId)) {
         onCheckboxToggle(task)
         return
       }

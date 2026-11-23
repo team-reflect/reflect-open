@@ -2,7 +2,7 @@ import { returnFalse, returnNull } from '@ocavue/utils'
 import { act } from '@/test-utils/act.ts'
 import { cleanup, renderHook } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getTaskKey, type OpenTask, type TaskCommands } from '@reflect/core'
+import { type OpenTask, type TaskCommands } from '@reflect/core'
 import { makeOpenTask as task } from '@reflect/core/testing'
 import { MOD_KEY } from '@/test-utils/mod-key.ts'
 import type { TaskSelection } from './use-task-selection.ts'
@@ -233,7 +233,7 @@ describe('useTaskKeyboard', () => {
     await press(root, 'Backspace')
     expect(commands.remove).toHaveBeenCalledWith([empty])
     // Lands on the previous row so the keyboard flow continues.
-    expect(selection.clickSelect).toHaveBeenCalledWith(getTaskKey(a), {
+    expect(selection.clickSelect).toHaveBeenCalledWith(a.taskId, {
       metaKey: false,
       ctrlKey: false,
       shiftKey: false,
@@ -335,7 +335,7 @@ describe('useTaskKeyboard', () => {
       pinnedOrder: null,
     })
     expect(setQuery).toHaveBeenCalledWith('')
-    expect(selection.clickSelect).toHaveBeenCalledWith(getTaskKey(NEW_ROW), {
+    expect(selection.clickSelect).toHaveBeenCalledWith(NEW_ROW.taskId, {
       metaKey: false,
       ctrlKey: false,
       shiftKey: false,

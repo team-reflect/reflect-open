@@ -1,6 +1,5 @@
 import { dailyPath } from '../graph/paths.ts'
 import type { OpenTask } from './open-task.ts'
-import { getTaskKey, isSameTask } from './task-identity.ts'
 import type { InsertTaskTarget } from './task-insert-target.ts'
 
 /**
@@ -29,10 +28,10 @@ export function todaysDailyTarget(today: string): InsertTaskTarget {
  * the new first). `null` when it was the only row, so the caller clears.
  */
 export function previousTaskKey(ordered: readonly OpenTask[], task: OpenTask): string | null {
-  const index = ordered.findIndex((row) => isSameTask(row, task))
+  const index = ordered.findIndex((row) => row.taskId === task.taskId)
   if (index === -1) {
     return null
   }
   const previous = ordered[index === 0 ? 1 : index - 1]
-  return previous ? getTaskKey(previous) : null
+  return previous?.taskId ?? null
 }

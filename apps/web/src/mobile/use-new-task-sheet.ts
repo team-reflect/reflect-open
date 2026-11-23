@@ -1,5 +1,5 @@
 import { useCallback, useState, useSyncExternalStore } from 'react'
-import { isSameTask, todaysDailyTarget, type OpenTask, type Unlisten } from '@reflect/core'
+import { todaysDailyTarget, type OpenTask, type Unlisten } from '@reflect/core'
 import { useToday } from '@/lib/use-today.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { noop } from '@ocavue/utils'
@@ -50,7 +50,8 @@ export function useNewTaskSheet(): NewTaskSheet {
   // The sheet edits the task's live row, like the Tasks tab: another change of
   // the note can rewrite the row while the sheet is up. Fall back to the
   // created row when the rows no longer hold the task.
-  const task = created === null ? null : (rows?.find((row) => isSameTask(row, created)) ?? created)
+  const task =
+    created === null ? null : (rows?.find((row) => row.taskId === created.taskId) ?? created)
 
   const start = (): void => {
     setCreated(taskService.commands.add(todaysDailyTarget(today)))
