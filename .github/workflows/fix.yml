@@ -45,6 +45,11 @@ jobs:
       - name: Set up Rust
         if: steps.changes.outputs.rust == 'true' || steps.changes.outputs.licenses == 'true'
         uses: ./.github/actions/setup-rust
+        with:
+          s3-endpoint: ${{ secrets.S3_SCCACHE_ENDPOINT }}
+          s3-bucket: ${{ secrets.S3_SCCACHE_BUCKET }}
+          s3-access-key-id: ${{ secrets.S3_SCCACHE_ACCESS_KEY_ID }}
+          s3-secret-access-key: ${{ secrets.S3_SCCACHE_SECRET_ACCESS_KEY }}
 
       - name: Generate WXT types
         run: pnpm gen:wxt

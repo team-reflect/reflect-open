@@ -12,6 +12,14 @@ on:
         required: true
         type: string
     secrets:
+      S3_SCCACHE_ENDPOINT:
+        required: false
+      S3_SCCACHE_BUCKET:
+        required: false
+      S3_SCCACHE_ACCESS_KEY_ID:
+        required: false
+      S3_SCCACHE_SECRET_ACCESS_KEY:
+        required: false
       TAURI_SIGNING_PRIVATE_KEY:
         required: false
 
@@ -58,6 +66,12 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-links: 'false'
+          s3-endpoint: ${{ secrets.S3_SCCACHE_ENDPOINT }}
+          s3-bucket: ${{ secrets.S3_SCCACHE_BUCKET }}
+          s3-access-key-id: ${{ secrets.S3_SCCACHE_ACCESS_KEY_ID }}
+          s3-secret-access-key: ${{ secrets.S3_SCCACHE_SECRET_ACCESS_KEY }}
 
       - name: Build Linux packages
         env:
