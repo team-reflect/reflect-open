@@ -368,11 +368,9 @@ describe('createIndexWriter', () => {
     const { writer, dirty, clock, store, reports } = setup({
       files: { 'notes/a.md': '# a' },
       failStore: (call) => {
-        if (call.method !== 'applyBatch' || failures === 0) {
-          return undefined
-        }
-        failures -= 1
-        return new AppError('io', 'busy')
+        const failed = call.method === 'applyBatch' && failures > 0
+        failures -= failed ? 1 : 0
+        return failed ? new AppError('io', 'busy') : undefined
       },
     })
 
