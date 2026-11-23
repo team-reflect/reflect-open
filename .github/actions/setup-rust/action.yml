@@ -38,6 +38,7 @@ runs:
       shell: bash
       run: |
         echo "CARGO_PROFILE_DEV_DEBUG=false" >> "$GITHUB_ENV"
+        echo "MBX_SUMMARY=full" >> "$GITHUB_ENV"
 
     - name: Configure cache compression
       shell: bash
