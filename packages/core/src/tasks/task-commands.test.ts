@@ -136,6 +136,15 @@ describe('a task that changed under a command', () => {
     expect(harness.progress.get()).toEqual([])
   })
 
+  it('completes two identical tasks while the index is behind the file', async () => {
+    const rows = await start({ [A]: '+ [ ] same\n+ [ ] same\n' })
+    harness.editExternally(A, 'intro\n\n+ [ ] same\n+ [ ] same\n')
+
+    await commands.complete(rows)
+
+    expect(file(A)).toBe('intro\n\n+ [x] same\n+ [x] same\n')
+  })
+
   it('keeps the typed text in the row while the index is behind the file', async () => {
     const rows = await start({ [A]: '+ [ ] one\n' })
     harness.editExternally(A, '+ [ ] one changed\n')
