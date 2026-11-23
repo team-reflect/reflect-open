@@ -46,6 +46,10 @@ export interface TaskReader {
    */
   readPaths(paths: readonly string[], signal: AbortSignal): Promise<TaskRead | null>
   /**
+   * Read every task of the notes at `paths` in one try. A failed read rejects.
+   */
+  readPathsOnce(paths: readonly string[]): Promise<TaskRead>
+  /**
    * Listen for committed note rows, from any window.
    */
   subscribe(listener: (commit: IndexCommitted) => void): Unlisten
@@ -64,6 +68,10 @@ class TaskReaderImpl implements TaskReader {
 
   readPaths(paths: readonly string[], signal: AbortSignal): Promise<TaskRead | null> {
     return this.#read(null, paths, signal)
+  }
+
+  readPathsOnce(paths: readonly string[]): Promise<TaskRead> {
+    return this.#deps.database.read('index_tasks', { checked: null, paths })
   }
 
   subscribe(listener: (commit: IndexCommitted) => void): Unlisten {

@@ -151,6 +151,21 @@ describe('a task that changed under a command', () => {
     expect(file(A)).toBe('+ [ ] one more\n')
   })
 
+  it('ends the write with the typed text in the row when the index cannot be read', async () => {
+    const rows = await start({ [A]: '+ [ ] one\n' })
+    harness.editExternally(A, '+ [ ] one changed\n')
+    harness.holdReads()
+
+    commands.setDraft(rows[0]!, 'one more')
+    const committing = commands.commit(rows[0]!)
+    await harness.failRead(new Error('database is locked'))
+    await committing
+
+    expect(file(A)).toBe('+ [ ] one changed\n')
+    expect(shown()).toEqual([[rows[0]!.taskId, 'one more']])
+    expect(harness.progress.get()).toEqual([])
+  })
+
   it('writes nothing and shows no failure when the task left the note', async () => {
     const rows = await start({ [A]: '+ [ ] one\n' })
     await changeBehindRows('gone\n')

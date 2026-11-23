@@ -73,7 +73,8 @@ export interface TaskCommandsDeps {
    */
   readonly publish: () => void
   /**
-   * Read the tasks of the note at `notePath` from the index into `store`.
+   * Read the tasks of the note at `notePath` from the index into `store`, in
+   * one try. A failed read rejects.
    */
   readonly reread: (store: TaskStore, notePath: string) => Promise<void>
 }
@@ -435,7 +436,8 @@ export class TaskCommands {
 
   /**
    * Write `ops`; `null` when no op names a task of the note. A write that
-   * finds a task gone runs once more on the tasks the index holds.
+   * finds a task gone runs once more on the tasks the index holds, and ends
+   * as it is when the index cannot be read.
    */
   async #writeOps(
     session: GraphSession,
@@ -443,14 +445,21 @@ export class TaskCommands {
     notePath: string,
     ops: readonly TaskOp[],
   ): Promise<TaskWriteResult | null> {
+    let stale: unknown
     try {
       return await this.#writeOnce(session, store, notePath, ops)
     } catch (cause) {
       if (!(cause instanceof NoteEditError && cause.kind === 'stale')) {
         throw cause
       }
+      stale = cause
     }
-    await this.#deps.reread(store, notePath)
+    try {
+      await this.#deps.reread(store, notePath)
+    } catch (cause) {
+      this.#deps.logger.error('tasks: read failed:', cause)
+      throw stale
+    }
     return await this.#writeOnce(session, store, notePath, ops)
   }
 

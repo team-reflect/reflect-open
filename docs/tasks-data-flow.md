@@ -68,8 +68,9 @@ loads the tasks of the named notes.
 ## Failures
 
 The app recovers by itself where it can. A read that fails keeps the rows and
-tries again with backoff. A write that finds its task gone reads the note again
-and runs once more. A write that still fails keeps the typed text in its row;
+tries again with backoff. A write that finds its task gone reads the note again,
+in one try, and runs once more. A write that still fails, or whose read failed,
+ends and keeps the typed text in its row while the row exists;
 the next command that names the row, or the app going to the background, writes
 it again. The user sees a message only when their own text cannot be saved as
 one task, or the note is not writable.

@@ -194,7 +194,10 @@ class TaskServiceImpl implements TaskService {
         return this.#store
       },
       publish: () => this.#publish(),
-      reread: (store, notePath) => this.#readPathsInto(store, [notePath]),
+      reread: async (store, notePath) => {
+        store.landPaths(await this.#reader.readPathsOnce([notePath]), [notePath])
+        this.#publish()
+      },
     })
   }
 
