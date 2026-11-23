@@ -1120,6 +1120,71 @@ fn open_index_at_creates_migrates_and_reopens() {
     assert_eq!(rows[0]["n"], Value::from(1));
 }
 
+/// Overwrites the root page of the table or index `name` in the index file
+/// under `root` with junk bytes.
+fn corrupt_root_page(root: &std::path::Path, name: &str) {
+    use std::io::{Seek, SeekFrom, Write};
+    let path = root.join(".reflect/index.sqlite");
+    let conn = open_index_at(root).expect("open");
+    let page_size: i64 = conn
+        .query_row("PRAGMA page_size", [], |row| row.get(0))
+        .unwrap();
+    let page: i64 = conn
+        .query_row(
+            "SELECT rootpage FROM sqlite_master WHERE name = ?1",
+            [name],
+            |row| row.get(0),
+        )
+        .unwrap();
+    drop(conn);
+    let mut file = std::fs::OpenOptions::new().write(true).open(path).unwrap();
+    file.seek(SeekFrom::Start(((page - 1) * page_size) as u64))
+        .unwrap();
+    file.write_all(&vec![0xA5; page_size as usize]).unwrap();
+}
+
+#[test]
+fn clear_resets_a_corrupt_index_file() {
+    // `links_source` breaks the cascade from `notes`; `search_fts_data`
+    // breaks the FTS5 delete.
+    for damaged in ["links_source", "search_fts_data"] {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        let session = IndexSession::new();
+        let generation = session.open(root, &FileIndexConnections).unwrap();
+        session
+            .apply(generation, &[note("notes/a.md", "A", vec![wiki("B")])])
+            .unwrap();
+        drop(session);
+        corrupt_root_page(root, damaged);
+
+        let session = IndexSession::new();
+        let generation = session.open(root, &FileIndexConnections).unwrap();
+        assert_eq!(
+            session.clear(generation).unwrap(),
+            Applied::Committed,
+            "{damaged}"
+        );
+        session
+            .apply(generation, &[note("notes/c.md", "C", vec![wiki("D")])])
+            .unwrap();
+        let reader = session.read_generation().unwrap();
+        let (integrity, notes, version) = session
+            .read(reader, |conn| {
+                let integrity: String =
+                    conn.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+                let notes: i64 =
+                    conn.query_row("SELECT count(*) FROM notes", [], |row| row.get(0))?;
+                let version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+                Ok((integrity, notes, version))
+            })
+            .unwrap();
+        assert_eq!(integrity, "ok", "{damaged}");
+        assert_eq!(notes, 1, "{damaged}");
+        assert_eq!(version, LATEST_SCHEMA_VERSION as i64, "{damaged}");
+    }
+}
+
 #[test]
 fn fts5_is_compiled_in() {
     let conn = Connection::open_in_memory().expect("open");

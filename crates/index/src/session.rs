@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
-use rusqlite::Connection;
+use rusqlite::{Connection, ErrorCode};
 use sea_query::{OnConflict, Query};
 
 use reflect_types::{
@@ -13,6 +13,8 @@ use reflect_types::{
 };
 
 use crate::chat_write;
+#[cfg(any(feature = "native", test))]
+use crate::connections::reset_corrupt;
 use crate::embed_write;
 use crate::scan;
 use crate::schema::IndexMeta;
@@ -331,9 +333,15 @@ impl IndexSession {
 
     /// Wipe all derived tables (the TS layer then re-applies every note). The
     /// `chat_*` and `note_visits` tables are deliberately untouched: they are
-    /// durable, not a rebuildable projection.
+    /// durable, not a rebuildable projection. A corrupt file is reset to an
+    /// empty index instead, and the durable tables are lost with it.
     pub fn clear(&self, generation: u64) -> AppResult<Applied> {
-        Self::applied(self.write(generation, |conn| write::clear_index(conn)))
+        Self::applied(
+            self.write(generation, |conn| match write::clear_index(conn) {
+                Err(err) if is_corrupt(&err) => reset_corrupt(conn, err),
+                result => Ok(result?),
+            }),
+        )
     }
 
     /// Upsert one chat message and its conversation row in a single
@@ -436,6 +444,21 @@ impl IndexSession {
             body(&tx)
         })
     }
+}
+
+/// Whether SQLite reports the database file as damaged.
+fn is_corrupt(err: &rusqlite::Error) -> bool {
+    matches!(
+        err.sqlite_error_code(),
+        Some(ErrorCode::DatabaseCorrupt | ErrorCode::NotADatabase)
+    )
+}
+
+/// A host without the schema crate cannot recreate the schema, so the error
+/// stands.
+#[cfg(not(any(feature = "native", test)))]
+fn reset_corrupt(_conn: &mut Connection, err: rusqlite::Error) -> AppResult<()> {
+    Err(err.into())
 }
 
 /// One committed row-move transaction (the rename pipeline's halves).

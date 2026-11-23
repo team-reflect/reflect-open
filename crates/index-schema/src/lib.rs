@@ -259,6 +259,18 @@ mod schema {
         }
     }
 
+    /// Empties the database file in place and migrates it to the latest
+    /// schema. It works on a corrupt file and keeps the file in place, so
+    /// other connections and processes see the new empty database.
+    pub fn reset(conn: &mut Connection) -> Result<(), SchemaError> {
+        use rusqlite::config::DbConfig;
+        conn.set_db_config(DbConfig::SQLITE_DBCONFIG_RESET_DATABASE, true)?;
+        let vacuumed = conn.execute_batch("VACUUM");
+        conn.set_db_config(DbConfig::SQLITE_DBCONFIG_RESET_DATABASE, false)?;
+        vacuumed?;
+        migrate(conn)
+    }
+
     /// Stop at schema `version`, so schema-evolution tests can stage data in an
     /// older shape and assert what a later migration does with it.
     pub fn migrate_to(conn: &mut Connection, version: usize) -> Result<(), SchemaError> {
@@ -443,6 +455,8 @@ mod schema {
 }
 
 #[cfg(feature = "vec")]
-pub use schema::{SchemaError, migrate, migrate_to, open_in_memory, register_sqlite_vec, validate};
+pub use schema::{
+    SchemaError, migrate, migrate_to, open_in_memory, register_sqlite_vec, reset, validate,
+};
 #[cfg(all(feature = "vec", not(target_family = "wasm")))]
 pub use schema::{open_index_at, open_index_read_only_at};
