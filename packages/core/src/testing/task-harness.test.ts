@@ -190,3 +190,69 @@ describe('task rows during an index rebuild', () => {
     expect(harness.view()).toEqual(harness.projectFiles())
   })
 })
+
+/**
+ * A pseudo-random number generator over `seed`: the same numbers on every run.
+ */
+function createRandom(seed: number): (limit: number) => number {
+  let state = seed
+  return (limit) => {
+    state = (state * 1_103_515_245 + 12_345) % 2_147_483_648
+    return state % limit
+  }
+}
+
+describe('task rows under interleaved writes and file changes', () => {
+  const NOTES = ['notes/a.md', 'notes/b.md', 'daily/2026-11-23.md']
+
+  it.each([1, 2, 3, 4, 5, 6])('show each task once and end as the files, seed %i', async (seed) => {
+    const harness = await start({
+      'notes/a.md': '## Tasks\n\n+ [ ] a1\n+ [ ] a2\n  + [ ] a3\n',
+      'notes/b.md': '+ [ ] same\n+ [ ] same\n',
+    })
+    const random = createRandom(seed)
+    const writes: Promise<unknown>[] = []
+    const pick = () => {
+      const open = harness.tasks.get().open ?? []
+      return open[random(Math.max(open.length, 1))]
+    }
+
+    for (let step = 0; step < 40; step += 1) {
+      const row = pick()
+      switch (random(7)) {
+        case 0:
+          if (row !== undefined) writes.push(harness.tasks.editTask(row, `edit ${step}`))
+          break
+        case 1:
+          if (row !== undefined) writes.push(harness.tasks.completeTasks([row]))
+          break
+        case 2:
+          if (row !== undefined) writes.push(harness.tasks.addTaskAfter(row, null))
+          break
+        case 3:
+          if (row !== undefined) writes.push(harness.tasks.deleteTasks([row]))
+          break
+        case 4: {
+          const path = NOTES[random(NOTES.length)]!
+          const source = harness.files.files().get(path) ?? ''
+          harness.editExternally(path, `+ [ ] outside ${step}\n${source}`)
+          break
+        }
+        case 5:
+          await harness.deliverWatcherBatch()
+          break
+        case 6:
+          await harness.startPass()
+          await harness.endPass()
+          break
+      }
+      await sleep(0)
+      const shown = [...(harness.tasks.get().open ?? []), ...harness.tasks.get().struck]
+      expect(new Set(shown.map((task) => task.taskId)).size).toBe(shown.length)
+    }
+
+    await Promise.allSettled(writes)
+    await harness.drain()
+    expect(harness.view()).toEqual(harness.projectFiles())
+  })
+})
