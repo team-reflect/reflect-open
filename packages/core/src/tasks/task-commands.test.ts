@@ -272,6 +272,19 @@ describe('typed text', () => {
     expect(file(TODAY.notePath)).toBe('## Tasks\n\n+ [ ] buy milk\n')
     expect(shown()).toContainEqual([empty.taskId, ''])
   })
+
+  it('keeps a task whose text is cleared when the app is about to stop', async () => {
+    const rows = await start({ [A]: '+ [ ] one\n' })
+
+    commands.setDraft(rows[0]!, '')
+    await commands.commitDrafts()
+    expect(harness.files.getWrites(A)).toEqual([])
+    expect(shown()).toEqual([[rows[0]!.taskId, 'one']])
+
+    commands.setDraft(rows[0]!, 'one more')
+    await commands.commitDrafts()
+    expect(file(A)).toBe('+ [ ] one more\n')
+  })
 })
 
 describe('a new task', () => {

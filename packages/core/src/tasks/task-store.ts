@@ -389,19 +389,19 @@ export class TaskStore {
 
   /**
    * The tasks that hold text no write has taken: every draft, held text, and
-   * new task. A new task with no text is left out.
+   * new task. A task whose text is blank is left out.
    */
   unsaved(): TaskIdentity[] {
     const tasks = new Map<string, TaskIdentity>()
     for (const [taskId, draft] of this.#drafts) {
-      tasks.set(taskId, { notePath: draft.notePath, taskId })
+      if (draft.markdown.trim() !== '') {
+        tasks.set(taskId, { notePath: draft.notePath, taskId })
+      }
     }
     for (const [taskId, write] of this.#unwritten) {
-      const op = this.findNewTask(taskId)
-      const markdown = this.#drafts.get(taskId)?.markdown ?? op?.markdown ?? ''
-      if (op !== undefined && markdown.trim() === '') {
-        tasks.delete(taskId)
-      } else {
+      const op = write.ops[0]
+      const held = op?.kind === 'insert' || op?.kind === 'setMarkdown' ? op.markdown : ''
+      if (!this.#drafts.has(taskId) && held.trim() !== '') {
         tasks.set(taskId, { notePath: write.notePath, taskId })
       }
     }

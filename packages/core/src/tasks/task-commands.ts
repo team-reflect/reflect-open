@@ -99,7 +99,8 @@ export class TaskCommands {
   }
 
   /**
-   * Save every typed text, for an app that is about to stop.
+   * Save every typed text, for an app that is about to stop. A task whose
+   * typed text is blank keeps that text for the command that names it.
    */
   commitDrafts(): Promise<void> {
     const store = this.#deps.store()
