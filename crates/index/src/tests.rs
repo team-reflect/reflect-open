@@ -2657,14 +2657,29 @@ fn tasks_split_by_checked_and_skip_templates() {
     apply_note(&conn, &with_tasks).unwrap();
     apply_note(&conn, &template).unwrap();
 
-    let open = tasks(&conn, false).unwrap();
+    let open = tasks(&conn, false).unwrap().rows;
     assert_eq!(open.len(), 1);
     assert_eq!(open[0].markdown, "open one");
     assert_eq!(open[0].note_title, "A");
     assert!(open[0].is_pinned && !open[0].checked);
-    let done = tasks(&conn, true).unwrap();
+    let done = tasks(&conn, true).unwrap().rows;
     assert_eq!(done.len(), 1);
     assert_eq!(done[0].markdown, "done one");
+}
+
+#[test]
+fn a_tasks_read_carries_the_commit_seq_of_its_rows() {
+    let graph_dir = tempfile::tempdir().expect("tempdir");
+    let (session, generation) = file_session(graph_dir.path());
+    let read = || session.read(generation, |conn| tasks(conn, false)).unwrap();
+    assert_eq!((read().seq, read().rows.len()), (0, 0));
+
+    let mut with_task = note("notes/a.md", "A", vec![]);
+    with_task.tasks = vec![task(0, "open one", false)];
+    let applied = session.apply(generation, &[with_task]).unwrap();
+
+    assert_eq!(Some(read().seq), applied.seq);
+    assert_eq!(read().rows.len(), 1);
 }
 
 #[test]

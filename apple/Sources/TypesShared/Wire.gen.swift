@@ -5063,6 +5063,34 @@ public struct TaskRow: Codable, Sendable, Equatable {
     }
 }
 
+/// The result of one read of the task rows.
+public struct TaskRows: Codable, Sendable, Equatable {
+    public let seq: UInt64
+    public let rows: [TaskRow]
+
+    private enum CodingKeys: String, CodingKey {
+        case seq = "seq"
+        case rows = "rows"
+    }
+
+    public init(seq: UInt64, rows: [TaskRow]) {
+        self.seq = seq
+        self.rows = rows
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.seq = try container.decode(UInt64.self, forKey: .seq)
+        self.rows = try container.decode([TaskRow].self, forKey: .rows)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(seq, forKey: .seq)
+        try container.encode(rows, forKey: .rows)
+    }
+}
+
 /// One template.
 public struct TemplateEntry: Codable, Sendable, Equatable {
     public let path: String

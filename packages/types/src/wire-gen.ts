@@ -1172,7 +1172,7 @@ export type Commands = {
     args: {
       checked: boolean
     }
-    result: TaskRow[]
+    result: TaskRows
   }
   index_resolve_wiki: {
     args: {
@@ -2590,6 +2590,13 @@ export type TaskRow = {
   pinnedOrder: number | null
   /**  When the note's row last changed (epoch ms). */
   updatedAt: number
+}
+
+/**  The result of one read of the task rows. */
+export type TaskRows = {
+  /**  The commit sequence of the index state that `rows` was read from. */
+  seq: number
+  rows: TaskRow[]
 }
 
 /**  One template. */

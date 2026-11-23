@@ -8,7 +8,7 @@ use reflect_types::{
     AppError, AppResult, Backlink, BacklinkPage, BacklinkSourceCursor, ChatConversation,
     ChatMessageRow, ChunkHash, ChunkHit, DailyNoteRow, EmbeddedChunk, GraphStats, IndexCommit,
     IndexTouch, IndexedNote, MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry, NotePrivacy,
-    NoteRow, PinnedNoteRow, RecentNoteRow, SearchHitRow, SearchRequest, TagFacet, TaskRow,
+    NoteRow, PinnedNoteRow, RecentNoteRow, SearchHitRow, SearchRequest, TagFacet, TaskRows,
     TemplateEntry, VisitedNote, WikiCandidates, WikiClaimMatch, WikiKeyWinner, WikiTitleCandidate,
     WikiWinningAlias,
 };
@@ -258,7 +258,7 @@ impl<'a> IndexCommands<'a> {
     }
 
     /// The open or the completed tasks of every note but templates.
-    fn index_tasks(&self, checked: bool) -> AppResult<Vec<TaskRow>> {
+    fn index_tasks(&self, checked: bool) -> AppResult<TaskRows> {
         self.read(|conn| read::tasks::tasks(conn, checked))
     }
 

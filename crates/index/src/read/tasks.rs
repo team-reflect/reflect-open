@@ -3,15 +3,18 @@
 use rusqlite::Connection;
 use sea_query::{Expr, ExprTrait, Query};
 
-use reflect_types::{AppResult, TaskRow};
+use reflect_types::{AppResult, TaskRow, TaskRows};
 
+use crate::read::meta::commit_seq;
 use crate::schema::{Notes, Tasks};
 use crate::sql::{self, lit};
 
 /// The open (`checked = false`) or the completed tasks of every note but
-/// templates, in no fixed order.
-pub(crate) fn tasks(conn: &Connection, checked: bool) -> AppResult<Vec<TaskRow>> {
-    sql::query(
+/// templates, in no fixed order, with the commit sequence of the index. The
+/// caller runs this in one read transaction, so both come from one state.
+pub(crate) fn tasks(conn: &Connection, checked: bool) -> AppResult<TaskRows> {
+    let seq = commit_seq(conn)?;
+    let rows = sql::query(
         conn,
         Query::select()
             .columns([
@@ -50,5 +53,6 @@ pub(crate) fn tasks(conn: &Connection, checked: bool) -> AppResult<Vec<TaskRow>>
                 updated_at: row.get(9)?,
             })
         },
-    )
+    )?;
+    Ok(TaskRows { seq, rows })
 }

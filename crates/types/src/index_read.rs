@@ -174,6 +174,16 @@ pub struct TaskRow {
     pub updated_at: i64,
 }
 
+/// The result of one read of the task rows.
+#[derive(Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct TaskRows {
+    /// The commit sequence of the index state that `rows` was read from.
+    pub seq: u64,
+    pub rows: Vec<TaskRow>,
+}
+
 /// The notes that claim a wiki key in its strongest tier.
 #[derive(Debug, PartialEq, Serialize)]
 #[cfg_attr(feature = "codegen", derive(specta::Type))]
