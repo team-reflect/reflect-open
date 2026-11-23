@@ -160,7 +160,11 @@ export function NotePaneComponent({
     return (
       <div className={cn(gutterClassName, className)}>
         <ProtectedNoteView content={snapshot.initialContent} />
-        {showBacklinks ? <BacklinksPanel path={path} /> : null}
+        {showBacklinks ? (
+          <div className="print:hidden">
+            <BacklinksPanel path={path} />
+          </div>
+        ) : null}
       </div>
     )
   }
@@ -189,7 +193,7 @@ export function NotePaneComponent({
       />
 
       {showBacklinks ? (
-        <div className={gutterClassName}>
+        <div className={cn(gutterClassName, 'print:hidden')}>
           <BacklinksPanel path={path} />
         </div>
       ) : null}

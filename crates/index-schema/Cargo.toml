@@ -17,6 +17,7 @@ vec = ["dep:sqlite-vec", "dep:sqlite-wasm-vec"]
 [dependencies]
 rusqlite = { workspace = true }
 rusqlite_migration = { workspace = true }
+tracing = { workspace = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 sqlite-vec = { workspace = true, optional = true }

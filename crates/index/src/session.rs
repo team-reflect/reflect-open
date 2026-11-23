@@ -12,6 +12,8 @@ use reflect_types::{
 };
 
 use crate::chat_write;
+#[cfg(any(feature = "native", test))]
+use crate::connections::{is_corrupt, reset_corrupt};
 use crate::embed_write;
 use crate::scan;
 use crate::schema::COMMIT_SEQ_KEY;
@@ -55,6 +57,8 @@ struct WriterInner {
     /// scan could otherwise walk a freshly swapped root and diff another
     /// graph's files against this index.
     root: Option<PathBuf>,
+    /// [`IndexSession::repair`] already ran for this generation.
+    repaired: bool,
 }
 
 /// The query reader: a second, **read-only** connection under its own lock,
@@ -112,6 +116,7 @@ impl IndexSession {
         // lock, so a generation can never pair with another graph's root.
         writer.conn = None;
         writer.root = None;
+        writer.repaired = false;
         {
             let mut reader = self.lock_reader()?;
             reader.conn = None;
@@ -323,9 +328,48 @@ impl IndexSession {
 
     /// Wipe all derived tables (the TS layer then re-applies every note). The
     /// `chat_*` and `note_visits` tables are deliberately untouched: they are
-    /// durable, not a rebuildable projection.
+    /// durable, not a rebuildable projection. A corrupt file is reset to an
+    /// empty index instead, and the durable tables are lost with it.
     pub fn clear(&self, generation: u64) -> AppResult<IndexCommit> {
-        self.commit(generation, |tx| write::clear_index(tx))
+        let seq = self.write(generation, |conn| {
+            match commit(conn, |tx| write::clear_index(tx)) {
+                #[cfg(any(feature = "native", test))]
+                Err(err) if is_corrupt(&err) => {
+                    reset_keeping_seq(conn, &err)?;
+                    commit(conn, |_| Ok(()))
+                }
+                result => result,
+            }
+        })?;
+        Ok(IndexCommit { seq })
+    }
+
+    /// Resets the index file of `generation` after `err` showed that it is
+    /// corrupt. It tries at most once per [`open`], even when the reset fails:
+    /// a repair never starts another open, so a file that stays corrupt cannot
+    /// cycle through reset and rebuild. Returns whether it tried: a reset that
+    /// fails part way can still leave an empty file, which needs a rebuild.
+    ///
+    /// [`open`]: IndexSession::open
+    #[cfg(any(feature = "native", test))]
+    pub fn repair(&self, generation: u64, err: &AppError) -> bool {
+        let Ok(mut writer) = self.lock_writer() else {
+            return false;
+        };
+        if writer.generation != generation || writer.repaired || !is_corrupt(err) {
+            return false;
+        }
+        writer.repaired = true;
+        let Some(conn) = writer.conn.as_mut() else {
+            return false;
+        };
+        if let Err(reset_err) = reset_keeping_seq(conn, err) {
+            tracing::error!(
+                error = reset_err.message(),
+                "resetting the corrupt index file failed"
+            );
+        }
+        true
     }
 
     /// Upsert one chat message and its conversation row in a single
@@ -445,6 +489,15 @@ fn move_rows(
         tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;
         write::move_note(tx, from, to, address)
     })
+}
+
+/// Resets a corrupt index file to an empty index. The commit sequence
+/// continues from its value when the file still gives it.
+#[cfg(any(feature = "native", test))]
+fn reset_keeping_seq(conn: &mut Connection, err: &AppError) -> AppResult<()> {
+    let seq = crate::read::meta::commit_seq(conn).unwrap_or(0);
+    reset_corrupt(conn, err)?;
+    write::set_meta(conn, COMMIT_SEQ_KEY, &seq.to_string())
 }
 
 /// Run `body` in one transaction that counts as one index commit. Returns the

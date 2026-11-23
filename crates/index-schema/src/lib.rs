@@ -172,6 +172,19 @@ mod schema {
 
     impl std::error::Error for SchemaError {}
 
+    impl SchemaError {
+        /// Whether SQLite reports the database file as damaged.
+        pub fn is_corrupt(&self) -> bool {
+            let SchemaError::Sqlite(err) = self else {
+                return false;
+            };
+            matches!(
+                err.sqlite_error_code(),
+                Some(rusqlite::ErrorCode::DatabaseCorrupt | rusqlite::ErrorCode::NotADatabase)
+            )
+        }
+    }
+
     impl From<rusqlite::Error> for SchemaError {
         fn from(err: rusqlite::Error) -> Self {
             SchemaError::Sqlite(err)
@@ -255,8 +268,27 @@ mod schema {
                     })
                 }
             }
+            Err(rusqlite_migration::Error::RusqliteError { err, .. }) => {
+                Err(SchemaError::Sqlite(err))
+            }
             Err(err) => Err(SchemaError::Migration(err.to_string())),
         }
+    }
+
+    /// Empties the database file in place and migrates it to the latest
+    /// schema. It works on a corrupt file and keeps the file in place, so
+    /// other connections and processes see the new empty database. Some
+    /// SQLite builds set the journal mode back to `delete` on a reset, so
+    /// this turns WAL on again.
+    pub fn reset(conn: &mut Connection) -> Result<(), SchemaError> {
+        use rusqlite::config::DbConfig;
+        conn.set_db_config(DbConfig::SQLITE_DBCONFIG_RESET_DATABASE, true)?;
+        let vacuumed = conn.execute_batch("VACUUM");
+        let reset_off = conn.set_db_config(DbConfig::SQLITE_DBCONFIG_RESET_DATABASE, false);
+        vacuumed?;
+        reset_off?;
+        conn.execute_batch("PRAGMA journal_mode=WAL")?;
+        migrate(conn)
     }
 
     /// Stop at schema `version`, so schema-evolution tests can stage data in an
@@ -268,6 +300,7 @@ mod schema {
     }
 
     /// Open (creating if needed) and migrate `<root>/.reflect/index.sqlite`.
+    /// A file that is corrupt at open is reset to an empty index once.
     #[cfg(not(target_family = "wasm"))]
     pub fn open_index_at(root: &Path) -> Result<Connection, SchemaError> {
         register_sqlite_vec()?;
@@ -280,9 +313,22 @@ mod schema {
         // Wait briefly for a cross-process lock to clear instead of failing
         // writes instantly with SQLITE_BUSY ("database is locked").
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
-        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
-        migrate(&mut conn)?;
+        if let Err(err) = prepare(&mut conn) {
+            if !err.is_corrupt() {
+                return Err(err);
+            }
+            tracing::warn!(%err, "the index file is corrupt at open; resetting it");
+            reset(&mut conn)?;
+            prepare(&mut conn)?;
+        }
         Ok(conn)
+    }
+
+    /// Turns on WAL and foreign keys, then migrates.
+    #[cfg(not(target_family = "wasm"))]
+    fn prepare(conn: &mut Connection) -> Result<(), SchemaError> {
+        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
+        migrate(conn)
     }
 
     /// Open `<root>/.reflect/index.sqlite` **read-only** (no create, no
@@ -443,6 +489,8 @@ mod schema {
 }
 
 #[cfg(feature = "vec")]
-pub use schema::{SchemaError, migrate, migrate_to, open_in_memory, register_sqlite_vec, validate};
+pub use schema::{
+    SchemaError, migrate, migrate_to, open_in_memory, register_sqlite_vec, reset, validate,
+};
 #[cfg(all(feature = "vec", not(target_family = "wasm")))]
 pub use schema::{open_index_at, open_index_read_only_at};

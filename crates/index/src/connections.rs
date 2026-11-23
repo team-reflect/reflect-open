@@ -41,6 +41,24 @@ impl IndexConnections for FileIndexConnections {
     }
 }
 
+/// Whether SQLite reports the index file as damaged.
+pub(crate) fn is_corrupt(err: &AppError) -> bool {
+    matches!(
+        err.sqlite_code().map(|code| code & 0xff),
+        Some(rusqlite::ffi::SQLITE_CORRUPT | rusqlite::ffi::SQLITE_NOTADB)
+    )
+}
+
+/// Empties the corrupt index file in place and recreates the schema. `err` is
+/// the failure that showed the damage.
+pub(crate) fn reset_corrupt(conn: &mut Connection, err: &AppError) -> AppResult<()> {
+    tracing::warn!(
+        error = err.message(),
+        "the index file is corrupt; resetting it"
+    );
+    reflect_index_schema::reset(conn).map_err(map_err)
+}
+
 /// Opens an in-memory connection with sqlite-vec available (used by tests).
 #[cfg(test)]
 pub(crate) fn open_in_memory() -> AppResult<Connection> {
