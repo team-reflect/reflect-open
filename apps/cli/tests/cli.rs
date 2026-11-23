@@ -556,6 +556,28 @@ fn search_without_an_index_exits_4() {
 }
 
 #[test]
+fn an_index_older_than_the_cli_is_not_queried() {
+    let fixture = graph();
+    fixture.write_note("notes/a.md", "# Alpha\nsearchable text\n");
+    fixture.build_index();
+    let index = fixture.root().join(".reflect/index.sqlite");
+    let older = (reflect_index_schema::MIN_COMPATIBLE_SCHEMA_VERSION - 1) as i64;
+    rusqlite::Connection::open(index)
+        .unwrap()
+        .pragma_update(None, "user_version", older)
+        .unwrap();
+
+    let search = reflect(&fixture, &["search", "searchable"]);
+    assert_eq!(search.status.code(), Some(4));
+    assert!(stderr(&search).contains("older than this CLI"));
+
+    let show = reflect(&fixture, &["show", "Alpha"]);
+    assert!(show.status.success(), "stderr: {}", stderr(&show));
+    assert!(stdout(&show).contains("searchable text"));
+    assert!(stderr(&show).contains("falling back to a file scan"));
+}
+
+#[test]
 fn search_warns_when_the_index_is_stale_but_still_returns_rows() {
     let fixture = graph();
     fixture.write_note("notes/a.md", "alpha content here\n");
