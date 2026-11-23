@@ -4,7 +4,7 @@ import { requireGraphSession, type GraphRole, type GraphSession } from '../graph
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import type { NoteDocumentService } from '../documents/note-document-service.ts'
-import { errorMessage, AppError } from '../errors.ts'
+import { AppError } from '../errors.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
 import { INDEX_WRITTEN_EVENT, listenNow, type IpcBridgeService } from '../ipc/ipc-service.ts'
@@ -22,6 +22,11 @@ import {
   type TaskSnapshot,
 } from '../markdown/index.ts'
 import { compareTasksByNote, type OpenTask } from './open-task.ts'
+import {
+  resolveSnippetTask,
+  toggleSnippetTask,
+  type SnippetTaskClick,
+} from './snippet-task-toggle.ts'
 import {
   asCompleted,
   asOpen,
@@ -139,15 +144,6 @@ export type TaskAction =
   | { kind: 'setMarkdown'; markdown: string }
   | { kind: 'remove' }
   | { kind: 'toBullet' }
-
-/**
- * A click on the `index`th checkbox of a rendered snippet, as the view reports it.
- */
-export interface SnippetTaskClick {
-  index: number
-  checked: boolean
-  text: string
-}
 
 /**
  * Reads, edits and adds round-checkbox tasks across notes (Plan 18), plus the
@@ -747,30 +743,20 @@ class TaskServiceImpl implements TaskService {
   }
 
   resolveSnippetTask(tasks: readonly SnippetTask[], click: SnippetTaskClick): SnippetTask | null {
-    const anchor = tasks[click.index]
-    if (anchor === undefined || anchor.checked !== click.checked || anchor.text !== click.text) {
-      this.#deps.progress.fail('Updating task', 'The note has changed — try again in a moment.')
-      return null
-    }
-    return anchor
+    return resolveSnippetTask(this.#deps.progress, tasks, click)
   }
 
   async toggleSnippetTask(
     notePath: string,
     task: { locator: TaskLocator; checked: boolean },
   ): Promise<void> {
-    if (this.#deps.graphSession.get().session === null) {
-      return
-    }
-    try {
-      await this.writeTask({ notePath, ...task.locator }, [{ kind: 'toggle' }])
-    } catch (cause) {
-      this.#deps.progress.fail(
-        task.checked ? 'Reopening task' : 'Completing task',
-        errorMessage(cause),
-      )
-      throw cause
-    }
+    await toggleSnippetTask(
+      this.#deps.graphSession,
+      this.#deps.progress,
+      (ref) => this.writeTask(ref, [{ kind: 'toggle' }]),
+      notePath,
+      task,
+    )
   }
 
   markRecentlyCompleted(root: string | null, completed: readonly OpenTask[]): void {
