@@ -19,6 +19,7 @@ import {
   createTestClockService,
   createTestIdService,
   createTestLoggerService,
+  createTestNoteDocumentService,
   createTestNoteFileService,
   createTestPageDescriberService,
   createTestSecretStoreService,
@@ -188,6 +189,7 @@ class CaptureTestKitImpl implements CaptureTestKit {
     this.#drainService = createCaptureDrainService({
       captureInbox,
       noteFile,
+      noteDocuments: createTestNoteDocumentService({ noteFile }),
       xArchive,
       backlinkTarget: { ensure: ensureBacklinkTargetMock },
       clock,

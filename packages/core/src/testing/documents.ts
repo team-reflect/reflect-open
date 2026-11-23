@@ -21,6 +21,13 @@ import { createTestIndexStoreService } from './index-store.ts'
 import { createTestIpcBridgeService } from './ipc.ts'
 import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
 import { createTestFileChangeService } from './file-change.ts'
+import {
+  createNoteDocumentService,
+  type NoteDocumentService,
+  type NoteDocumentServiceDeps,
+} from '../documents/note-document-service.ts'
+import { createTestNoteFileService } from './graph.ts'
+import { createTestIndexLifecycleService } from './index-lifecycle.ts'
 
 export interface TestNoteSessionOptions {
   /**
@@ -263,4 +270,22 @@ export function createTestNoteMoveService(
       logger: options?.logger ?? createTestLoggerService(),
     }),
   )
+}
+
+/**
+ * The real {@link NoteDocumentService} over test doubles. Without a
+ * `graphSession` no graph is open, so commits write no index rows.
+ */
+export function createTestNoteDocumentService(
+  deps?: Partial<NoteDocumentServiceDeps>,
+): NoteDocumentService {
+  return createNoteDocumentService({
+    openDocuments:
+      deps?.openDocuments ??
+      createOpenDocumentsService({ fileChanges: createTestFileChangeService() }),
+    noteFile: deps?.noteFile ?? createTestNoteFileService(),
+    graphSession: deps?.graphSession ?? { get: () => ({ session: null }) },
+    indexLifecycle: deps?.indexLifecycle ?? createTestIndexLifecycleService(),
+    logger: deps?.logger ?? createTestLoggerService(),
+  })
 }

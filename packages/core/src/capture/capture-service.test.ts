@@ -23,6 +23,7 @@ import {
   createTestActivityPort,
   createTestLoggerService,
   createTestNoteFileService,
+  createTestNoteDocumentService,
   createTestNoteSession,
   createTestProgressPort,
   createTestPageDescriberService,
@@ -74,6 +75,7 @@ function setup(options: { mobile?: boolean; settings?: Partial<Settings> } = {})
     noteFile,
     assetStore: createTestAssetStoreService(),
     openDocuments,
+    noteDocuments: createTestNoteDocumentService({ openDocuments, noteFile }),
     backlinkTarget: { ensure: (title) => title },
     xArchive: createTestXArchiveService(),
     webFetch: createTestWebFetchService(),
@@ -587,6 +589,22 @@ describe('CaptureService (X posts)', () => {
     expect(daily.content()).toBe(
       'Unsaved draft\n\n## X bookmarks\n\n![](https://x.com/i/status/20)\n',
     )
+    expect(kit.noteFile.writes()).toEqual([])
+    expect(kit.captureInbox.files().size).toBe(0)
+    session.dispose()
+  })
+
+  it('routes a text capture through the open daily document', async () => {
+    const kit = setup()
+    const daily = createTestNoteSession({ path: DAILY, content: 'Unsaved draft\n' })
+    kit.openDocuments.register({ session: daily })
+    kit.captureInbox.add(`${TEXT.id}.json`, TEXT)
+
+    const session = kit.capture.openSession({ generation: 3 })
+    session.start()
+    await flush()
+
+    expect(daily.content()).toBe('Unsaved draft\n\n- call the bank\n')
     expect(kit.noteFile.writes()).toEqual([])
     expect(kit.captureInbox.files().size).toBe(0)
     session.dispose()

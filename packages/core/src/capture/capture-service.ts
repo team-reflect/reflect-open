@@ -18,8 +18,10 @@ import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { isMobilePlatform } from '../ports/platform-facts.ts'
 import { isSilentStop, type ReconcileStop } from '../reconcile/reconcile.ts'
 import type { WebFetchService } from '../link-preview/web-fetch-service.ts'
+import type { NoteDocumentService } from '../documents/note-document-service.ts'
 import type { OpenDocumentsService } from '../documents/open-documents-service.ts'
-import { errorMessage, isAppError, toAppError } from '../errors.ts'
+import { NoteBusyError } from '../tasks/task-errors.ts'
+import { errorMessage, toAppError } from '../errors.ts'
 import type { AssetStoreService } from '../graph/asset-store-service.ts'
 import type { CaptureInboxService } from '../graph/capture-inbox-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
@@ -78,6 +80,7 @@ export interface CaptureServiceDeps {
   readonly noteFile: NoteFileService
   readonly assetStore: AssetStoreService
   readonly openDocuments: OpenDocumentsService
+  readonly noteDocuments: NoteDocumentService
   readonly backlinkTarget: BacklinkTargetService
   readonly xArchive: XArchiveService
   readonly webFetch: WebFetchService
@@ -331,6 +334,7 @@ class CaptureServiceImpl implements CaptureService {
     this.#drain = createCaptureDrainService({
       captureInbox,
       noteFile,
+      noteDocuments: deps.noteDocuments,
       xArchive,
       backlinkTarget,
       clock: deps.clock,
@@ -400,34 +404,21 @@ class CaptureServiceImpl implements CaptureService {
   }
 
   /**
-   * Route an X post through the live daily document, or a revision-checked file write.
+   * Append an X post to the daily note at `path`.
    */
   async #commitXPost(envelope: XPostEnvelope, path: string, generation: number): Promise<void> {
-    const { openDocuments, noteFile } = this.#deps
-    const owner = openDocuments.sessionFor(path)
-    if (owner !== null) {
-      if (!(await owner.commitSourceEdit((source) => appendXPost(source, envelope)))) {
-        throw new Error('Resolve or finish loading the daily note before saving X posts')
-      }
-      return
-    }
-    let source: string | null
     try {
-      source = await noteFile.read(path, generation)
+      await this.#deps.noteDocuments.commitSourceEdit(
+        path,
+        (source) => appendXPost(source, envelope),
+        { generation, createIfMissing: true },
+      )
     } catch (cause) {
-      if (!isAppError(cause) || cause.kind !== 'notFound') throw cause
-      source = null
-    }
-    // A document may have opened while the filesystem read was pending.
-    const opened = openDocuments.sessionFor(path)
-    if (opened !== null) {
-      if (!(await opened.commitSourceEdit((current) => appendXPost(current, envelope)))) {
-        throw new Error('The daily note is busy; X post remains queued')
+      if (cause instanceof NoteBusyError) {
+        throw new Error('Resolve or finish loading the daily note before saving X posts', { cause })
       }
-      return
+      throw cause
     }
-    const next = appendXPost(source ?? '', envelope)
-    if (next !== source) await noteFile.write(path, next, generation, source)
   }
 }
 

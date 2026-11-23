@@ -1349,6 +1349,7 @@ export function composeCoreServices(
       noteFile,
       assetStore,
       openDocuments,
+      noteDocuments,
       backlinkTarget,
       xArchive,
       webFetch,

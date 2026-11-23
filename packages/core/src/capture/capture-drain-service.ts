@@ -25,6 +25,7 @@ import type { LoggerService } from '../ports/logger-service.ts'
 import type { ReconcileStop } from '../reconcile/reconcile.ts'
 import { errorMessage, isAppError, toAppError } from '../errors.ts'
 import type { CaptureInboxService } from '../graph/capture-inbox-service.ts'
+import type { NoteDocumentService } from '../documents/note-document-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { dailyPath, notePath } from '../graph/paths.ts'
 import { parseNote } from '../markdown/extract.ts'
@@ -110,6 +111,7 @@ function parseEnvelope(raw: string): InboxEnvelope | null {
 export interface CaptureDrainServiceDeps {
   readonly captureInbox: CaptureInboxService
   readonly noteFile: NoteFileService
+  readonly noteDocuments: NoteDocumentService
   readonly xArchive: XArchiveService
   readonly backlinkTarget: BacklinkTargetService
   readonly clock: ClockService
@@ -134,7 +136,7 @@ class CaptureDrainServiceImpl implements CaptureDrainService {
   }
 
   async drain(input: DrainCaptureInboxInput): Promise<DrainCaptureInboxOutcome> {
-    const { captureInbox, noteFile, xArchive, backlinkTarget } = this.#deps
+    const { captureInbox, noteFile, noteDocuments, xArchive, backlinkTarget } = this.#deps
     let entries
     try {
       entries = await captureInbox.list(input.generation)
@@ -254,24 +256,33 @@ class CaptureDrainServiceImpl implements CaptureDrainService {
           input.generation,
         )
         const freshTitle = displayTitle(envelope)
-        let updatedDaily = dailySource
-        if (existing !== null) {
-          // The refresh reset the note's H1 to the fresh tab title; keep the
-          // daily's link text in step.
-          updatedDaily = retitleDailyEntry(updatedDaily, identity.base, existing.title, freshTitle)
-        }
         const section: SectionTarget = { titles: [linksNoteTitle, LINKS_NOTE_TITLE], linked: true }
-        updatedDaily = linkSectionHeading(updatedDaily, section)
-        if (!updatedDaily.includes(`[[${identity.base}`)) {
-          updatedDaily = appendListItem(updatedDaily, {
-            kind: 'bullet',
-            markdown: `[[${identity.base}|${freshTitle}]]`,
-            section,
-          })
-        }
-        if (updatedDaily !== dailySource) {
-          await noteFile.write(daily, updatedDaily, input.generation)
-        }
+        await noteDocuments.commitSourceEdit(
+          daily,
+          (source) => {
+            let updatedDaily = source
+            if (existing !== null) {
+              // The refresh reset the note's H1 to the fresh tab title; keep the
+              // daily's link text in step.
+              updatedDaily = retitleDailyEntry(
+                updatedDaily,
+                identity.base,
+                existing.title,
+                freshTitle,
+              )
+            }
+            updatedDaily = linkSectionHeading(updatedDaily, section)
+            if (!updatedDaily.includes(`[[${identity.base}`)) {
+              updatedDaily = appendListItem(updatedDaily, {
+                kind: 'bullet',
+                markdown: `[[${identity.base}|${freshTitle}]]`,
+                section,
+              })
+            }
+            return updatedDaily
+          },
+          { generation: input.generation, createIfMissing: true },
+        )
         await captureInbox.remove(name, input.generation)
         if (envelope.screenshotRef) {
           await captureInbox.remove(envelope.screenshotRef, input.generation)
@@ -352,23 +363,26 @@ class CaptureDrainServiceImpl implements CaptureDrainService {
    * which re-appends one line once on retry.
    */
   async #drainTextCapture(envelope: TextCaptureEnvelope, generation: number): Promise<void> {
-    const { noteFile, logger } = this.#deps
+    const { noteDocuments, logger } = this.#deps
     const daily = dailyPath(formatIsoDate(new Date(envelope.capturedAt)))
-    const dailySource = await noteSource(noteFile, daily, generation)
     // `task` is Reflect's round `+` checkbox, the only marker the Tasks
     // projection reads, and lands in the `## Tasks` section; `checkbox` is the
     // square `- [ ]`, an inert daily item appended at the end.
-    const next =
-      envelope.kind === 'task'
-        ? applyTaskEdits({ logger }, dailySource, [
-            { kind: 'insert', at: { kind: 'tasksSection' }, markdown: envelope.text },
-          ]).source
-        : appendListItem(dailySource, {
-            kind: envelope.kind === 'append' ? 'bullet' : 'checkbox',
-            markdown: envelope.text,
-            parent: envelope.parent,
-          })
-    await noteFile.write(daily, next, generation)
+    await noteDocuments.commitSourceEdit(
+      daily,
+      (source) => {
+        return envelope.kind === 'task'
+          ? applyTaskEdits({ logger }, source, [
+              { kind: 'insert', at: { kind: 'tasksSection' }, markdown: envelope.text },
+            ]).source
+          : appendListItem(source, {
+              kind: envelope.kind === 'append' ? 'bullet' : 'checkbox',
+              markdown: envelope.text,
+              parent: envelope.parent,
+            })
+      },
+      { generation, createIfMissing: true },
+    )
   }
 
   async #sweepOrphanSpools(
