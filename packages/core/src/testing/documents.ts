@@ -1,3 +1,4 @@
+import { sha256HexSync } from '@reflect/utils'
 import type { Unlisten } from '../unlisten.ts'
 import {
   createNoteMoveService,
@@ -178,7 +179,7 @@ class TestNoteSessionImpl implements TestNoteSession {
         return null
       }
       this.#content = transform(this.#content)
-      return { content: this.#content, merged: false }
+      return { content: this.#content, revision: sha256HexSync(this.#content), merged: false }
     })
   }
 

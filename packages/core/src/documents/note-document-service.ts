@@ -8,7 +8,6 @@ import { splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter.ts'
 import type { OpenDocumentsService } from './open-documents-service.ts'
 import { noop } from '@ocavue/utils'
-import { sha256Hex } from '@reflect/utils'
 
 /**
  * The single safe way to read and write a note from an in-app action (pin,
@@ -94,9 +93,9 @@ export interface NoteCommitResult {
    */
   readonly content: string
   /**
-   * Lowercase hex SHA-256 of `content`.
+   * Lowercase hex SHA-256 of `content`; `null` when the note has no file.
    */
-  readonly revision: string
+  readonly revision: string | null
   /**
    * Whether `content` differs from the text `transform` returned.
    */
@@ -214,10 +213,14 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
             'This note can’t be updated right now — try again in a moment.',
           )
         }
-        const revision = await sha256Hex(commit.content)
-        const note = { content: commit.content, hash: revision }
-        const indexSeq = await this.#indexCommit(path, options.generation, note)
-        return { ...commit, revision, indexSeq }
+        const indexSeq =
+          commit.revision === null
+            ? null
+            : await this.#indexCommit(path, options.generation, {
+                content: commit.content,
+                hash: commit.revision,
+              })
+        return { ...commit, indexSeq }
       }
       let source = await this.#readForEdit(
         path,
@@ -225,11 +228,17 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
         options.generation,
       )
       for (let attempt = 0; attempt < COMMIT_ATTEMPT_LIMIT; attempt += 1) {
-        const content = transform(source ?? '')
-        if (content === source) {
-          return { content, revision: await sha256Hex(content), merged: false, indexSeq: null }
+        const content = transform(source?.content ?? '')
+        if (content === (source?.content ?? '')) {
+          return { content, revision: source?.hash ?? null, merged: false, indexSeq: null }
         }
-        const written = await noteFile.write(path, content, options.generation, source, 'reject')
+        const written = await noteFile.write(
+          path,
+          content,
+          options.generation,
+          source?.content ?? null,
+          'reject',
+        )
         if (written.merged === null) {
           const indexSeq = await this.#indexCommit(
             path,
@@ -239,7 +248,7 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
           )
           return { content, revision: written.hash, merged: false, indexSeq }
         }
-        source = written.merged
+        source = { content: written.merged, hash: written.hash }
       }
       throw new NoteEditError('conflict', `${path} kept changing on disk; the edit was not saved.`)
     })
@@ -319,9 +328,9 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
     path: string,
     createIfMissing: boolean,
     generation: number,
-  ): Promise<string | null> {
+  ): Promise<NoteRead | null> {
     try {
-      return await this.#deps.noteFile.read(path, generation)
+      return await this.#deps.noteFile.readWithHash(path, generation)
     } catch (cause) {
       if (createIfMissing && isAppError(cause) && cause.kind === 'notFound') {
         return null

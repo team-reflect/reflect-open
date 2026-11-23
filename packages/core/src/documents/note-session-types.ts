@@ -129,6 +129,10 @@ export interface NoteSessionCommit {
    */
   readonly content: string
   /**
+   * Lowercase hex SHA-256 of `content`; `null` when the note has no file.
+   */
+  readonly revision: string | null
+  /**
    * Whether `content` differs from the text the transform returned: the write
    * merged with a newer disk text, or keystrokes landed during the flush.
    */

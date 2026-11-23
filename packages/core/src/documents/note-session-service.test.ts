@@ -1200,6 +1200,7 @@ describe('commitSourceEdit', () => {
 
     expect(await h.session.commitSourceEdit(toggleTransform(firstTask(source)))).toEqual({
       content: '# Todo\n\n+ [x] buy milk\n\njot\n',
+      revision: sha256HexSync('# Todo\n\n+ [x] buy milk\n\njot\n'),
       merged: false,
     })
     // The write carries both the unsaved edit and the toggled checkbox.
@@ -1219,6 +1220,7 @@ describe('commitSourceEdit', () => {
 
     expect(await h.session.commitSourceEdit(toggleTransform(firstTask(source)))).toEqual({
       content: '# Todo\n\n+ [x] buy milk\n\ntheirs\n',
+      revision: sha256HexSync('# Todo\n\n+ [x] buy milk\n\ntheirs\n'),
       merged: true,
     })
   })
@@ -1260,7 +1262,11 @@ describe('commitSourceEdit', () => {
     pendingRead.resolve()
     await commit
     await settled()
-    expect(result).toEqual({ content: '# Todo\n\n+ [ ] buy oat milk\n', merged: false })
+    expect(result).toEqual({
+      content: '# Todo\n\n+ [ ] buy oat milk\n',
+      revision: sha256HexSync('# Todo\n\n+ [ ] buy oat milk\n'),
+      merged: false,
+    })
     expect(h.writes.at(-1)?.contents).toBe('# Todo\n\n+ [ ] buy oat milk\n')
     expect(h.applied.at(-1)).toBe('# Todo\n\n+ [ ] buy oat milk\n')
     // The pane mounts its editor from `initialContent` only after the ready
