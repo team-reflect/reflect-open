@@ -22,4 +22,10 @@ describe('sha256Hex', () => {
       '4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c',
     )
   })
+
+  it('gives the hash that `note_write` reports for the same note text', async () => {
+    await expect(sha256Hex('a\nb\n')).resolves.toBe(
+      '911169ddaaf146aff539f58c26c489af3b892dff0fe283c1c264c65ae5aa59a2',
+    )
+  })
 })

@@ -8,6 +8,10 @@ use reflect_core::{Core, CoreConfig, Host, Reply};
 use reflect_types::AppResult;
 use serde_json::{Value, json};
 
+/// SHA-256 of `a\nb\n`, the value `sha256Hex` in `packages/utils` gives for
+/// the same text.
+const LF_NOTE_HASH: &str = "911169ddaaf146aff539f58c26c489af3b892dff0fe283c1c264c65ae5aa59a2";
+
 struct NoopHost;
 
 impl Host for NoopHost {
@@ -151,7 +155,11 @@ fn commands_reply_their_pinned_json() {
     ok(
         "note_write",
         json!({"path": "notes/a.md", "contents": "# A\n\nb\n", "generation": 1}),
-        json!({"merged": null, "modifiedMs": 0}),
+        json!({
+            "merged": null,
+            "modifiedMs": 0,
+            "hash": "51c2e1731b70029d0cc3027d83651492a492a72f344331278569a6baad11bf9a",
+        }),
     );
     ok(
         "note_read",
@@ -162,6 +170,27 @@ fn commands_reply_their_pinned_json() {
     let note = json!([{"modifiedMs": 0, "path": "notes/a.md", "size": 7}]);
     ok("list_files", json!({}), note.clone());
     ok("dir_list", json!({"dir": "notes", "generation": 1}), note);
+
+    let crlf_note = Path::new(graph).join("notes/crlf.md");
+    std::fs::write(&crlf_note, "a\r\nb\r\n").unwrap();
+    ok(
+        "note_read",
+        json!({"path": "notes/crlf.md"}),
+        json!("a\nb\n"),
+    );
+    ok(
+        "note_write",
+        json!({
+            "path": "notes/crlf.md",
+            "contents": "a\nb\n",
+            "generation": 1,
+            "checkContents": true,
+            "expectedContents": "a\n",
+        }),
+        json!({"merged": null, "modifiedMs": 0, "hash": LF_NOTE_HASH}),
+    );
+    assert_eq!(std::fs::read(&crlf_note).unwrap(), b"a\r\nb\r\n");
+    std::fs::remove_file(&crlf_note).unwrap();
 
     ok(
         "asset_write",
