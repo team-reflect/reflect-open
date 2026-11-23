@@ -68,7 +68,7 @@ runs:
       env:
         SCOPE: ${{ inputs.cache-scope || github.job }}
       run: |
-        prefix="mbx-objects-v1-$RUNNER_OS-$RUNNER_ARCH-"
+        prefix="mbx-v2-$RUNNER_OS-$RUNNER_ARCH-"
         echo "key=$prefix$SCOPE-$GITHUB_SHA" >> "$GITHUB_OUTPUT"
         {
           echo "restore-keys<<EOF"
