@@ -10,7 +10,7 @@ use std::path::{Component, Path, PathBuf};
 use rusqlite::Connection;
 
 use crate::error::CliError;
-use crate::note_file::{checked_note_path, parse_note_meta, read_note_text, walk_notes};
+use crate::note_file::{checked_note_path, parse_note_meta, read_note, read_note_text, walk_notes};
 use crate::paths::{daily_path, parse_calendar_date};
 use reflect_index::text::keys::fold_key;
 
@@ -157,11 +157,18 @@ pub fn resolve_note(
             "no note matching '{trimmed}' (by date, path, title, or alias)"
         ))),
         Some((first, rest)) => {
-            if !rest.is_empty() {
+            // A private note gives no path, here as on stdout. A note that
+            // cannot be read fails closed.
+            let others: Vec<&str> = rest
+                .iter()
+                .filter(|path| read_note(root, path).is_ok())
+                .map(String::as_str)
+                .collect();
+            if !others.is_empty() {
                 eprintln!(
                     "reflect: note: {} other match(es) for '{trimmed}': {}",
-                    rest.len(),
-                    rest.join(", ")
+                    others.len(),
+                    others.join(", ")
                 );
             }
             Ok(ResolvedNote::File {

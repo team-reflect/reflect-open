@@ -839,6 +839,24 @@ fn show_blocks_a_private_note_even_when_the_index_says_public() {
 }
 
 #[test]
+fn ambiguous_matches_never_name_a_private_note() {
+    let fixture = graph();
+    fixture.write_note("notes/a.md", "# Shared\npublic body\n");
+    fixture.write_note("notes/b.md", "# Shared\nother body\n");
+    fixture.write_note("notes/c.md", "---\nprivate: true\n---\n# Shared\nsecret\n");
+
+    let scanned = reflect(&fixture, &["show", "Shared"]);
+    fixture.build_index();
+    let indexed = reflect(&fixture, &["show", "Shared"]);
+    for output in [scanned, indexed] {
+        assert!(output.status.success(), "stderr: {}", stderr(&output));
+        assert!(stdout(&output).contains("public body"));
+        assert!(stderr(&output).contains("1 other match(es) for 'Shared': notes/b.md"));
+        assert!(!stderr(&output).contains("notes/c.md"));
+    }
+}
+
+#[test]
 fn show_json_includes_the_daily_date() {
     let fixture = graph();
     fixture.write_note("daily/2026-01-02.md", "daily body\n");
