@@ -16,7 +16,8 @@ import { createTestLoggerService } from '../testing/logger.ts'
 import type { FileChange } from './file-change-service.ts'
 import { createIndexQueryService } from './index-query-service.ts'
 import { buildIndexedNote, PROJECTION_VERSION } from './indexed-note.ts'
-import { createNoteIndexer, PROJECTION_VERSION_KEY, type ChangesAppliedEmitter } from './indexer.ts'
+import type { ChangesAppliedEmitter } from './index-writer.ts'
+import { createNoteIndexer, PROJECTION_VERSION_KEY } from './indexer.ts'
 import { createLiveIndex } from './live.ts'
 
 const NOW = 1_750_000_000_000

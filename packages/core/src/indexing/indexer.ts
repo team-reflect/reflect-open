@@ -1,16 +1,10 @@
-import type { ClockService } from '../ports/clock-service.ts'
 import { sha256Hex } from '@reflect/utils'
-import type { LoggerService } from '../ports/logger-service.ts'
 import { isAppError } from '../errors.ts'
-import type { NoteFileService } from '../graph/note-file-service.ts'
 import { parseNote } from '../markdown/index.ts'
-import type { XArchiveService } from '../embeds/x-archive-service.ts'
 import { createAssetDescriptionText, type AssetDescriptionText } from './asset-description-text.ts'
 import { createAssetReferences, type AssetReferences } from './asset-refs.ts'
-import type { DatabaseService } from './database-service.ts'
-import type { FileChange } from './file-change-service.ts'
-import type { IndexQueryService } from './index-query-service.ts'
-import type { IndexStoreService, SkippedIndexedNote } from './index-store-service.ts'
+import type { SkippedIndexedNote } from './index-store-service.ts'
+import type { ChangesAppliedEmitter, IndexingDeps } from './index-writer.ts'
 import { buildIndexedNote, PROJECTION_VERSION, type IndexedNote } from './indexed-note.ts'
 import { createMoveHealing, type MoveHealing } from './move-healing.ts'
 import { INDEX_PASS_YIELD_EVERY, yieldToEventLoop } from './pacing.ts'
@@ -34,26 +28,6 @@ import { INDEX_PASS_YIELD_EVERY, yieldToEventLoop } from './pacing.ts'
  * `index_meta`, and the stamp is rewritten once the rebuild completes.
  */
 export const PROJECTION_VERSION_KEY = 'projection_version'
-
-/**
- * The services the indexing components read from and write through.
- */
-export interface IndexingDeps {
-  readonly indexStore: IndexStoreService
-  readonly noteFile: NoteFileService
-  readonly indexQuery: IndexQueryService
-  readonly database: DatabaseService
-  readonly xArchive: XArchiveService
-  readonly clock: ClockService
-  readonly logger: LoggerService
-}
-
-/**
- * Reports a batch of file changes after the index applied it at `generation`.
- * The lifecycle that owns the indexer supplies it and forwards each batch to
- * its `onApplied` listeners.
- */
-export type ChangesAppliedEmitter = (changes: readonly FileChange[], generation: number) => void
 
 export interface NoteIndexerDeps extends IndexingDeps {
   readonly emitChangesApplied: ChangesAppliedEmitter

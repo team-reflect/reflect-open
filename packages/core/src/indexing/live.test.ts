@@ -9,7 +9,7 @@ import { createTestIndexStoreService } from '../testing/index-store.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import type { FileChange } from './file-change-service.ts'
 import { createIndexQueryService } from './index-query-service.ts'
-import type { ChangesAppliedEmitter } from './indexer.ts'
+import type { ChangesAppliedEmitter } from './index-writer.ts'
 import { createLiveIndex } from './live.ts'
 import { sleep } from '@ocavue/utils'
 
