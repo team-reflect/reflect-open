@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { createTaskHarness, type TaskHarness } from './task-harness.ts'
+import { TaskHarness } from './task-harness.ts'
 
 const harnesses: TaskHarness[] = []
 
@@ -7,7 +7,7 @@ const harnesses: TaskHarness[] = []
  * A started harness over `files`, closed after the test.
  */
 async function start(files: Readonly<Record<string, string>>): Promise<TaskHarness> {
-  const harness = createTaskHarness({ files })
+  const harness = new TaskHarness({ files })
   harnesses.push(harness)
   await harness.start()
   return harness
@@ -19,7 +19,7 @@ afterEach(() => {
   }
 })
 
-describe('createTaskHarness', () => {
+describe('TaskHarness', () => {
   it('steps the pipeline one event at a time', async () => {
     const harness = await start({ 'notes/a.md': '+ [ ] one\n' })
     const indexed = () => harness.indexStore.applied().map((note) => note.path)

@@ -109,83 +109,7 @@ export interface TaskHarnessOptions {
  * the index lifecycle, the index database, and the task service. Every
  * asynchronous hop is an event a test triggers one step at a time.
  */
-export interface TaskHarness {
-  readonly files: TestNoteFileService
-  readonly fileChanges: TestFileChangeService
-  readonly database: TestDatabaseService
-  readonly indexStore: TestIndexStoreService
-  readonly index: IndexLifecycleService
-  readonly clock: TestClockService
-  readonly tasks: TaskService
-  readonly session: GraphSession
-  /**
-   * Run the first index pass, subscribe to the task list, and land its first read.
-   */
-  start(): Promise<void>
-  /**
-   * Change a note on disk as another app does. The watcher reports it in its next batch.
-   */
-  editExternally(path: string, contents: string): void
-  /**
-   * Make each task file write wait for {@link TaskHarness.landWrite}.
-   */
-  holdWrites(): void
-  /**
-   * Let the oldest held file write reach the disk.
-   */
-  landWrite(): Promise<void>
-  /**
-   * Make each task list read wait for {@link TaskHarness.landRead} or {@link TaskHarness.failRead}.
-   */
-  holdReads(): void
-  /**
-   * Let the oldest held task list read run and land.
-   */
-  landRead(): Promise<void>
-  /**
-   * Reject the oldest held task list read with `error`.
-   */
-  failRead(error: Error): Promise<void>
-  /**
-   * Report every file changed since the last batch as one watcher batch, and apply it.
-   */
-  deliverWatcherBatch(): Promise<void>
-  /**
-   * Start a refresh pass and stop it once its scan has listed the files.
-   */
-  startPass(): Promise<void>
-  /**
-   * Let the pass that {@link TaskHarness.startPass} stopped run to its end.
-   */
-  endPass(): Promise<void>
-  /**
-   * Suspend the index, as the app does when it hides.
-   */
-  suspend(): void
-  /**
-   * Resume the index and run its catch-up pass.
-   */
-  resume(): Promise<void>
-  /**
-   * Release every held step, deliver every unreported change, and run every timer.
-   */
-  drain(): Promise<void>
-  /**
-   * The open tasks the task list shows.
-   */
-  view(): TaskRef[]
-  /**
-   * The open tasks of the notes on disk, by note path, then by place in the note.
-   */
-  projectFiles(): TaskRef[]
-  /**
-   * Release the index database.
-   */
-  close(): void
-}
-
-// FIXME: is there any other places (now or in future) that will use `interface TaskHarness` but not `class TaskHarnessImpl`? If not, we can remove the interface and just export the class (e.g. rename TaskHarnessImpl to TaskHarness, move comments from interface into class, remove "createTaskHarness" and just export the class directly)
-class TaskHarnessImpl implements TaskHarness {
+export class TaskHarness {
   readonly files: TestNoteFileService
   readonly fileChanges: TestFileChangeService
   readonly database: TestDatabaseService
@@ -269,6 +193,9 @@ class TaskHarnessImpl implements TaskHarness {
     })
   }
 
+  /**
+   * Run the first index pass, subscribe to the task list, and land its first read.
+   */
   async start(): Promise<void> {
     this.index.sync(this.session)
     await this.index.settled()
@@ -276,35 +203,56 @@ class TaskHarnessImpl implements TaskHarness {
     await sleep(0)
   }
 
+  /**
+   * Change a note on disk as another app does. The watcher reports it in its next batch.
+   */
   editExternally(path: string, contents: string): void {
     this.#externalModifiedMs += 1
     this.files.set(path, contents, { modifiedMs: this.#externalModifiedMs })
     this.#unreported.add(path)
   }
 
+  /**
+   * Make each task file write wait for {@link TaskHarness.landWrite}.
+   */
   holdWrites(): void {
     this.#writes.hold()
   }
 
+  /**
+   * Let the oldest held file write reach the disk.
+   */
   async landWrite(): Promise<void> {
     await this.#writes.land()
     await sleep(0)
   }
 
+  /**
+   * Make each task list read wait for {@link TaskHarness.landRead} or {@link TaskHarness.failRead}.
+   */
   holdReads(): void {
     this.#reads.hold()
   }
 
+  /**
+   * Let the oldest held task list read run and land.
+   */
   async landRead(): Promise<void> {
     await this.#reads.land()
     await sleep(0)
   }
 
+  /**
+   * Reject the oldest held task list read with `error`.
+   */
   async failRead(error: Error): Promise<void> {
     await this.#reads.fail(error)
     await sleep(0)
   }
 
+  /**
+   * Report every file changed since the last batch as one watcher batch, and apply it.
+   */
   async deliverWatcherBatch(): Promise<void> {
     const listed = new Map(
       (await this.files.listNotes(FILE_GENERATION)).map((file) => [file.path, file]),
@@ -334,12 +282,18 @@ class TaskHarnessImpl implements TaskHarness {
     await sleep(0)
   }
 
+  /**
+   * Start a refresh pass and stop it once its scan has listed the files.
+   */
   async startPass(): Promise<void> {
     this.#scans.hold()
     this.index.refresh(this.session)
     await this.#scans.arrived()
   }
 
+  /**
+   * Let the pass that {@link TaskHarness.startPass} stopped run to its end.
+   */
   async endPass(): Promise<void> {
     this.#scans.release()
     await sleep(0)
@@ -347,11 +301,17 @@ class TaskHarnessImpl implements TaskHarness {
     await sleep(0)
   }
 
+  /**
+   * Suspend the index, as the app does when it hides.
+   */
   suspend(): void {
     this.#suspended = true
     this.index.suspend()
   }
 
+  /**
+   * Resume the index and run its catch-up pass.
+   */
   async resume(): Promise<void> {
     this.#suspended = false
     this.index.resume(this.session)
@@ -360,6 +320,9 @@ class TaskHarnessImpl implements TaskHarness {
     await sleep(0)
   }
 
+  /**
+   * Release every held step, deliver every unreported change, and run every timer.
+   */
   async drain(): Promise<void> {
     this.#writes.release()
     this.#reads.release()
@@ -375,12 +338,18 @@ class TaskHarnessImpl implements TaskHarness {
     } while (this.#unreported.size > 0)
   }
 
+  /**
+   * The open tasks the task list shows.
+   */
   view(): TaskRef[] {
     return (this.tasks.get().open ?? []).map(({ notePath, astPath, markdown, checked }) => {
       return { notePath, astPath, markdown, checked }
     })
   }
 
+  /**
+   * The open tasks of the notes on disk, by note path, then by place in the note.
+   */
   projectFiles(): TaskRef[] {
     return [...this.files.files()]
       .toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
@@ -391,6 +360,9 @@ class TaskHarnessImpl implements TaskHarness {
       })
   }
 
+  /**
+   * Release the index database.
+   */
   close(): void {
     this.database.close()
   }
@@ -425,11 +397,4 @@ class TaskHarnessImpl implements TaskHarness {
       stalePlaceholders: [],
     }
   }
-}
-
-/**
- * A {@link TaskHarness} over `options.files`, not started yet.
- */
-export function createTaskHarness(options: TaskHarnessOptions): TaskHarness {
-  return new TaskHarnessImpl(options)
 }
