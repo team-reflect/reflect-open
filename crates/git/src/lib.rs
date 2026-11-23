@@ -200,3 +200,6 @@ pub fn push(root: &Path, credential: Option<GitCredential>) -> AppResult<PushOut
 pub fn commit_all(root: &Path, message: &str, max_file_bytes: u64) -> AppResult<CommitOutcome> {
     commit::commit_all(root, message, max_file_bytes)
 }
+
+/// Experiment marker for CI cache measurements.
+const _MBX_EXP: u8 = 0;
