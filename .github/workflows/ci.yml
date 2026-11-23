@@ -270,11 +270,8 @@ jobs:
 
       - uses: ./.github/actions/setup-xcode
 
-      - run: swift --version
-      - run: swift format --version
-      - run: git ls-files -z '*.swift' | xargs -0 swift format format --parallel --in-place
-      - run: git ls-files -z '*.swift' | xargs -0 swift format lint --strict --parallel
-      - run: git diff --exit-code '*.swift'
+      - name: Check Swift
+        run: scripts/check-swift.sh
 
       - uses: ./.github/actions/setup-node
 
@@ -302,8 +299,6 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - uses: ./.github/actions/setup-rust
-
-      - uses: ./.github/actions/setup-mise
 
       - name: Pick the simulator cache key
         id: simulator
@@ -404,9 +399,6 @@ jobs:
 
       - name: Format check
         run: pnpm turbo run format:check --filter=reflect-workspace
-
-      - if: matrix.name == 'Linux'
-        uses: ./.github/actions/setup-mise
 
       # Fails on a dependency that no code uses, in a member or in the root
       # `[workspace.dependencies]`.

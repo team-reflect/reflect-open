@@ -1,4 +1,16 @@
+[settings]
+# mise installs the toolchain, components and targets in rust-toolchain.toml.
+idiomatic_version_file_enable_tools = ["rust"]
+
 [tools]
+mr-boxington = "1.30.0"
 "github:Boshen/cargo-shear" = "1.14.0"
 "github:EmbarkStudios/cargo-about" = "0.9.3"
 "github:MobAI-App/simslim" = { version = "0.15.0", os = ["macos"] }
+
+# Runs cargo through mbx. The same as the `mr_boxington` option of mise's
+# `rust` tool, which needs a `rust` entry in [tools].
+# https://mise.jdx.dev/dev-tools/shims.html#command-wrappers
+[wrappers.cargo]
+command = "mbx"
+env = { MBX_CARGO_SHIM_MODE = "1" }

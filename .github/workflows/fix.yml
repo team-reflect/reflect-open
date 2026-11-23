@@ -41,9 +41,9 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       # `cargo about` in `gen:licenses` also needs the toolchain.
-      - name: Install Rust toolchain
+      - name: Set up Rust
         if: steps.changes.outputs.rust == 'true' || steps.changes.outputs.licenses == 'true'
-        run: rustup toolchain install --no-self-update
+        uses: ./.github/actions/setup-rust
 
       - name: Generate WXT types
         run: pnpm gen:wxt
@@ -60,13 +60,7 @@ jobs:
         run: pnpm gen:types
 
       - name: Fix (Swift)
-        run: |
-          swift format --version
-          git ls-files -z '*.swift' | xargs -0 swift format format --parallel --in-place
-
-      - name: Install dependencies required for license generation
-        if: steps.changes.outputs.licenses == 'true'
-        uses: ./.github/actions/setup-mise
+        run: scripts/check-swift.sh --fix
 
       - name: Generate licenses
         if: steps.changes.outputs.licenses == 'true'
