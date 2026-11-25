@@ -246,7 +246,11 @@ async function revealSwipeActions(
 ): Promise<HTMLElement> {
   const body = await view.findByRole('button', { name: `Edit: ${label}` })
   const scroller = body.closest<HTMLElement>('[data-slot="swipe-row"]')!
-  await scrollElement({ element: scroller, left: 184, touch: true })
+  await scrollElement({
+    element: scroller,
+    left: scroller.scrollWidth - scroller.clientWidth,
+    touch: true,
+  })
   return scroller
 }
 
@@ -909,7 +913,9 @@ describe('MobileTasks', () => {
       .element(view.getByRole('button', { name: 'Open note: buy milk' }))
       .toBeInTheDocument()
     await expect.element(view.getByRole('button', { name: 'Delete: buy milk' })).toBeInTheDocument()
-    expect(scroller.scrollLeft).toBe(184)
+    expect(
+      Math.abs(scroller.scrollLeft - (scroller.scrollWidth - scroller.clientWidth)),
+    ).toBeLessThan(1)
     expect(page.getByRole('dialog').query()).toBeNull()
     await view.unmount()
   })

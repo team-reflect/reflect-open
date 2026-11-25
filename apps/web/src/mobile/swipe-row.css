@@ -6,12 +6,22 @@
   }
 }
 
-/* Index from the trailing edge: the outermost (primary) action is 0. */
-.swipe-action:nth-last-child(1) {
-  --swipe-action-index: 0;
+/* Registered, so `sibling-index()` resolves on the action, not on its pill. */
+@property --swipe-action-index {
+  syntax: '<integer>';
+  inherits: true;
+  initial-value: 0;
 }
-.swipe-action:nth-last-child(2) {
-  --swipe-action-index: 1;
+@property --swipe-action-count {
+  syntax: '<integer>';
+  inherits: true;
+  initial-value: 1;
+}
+
+/* Index from the trailing edge: the outermost (primary) action is 0. */
+.swipe-action {
+  --swipe-action-index: calc(sibling-count() - sibling-index());
+  --swipe-action-count: sibling-count();
 }
 
 /* An idle row paints no actions, so the surface needs no layer of its own. */
@@ -27,10 +37,11 @@
 }
 
 /* Only a touched or open row animates, so a long list holds no idle animations.
-   The spacing units match the `w-20` buttons and the `gap-2` / `px-2` actions box. */
+   Each action has an equal share of the scroll range, and its pill grows over
+   the second half of that share. */
 .swipe-row[data-active] .swipe-action-body {
   animation: swipe-action-grow linear both;
   animation-timeline: scroll(nearest inline);
-  animation-range: calc(var(--spacing) * (22 * var(--swipe-action-index) + 12))
-    calc(var(--spacing) * (22 * var(--swipe-action-index) + 24));
+  animation-range: calc((var(--swipe-action-index) + 0.5) / var(--swipe-action-count) * 100%)
+    calc((var(--swipe-action-index) + 1) / var(--swipe-action-count) * 100%);
 }

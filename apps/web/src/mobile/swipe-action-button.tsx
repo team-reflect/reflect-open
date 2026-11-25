@@ -29,13 +29,13 @@ export function SwipeActionButton({
   return (
     <button
       type="button"
-      className="swipe-action flex w-20 items-center active:opacity-70"
+      className="swipe-action flex items-center active:opacity-70"
       aria-label={ariaLabel}
       onClick={onClick}
     >
       <span
         className={cn(
-          'swipe-action-body flex h-9 w-full items-center justify-center gap-1 rounded-full text-sm font-medium text-text-on-brand',
+          'swipe-action-body flex h-9 items-center gap-1 rounded-full px-3 text-sm font-medium text-text-on-brand',
           className,
         )}
       >
