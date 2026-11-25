@@ -14,7 +14,7 @@ import { useDateFormat } from '@/providers/settings-provider.tsx'
 /**
  * Height (px) of a single-line row: `min-h-12` plus the bottom border.
  */
-export const MOBILE_TASK_ROW_HEIGHT = 49
+export const MOBILE_TASK_ROW_HEIGHT = 49 // QUESTION: if we remove min-h-12 (and replace it like h-full) and add height: MOBILE_TASK_ROW_HEIGHTpx in <div data-task-key={key}>, will it still work. In general, I do not want to write the same style in multiple units (min-h-12 vs 49px) because it could be wrong in the future if we change what min-h-12 means. if we have to use px units (for example because we need to pass a px value to a 3-rd party lib), then let's use a constant like MOBILE_TASK_ROW_HEIGHT and do not use tailwindcss class like h-12. FIXME. This also applies to other places in the codebase where we mix tailwindcss classes and px values.
 
 interface MobileTaskRowProps {
   task: OpenTask
@@ -161,6 +161,7 @@ export function MobileTaskRow({
           >
             <span
               className={cn(
+                // FIXME: it seems that the class `break-words` can be written as `wrap-break-word`. Search the whole codebase and fix it.
                 'min-w-0 flex-1 break-words text-sm leading-6 text-text',
                 task.checked && 'text-text-muted line-through',
               )}
