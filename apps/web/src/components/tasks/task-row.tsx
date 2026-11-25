@@ -1,4 +1,4 @@
-import { memo, type KeyboardEvent, type MouseEvent, type ReactElement } from 'react'
+import type { KeyboardEvent, MouseEvent, ReactElement } from 'react'
 import { Circle, CircleCheck } from 'lucide-react'
 import type { OpenTask } from '@reflect/core'
 import { getIsComposing } from '@meowdown/core'
@@ -49,7 +49,7 @@ interface TaskRowProps {
  * (completed) row shows struck through. A checkbox click on any selected row in
  * a multi-selection completes or reopens the selected rows together.
  */
-export const TaskRow = memo(function TaskRow({
+export function TaskRow({
   task,
   showSource,
   selected,
@@ -150,4 +150,4 @@ export const TaskRow = memo(function TaskRow({
       ) : null}
     </div>
   )
-})
+}
