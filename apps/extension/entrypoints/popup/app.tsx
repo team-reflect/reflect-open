@@ -233,7 +233,7 @@ export function CapturePopup(): ReactElement {
         ) : null}
         {save.phase === 'idle' && heldCount > 0 ? (
           <p className="text-xs text-text-muted">
-            {heldCount} earlier {heldCount === 1 ? 'capture' : 'captures'} waiting for Reflect.
+            {`${heldCount} earlier ${heldCount === 1 ? 'capture' : 'captures'} waiting for Reflect.`}
           </p>
         ) : null}
       </form>

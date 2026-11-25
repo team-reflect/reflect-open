@@ -51,7 +51,7 @@ export function ImportSection(): ReactElement {
             onClick={() => void chooseAndImport()}
           >
             <FileArchive aria-hidden strokeWidth={1.75} />
-            {running ? 'Importing...' : 'Import zip...'}
+            <span>{running ? 'Importing...' : 'Import zip...'}</span>
           </Button>
         </div>
       </SettingsField>

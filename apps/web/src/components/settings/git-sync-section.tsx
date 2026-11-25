@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { useRef, useState, type ReactElement } from 'react'
 import { ExternalLink } from 'lucide-react'
 import { remoteLabel, signInNeededText } from '@reflect/app'
 import {
@@ -31,28 +31,32 @@ function GitSyncStatusLine({
   state,
 }: {
   state: Extract<GitSyncState, { phase: 'connected' }>
-}): ReactNode {
+}): ReactElement {
   switch (state.status.state) {
     case 'idle':
-      return 'Up to date'
+      return <span>Up to date</span>
     case 'waiting':
       return (
-        <>
+        <span>
           Syncs in <CountdownText until={state.status.until} />
-        </>
+        </span>
       )
     case 'syncing':
-      return 'Syncing…'
+      return <span>Syncing…</span>
     case 'offline':
-      return state.status.message
+      return <span>{state.status.message}</span>
     case 'error':
       // A rejected GitHub sign-in (expired or revoked; the account is still
       // stored) is fixed under Accounts. A host remote gets "Update sign-in…"
       // beside this line; an SSH remote's message already names the fix
       // (ssh-add, known_hosts…).
-      return state.status.errorKind === 'auth' && state.remote.kind === 'github'
-        ? 'Sync failed: GitHub rejected the sign-in. Sign in again under Accounts.'
-        : `Sync failed: ${state.status.message}`
+      return (
+        <span>
+          {state.status.errorKind === 'auth' && state.remote.kind === 'github'
+            ? 'Sync failed: GitHub rejected the sign-in. Sign in again under Accounts.'
+            : `Sync failed: ${state.status.message}`}
+        </span>
+      )
   }
 }
 

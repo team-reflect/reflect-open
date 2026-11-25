@@ -91,7 +91,7 @@ function TabButton({
       )}
     >
       {icon}
-      {compact ? null : label}
+      {compact ? null : <span>{label}</span>}
     </button>
   )
 }

@@ -73,9 +73,7 @@ export function BacklinksPanel({ path }: BacklinksPanelProps): ReactElement | nu
               expanded ? 'rotate-90' : ''
             }`}
           />
-          <span>
-            Incoming backlink{count === 1 ? '' : 's'} ({count})
-          </span>
+          <span>{`Incoming backlink${count === 1 ? '' : 's'} (${count})`}</span>
         </button>
       </h3>
 

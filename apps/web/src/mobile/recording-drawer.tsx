@@ -155,7 +155,7 @@ function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactEleme
           onClick={confirmDiscard}
         >
           <Trash2 aria-hidden className="size-3.5" />
-          {discardArmed ? 'Tap again to discard' : 'Discard'}
+          <span>{discardArmed ? 'Tap again to discard' : 'Discard'}</span>
         </Button>
       </div>
     </div>

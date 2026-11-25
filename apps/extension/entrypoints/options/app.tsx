@@ -123,8 +123,7 @@ export function OptionsPage(): ReactElement {
         {showXAccessNotice ? (
           <div className="flex items-center justify-between gap-4 px-4 py-3 text-xs text-text-muted">
             <span>
-              Reflect Capture can’t see x.com right now, so enabled X captures are not being saved.
-              {xAccessRefused ? ` ${SITE_ACCESS_FALLBACK}` : null}
+              {`Reflect Capture can’t see x.com right now, so enabled X captures are not being saved.${xAccessRefused ? ` ${SITE_ACCESS_FALLBACK}` : ''}`}
             </span>
             <button
               type="button"

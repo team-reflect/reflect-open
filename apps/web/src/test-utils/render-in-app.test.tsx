@@ -31,8 +31,7 @@ function Probe(): ReactElement {
   return (
     <div>
       <output data-testid="graph">
-        {status} {graph?.root ?? 'none'} {graph?.generation ?? '-'} {indexGeneration ?? '-'}{' '}
-        {indexing ? 'indexing' : 'idle'} {recents.length} {mobileStorageKind ?? '-'}
+        {`${status} ${graph?.root ?? 'none'} ${graph?.generation ?? '-'} ${indexGeneration ?? '-'} ${indexing ? 'indexing' : 'idle'} ${recents.length} ${mobileStorageKind ?? '-'}`}
       </output>
       <output data-testid="settings">{dateFormat}</output>
       <output data-testid="route">{JSON.stringify(route)}</output>

@@ -107,7 +107,7 @@ export function NewGraphDrawer({
           {error !== null ? <p className="text-xs text-destructive">{error}</p> : null}
           <Button type="button" disabled={!canCreate} onClick={create}>
             {busy ? <Spinner /> : null}
-            {busy ? 'Setting up…' : 'Create'}
+            <span>{busy ? 'Setting up…' : 'Create'}</span>
           </Button>
         </DrawerBody>
       </DrawerContent>

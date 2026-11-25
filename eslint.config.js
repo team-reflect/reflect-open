@@ -1,3 +1,4 @@
+import reactGoogleTranslate from 'eslint-plugin-react-google-translate'
 import { defineESLintConfig } from '@ocavue/eslint-config'
 
 // Lint rules that keep the service architecture (`docs/contributing/services.md`).
@@ -422,4 +423,15 @@ export default defineESLintConfig(
     return viMockBlock([file], [...WEB_VI_MOCK_ALLOW, ...allow])
   }),
   viMockBlock([`apps/extension/**/*.${SOURCE_EXTENSIONS}`], EXTENSION_VI_MOCK_ALLOW),
+  // Rule: JSX text survives Google Translate, which swaps text nodes for
+  // `<font>` elements. A conditional text node with siblings makes React crash
+  // or show stale text, so join the text into one string or wrap it in an element.
+  {
+    files: ['**/*.tsx'],
+    plugins: { 'react-google-translate': reactGoogleTranslate },
+    rules: {
+      'react-google-translate/no-conditional-text-nodes-with-siblings': 'error',
+      'react-google-translate/no-return-text-nodes': 'error',
+    },
+  },
 )

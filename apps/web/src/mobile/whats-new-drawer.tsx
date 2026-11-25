@@ -187,7 +187,7 @@ function WhatsNewPages({
               }}
             >
               <Star />
-              {rated ? 'Write a review' : 'Rate Reflect'}
+              <span>{rated ? 'Write a review' : 'Rate Reflect'}</span>
             </Button>
             <p className="mt-5 flex items-center gap-3 text-sm text-text-secondary">
               <span aria-hidden className="h-px flex-1 bg-border" />

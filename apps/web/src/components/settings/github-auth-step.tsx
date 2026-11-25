@@ -165,14 +165,17 @@ export function GithubAuthStep({ onAuthed, repoName }: GithubAuthStepProps): Rea
               Paste a fine-grained personal access token with <strong>Contents</strong> read/write
               access to{' '}
               {repoName !== undefined ? (
-                <>
+                <span>
                   the <strong>{repoName}</strong> repository
-                </>
+                </span>
               ) : (
-                'your repository'
-              )}{' '}
-              (GitHub → Settings → Developer settings → Fine-grained tokens). It is stored in your
-              OS keychain, never in your graph.
+                <span>your repository</span>
+              )}
+              <span>
+                {' '}
+                (GitHub → Settings → Developer settings → Fine-grained tokens). It is stored in your
+                OS keychain, never in your graph.
+              </span>
             </p>
             <label className="flex flex-col gap-1">
               <span className={FIELD_LABEL_CLASS}>Personal access token</span>

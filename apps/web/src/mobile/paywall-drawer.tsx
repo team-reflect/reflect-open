@@ -194,7 +194,7 @@ function PaywallContent({
               onClick={subscribe}
             >
               {purchasingPlan !== null ? <Spinner className="size-4" /> : null}
-              Subscribe
+              <span>Subscribe</span>
             </Button>
             <p className="text-center text-xs leading-5 text-text-muted">
               Renews automatically until canceled. Cancel anytime in the App Store.

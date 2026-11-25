@@ -62,7 +62,7 @@ function NoteLinks({ notes, onOpen }: NoteLinksProps): ReactElement | null {
       {': '}
       {notes.map((note, index) => (
         <Fragment key={`${note.path}-${index}`}>
-          {index > 0 ? ', ' : ''}
+          {index > 0 ? <span>, </span> : null}
           <button
             type="button"
             onClick={(event) => onOpen(note.path, event)}
@@ -98,7 +98,7 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
     const result = part.result?.tool === 'search' ? part.result : null
     return (
       <ChipFrame pending={pending} icon={<Search aria-hidden className="size-3.5" />}>
-        Searched “{call.query}”{result !== null ? countSuffix(result.hits.length, 'note') : ''}
+        {`Searched “${call.query}”${result !== null ? countSuffix(result.hits.length, 'note') : ''}`}
         {result !== null ? <NoteLinks notes={result.hits} onOpen={openNote} /> : null}
       </ChipFrame>
     )
@@ -120,14 +120,16 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
       ) : (
         'recent'
       )
+    const suffix =
+      result === null
+        ? ''
+        : result.error !== null
+          ? ` — ${result.error}`
+          : countSuffix(result.notes.length, 'note')
     return (
       <ChipFrame pending={pending} icon={<History aria-hidden className="size-3.5" />}>
-        Listed {tagLabel} notes
-        {result !== null
-          ? result.error !== null
-            ? ` — ${result.error}`
-            : countSuffix(result.notes.length, 'note')
-          : ''}
+        Listed {tagLabel}
+        {` notes${suffix}`}
         {result !== null && result.error === null ? (
           <NoteLinks notes={result.notes} onOpen={openNote} />
         ) : null}
@@ -139,9 +141,7 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
     const result = part.result?.tool === 'dailies' ? part.result : null
     return (
       <ChipFrame pending={pending} icon={<CalendarDays aria-hidden className="size-3.5" />}>
-        Listed daily notes {formatShortDate(call.start, dateFormat)} –{' '}
-        {formatShortDate(call.end, dateFormat)}
-        {result !== null ? countSuffix(result.days.length, 'day') : ''}
+        {`Listed daily notes ${formatShortDate(call.start, dateFormat)} – ${formatShortDate(call.end, dateFormat)}${result !== null ? countSuffix(result.days.length, 'day') : ''}`}
         {result !== null ? <NoteLinks notes={result.days} onOpen={openNote} /> : null}
       </ChipFrame>
     )
@@ -165,11 +165,8 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
         Read{' '}
         {assets.map((asset, index) => (
           <Fragment key={`${asset.path}-${index}`}>
-            {index > 0 ? ', ' : ''}
-            <span>
-              {assetName(asset.path)}
-              {asset.error !== null ? ` — ${asset.error}` : ''}
-            </span>
+            {index > 0 ? <span>, </span> : null}
+            <span>{`${assetName(asset.path)}${asset.error !== null ? ` — ${asset.error}` : ''}`}</span>
           </Fragment>
         ))}
       </ChipFrame>
@@ -196,7 +193,7 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
           note.title !== null ? noteLabel({ path: note.path, title: note.title }) : note.path
         return (
           <Fragment key={`${note.path}-${index}`}>
-            {index > 0 ? ', ' : ''}
+            {index > 0 ? <span>, </span> : null}
             {!pending && note.error === null ? (
               <button
                 type="button"
@@ -206,10 +203,7 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
                 {label}
               </button>
             ) : (
-              <span>
-                {label}
-                {note.error !== null ? ` — ${note.error}` : ''}
-              </span>
+              <span>{`${label}${note.error !== null ? ` — ${note.error}` : ''}`}</span>
             )}
           </Fragment>
         )

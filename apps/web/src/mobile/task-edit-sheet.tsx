@@ -260,7 +260,7 @@ export function MobileTaskEditSheet({
               onClick={complete}
             >
               {task.checked ? <Undo2 /> : <CircleCheck />}
-              {task.checked ? 'Reopen' : 'Complete'}
+              <span>{task.checked ? 'Reopen' : 'Complete'}</span>
             </Button>
             <Button
               variant="ghost"
@@ -339,7 +339,7 @@ function ScheduleChip({
       className={getScheduleChipClassName(active)}
     >
       {active && icon === undefined ? <Check aria-hidden className="size-3.5" /> : icon}
-      {label}
+      <span>{label}</span>
     </button>
   )
 }
