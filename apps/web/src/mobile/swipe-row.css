@@ -1,9 +1,7 @@
-/* The surface turns into a rounded card as soon as the row moves. */
+/* The surface turns gray as soon as the row moves. */
 @keyframes swipe-row-card {
   to {
     background-color: color-mix(in oklab, var(--text) 8%, var(--surface-canvas));
-    border-top-right-radius: 1.5rem;
-    border-bottom-right-radius: 1.5rem;
   }
 }
 
