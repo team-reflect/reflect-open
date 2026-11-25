@@ -28,8 +28,8 @@ interface TaskGroupHeaderProps {
 /**
  * The header of one group in a Tasks list, colour-coded: a date bucket
  * (Current/Overdue/Upcoming) or a note, with its task count. A note group's
- * header opens the note. Current and note groups have an "Add" button. It
- * fills the height of its parent.
+ * header opens the note. Current and note groups have an "Add" button, with
+ * its label in a wide header only. It fills the height of its parent.
  */
 export function TaskGroupHeader({
   group,
@@ -45,7 +45,7 @@ export function TaskGroupHeader({
   return (
     // `bg-surface-canvas` is opaque, so rows do not show through the translucent
     // dark-mode `bg-surface-sunken`.
-    <div className="h-full bg-surface-canvas">
+    <div className="@container h-full bg-surface-canvas">
       <div className={cn('flex h-full items-center gap-2 bg-surface-sunken px-4', className)}>
         <h2 className={cn('flex min-w-0 items-center gap-2 text-sm font-medium', colorClass)}>
           {icon}
@@ -71,11 +71,11 @@ export function TaskGroupHeader({
             type="button"
             aria-label={`Add a task to ${group.kind === 'current' ? 'today' : group.label}`}
             onClick={() => onAdd(addTarget)}
-            className="ml-auto flex h-full flex-none items-center gap-1 text-xs font-medium text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none"
+            className="ml-auto flex h-full min-w-8 flex-none items-center justify-center gap-1 text-xs font-medium text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none"
           >
             <Plus aria-hidden className="size-3.5" />
-            {/* FIXME: 1. add a <span> tag around Add. See https://www.npmjs.com/package/eslint-plugin-react-google-translate for reasons; 2. let's hide Add if TaskGroupHeader's width is small. Notice that this rule applies to both mobile and desktop. Also, notice that we are now using the container size instead of the viewport size.Ensure that in normal phone this "add" word will not be showing.*/}
-            Add
+            {/* The label shows only where the header is wide enough for it. */}
+            <span className="hidden @lg:inline">Add</span>
           </button>
         ) : null}
       </div>
