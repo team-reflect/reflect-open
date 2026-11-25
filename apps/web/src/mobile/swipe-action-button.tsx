@@ -35,7 +35,7 @@ export function SwipeActionButton({
     >
       <span
         className={cn(
-          'swipe-action-body flex h-9 items-center gap-1 rounded-full px-3 text-sm font-medium text-text-on-brand',
+          'flex h-9 items-center gap-1 rounded-full px-3 text-sm font-medium text-text-on-brand',
           className,
         )}
       >

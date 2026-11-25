@@ -6,24 +6,6 @@
   }
 }
 
-/* Registered, so `sibling-index()` resolves on the action, not on its pill. */
-@property --swipe-action-index {
-  syntax: '<integer>';
-  inherits: true;
-  initial-value: 0;
-}
-@property --swipe-action-count {
-  syntax: '<integer>';
-  inherits: true;
-  initial-value: 1;
-}
-
-/* Index from the trailing edge: the outermost (primary) action is 0. */
-.swipe-action {
-  --swipe-action-index: calc(sibling-count() - sibling-index());
-  --swipe-action-count: sibling-count();
-}
-
 /* An idle row paints no actions, so the surface needs no layer of its own. */
 .swipe-row:not([data-active]) .swipe-row-actions {
   visibility: hidden;
@@ -37,11 +19,11 @@
 }
 
 /* Only a touched or open row animates, so a long list holds no idle animations.
-   Each action has an equal share of the scroll range, and its pill grows over
-   the second half of that share. */
-.swipe-row[data-active] .swipe-action-body {
+   Each action has an equal share of the scroll range, counted from the trailing
+   edge, and it grows over the second half of that share. */
+.swipe-row[data-active] .swipe-action {
   animation: swipe-action-grow linear both;
   animation-timeline: scroll(nearest inline);
-  animation-range: calc((var(--swipe-action-index) + 0.5) / var(--swipe-action-count) * 100%)
-    calc((var(--swipe-action-index) + 1) / var(--swipe-action-count) * 100%);
+  animation-range: calc((sibling-count() - sibling-index() + 0.5) / sibling-count() * 100%)
+    calc((sibling-count() - sibling-index() + 1) / sibling-count() * 100%);
 }
