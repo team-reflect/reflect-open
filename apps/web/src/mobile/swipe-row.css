@@ -34,7 +34,6 @@
 .swipe-row[data-active] .swipe-action-body {
   animation: swipe-action-grow linear both;
   animation-timeline: scroll(nearest inline);
-  animation-range:
-    calc(var(--swipe-action-index) * var(--spacing) * 22 + var(--spacing) * 12)
+  animation-range: calc(var(--swipe-action-index) * var(--spacing) * 22 + var(--spacing) * 12)
     calc(var(--swipe-action-index) * var(--spacing) * 22 + var(--spacing) * 24);
 }
