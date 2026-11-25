@@ -1075,7 +1075,11 @@ describe('missing-note seed (new ordinary notes)', () => {
 
     const failed = h.snapshots.at(-1)
     expect(failed?.error).toBe('disk full')
-    expect(logger.getErrors().map((entry) => entry.message)).toEqual(['failed to save note:'])
+    // The save and its one retry.
+    expect(logger.getErrors().map((entry) => entry.message)).toEqual([
+      'failed to save note:',
+      'failed to save note:',
+    ])
     expect(failed?.dirty).toBe(true) // the edit is kept, not lost
     expect(h.writes).toEqual([])
 
@@ -1127,6 +1131,60 @@ describe('missing-note seed (new ordinary notes)', () => {
     await h.session.flush() // a settle point (blur/quit) retries without a new edit
     expect(h.writes).toEqual([{ path: 'notes/a.md', contents: '# Edited\n' }])
     expect(h.snapshots.at(-1)?.error).toBeNull()
+  })
+
+  it('dispose retries a save that found a file where none was expected', async () => {
+    let attempts = 0
+    const h: Harness = harness({
+      disk: null,
+      createIfMissing: true,
+      beforeWrite: () => {
+        attempts += 1
+        if (attempts === 1) {
+          h.setDisk('theirs\n')
+          return Promise.reject(new Error('Note changed on disk; reload before retrying'))
+        }
+        return Promise.resolve()
+      },
+    })
+    h.session.load()
+    await settled()
+
+    h.mergeNextWrite('theirs\nmine\n')
+    h.session.editorChanged('mine\n')
+    h.session.dispose()
+    await settled()
+
+    expect(h.expectedContents).toEqual([null, ''])
+    expect(h.disk()).toBe('theirs\nmine\n')
+  })
+
+  it('dispose retries a save that found an empty file where none was expected', async () => {
+    const h = harness({ disk: null, createIfMissing: true })
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('mine\n')
+    h.setDisk('')
+    h.session.dispose()
+    await settled()
+
+    expect(h.expectedContents).toEqual([null, ''])
+    expect(h.disk()).toBe('mine\n')
+  })
+
+  it('dispose retries a save whose file was deleted', async () => {
+    const h = harness()
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('# Edited\n')
+    h.setDisk(null)
+    h.session.dispose()
+    await settled()
+
+    expect(h.expectedContents).toEqual(['# Hello\n', null])
+    expect(h.disk()).toBe('# Edited\n')
   })
 })
 
