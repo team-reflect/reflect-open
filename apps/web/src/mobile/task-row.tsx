@@ -6,15 +6,10 @@ import { type OpenTask, formatShortDate, type WritableStore } from '@reflect/cor
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { SWIPE_ACTION_WIDTH, SwipeActionButton } from '@/mobile/swipe-action-button.tsx'
+import { SwipeActionButton } from '@/mobile/swipe-action-button.tsx'
 import { useRevealedRow } from '@/mobile/revealed-row.ts'
 import { SwipeRow } from '@/mobile/swipe-row.tsx'
 import { useDateFormat } from '@/providers/settings-provider.tsx'
-
-/**
- * Total width of the two actions (open note, delete) under every task row.
- */
-const ACTION_WIDTH = SWIPE_ACTION_WIDTH * 2
 
 interface MobileTaskRowProps {
   task: OpenTask
@@ -73,13 +68,11 @@ export function MobileTaskRow({
   return (
     <li data-task-key={key} className="border-b border-border">
       <SwipeRow
-        actionWidth={ACTION_WIDTH}
         revealed={revealed}
         onReveal={reveal}
         onClose={close}
         onBeginInteraction={beginInteraction}
         surfaceClassName="bg-surface-canvas"
-        overscrollColor="var(--color-destructive)"
         actions={
           <>
             <SwipeActionButton

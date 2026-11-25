@@ -7,6 +7,9 @@ import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { scrollElement, touch } from '@/test-utils/scroll.ts'
 import { SwipeRow } from './swipe-row.tsx'
 
+/**
+ * The open scroll position: the action button plus the `px-2` padding of the actions box.
+ */
 const ACTION_WIDTH = 136
 
 const onBeginInteraction = vi.fn()
@@ -20,16 +23,14 @@ function Harness({ initiallyRevealed = false }: { initiallyRevealed?: boolean })
         Toggle
       </button>
       <SwipeRow
-        actionWidth={ACTION_WIDTH}
         revealed={revealed}
         onReveal={() => setRevealed(true)}
         onClose={() => setRevealed(false)}
         onBeginInteraction={onBeginInteraction}
         className="h-12"
         surfaceClassName="bg-background"
-        overscrollColor="red"
         actions={
-          <button type="button" style={{ width: ACTION_WIDTH }} onClick={onAction}>
+          <button type="button" style={{ width: ACTION_WIDTH - 16 }} onClick={onAction}>
             Delete
           </button>
         }
@@ -121,11 +122,12 @@ describe('SwipeRow', () => {
     await vi.waitFor(() => expect(scroller.scrollLeft).toBe(0))
   })
 
-  it('mounts an open row at its open position', async () => {
+  it('mounts an open row at its open position, marked active', async () => {
     const view = await mount(<Harness initiallyRevealed />)
     const scroller = getScroller(view.getByText('Row').element())
 
     expect(scroller.scrollLeft).toBe(ACTION_WIDTH)
+    expect(scroller).toHaveAttribute('data-active')
     await expect.element(view.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 

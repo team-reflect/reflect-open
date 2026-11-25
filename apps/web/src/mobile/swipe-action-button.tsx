@@ -1,20 +1,24 @@
 import type { ReactElement, ReactNode } from 'react'
 import { cn } from '@/lib/utils.ts'
 
-/** Width (px) of one action button under a swipeable list row. */
-export const SWIPE_ACTION_WIDTH = 68
-
 interface SwipeActionButtonProps {
   icon: ReactNode
-  /** The short visible caption under the icon (the full name goes in `ariaLabel`). */
+  /**
+   * The short visible caption beside the icon (the full name goes in `ariaLabel`).
+   */
   label: string
   ariaLabel: string
-  /** The action's background, e.g. `bg-accent` or `bg-destructive`. */
+  /**
+   * The pill's background, e.g. `bg-accent` or `bg-destructive`.
+   */
   className: string
   onClick: () => void
 }
 
-/** One icon-over-caption action button revealed underneath a swiped list row. */
+/**
+ * One icon-and-caption pill beside a swiped list row. The button fills the row
+ * height, so a tap above or below the pill still counts.
+ */
 export function SwipeActionButton({
   icon,
   label,
@@ -25,16 +29,19 @@ export function SwipeActionButton({
   return (
     <button
       type="button"
-      className={cn(
-        'flex h-full flex-col items-center justify-center gap-1 text-[10px] font-medium text-text-on-brand active:opacity-70',
-        className,
-      )}
-      style={{ width: SWIPE_ACTION_WIDTH }}
+      className="swipe-action flex w-20 flex-none items-center active:opacity-70"
       aria-label={ariaLabel}
       onClick={onClick}
     >
-      {icon}
-      <span aria-hidden>{label}</span>
+      <span
+        className={cn(
+          'swipe-action-body flex h-9 w-full items-center justify-center gap-1 rounded-full text-sm font-medium text-text-on-brand',
+          className,
+        )}
+      >
+        {icon}
+        <span aria-hidden>{label}</span>
+      </span>
     </button>
   )
 }

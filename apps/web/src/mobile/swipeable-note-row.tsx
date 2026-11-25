@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from 'react'
 import { Pin, PinOff, Trash2 } from 'lucide-react'
 import { type HighlightSegment, formatRecencyLabel, type WritableStore } from '@reflect/core'
-import { SWIPE_ACTION_WIDTH, SwipeActionButton } from '@/mobile/swipe-action-button.tsx'
+import { SwipeActionButton } from '@/mobile/swipe-action-button.tsx'
 import { useRevealedRow } from '@/mobile/revealed-row.ts'
 import { SwipeRow } from '@/mobile/swipe-row.tsx'
 import { useDateFormat, useTimeFormat } from '@/providers/settings-provider.tsx'
@@ -61,7 +61,6 @@ export function SwipeableNoteRow({
   const dateFormat = useDateFormat()
   const timeFormat = useTimeFormat()
   const { revealed, reveal, close, beginInteraction } = useRevealedRow(revealedRow, row.path)
-  const actionWidth = SWIPE_ACTION_WIDTH * (row.canDelete ? 2 : 1)
   const title = row.titleSegments.map((segment) => segment.text).join('')
   const activate = (): void => {
     if (revealed) {
@@ -74,14 +73,12 @@ export function SwipeableNoteRow({
   return (
     <div className="border-b border-border" style={{ height: NOTE_ROW_HEIGHT }}>
       <SwipeRow
-        actionWidth={actionWidth}
         revealed={revealed}
         onReveal={reveal}
         onClose={close}
         onBeginInteraction={beginInteraction}
         className="h-full"
         surfaceClassName="bg-surface-canvas"
-        overscrollColor={row.canDelete ? 'var(--color-destructive)' : 'var(--color-accent)'}
         actions={
           <>
             <SwipeActionButton
