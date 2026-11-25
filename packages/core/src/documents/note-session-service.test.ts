@@ -82,6 +82,10 @@ interface Harness {
   disk: () => string | undefined
   session: NoteSession
   /**
+   * A new session of the same note, from the same service.
+   */
+  reopen: () => { session: NoteSession; snapshots: NoteSessionSnapshot[] }
+  /**
    * The graph open when the session was created.
    */
   graph: TestGraphSessionService<never>
@@ -144,25 +148,29 @@ function harness(options?: {
     },
   })
   const graph = createTestGraphSessionService({ graph: { generation: 1 } })
-  const session = createNoteSessionService({
+  const service = createNoteSessionService({
     noteFile,
     clock,
     logger,
     graphSession: graph,
-  }).create({
-    path: PATH,
-    readOnly: options?.write === false,
-    classify: options?.classify ?? (() => 'exact'),
-    onSnapshot: (snapshot) => {
-      snapshots.push(snapshot)
-    },
-    onContent: (content, origin) => {
-      contents.push({ content, origin })
-    },
-    createIfMissing: options?.createIfMissing,
-    missingSeed: options?.missingSeed,
-    saveDebounceMs: 10,
   })
+  const create = (into: NoteSessionSnapshot[]): NoteSession => {
+    return service.create({
+      path: PATH,
+      readOnly: options?.write === false,
+      classify: options?.classify ?? (() => 'exact'),
+      onSnapshot: (snapshot) => {
+        into.push(snapshot)
+      },
+      onContent: (content, origin) => {
+        contents.push({ content, origin })
+      },
+      createIfMissing: options?.createIfMissing,
+      missingSeed: options?.missingSeed,
+      saveDebounceMs: 10,
+    })
+  }
+  const session = create(snapshots)
   session.attachEditor({
     getMarkdown: () => {
       options?.reconcilePendingEditorInput?.()
@@ -194,6 +202,10 @@ function harness(options?: {
     },
     disk: () => files.files().get(PATH),
     session,
+    reopen: () => {
+      const reopened: NoteSessionSnapshot[] = []
+      return { session: create(reopened), snapshots: reopened }
+    },
     graph,
     generations: () => files.writes().map((write) => write.generation),
   }
@@ -263,6 +275,96 @@ describe('createNoteSession', () => {
 
     expect(reconcilePendingEditorInput).toHaveBeenCalledOnce()
     expect(writes).toEqual([{ path: 'notes/a.md', contents: '# 🧠 Business ideas\n' }])
+  })
+
+  it('a reopened lazy note is ready at once, from the last disk state', async () => {
+    const h = harness({ createIfMissing: true })
+    h.session.load()
+    await settled()
+    h.session.dispose()
+
+    const reopened = h.reopen()
+    reopened.session.load()
+    expect(reopened.snapshots.at(-1)).toMatchObject({
+      status: 'ready',
+      initialContent: '# Hello\n',
+      missing: false,
+    })
+  })
+
+  it('a reopened lazy note reconciles with a file that changed while it was closed', async () => {
+    const h = harness({ createIfMissing: true })
+    h.session.load()
+    await settled()
+    h.session.dispose()
+    h.setDisk('# Changed\n')
+
+    const reopened = h.reopen()
+    reopened.session.load()
+    expect(reopened.snapshots.at(-1)).toMatchObject({
+      status: 'ready',
+      initialContent: '# Hello\n',
+    })
+    await settled()
+    expect(reopened.snapshots.at(-1)).toMatchObject({
+      status: 'ready',
+      initialContent: '# Changed\n',
+    })
+  })
+
+  it('a reopened lazy note starts from the edit its last session saved on dispose', async () => {
+    const h = harness({ createIfMissing: true })
+    h.session.load()
+    await settled()
+    h.session.editorChanged('# Edited\n')
+    h.session.dispose()
+
+    // The save is in flight: the disk state is unknown.
+    const early = h.reopen()
+    early.session.load()
+    expect(early.snapshots.at(-1)).toMatchObject({ status: 'loading' })
+    early.session.dispose()
+    await settled()
+
+    const reopened = h.reopen()
+    reopened.session.load()
+    expect(reopened.snapshots.at(-1)).toMatchObject({
+      status: 'ready',
+      initialContent: '# Edited\n',
+    })
+  })
+
+  it('a reopened missing lazy note is ready and missing at once', async () => {
+    const h = harness({ disk: null, createIfMissing: true })
+    h.session.load()
+    await settled()
+    h.session.dispose()
+
+    const reopened = h.reopen()
+    reopened.session.load()
+    expect(reopened.snapshots.at(-1)).toMatchObject({
+      status: 'ready',
+      initialContent: '',
+      missing: true,
+    })
+  })
+
+  it('a reopened note loads from disk after a discard, and without createIfMissing', async () => {
+    const lazy = harness({ createIfMissing: true })
+    lazy.session.load()
+    await settled()
+    lazy.session.discard()
+    const afterDiscard = lazy.reopen()
+    afterDiscard.session.load()
+    expect(afterDiscard.snapshots.at(-1)).toMatchObject({ status: 'loading' })
+
+    const plain = harness()
+    plain.session.load()
+    await settled()
+    plain.session.dispose()
+    const reopened = plain.reopen()
+    reopened.session.load()
+    expect(reopened.snapshots.at(-1)).toMatchObject({ status: 'loading' })
   })
 
   it('discard detaches without writing — even with a pending edit (delete path)', async () => {

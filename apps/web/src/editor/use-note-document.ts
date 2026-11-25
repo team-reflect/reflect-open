@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import {
   createDocumentBinding,
   type DocumentBinding,
@@ -66,7 +66,9 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
   // pane, and the session's writes follow that reopen on their own.
   const canWrite = useGraphInfo() !== null
 
-  useEffect(() => {
+  // A layout effect: a session that is `ready` at once renders its editor
+  // in the first frame.
+  useLayoutEffect(() => {
     if (!path) {
       return
     }

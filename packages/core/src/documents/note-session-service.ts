@@ -1,5 +1,10 @@
+import { createLRU } from 'lru.min'
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
-import { writeGenerationFor, type GraphSessionSource } from '../graph/graph-session.ts'
+import {
+  writeGenerationFor,
+  type GraphSession,
+  type GraphSessionSource,
+} from '../graph/graph-session.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { errorMessage, isAppError, AppError } from '../errors.ts'
 import type {
@@ -39,6 +44,25 @@ interface NoteSessionIo {
 
 const DEFAULT_SAVE_DEBOUNCE_MS = 800
 
+const MAX_KNOWN_NOTES = 8
+
+/**
+ * The last disk state of a note that a session read or wrote.
+ */
+interface KnownNote {
+  readonly graph: GraphSession
+  /**
+   * The file text, or the empty string for a missing file.
+   */
+  readonly content: string
+  /**
+   * The content hash, or `null` for a missing file.
+   */
+  readonly hash: string | null
+}
+
+type KnownNotes = ReturnType<typeof createLRU<string, KnownNote>>
+
 export interface NoteSessionServiceDeps {
   readonly noteFile: WritableNoteFileService
   readonly clock: ClockService
@@ -48,13 +72,14 @@ export interface NoteSessionServiceDeps {
 
 class NoteSessionServiceImpl implements NoteSessionService {
   readonly #deps: NoteSessionServiceDeps
+  readonly #known: KnownNotes = createLRU({ max: MAX_KNOWN_NOTES })
 
   constructor(deps: NoteSessionServiceDeps) {
     this.#deps = deps
   }
 
   create(options: NoteSessionOptions): NoteSession {
-    return new NoteSessionImpl(this.#deps, options)
+    return new NoteSessionImpl(this.#deps, options, this.#known)
   }
 }
 
@@ -68,6 +93,8 @@ export function createNoteSessionService(deps: NoteSessionServiceDeps): NoteSess
 class NoteSessionImpl implements NoteSession {
   readonly #deps: NoteSessionServiceDeps
   readonly #io: NoteSessionIo
+  readonly #graph: GraphSession | null
+  readonly #known: KnownNotes
   readonly #classify: NoteSessionOptions['classify']
   readonly #onSnapshot: NoteSessionOptions['onSnapshot']
   readonly #onContent: NoteSessionOptions['onContent']
@@ -150,26 +177,41 @@ class NoteSessionImpl implements NoteSession {
 
   #lastEmitted: NoteSessionSnapshot | null = null
 
-  constructor(deps: NoteSessionServiceDeps, options: NoteSessionOptions) {
+  constructor(deps: NoteSessionServiceDeps, options: NoteSessionOptions, known: KnownNotes) {
     this.#deps = deps
+    this.#known = known
     const { noteFile, graphSession } = deps
     this.#classify = options.classify
     this.#onSnapshot = options.onSnapshot
     this.#onContent = options.onContent
     const graph = graphSession.get().session
+    this.#graph = graph
     this.#io = {
       read: async (forPath) => {
         if (graph === null) {
           throw new AppError('noGraph', 'No graph is open.')
         }
-        return await noteFile.readWithHash(forPath, writeGenerationFor(graphSession, graph))
+        try {
+          const read = await noteFile.readWithHash(forPath, writeGenerationFor(graphSession, graph))
+          known.set(forPath, { graph, content: read.content, hash: read.hash })
+          return read
+        } catch (cause) {
+          if (isAppError(cause) && cause.kind === 'notFound') {
+            known.set(forPath, { graph, content: '', hash: null })
+          }
+          throw cause
+        }
       },
       write:
         options.readOnly === true || graph === null
           ? null
           : async (forPath, contents, expectedContents) => {
+              // The disk state is unknown until the write lands.
+              known.delete(forPath)
               const generation = writeGenerationFor(graphSession, graph)
-              return await noteFile.write(forPath, contents, generation, expectedContents)
+              const result = await noteFile.write(forPath, contents, generation, expectedContents)
+              known.set(forPath, { graph, content: result.merged ?? contents, hash: result.hash })
+              return result
             },
     }
     this.path = options.path
@@ -501,7 +543,53 @@ class NoteSessionImpl implements NoteSession {
     }
   }
 
+  /**
+   * The last disk state of this note, for a note that may be missing.
+   */
+  #knownNote(): KnownNote | null {
+    if (!this.#createIfMissing || this.#missingSeed !== undefined) {
+      return null
+    }
+    const known = this.#known.get(this.path)
+    return known !== undefined && known.graph === this.#graph ? known : null
+  }
+
+  /**
+   * Take the note's first content as the clean baseline.
+   */
+  #adoptInitial(content: string, hash: string | null): void {
+    const fileMissing = hash === null
+    // A missing note adopts the seed as its clean baseline: the editor
+    // shows the template, but disk-comparison sees no difference, so
+    // nothing is written until a real edit (the lazy no-litter contract).
+    const adopted = fileMissing && this.#missingSeed !== undefined ? this.#missingSeed : content
+    const doc = splitDoc(adopted)
+    this.#header = doc.header
+    this.#buffer = doc.body
+    this.#disk = adopted
+    this.#diskHash = hash
+    this.#writeBase = adopted
+    this.#dirty = false
+    this.#missing = fileMissing
+    // The data-loss gate: a note the editor can't reproduce opens read-only.
+    this.#isProtected = this.#classify(doc.body) === 'lossy'
+    this.#initialContent = this.#isProtected ? adopted : doc.body
+    this.#status = 'ready'
+    this.#emit()
+    // The real disk content, not the seed: the rename tracker must
+    // baseline untitled so the first authored title is a birth.
+    this.#onContent?.(content, 'load')
+  }
+
   load(): void {
+    const known = this.#knownNote()
+    if (known !== null) {
+      this.#error = null
+      this.#adoptInitial(known.content, known.hash)
+      // The file may be newer than what the last session saw.
+      void this.#reconcileFromDisk(true)
+      return
+    }
     this.#loading = true
     this.#missedChange = false
     this.#status = 'loading'
@@ -510,30 +598,10 @@ class NoteSessionImpl implements NoteSession {
     this.#loadPromise = (async () => {
       try {
         const { content, hash } = await this.#readInitial()
-        const fileMissing = hash === null
         if (this.#disposed) {
           return
         }
-        // A missing note adopts the seed as its clean baseline: the editor
-        // shows the template, but disk-comparison sees no difference, so
-        // nothing is written until a real edit (the lazy no-litter contract).
-        const adopted = fileMissing && this.#missingSeed !== undefined ? this.#missingSeed : content
-        const doc = splitDoc(adopted)
-        this.#header = doc.header
-        this.#buffer = doc.body
-        this.#disk = adopted
-        this.#diskHash = hash
-        this.#writeBase = adopted
-        this.#dirty = false
-        this.#missing = fileMissing
-        // The data-loss gate: a note the editor can't reproduce opens read-only.
-        this.#isProtected = this.#classify(doc.body) === 'lossy'
-        this.#initialContent = this.#isProtected ? adopted : doc.body
-        this.#status = 'ready'
-        this.#emit()
-        // The real disk content, not the seed: the rename tracker must
-        // baseline untitled so the first authored title is a birth.
-        this.#onContent?.(content, 'load')
+        this.#adoptInitial(content, hash)
       } catch (cause) {
         if (!this.#disposed) {
           this.#error = errorMessage(cause)
@@ -689,6 +757,10 @@ class NoteSessionImpl implements NoteSession {
     // session's path even after the UI moves on.
     if (!this.#discarded) {
       void this.flush()
+      // The pending save changes the file: the known state is stale until it lands.
+      if (this.#dirty) {
+        this.#known.delete(this.path)
+      }
     }
     this.#disposed = true
   }
@@ -697,6 +769,7 @@ class NoteSessionImpl implements NoteSession {
     this.#cancelScheduledSave()
     this.#discarded = true
     this.#disposed = true
+    this.#known.delete(this.path)
   }
 
   async prepareDelete(): Promise<boolean> {

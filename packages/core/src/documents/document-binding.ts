@@ -31,7 +31,7 @@ import type { OpenDocumentsService } from './open-documents-service.ts'
  * The desktop hook's effect drives it like so (see `use-note-document.ts`):
  *
  * ```ts
- * useEffect(() => {
+ * useLayoutEffect(() => {
  *   const { session, created } = binding.bind(path, {
  *     coordinator: () => titleRename.createCoordinator({ ... }),
  *     session: (coordinator, onSnapshot) => noteSessions.create({ onSnapshot, ... }),
