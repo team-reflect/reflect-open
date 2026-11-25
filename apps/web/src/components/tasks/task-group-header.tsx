@@ -71,9 +71,9 @@ export function TaskGroupHeader({
             type="button"
             aria-label={`Add a task to ${group.kind === 'current' ? 'today' : group.label}`}
             onClick={() => onAdd(addTarget)}
-            className="ml-auto flex h-full min-w-8 flex-none items-center justify-center gap-1 text-xs font-medium text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none"
+            className="ml-auto flex h-full -mr-4 min-w-11 @lg:mr-0 flex-none items-center justify-center gap-1 text-xs font-medium text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none"
           >
-            <Plus aria-hidden className="size-3.5" />
+            <Plus aria-hidden className="size-4" />
             {/* The label shows only where the header is wide enough for it. */}
             <span className="hidden @lg:inline">Add</span>
           </button>
