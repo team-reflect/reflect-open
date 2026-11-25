@@ -130,7 +130,7 @@ describe('NoteRowList', () => {
       .element(view.getByRole('button', { name: /Alpha.*First line/ }))
       .toBeInTheDocument()
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
-    await swipeRow(surface, 136)
+    await swipeRow(surface, 184)
     await view.getByRole('button', { name: 'Pin Alpha', exact: true }).click()
     await vi.waitFor(() => {
       expect(view.core.noteRows.get().get('notes/alpha.md')).toMatchObject({
@@ -168,11 +168,11 @@ describe('NoteRowList', () => {
   it('reveals pin and delete actions once a leftward swipe settles open', async () => {
     const view = await mount(<SwipeHarness />)
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
-    const scroller = await swipeRow(surface, 136)
+    const scroller = await swipeRow(surface, 184)
 
     await expect.element(view.getByRole('button', { name: 'Pin Alpha' })).toBeInTheDocument()
     await expect.element(view.getByRole('button', { name: 'Delete Alpha' })).toBeInTheDocument()
-    expect(scroller.scrollLeft).toBe(136)
+    expect(scroller.scrollLeft).toBe(184)
     expect(onOpen).not.toHaveBeenCalled()
   })
 
@@ -196,7 +196,7 @@ describe('NoteRowList', () => {
   it('closes an open row when its note surface is tapped', async () => {
     const view = await mount(<SwipeHarness />)
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
-    const scroller = await swipeRow(surface, 136)
+    const scroller = await swipeRow(surface, 184)
     // A tap leaves the row where it is; a locator click would scroll it into view first.
     await act(() => (surface as HTMLElement).click())
 
@@ -210,7 +210,7 @@ describe('NoteRowList', () => {
   it('runs the revealed delete action without opening the note', async () => {
     const view = await mount(<SwipeHarness />)
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
-    await swipeRow(surface, 136)
+    await swipeRow(surface, 184)
     // In place, like a tap: a locator click scrolls the button into view first.
     const remove = view.getByRole('button', { name: 'Delete Alpha' }).element() as HTMLElement
     await act(() => remove.click())
@@ -224,7 +224,7 @@ describe('NoteRowList', () => {
       <SwipeHarness note={row({ path: 'daily/2026-08-15.md', canDelete: false })} />,
     )
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
-    await swipeRow(surface, 68)
+    await swipeRow(surface, 96)
 
     await expect.element(view.getByRole('button', { name: 'Pin Alpha' })).toBeInTheDocument()
     expect(view.getByRole('button', { name: 'Delete Alpha' }).query()).toBeNull()
@@ -244,7 +244,7 @@ describe('NoteRowList', () => {
     )
     await expect.element(view.getByRole('button', { name: /Note 0/ })).toBeInTheDocument()
     const surface = view.getByRole('button', { name: /Note 0/ }).element()
-    const scroller = await swipeRow(surface, 136)
+    const scroller = await swipeRow(surface, 184)
     await expect.element(view.getByRole('button', { name: 'Delete Note 0' })).toBeInTheDocument()
 
     await scrollElement({ element: scroller.closest('ul')!.parentElement!, top: 40 })
