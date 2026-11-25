@@ -128,11 +128,7 @@ export function IcloudSettingsField(): ReactElement | null {
                 <DialogHeader>
                   <DialogTitle>Move this graph to iCloud Drive?</DialogTitle>
                   <DialogDescription>
-                    Your notes are copied into iCloud Drive and the graph reopens there. The current
-                    folder stays on disk, untouched, as a recovery copy.
-                    {gitSyncConnected
-                      ? ' GitHub sync is disconnected from the recovery copy; you can reconnect GitHub sync after the iCloud graph opens.'
-                      : ''}
+                    {`Your notes are copied into iCloud Drive and the graph reopens there. The current folder stays on disk, untouched, as a recovery copy.${gitSyncConnected ? ' GitHub sync is disconnected from the recovery copy; you can reconnect GitHub sync after the iCloud graph opens.' : ''}`}
                   </DialogDescription>
                 </DialogHeader>
                 {/* A failure before the copy lands keeps the dialog open; show it here too. */}

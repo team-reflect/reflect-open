@@ -24,6 +24,9 @@ importers:
       eslint:
         specifier: ^10.15.0
         version: 10.15.0(jiti@2.7.0)(supports-color@8.1.1)
+      eslint-plugin-react-google-translate:
+        specifier: ^1.1.0
+        version: 1.1.0(eslint@10.15.0)(supports-color@8.1.1)(typescript@6.0.3)
       knip:
         specifier: ^6.46.0
         version: 6.46.1
@@ -3726,6 +3729,12 @@ packages:
     peerDependenciesMeta:
       eslint:
         optional: true
+
+  eslint-plugin-react-google-translate@1.1.0:
+    resolution: {integrity: sha512-TuMGXLrR5dntqRzhg4r/dsmO16o0pXVezYeYJ1akn6HnCh3RJOIRcn8MP7QoVHFuOhIoUuT40YqQS4BpH4fvYQ==}
+    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    peerDependencies:
+      eslint: '>=8'
 
   eslint-plugin-react-hooks@7.1.1:
     resolution: {integrity: sha512-f2I7Gw6JbvCexzIInuSbZpfdQ44D7iqdWX01FKLvrPgqxoE7oMj8clOfto8U6vYiz4yd5oKu39rRSVOe1zRu0g==}
@@ -9566,6 +9575,14 @@ snapshots:
       eslint: 10.15.0(jiti@2.7.0)(supports-color@8.1.1)
     transitivePeerDependencies:
       - supports-color
+
+  eslint-plugin-react-google-translate@1.1.0(eslint@10.15.0)(supports-color@8.1.1)(typescript@6.0.3):
+    dependencies:
+      '@typescript-eslint/utils': 8.72.0(eslint@10.15.0)(supports-color@8.1.1)(typescript@6.0.3)
+      eslint: 10.15.0(jiti@2.7.0)(supports-color@8.1.1)
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
 
   eslint-plugin-react-hooks@7.1.1(eslint@10.15.0)(supports-color@8.1.1):
     dependencies:

@@ -92,11 +92,13 @@ export function BacklinkLoadMore({
         onClick={requestLoadMore}
       >
         {isFetchingNextPage ? <Spinner /> : null}
-        {isFetchingNextPage
-          ? 'Loading more backlinks…'
-          : isFetchNextPageError
-            ? 'Retry loading backlinks'
-            : 'Load more backlinks'}
+        <span>
+          {isFetchingNextPage
+            ? 'Loading more backlinks…'
+            : isFetchNextPageError
+              ? 'Retry loading backlinks'
+              : 'Load more backlinks'}
+        </span>
       </Button>
     </div>
   )

@@ -72,9 +72,7 @@ export function IncomingBacklinks({
             aria-hidden
             className={cn('size-4 shrink-0 transition-transform', expanded && 'rotate-90')}
           />
-          <span>
-            Incoming backlink{count === 1 ? '' : 's'} ({count})
-          </span>
+          <span>{`Incoming backlink${count === 1 ? '' : 's'} (${count})`}</span>
         </button>
       </h3>
 

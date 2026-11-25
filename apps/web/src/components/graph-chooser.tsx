@@ -65,8 +65,7 @@ export function GraphChooser(): ReactElement {
             icon={<Folder aria-hidden className="size-4" strokeWidth={1.75} />}
             title="A folder you choose"
           >
-            Open an existing Markdown folder on this {icloudCapable ? 'Mac' : 'computer'}. Reflect
-            keeps its files where they are.
+            {`Open an existing Markdown folder on this ${icloudCapable ? 'Mac' : 'computer'}. Reflect keeps its files where they are.`}
           </CardHeader>
           <Button
             type="button"
@@ -320,7 +319,7 @@ function IcloudCard({
               onClick={() => create()}
             >
               {busy === 'create' ? <Spinner /> : null}
-              Create
+              <span>Create</span>
             </Button>
           </div>
           {nameTaken ? (
@@ -355,7 +354,7 @@ function IcloudCard({
             onClick={() => create()}
           >
             {busy === 'create' ? <Spinner /> : <Cloud aria-hidden strokeWidth={1.75} />}
-            {busy === 'create' ? 'Setting up…' : 'Create'}
+            <span>{busy === 'create' ? 'Setting up…' : 'Create'}</span>
           </Button>
         </div>
       )}

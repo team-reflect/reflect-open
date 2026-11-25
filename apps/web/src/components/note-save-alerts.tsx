@@ -24,8 +24,7 @@ export function NoteSaveAlerts({
       ) : null}
       {assetSaveError !== null ? (
         <InlineAlert tone="error" className="mb-4">
-          Couldn’t save the {assetSaveError.kind === 'image' ? 'pasted image' : 'file'}:{' '}
-          {assetSaveError.message}. It was not added to the note.
+          {`Couldn’t save the ${assetSaveError.kind === 'image' ? 'pasted image' : 'file'}: ${assetSaveError.message}. It was not added to the note.`}
         </InlineAlert>
       ) : null}
     </>

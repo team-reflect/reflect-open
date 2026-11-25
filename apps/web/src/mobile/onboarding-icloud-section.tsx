@@ -133,7 +133,7 @@ export function OnboardingIcloudSection(props: OnboardingIcloudSectionProps): Re
               ) : (
                 <Cloud aria-hidden strokeWidth={1.75} />
               )}
-              {pendingChoice === 'icloud-create' ? 'Setting up…' : 'Setup graph'}
+              <span>{pendingChoice === 'icloud-create' ? 'Setting up…' : 'Setup graph'}</span>
             </Button>
           </div>
         </>

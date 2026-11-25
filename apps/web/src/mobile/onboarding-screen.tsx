@@ -117,7 +117,7 @@ export function MobileOnboardingScreen(): ReactElement {
               ) : (
                 <HardDrive aria-hidden strokeWidth={1.75} />
               )}
-              {pendingChoice === 'local' ? 'Setting up…' : 'Or, use this device only'}
+              <span>{pendingChoice === 'local' ? 'Setting up…' : 'Or, use this device only'}</span>
             </Button>
           </div>
         </div>
