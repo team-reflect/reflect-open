@@ -1024,11 +1024,14 @@ describe('MobileTasks', () => {
     }
 
     await scrollElement({ element: view.getByRole('list').element().parentElement!, top: 7000 })
-    const before = await waitFor(topRow)
+    await waitFor(topRow)
 
-    await userEvent.click(view.getByRole('button', { name: 'Remount' }))
-    await userEvent.click(view.getByRole('button', { name: 'Remount' }))
-    await waitFor(() => expect(topRow()).toBe(before))
+    // Read the row and unmount in one task, so the list cannot move in between.
+    const remount = view.getByRole('button', { name: 'Remount' }).element() as HTMLElement
+    const before = readTopRow()
+    await act(() => remount.click())
+    await act(() => remount.click())
+    await waitFor(() => expect(readTopRow()).toBe(before))
     await view.unmount()
   })
 
