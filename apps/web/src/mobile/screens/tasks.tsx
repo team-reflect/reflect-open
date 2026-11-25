@@ -1,16 +1,18 @@
-import { useDeferredValue, useMemo, useRef, useState, type ReactElement } from 'react'
+import { useCallback, useDeferredValue, useMemo, useRef, useState, type ReactElement } from 'react'
 import { CircleCheck } from 'lucide-react'
 import {
   todaysDailyTarget,
   WritableStore,
   type InsertTaskTarget,
   type OpenTask,
+  type TaskGroup,
 } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { TaskBreadcrumbs } from '@/components/tasks/task-breadcrumbs.tsx'
 import { TaskGroupHeader } from '@/components/tasks/task-group-header.tsx'
 import { TaskList } from '@/components/tasks/task-list.tsx'
+import type { TaskListRow } from '@/lib/tasks/task-list-items.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
 import { useVisibleTaskGroups } from '@/lib/tasks/use-visible-task-groups.ts'
 import { useToday } from '@/lib/use-today.ts'
@@ -102,22 +104,66 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
     return groups.flatMap((group) => group.tasks).find((row) => row.taskId === key) ?? editingTask
   }, [groups, editingTask])
 
-  const editTask = (task: OpenTask, options?: { autoFocus?: boolean; haptic?: boolean }): void => {
-    if (options?.haptic !== false) {
-      hapticImpactLight(haptics)
-    }
-    setAutoFocusEditor(options?.autoFocus === true)
-    setEditingTask(task)
-    setSheetOpen(true)
-  }
+  const editTask = useCallback(
+    (task: OpenTask, options?: { autoFocus?: boolean; haptic?: boolean }): void => {
+      if (options?.haptic !== false) {
+        hapticImpactLight(haptics)
+      }
+      setAutoFocusEditor(options?.autoFocus === true)
+      setEditingTask(task)
+      setSheetOpen(true)
+    },
+    [haptics],
+  )
 
   // The group headers' "+" (V1): drop any search filter so the new row is
   // visible, then open its quick-edit sheet with the editor focused.
-  const onAdd = (target: InsertTaskTarget): void => {
-    hapticImpactLight(haptics)
-    onQueryChange('')
-    editTask(commands.add(target), { autoFocus: true, haptic: false })
-  }
+  const onAdd = useCallback(
+    (target: InsertTaskTarget): void => {
+      hapticImpactLight(haptics)
+      onQueryChange('')
+      editTask(commands.add(target), { autoFocus: true, haptic: false })
+    },
+    [haptics, onQueryChange, editTask, commands],
+  )
+
+  const openNote = useCallback((path: string) => navigate(routeForPath(path)), [navigate])
+  const toggleTask = useCallback((task: OpenTask) => void commands.toggle([task]), [commands])
+  const deleteTask = useCallback((task: OpenTask) => void commands.remove([task]), [commands])
+
+  const renderHeader = useCallback(
+    (group: TaskGroup) => (
+      <TaskGroupHeader
+        group={group}
+        today={today}
+        onAdd={onAdd}
+        onOpen={(path) => {
+          hapticImpactLight(haptics)
+          openNote(path)
+        }}
+      />
+    ),
+    [today, onAdd, haptics, openNote],
+  )
+  const renderRow = useCallback(
+    (row: TaskListRow) => {
+      if (row.kind === 'breadcrumbs') {
+        return <TaskBreadcrumbs breadcrumbs={row.labels} className="px-4 pb-1 pt-3" />
+      }
+      return (
+        <MobileTaskRow
+          task={row.task}
+          showSource={row.showSource}
+          onEdit={editTask}
+          onToggle={toggleTask}
+          revealedRow={revealedRow}
+          onOpenNote={openNote}
+          onDelete={deleteTask}
+        />
+      )
+    },
+    [editTask, toggleTask, revealedRow, openNote, deleteTask],
+  )
 
   const archiveCompleted = (): void => {
     hapticImpactLight(haptics)
@@ -184,34 +230,8 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
             groups={groups}
             ready={ready}
             rowHeight={MOBILE_TASK_ROW_HEIGHT}
-            renderHeader={(group) => (
-              <TaskGroupHeader
-                group={group}
-                today={today}
-                onAdd={onAdd}
-                onOpen={(path) => {
-                  hapticImpactLight(haptics)
-                  navigate(routeForPath(path))
-                }}
-              />
-            )}
-            renderRow={(row) => {
-              if (row.kind === 'breadcrumbs') {
-                return <TaskBreadcrumbs breadcrumbs={row.labels} className="px-4 pb-1 pt-3" />
-              }
-              const { task } = row
-              return (
-                <MobileTaskRow
-                  task={task}
-                  showSource={row.showSource}
-                  onEdit={editTask}
-                  onToggle={() => void commands.toggle([task])}
-                  revealedRow={revealedRow}
-                  onOpenNote={() => navigate(routeForPath(task.notePath))}
-                  onDelete={() => void commands.remove([task])}
-                />
-              )
-            }}
+            renderHeader={renderHeader}
+            renderRow={renderRow}
           />
         </div>
       )}
@@ -222,7 +242,7 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
           open={sheetOpen}
           onOpenChange={setSheetOpen}
           today={today}
-          onOpenNote={(path) => navigate(routeForPath(path))}
+          onOpenNote={openNote}
           autoFocusEditor={autoFocusEditor}
         />
       ) : null}

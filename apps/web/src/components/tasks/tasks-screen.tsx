@@ -8,12 +8,13 @@ import {
   type ReactElement,
 } from 'react'
 import { Archive, CalendarClock, List, Search } from 'lucide-react'
-import type { InsertTaskTarget, OpenTask } from '@reflect/core'
+import type { InsertTaskTarget, OpenTask, TaskGroup } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { useNoteLinkNavigation, type ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
 import { useTaskRowHandlers } from '@/lib/tasks/use-task-row-handlers.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
+import type { TaskListRow } from '@/lib/tasks/task-list-items.ts'
 import { useTaskKeyboard } from '@/lib/tasks/use-task-keyboard.ts'
 import { useTaskSelection } from '@/lib/tasks/use-task-selection.ts'
 import { useVisibleTaskGroups } from '@/lib/tasks/use-visible-task-groups.ts'
@@ -197,6 +198,49 @@ export function TasksScreen(): ReactElement {
     onConvertToBullet,
   })
 
+  const renderHeader = useCallback(
+    (group: TaskGroup) => (
+      <TaskGroupHeader
+        group={group}
+        today={today}
+        onAdd={onAdd}
+        onOpen={openNote}
+        className="lg:px-12"
+      />
+    ),
+    [today, onAdd, openNote],
+  )
+  const renderRow = useCallback(
+    (row: TaskListRow) => {
+      if (row.kind === 'breadcrumbs') {
+        return (
+          <TaskBreadcrumbs
+            breadcrumbs={row.labels}
+            onSelect={() => selection.select(row.tasks.map((task) => task.taskId))}
+          />
+        )
+      }
+      const { task } = row
+      const key = task.taskId
+      const selected = selection.isSelected(key)
+      return (
+        <TaskRow
+          task={task}
+          showSource={row.showSource}
+          selected={selected}
+          editing={selection.isSoleSelected(key)}
+          togglesSelection={selected && selection.selectedCount > 1}
+          onSelect={(event) => selection.clickSelect(key, event)}
+          onCheckboxToggle={() => onCheckboxToggle(task)}
+          onSelectionCheckboxToggle={() => onSelectionCheckboxToggle(task)}
+          editHandlers={editHandlers(task)}
+          onOpen={openNote}
+        />
+      )
+    },
+    [selection, onCheckboxToggle, onSelectionCheckboxToggle, editHandlers, openNote],
+  )
+
   // Move focus into the Tasks surface on mount so the shortcuts work the moment
   // you navigate here — without it, focus would linger on the sidebar link that
   // navigated, where the scoping guard (rightly) backs the shortcuts off.
@@ -294,42 +338,8 @@ export function TasksScreen(): ReactElement {
             groupGap={GROUP_GAP}
             // The inline editor saves its draft and loses focus when it unmounts.
             keepMountedTaskId={selection.selectedCount === 1 ? focusedKey : null}
-            renderHeader={(group) => (
-              <TaskGroupHeader
-                group={group}
-                today={today}
-                onAdd={onAdd}
-                onOpen={openNote}
-                className="lg:px-12"
-              />
-            )}
-            renderRow={(row) => {
-              if (row.kind === 'breadcrumbs') {
-                return (
-                  <TaskBreadcrumbs
-                    breadcrumbs={row.labels}
-                    onSelect={() => selection.select(row.tasks.map((task) => task.taskId))}
-                  />
-                )
-              }
-              const { task } = row
-              const key = task.taskId
-              const selected = selection.isSelected(key)
-              return (
-                <TaskRow
-                  task={task}
-                  showSource={row.showSource}
-                  selected={selected}
-                  editing={selection.isSoleSelected(key)}
-                  togglesSelection={selected && selection.selectedCount > 1}
-                  onSelect={(event) => selection.clickSelect(key, event)}
-                  onCheckboxToggle={() => onCheckboxToggle(task)}
-                  onSelectionCheckboxToggle={() => onSelectionCheckboxToggle(task)}
-                  editHandlers={editHandlers(task)}
-                  onOpen={openNote}
-                />
-              )
-            }}
+            renderHeader={renderHeader}
+            renderRow={renderRow}
           />
         )}
       </div>

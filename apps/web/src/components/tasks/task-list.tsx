@@ -67,9 +67,14 @@ interface TaskListProps {
    */
   keepMountedTaskId?: string | null | undefined
   /**
-   * Renders a group header. It fills the header slot.
+   * Renders a group header. It fills the header slot. Keep the function
+   * stable: the list renders every header again when it changes.
    */
   renderHeader: (group: TaskGroup) => ReactElement
+  /**
+   * Renders a row. Keep the function stable: the list renders every row
+   * again when it changes.
+   */
   renderRow: (row: TaskListRow) => ReactElement
 }
 
@@ -214,6 +219,13 @@ export function TaskList({
   const virtualizerRef = useRef<VirtualizerHandle>(null)
 
   const { items, headerIndexes, indexByTaskId } = useMemo(() => flattenTaskGroups(groups), [groups])
+  // One element per item, so an item renders again only when the data or its
+  // renderer changes, not when the list scrolls.
+  const elements = useMemo(() => {
+    return items.map((item) => {
+      return item.kind === 'header' ? renderHeader(item.group) : renderRow(item)
+    })
+  }, [items, renderHeader, renderRow])
   const tracks = useGroupTracks(virtualizerRef, headerIndexes, groupGap)
   const saveScroll = useScrollMemory(virtualizerRef, items, ready)
 
@@ -272,7 +284,7 @@ export function TaskList({
             const isGroupEnd = next === undefined || next.kind === 'header'
             return (
               <div key={item.key} style={{ paddingBottom: isGroupEnd ? groupGap : 0 }}>
-                {renderRow(item)}
+                {elements[index]}
               </div>
             )
           }
@@ -283,7 +295,7 @@ export function TaskList({
                 style={{ height: tracks.heights.get(index) }}
               >
                 <div className="pointer-events-auto sticky top-0" style={{ height: HEADER_HEIGHT }}>
-                  {renderHeader(item.group)}
+                  {elements[index]}
                 </div>
               </div>
             </div>
