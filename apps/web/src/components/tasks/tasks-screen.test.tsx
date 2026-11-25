@@ -526,10 +526,7 @@ describe('TasksScreen', () => {
     const view = await renderScreen()
     view.container.style.height = '600px'
     await userEvent.click(await view.findByRole('button', { name: 'task 0' }))
-    const scroller = view
-      .getByTestId('task-editor')
-      .element()
-      .closest<HTMLElement>('.overflow-auto')!
+    const scroller = view.getByRole('list').element().parentElement!
     await waitFor(() => expect(view.queryByRole('button', { name: 'task 150' })).toBeNull())
 
     await scrollElement({ element: scroller, top: 5000 })

@@ -968,23 +968,23 @@ describe('MobileTasks', () => {
     ])
     const view = await renderScreen()
     view.container.style.height = '600px'
-    const title = await view.findByRole('button', { name: 'N', exact: true })
-    const scroller = title.closest<HTMLElement>('.overflow-y-auto')!
-    // How far the header of the group `name` is from the top of the list.
+    await view.findByRole('heading', { name: 'N' })
+    const scroller = view.getByRole('list').element().parentElement!
+    // How far the header of the group `name` is from the top of the scroller.
     const headerOffset = (name: string): number | undefined => {
-      const header = view.getByRole('button', { name, exact: true }).query()?.closest('.sticky')
-      if (!header) {
+      const heading = view.getByRole('heading', { name, exact: true }).query()
+      if (heading === null) {
         return undefined
       }
-      return header.getBoundingClientRect().top - scroller.getBoundingClientRect().top
+      return heading.getBoundingClientRect().top - scroller.getBoundingClientRect().top
     }
+    const atRest = headerOffset('N')
 
     await scrollElement({ element: scroller, top: 2000 })
-    await scrollElement({ element: scroller, top: 2000 })
-    await expect.poll(() => headerOffset('N')).toBe(0)
+    await expect.poll(() => headerOffset('N')).toBe(atRest)
 
     await scrollElement({ element: scroller, top: scroller.scrollHeight })
-    await expect.poll(() => headerOffset('Zoo')).toBe(0)
+    await expect.poll(() => headerOffset('Zoo')).toBe(atRest)
     await view.unmount()
   })
 
@@ -998,29 +998,32 @@ describe('MobileTasks', () => {
     )
     const view = await renderScreen(<RemountableTasks />)
     view.container.style.height = '600px'
-    const title = await view.findByRole('button', { name: 'N', exact: true })
-    const scroller = title.closest<HTMLElement>('.overflow-y-auto')!
-    // The first task row below the stuck header and where its top is, once
-    // two reads in a row agree.
+    await view.findByRole('heading', { name: 'N' })
+    // The first task row below the stuck header and how far below it is.
+    const readTopRow = (): string | undefined => {
+      const header = view.getByRole('heading', { name: 'N' }).query()?.getBoundingClientRect()
+      const row = [...view.container.querySelectorAll('[data-task-key]')].find((element) => {
+        return header !== undefined && element.getBoundingClientRect().bottom > header.bottom
+      })
+      if (header === undefined || row === undefined) {
+        return undefined
+      }
+      const offset = Math.round(row.getBoundingClientRect().top - header.bottom)
+      return `${row.getAttribute('data-task-key')} ${offset}`
+    }
+    // The top row once the list is at rest: two reads in a row agree.
     let lastRead: string | undefined
     const topRow = (): string => {
-      const list = view.container.querySelector<HTMLElement>('.overflow-y-auto')
-      const top = (list?.getBoundingClientRect().top ?? 0) + 32
-      const row = [...(list?.querySelectorAll('[data-task-key]') ?? [])].find((element) => {
-        return element.getBoundingClientRect().bottom > top
-      })
-      const read = row
-        ? `${row.getAttribute('data-task-key')} ${Math.round(row.getBoundingClientRect().top - top)}`
-        : undefined
-      const settled = read !== undefined && read === lastRead
+      const read = readTopRow()
+      const atRest = read !== undefined && read === lastRead
       lastRead = read
-      if (!settled) {
+      if (!atRest) {
         throw new Error('The list is still moving')
       }
       return read
     }
 
-    await scrollElement({ element: scroller, top: 7000 })
+    await scrollElement({ element: view.getByRole('list').element().parentElement!, top: 7000 })
     const before = await waitFor(topRow)
 
     await userEvent.click(view.getByRole('button', { name: 'Remount' }))

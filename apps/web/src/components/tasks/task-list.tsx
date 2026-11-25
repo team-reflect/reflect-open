@@ -55,7 +55,7 @@ interface TaskListProps {
    */
   ready: boolean
   /**
-   * Size hint (px) for rows not measured yet: a single-line task row.
+   * Size hint (px) for items not measured yet: a single-line task row.
    */
   rowHeight: number
   /**
@@ -63,7 +63,7 @@ interface TaskListProps {
    */
   groupGap?: number | undefined
   /**
-   * A task whose row stays mounted out of view, e.g. the one being edited.
+   * A task whose row stays mounted out of view.
    */
   keepMountedTaskId?: string | null | undefined
   /**
@@ -82,7 +82,7 @@ function TaskListItemElement({
   ref,
 }: CustomItemComponentProps): ReactElement {
   const isHeader = use(ItemsContext)[index]?.kind === 'header'
-  // A header reaches out of its item, over the rows of its group.
+  // The item is a stacking context, so the z-index of its header goes on the item.
   const itemStyle = useMemo(() => (isHeader ? { ...style, zIndex: 1 } : style), [style, isHeader])
   return (
     <li ref={ref} style={itemStyle}>
@@ -160,7 +160,7 @@ function useScrollMemory(
       return
     }
     const saved = savedScroll()
-    const position = typeof saved === 'object' && saved?.key !== undefined ? saved : null
+    const position = typeof saved === 'object' ? saved : null
     const index = position === null ? -1 : items.findIndex((item) => item.key === position.key)
     if (position !== null && index !== -1) {
       virtualizer.scrollToIndex(index, { align: 'start', offset: position.offset })
@@ -169,9 +169,12 @@ function useScrollMemory(
     }
   })
 
-  // An arrival restores its saved position; a new one starts at the top.
+  // An arrival restores its saved position once; a new one starts at the top.
+  const restoredArrivalRef = useRef<string | null>(null)
   useLayoutEffect(() => {
-    if (ready) {
+    const arrival = `${entryId}:${arrivalSeq}`
+    if (ready && restoredArrivalRef.current !== arrival) {
+      restoredArrivalRef.current = arrival
       restore()
     }
   }, [arrivalSeq, entryId, ready])
@@ -264,10 +267,11 @@ export function TaskList({
       >
         {(item, index) => {
           if (item.kind !== 'header') {
-            // The gap is inside the item: virtua measures an item without its padding.
-            const gap = item.kind === 'task' && item.groupEnd ? groupGap : 0
+            // The gap is padding inside the item, so the item's measured size includes it.
+            const next = items[index + 1]
+            const isGroupEnd = next === undefined || next.kind === 'header'
             return (
-              <div key={item.key} style={{ paddingBottom: gap }}>
+              <div key={item.key} style={{ paddingBottom: isGroupEnd ? groupGap : 0 }}>
                 {renderRow(item)}
               </div>
             )

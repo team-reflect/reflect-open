@@ -80,8 +80,6 @@ export function TasksScreen(): ReactElement {
   const rootRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<TaskListHandle>(null)
   const needle = query.trim().toLowerCase()
-  // The empty state waits for `ready`: with archived on, a graph with only
-  // completed tasks would flash "No tasks to show." while they load.
   const { groups, ready, struck } = useVisibleTaskGroups({ needle, filters, today })
 
   // The flat, render-order list of tasks the selection and its shortcuts act on.
@@ -120,9 +118,8 @@ export function TasksScreen(): ReactElement {
       setQuery('')
       const key = commands.add(target).taskId
       selection.clickSelect(key, { metaKey: false, ctrlKey: false, shiftKey: false })
-      scrollToKey(key)
     },
-    [commands, selection, scrollToKey],
+    [commands, selection],
   )
   // The tasks behind the current selection's keys, in selection order — what the
   // toolbar actions (schedule, convert) act on. A row whose key no longer
@@ -282,6 +279,8 @@ export function TasksScreen(): ReactElement {
         />
       </header>
       <div className="min-h-0 flex-1 overflow-auto pb-8">
+        {/* The empty state waits for `ready`: with archived on, a graph with only
+            completed tasks would flash "No tasks to show." while they load. */}
         {ready && groups.length === 0 ? (
           <p className="px-4 py-6 text-sm text-text-muted lg:px-12">
             {needle ? 'No matching tasks.' : 'No tasks to show.'}

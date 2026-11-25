@@ -1,5 +1,4 @@
 import type { Store, Unlisten } from '@reflect/core'
-import type { DayScrollPosition } from '../daily/day-window.ts'
 import {
   normalizeRoute,
   ROUTE_META,
@@ -18,7 +17,7 @@ import {
  * Each history entry can carry a **scroll position** (Plan 06b): views report
  * theirs via `saveScrollState` (never notifies subscribers — safe from scroll
  * handlers) and read `savedScroll()` after a back/forward restores an entry.
- * Plain views save a pixel offset; the daily stream saves a {@link DayScrollPosition}.
+ * Plain views save a pixel offset; lists save an {@link ItemScrollPosition}.
  *
  * Long-lived surfaces (the daily stream, shared by the today/daily routes,
  * and the All and Tasks lists) additionally keep a **surface position** — the
@@ -29,19 +28,17 @@ import {
 
 /**
  * A list's scroll position: the item at the viewport top, by its key, and
- * pixels into it.
+ * pixels into it. The daily stream's key is the day's ISO date.
  */
 export interface ItemScrollPosition {
   readonly key: string
   readonly offset: number
-  readonly date?: undefined
 }
 
 /**
- * A view's saved scroll position: a pixel offset, a daily-stream day, or a
- * list item.
+ * A view's saved scroll position: a pixel offset, or a list item.
  */
-export type ScrollPosition = number | DayScrollPosition | ItemScrollPosition
+export type ScrollPosition = number | ItemScrollPosition
 
 export interface NavigateOptions {
   /**

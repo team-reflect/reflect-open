@@ -102,7 +102,6 @@ export {
   indexWithin,
   neighborDate,
   PAST_DAYS,
-  type DayScrollPosition,
   type DayWindow,
   type DayWindowRadius,
 } from './daily/day-window.ts'
