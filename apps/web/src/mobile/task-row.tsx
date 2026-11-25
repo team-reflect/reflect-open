@@ -12,9 +12,9 @@ import { SwipeRow } from '@/mobile/swipe-row.tsx'
 import { useDateFormat } from '@/providers/settings-provider.tsx'
 
 /**
- * Height (px) of a single-line row: `min-h-12` plus the bottom border.
+ * Minimum height (px) of a row with its bottom border: a single-line row.
  */
-export const MOBILE_TASK_ROW_HEIGHT = 49 // QUESTION: if we remove min-h-12 (and replace it like h-full) and add height: MOBILE_TASK_ROW_HEIGHTpx in <div data-task-key={key}>, will it still work. In general, I do not want to write the same style in multiple units (min-h-12 vs 49px) because it could be wrong in the future if we change what min-h-12 means. if we have to use px units (for example because we need to pass a px value to a 3-rd party lib), then let's use a constant like MOBILE_TASK_ROW_HEIGHT and do not use tailwindcss class like h-12. FIXME. This also applies to other places in the codebase where we mix tailwindcss classes and px values.
+export const MOBILE_TASK_ROW_HEIGHT = 49
 
 interface MobileTaskRowProps {
   task: OpenTask
@@ -71,7 +71,11 @@ export function MobileTaskRow({
   const edit = (): void => onEdit(task)
 
   return (
-    <div data-task-key={key} className="border-b border-border">
+    <div
+      data-task-key={key}
+      className="border-b border-border"
+      style={{ minHeight: MOBILE_TASK_ROW_HEIGHT }}
+    >
       <SwipeRow
         revealed={revealed}
         onReveal={reveal}
@@ -115,7 +119,7 @@ export function MobileTaskRow({
               close()
             }
           }}
-          className="flex min-h-12 items-start"
+          className="flex items-start"
         >
           <button
             type="button"
@@ -161,8 +165,7 @@ export function MobileTaskRow({
           >
             <span
               className={cn(
-                // FIXME: it seems that the class `break-words` can be written as `wrap-break-word`. Search the whole codebase and fix it.
-                'min-w-0 flex-1 break-words text-sm leading-6 text-text',
+                'min-w-0 flex-1 wrap-break-word text-sm leading-6 text-text',
                 task.checked && 'text-text-muted line-through',
               )}
             >

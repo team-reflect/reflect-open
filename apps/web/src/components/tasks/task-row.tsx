@@ -9,7 +9,7 @@ import { TaskText } from './task-text.tsx'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 /**
- * Height (px) of a single-line row: `min-h-10` plus the bottom border.
+ * Minimum height (px) of a row with its bottom border: a single-line row.
  */
 export const TASK_ROW_HEIGHT = 41
 
@@ -101,8 +101,9 @@ export function TaskRow({
     <div
       data-task-key={task.taskId}
       onClick={selectFromRow}
+      style={{ minHeight: TASK_ROW_HEIGHT }}
       className={cn(
-        'group/task flex min-h-10 items-start gap-3 border-b border-border bg-surface-canvas px-4 py-2 lg:px-12',
+        'group/task flex items-start gap-3 border-b border-border bg-surface-canvas px-4 py-2 lg:px-12',
         !editing && 'cursor-pointer',
         selected
           ? 'bg-accent-soft ring-1 ring-inset ring-accent/20 dark:ring-accent/10'
@@ -140,7 +141,7 @@ export function TaskRow({
           aria-pressed={selected}
           onKeyDown={selectFromKeyboard}
           className={cn(
-            'min-w-0 flex-1 break-words text-left text-sm leading-6 text-text focus-visible:outline-none',
+            'min-w-0 flex-1 wrap-break-word text-left text-sm leading-6 text-text focus-visible:outline-none',
             task.checked && 'text-text-muted line-through',
           )}
         >
