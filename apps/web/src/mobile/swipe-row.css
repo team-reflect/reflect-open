@@ -23,8 +23,16 @@
   --swipe-action-index: 1;
 }
 
-/* Only a touched or open row animates, so a long list holds no idle animations. */
+/* An idle row paints no actions, so the surface needs no layer of its own. */
+.swipe-row:not([data-active]) .swipe-row-actions {
+  visibility: hidden;
+}
+
+/* Only a touched or open row animates, so a long list holds no idle animations.
+   Its own compositing layer keeps the surface above the sticky actions inside a
+   stacking context (iOS 26 misorders them under virtua's `contain: layout` items). */
 .swipe-row[data-active] .swipe-row-surface {
+  will-change: transform;
   animation: swipe-row-card linear both;
   animation-timeline: scroll(nearest inline);
   animation-range: 0 calc(var(--spacing) * 3);
