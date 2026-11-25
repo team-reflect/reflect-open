@@ -2,11 +2,11 @@ import type { ReactElement } from 'react'
 import { cn } from '@/lib/utils.ts'
 
 interface TaskBreadcrumbsProps {
-  /** The context's display labels ({@link TaskContext.visibleBreadcrumbs}); empty renders nothing. */
+  /** The context's display labels ({@link TaskContext.visibleBreadcrumbs}). */
   breadcrumbs: readonly string[]
   /** Select every task row sharing this outline context; omit on read-only surfaces. */
   onSelect?: () => void
-  /** Additional classes applied to the wrapper list item. */
+  /** Additional classes applied to the wrapper. */
   className?: string
 }
 
@@ -15,14 +15,11 @@ export function TaskBreadcrumbs({
   breadcrumbs,
   onSelect,
   className,
-}: TaskBreadcrumbsProps): ReactElement | null {
-  if (breadcrumbs.length === 0) {
-    return null
-  }
+}: TaskBreadcrumbsProps): ReactElement {
   const label = breadcrumbs.join(' → ')
 
   return (
-    <li className={cn('min-w-0 px-4 pt-1.5 lg:px-12', className)}>
+    <div className={cn('min-w-0 px-4 pt-1.5 lg:px-12', className)}>
       {onSelect === undefined ? (
         <span
           title={label}
@@ -40,6 +37,6 @@ export function TaskBreadcrumbs({
           {label}
         </button>
       )}
-    </li>
+    </div>
   )
 }

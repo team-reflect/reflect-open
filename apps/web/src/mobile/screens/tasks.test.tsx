@@ -923,6 +923,55 @@ describe('MobileTasks', () => {
     await view.unmount()
   })
 
+  it('mounts only the rows near the viewport', async () => {
+    getOpenTasks.mockResolvedValue(
+      Array.from({ length: 300 }, (_, index) => task({ text: `task ${index}`, astPath: [index] })),
+    )
+    const view = await renderScreen()
+    view.container.style.height = '600px'
+
+    await view.findByText('task 0')
+    await expect
+      .poll(() => view.container.querySelectorAll('[data-task-key]').length)
+      .toBeLessThan(60)
+    await view.unmount()
+  })
+
+  it('keeps a group header at the top while its group is in view', async () => {
+    getOpenTasks.mockResolvedValue([
+      ...Array.from({ length: 100 }, (_, index) => {
+        return task({ text: `task ${index}`, astPath: [index] })
+      }),
+      ...Array.from({ length: 100 }, (_, index) => {
+        return task({
+          text: `zoo ${index}`,
+          notePath: 'notes/zoo.md',
+          noteTitle: 'Zoo',
+          astPath: [index],
+        })
+      }),
+    ])
+    const view = await renderScreen()
+    view.container.style.height = '600px'
+    const title = await view.findByRole('button', { name: 'N', exact: true })
+    const scroller = title.closest<HTMLElement>('.overflow-y-auto')!
+    // How far the header of the group `name` is from the top of the list.
+    const headerOffset = (name: string): number | undefined => {
+      const header = view.getByRole('button', { name, exact: true }).query()?.closest('.sticky')
+      if (!header) {
+        return undefined
+      }
+      return header.getBoundingClientRect().top - scroller.getBoundingClientRect().top
+    }
+
+    await scrollElement({ element: scroller, top: 2000 })
+    await expect.poll(() => headerOffset('N')).toBe(0)
+
+    await scrollElement({ element: scroller, top: scroller.scrollHeight })
+    await expect.poll(() => headerOffset('Zoo')).toBe(0)
+    await view.unmount()
+  })
+
   it('reveals one row at a time across groups', async () => {
     getOpenTasks.mockResolvedValue([
       task({ text: 'buy milk' }),

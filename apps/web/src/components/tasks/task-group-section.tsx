@@ -96,10 +96,14 @@ export function TaskGroupSection({
             const firstTask = context.tasks[0]!
             return (
               <Fragment key={firstTask.taskId}>
-                <TaskBreadcrumbs
-                  breadcrumbs={context.visibleBreadcrumbs}
-                  onSelect={() => selection.select(context.tasks.map((task) => task.taskId))}
-                />
+                {context.visibleBreadcrumbs.length > 0 ? (
+                  <li>
+                    <TaskBreadcrumbs
+                      breadcrumbs={context.visibleBreadcrumbs}
+                      onSelect={() => selection.select(context.tasks.map((task) => task.taskId))}
+                    />
+                  </li>
+                ) : null}
                 {context.tasks.map((task) => {
                   const key = task.taskId
                   const selected = selection.isSelected(key)

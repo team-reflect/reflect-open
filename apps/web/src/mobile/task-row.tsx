@@ -71,7 +71,7 @@ export function MobileTaskRow({
   const edit = (): void => onEdit(task)
 
   return (
-    <li data-task-key={key} className="border-b border-border">
+    <div data-task-key={key} className="border-b border-border">
       <SwipeRow
         actionWidth={ACTION_WIDTH}
         revealed={revealed}
@@ -179,6 +179,6 @@ export function MobileTaskRow({
           </div>
         </div>
       </SwipeRow>
-    </li>
+    </div>
   )
 }

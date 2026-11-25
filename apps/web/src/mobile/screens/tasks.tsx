@@ -9,13 +9,17 @@ import {
 } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
+import { TaskBreadcrumbs } from '@/components/tasks/task-breadcrumbs.tsx'
+import { flattenTaskGroups } from '@/lib/tasks/task-list-items.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet.tsx'
 import { TaskFiltersDrawer } from '@/mobile/task-filters-drawer.tsx'
-import { MobileTaskGroup } from '@/mobile/task-group.tsx'
+import { MobileTaskGroupHeader } from '@/mobile/task-group-header.tsx'
+import { MobileTaskList } from '@/mobile/task-list.tsx'
+import { MobileTaskRow } from '@/mobile/task-row.tsx'
 import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import type { Focusable } from '@/mobile/chrome/screen-chrome.ts'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
@@ -96,6 +100,9 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
     () => composeVisibleTaskGroups({ open, completed, struck, filters, needle, today }),
     [open, completed, struck, filters, needle, today],
   )
+
+  const { items, headerIndexes } = useMemo(() => flattenTaskGroups(groups), [groups])
+  const resetKey = useMemo(() => JSON.stringify([needle, filters]), [needle, filters])
 
   // The task list scroller renders only while there are rows to show.
   const listRef = useRef<HTMLDivElement>(null)
@@ -197,19 +204,40 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
             onScroll(event)
           }}
         >
-          {groups.map((group) => (
-            <MobileTaskGroup
-              key={group.kind === 'note' ? `note:${group.notePath}` : group.kind}
-              group={group}
-              today={today}
-              onAdd={onAdd}
-              onEdit={editTask}
-              onToggle={(task) => void commands.toggle([task])}
-              onOpen={(path) => navigate(routeForPath(path))}
-              onDelete={(task) => void commands.remove([task])}
-              revealedRow={revealedRow}
-            />
-          ))}
+          <MobileTaskList
+            scrollRef={listRef}
+            items={items}
+            headerIndexes={headerIndexes}
+            resetKey={resetKey}
+            renderHeader={(group) => (
+              <MobileTaskGroupHeader
+                group={group}
+                today={today}
+                onAdd={onAdd}
+                onOpen={(path) => navigate(routeForPath(path))}
+              />
+            )}
+            renderRow={(item) => {
+              return item.kind === 'breadcrumbs' ? (
+                <TaskBreadcrumbs
+                  key={item.key}
+                  breadcrumbs={item.labels}
+                  className="px-4 pb-1 pt-3"
+                />
+              ) : (
+                <MobileTaskRow
+                  key={item.key}
+                  task={item.task}
+                  showSource={item.showSource}
+                  onEdit={editTask}
+                  onToggle={() => void commands.toggle([item.task])}
+                  revealedRow={revealedRow}
+                  onOpenNote={() => navigate(routeForPath(item.task.notePath))}
+                  onDelete={() => void commands.remove([item.task])}
+                />
+              )
+            }}
+          />
         </div>
       )}
       {liveEditingTask !== null ? (
