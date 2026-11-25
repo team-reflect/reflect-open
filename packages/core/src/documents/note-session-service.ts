@@ -149,7 +149,7 @@ class NoteSessionImpl implements NoteSession {
   #discarded = false
 
   /**
-   * True after a failed save retried once from its reconciliation; a landed write clears it.
+   * True after a failed save retried once; a landed write clears it.
    */
   #retriedFailedSave = false
 
@@ -292,7 +292,10 @@ class NoteSessionImpl implements NoteSession {
         this.#error = errorMessage(cause)
         const retry = !this.#retriedFailedSave
         this.#retriedFailedSave = true
-        await this.#reconcileFromDisk(retry)
+        await this.#reconcileFromDisk(false)
+        if (retry) {
+          this.#save()
+        }
         this.#emit()
       })
   }
@@ -452,14 +455,11 @@ class NoteSessionImpl implements NoteSession {
     try {
       ;({ content, hash } = await this.#io.read(this.path))
     } catch (cause) {
-      if (!this.#disposed && isAppError(cause) && cause.kind === 'notFound') {
+      if (isAppError(cause) && cause.kind === 'notFound') {
         this.#missing = true
         this.#emit()
       }
       return // preserve the buffer if the file disappeared or cannot be read
-    }
-    if (this.#disposed) {
-      return
     }
     if (content === this.#disk || content === this.#inFlightWrite) {
       // Nothing to reconcile (stale, or an echo of our own possibly
@@ -483,6 +483,9 @@ class NoteSessionImpl implements NoteSession {
         this.#cancelScheduledSave()
         this.#save()
       }
+      return
+    }
+    if (this.#disposed) {
       return
     }
     this.#adoptCleanContent(content, hash)
