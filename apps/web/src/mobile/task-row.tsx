@@ -16,6 +16,11 @@ import { useDateFormat } from '@/providers/settings-provider.tsx'
  */
 const ACTION_WIDTH = SWIPE_ACTION_WIDTH * 2
 
+/**
+ * Height (px) of a single-line row: `min-h-12` plus the bottom border.
+ */
+export const MOBILE_TASK_ROW_HEIGHT = 49
+
 interface MobileTaskRowProps {
   task: OpenTask
   /**

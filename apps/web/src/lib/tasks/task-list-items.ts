@@ -1,12 +1,19 @@
 import { groupTaskContexts, type OpenTask, type TaskGroup } from '@reflect/core'
 
 /**
- * One row of a flat Tasks list: a group header, a breadcrumb over a run of
- * tasks that share an outline context, or a task.
+ * A row under a group header: a breadcrumb over a run of tasks that share an
+ * outline context, or a task.
  */
-export type TaskListItem =
-  | { kind: 'header'; key: string; group: TaskGroup }
-  | { kind: 'breadcrumbs'; key: string; labels: readonly string[] }
+export type TaskListRow =
+  | {
+      kind: 'breadcrumbs'
+      key: string
+      labels: readonly string[]
+      /**
+       * The tasks this breadcrumb labels.
+       */
+      tasks: readonly OpenTask[]
+    }
   | {
       kind: 'task'
       key: string
@@ -18,6 +25,11 @@ export type TaskListItem =
     }
 
 /**
+ * One item of a flat Tasks list: a group header or a row.
+ */
+export type TaskListItem = { kind: 'header'; key: string; group: TaskGroup } | TaskListRow
+
+/**
  * Task groups as one flat list.
  */
 export interface TaskListItems {
@@ -26,6 +38,10 @@ export interface TaskListItems {
    * Indexes of the header items, ascending.
    */
   headerIndexes: number[]
+  /**
+   * The index of each task's item, by `taskId`.
+   */
+  indexByTaskId: ReadonlyMap<string, number>
 }
 
 /**
@@ -35,6 +51,7 @@ export interface TaskListItems {
 export function flattenTaskGroups(groups: readonly TaskGroup[]): TaskListItems {
   const items: TaskListItem[] = []
   const headerIndexes: number[] = []
+  const indexByTaskId = new Map<string, number>()
   for (const group of groups) {
     const groupKey = group.kind === 'note' ? `note:${group.notePath}` : group.kind
     const showSource = group.kind !== 'note'
@@ -46,12 +63,14 @@ export function flattenTaskGroups(groups: readonly TaskGroup[]): TaskListItems {
           kind: 'breadcrumbs',
           key: `breadcrumbs:${groupKey}:${context.tasks[0]!.taskId}`,
           labels: context.visibleBreadcrumbs,
+          tasks: context.tasks,
         })
       }
       for (const task of context.tasks) {
+        indexByTaskId.set(task.taskId, items.length)
         items.push({ kind: 'task', key: `task:${groupKey}:${task.taskId}`, task, showSource })
       }
     }
   }
-  return { items, headerIndexes }
+  return { items, headerIndexes, indexByTaskId }
 }

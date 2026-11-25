@@ -10,16 +10,15 @@ import {
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { TaskBreadcrumbs } from '@/components/tasks/task-breadcrumbs.tsx'
-import { flattenTaskGroups } from '@/lib/tasks/task-list-items.ts'
+import { TaskGroupHeader } from '@/components/tasks/task-group-header.tsx'
+import { TaskList } from '@/components/tasks/task-list.tsx'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet.tsx'
 import { TaskFiltersDrawer } from '@/mobile/task-filters-drawer.tsx'
-import { MobileTaskGroupHeader } from '@/mobile/task-group-header.tsx'
-import { MobileTaskList } from '@/mobile/task-list.tsx'
-import { MobileTaskRow } from '@/mobile/task-row.tsx'
+import { MOBILE_TASK_ROW_HEIGHT, MobileTaskRow } from '@/mobile/task-row.tsx'
 import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import type { Focusable } from '@/mobile/chrome/screen-chrome.ts'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
@@ -101,7 +100,6 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
     [open, completed, struck, filters, needle, today],
   )
 
-  const { items, headerIndexes } = useMemo(() => flattenTaskGroups(groups), [groups])
   const resetKey = useMemo(() => JSON.stringify([needle, filters]), [needle, filters])
 
   // The task list scroller renders only while there are rows to show.
@@ -204,36 +202,36 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
             onScroll(event)
           }}
         >
-          <MobileTaskList
+          <TaskList
             scrollRef={listRef}
-            items={items}
-            headerIndexes={headerIndexes}
+            groups={groups}
             resetKey={resetKey}
+            rowHeight={MOBILE_TASK_ROW_HEIGHT}
             renderHeader={(group) => (
-              <MobileTaskGroupHeader
+              <TaskGroupHeader
                 group={group}
                 today={today}
                 onAdd={onAdd}
-                onOpen={(path) => navigate(routeForPath(path))}
+                onOpen={(path) => {
+                  hapticImpactLight(haptics)
+                  navigate(routeForPath(path))
+                }}
               />
             )}
-            renderRow={(item) => {
-              return item.kind === 'breadcrumbs' ? (
-                <TaskBreadcrumbs
-                  key={item.key}
-                  breadcrumbs={item.labels}
-                  className="px-4 pb-1 pt-3"
-                />
-              ) : (
+            renderRow={(row) => {
+              if (row.kind === 'breadcrumbs') {
+                return <TaskBreadcrumbs breadcrumbs={row.labels} className="px-4 pb-1 pt-3" />
+              }
+              const { task } = row
+              return (
                 <MobileTaskRow
-                  key={item.key}
-                  task={item.task}
-                  showSource={item.showSource}
+                  task={task}
+                  showSource={row.showSource}
                   onEdit={editTask}
-                  onToggle={() => void commands.toggle([item.task])}
+                  onToggle={() => void commands.toggle([task])}
                   revealedRow={revealedRow}
-                  onOpenNote={() => navigate(routeForPath(item.task.notePath))}
-                  onDelete={() => void commands.remove([item.task])}
+                  onOpenNote={() => navigate(routeForPath(task.notePath))}
+                  onDelete={() => void commands.remove([task])}
                 />
               )
             }}

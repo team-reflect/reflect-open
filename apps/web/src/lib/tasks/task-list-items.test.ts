@@ -24,7 +24,7 @@ function flatten(tasks: ReturnType<typeof task>[]): ReturnType<typeof flattenTas
 
 describe('flattenTaskGroups', () => {
   it('puts each group header before its breadcrumbs and tasks', () => {
-    const { items, headerIndexes } = flatten([
+    const { items, headerIndexes, indexByTaskId } = flatten([
       task({ text: 'a', notePath: 'notes/a.md', noteTitle: 'A', astPath: [0] }),
       task({
         text: 'b',
@@ -45,6 +45,7 @@ describe('flattenTaskGroups', () => {
       'task',
     ])
     expect(headerIndexes).toEqual([0, 4])
+    expect([...indexByTaskId.values()]).toEqual([1, 3, 5])
   })
 
   it('gives every item a different key', () => {

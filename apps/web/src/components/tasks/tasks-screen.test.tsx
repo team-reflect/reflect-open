@@ -15,6 +15,7 @@ import { act } from '@/test-utils/act.ts'
 import { useRouterState } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { MOD_KEY } from '@/test-utils/mod-key.ts'
+import { scrollElement } from '@/test-utils/scroll.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { spyOnTaskWrites, type TaskAction, type TaskWriteSpies } from '@/test-utils/task-writes.ts'
@@ -511,20 +512,40 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
-  it('scrolls the focused task row into view after selection renders', async () => {
-    getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/p.md', astPath: [2], text: 'first', noteTitle: 'Project' }),
-      task({ notePath: 'notes/p.md', astPath: [3], text: 'second', noteTitle: 'Project' }),
-    ])
+  it('keeps the edited row mounted while it is out of view, then scrolls the next selection into view', async () => {
+    getOpenTasks.mockResolvedValue(
+      Array.from({ length: 200 }, (_, index) => {
+        return task({
+          notePath: 'notes/p.md',
+          astPath: [index],
+          text: `task ${index}`,
+          noteTitle: 'Project',
+        })
+      }),
+    )
     const view = await renderScreen()
+    view.container.style.height = '600px'
+    await userEvent.click(await view.findByRole('button', { name: 'task 0' }))
+    const scroller = view
+      .getByTestId('task-editor')
+      .element()
+      .closest<HTMLElement>('.overflow-auto')!
+    await waitFor(() => expect(view.queryByRole('button', { name: 'task 150' })).toBeNull())
 
-    await userEvent.click(await view.findByRole('button', { name: 'second' }))
-    const row = view.container.querySelectorAll('[data-task-key]')[1] as HTMLElement
+    await scrollElement({ element: scroller, top: 5000 })
+    await view.findByRole('button', { name: 'task 125' })
+    expect(view.getByTestId('task-editor').element().textContent).toContain('task 0')
 
+    // The row lands below the stuck group header, not under it.
+    await userEvent.keyboard('{ArrowDown}')
     await waitFor(() => {
-      const rect = row.getBoundingClientRect()
-      expect(rect.top).toBeGreaterThanOrEqual(0)
-      expect(rect.bottom).toBeLessThanOrEqual(window.innerHeight)
+      const editor = view.getByTestId('task-editor').element()
+      expect(editor.textContent).toContain('task 1')
+      const header = view.getByRole('heading', { name: 'Project' }).element()
+      expect(editor.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+        header.getBoundingClientRect().bottom,
+      )
+      expect(scroller.scrollTop).toBeLessThan(100)
     })
     await view.unmount()
   })

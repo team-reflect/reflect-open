@@ -8,16 +8,10 @@ import {
   type ReactElement,
 } from 'react'
 import { Archive, CalendarClock, List, Search } from 'lucide-react'
-import {
-  composeVisibleTaskGroups,
-  type InsertTaskTarget,
-  type OpenTask,
-  type TaskGroup,
-} from '@reflect/core'
+import { composeVisibleTaskGroups, type InsertTaskTarget, type OpenTask } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { useNoteLinkNavigation, type ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
-import { scrollTaskIntoView } from '@/lib/tasks/task-navigation.ts'
 import { useTaskRowHandlers } from '@/lib/tasks/use-task-row-handlers.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
 import { useTaskKeyboard } from '@/lib/tasks/use-task-keyboard.ts'
@@ -28,10 +22,18 @@ import { useCoreServices } from '@/services/services-provider.tsx'
 import { useStore } from '@/lib/use-store.ts'
 import { routeForPath } from '@reflect/app'
 import { TaskFiltersMenu } from './task-filters-menu.tsx'
-import { TaskGroupSection } from './task-group-section.tsx'
+import { TaskBreadcrumbs } from './task-breadcrumbs.tsx'
+import { TaskGroupHeader } from './task-group-header.tsx'
+import { TaskList, type TaskListHandle } from './task-list.tsx'
+import { TASK_ROW_HEIGHT, TaskRow } from './task-row.tsx'
 import { TaskScheduleCalendar } from './task-schedule-calendar.tsx'
 import { TaskToolbarCountBadge } from './task-toolbar-count-badge.tsx'
 import { isModEvent } from '@meowdown/core'
+
+/**
+ * Space (px) between the last row of a group and the next group's header.
+ */
+const GROUP_GAP = 24
 
 /**
  * The selected task that owns keyboard focus: the cursor/anchor, else the first row left selected.
@@ -78,6 +80,7 @@ export function TasksScreen(): ReactElement {
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<TaskListHandle>(null)
   const { open, completed, struck } = useStore(taskService)
   useEffect(
     () => (filters.archived ? taskService.includeCompleted() : undefined),
@@ -91,6 +94,7 @@ export function TasksScreen(): ReactElement {
   const { onScroll } = useScrollRestoration(scrollRef, ready)
 
   const needle = query.trim().toLowerCase()
+  const resetKey = useMemo(() => JSON.stringify([needle, filters]), [needle, filters])
   const groups = useMemo(
     () => composeVisibleTaskGroups({ open, completed, struck, filters, needle, today }),
     [open, completed, struck, filters, needle, today],
@@ -112,18 +116,19 @@ export function TasksScreen(): ReactElement {
   }
   const scrollToKey = useCallback((key: string | null) => {
     if (key !== null) {
-      scrollTaskIntoView(rootRef.current, key)
+      listRef.current?.revealTask(key)
     }
   }, [])
   const editHandlers = useTaskRowHandlers({ selection, orderedTasks, scrollToKey, setQuery })
   const selectedTaskKeys = selection.selected
   const activeTaskKey = selection.activeKey
   // Selection opens the focused task's inline editor, often after an async insert
-  // and optimistic cache render. Scroll after the DOM reflects that selection so
+  // and optimistic cache render. Scroll after the list holds that selection so
   // the focused row is always visible.
+  const focusedKey = focusedSelectedKey(selectedTaskKeys, activeTaskKey)
   useLayoutEffect(() => {
-    scrollToKey(focusedSelectedKey(selectedTaskKeys, activeTaskKey))
-  }, [activeTaskKey, orderedKeys, scrollToKey, selectedTaskKeys])
+    scrollToKey(focusedKey)
+  }, [focusedKey, orderedKeys, scrollToKey])
   // The group headers' "+ Add" (V1): drop any search filter so the new row is
   // visible, then select it so its editor opens focused.
   const onAdd = useCallback(
@@ -298,21 +303,52 @@ export function TasksScreen(): ReactElement {
             {needle ? 'No matching tasks.' : 'No tasks to show.'}
           </p>
         ) : (
-          <div className="flex flex-col gap-5">
-            {groups.map((group: TaskGroup) => (
-              <TaskGroupSection
-                key={group.kind === 'note' ? `note:${group.notePath}` : group.kind}
+          <TaskList
+            ref={listRef}
+            scrollRef={scrollRef}
+            groups={groups}
+            resetKey={resetKey}
+            rowHeight={TASK_ROW_HEIGHT}
+            groupGap={GROUP_GAP}
+            // The inline editor saves its draft and loses focus when it unmounts.
+            mountedTaskId={selection.selectedCount === 1 ? focusedKey : null}
+            renderHeader={(group) => (
+              <TaskGroupHeader
                 group={group}
-                selection={selection}
-                editHandlers={editHandlers}
-                onCheckboxToggle={onCheckboxToggle}
-                onSelectionCheckboxToggle={onSelectionCheckboxToggle}
                 today={today}
                 onAdd={onAdd}
                 onOpen={openNote}
+                className="lg:px-12"
               />
-            ))}
-          </div>
+            )}
+            renderRow={(row) => {
+              if (row.kind === 'breadcrumbs') {
+                return (
+                  <TaskBreadcrumbs
+                    breadcrumbs={row.labels}
+                    onSelect={() => selection.select(row.tasks.map((task) => task.taskId))}
+                  />
+                )
+              }
+              const { task } = row
+              const key = task.taskId
+              const selected = selection.isSelected(key)
+              return (
+                <TaskRow
+                  task={task}
+                  showSource={row.showSource}
+                  selected={selected}
+                  editing={selection.isSoleSelected(key)}
+                  togglesSelection={selected && selection.selectedCount > 1}
+                  onSelect={(event) => selection.clickSelect(key, event)}
+                  onCheckboxToggle={() => onCheckboxToggle(task)}
+                  onSelectionCheckboxToggle={() => onSelectionCheckboxToggle(task)}
+                  editHandlers={editHandlers(task)}
+                  onOpen={openNote}
+                />
+              )
+            }}
+          />
         )}
       </div>
     </div>
