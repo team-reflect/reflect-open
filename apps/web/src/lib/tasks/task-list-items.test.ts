@@ -46,6 +46,14 @@ describe('flattenTaskGroups', () => {
     ])
     expect(headerIndexes).toEqual([0, 4])
     expect([...indexByTaskId.values()]).toEqual([1, 3, 5])
+    expect(items.map((item) => item.kind === 'task' && item.groupEnd)).toEqual([
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+    ])
   })
 
   it('gives every item a different key', () => {

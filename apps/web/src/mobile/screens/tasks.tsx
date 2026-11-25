@@ -1,7 +1,6 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { useDeferredValue, useMemo, useRef, useState, type ReactElement } from 'react'
 import { CircleCheck } from 'lucide-react'
 import {
-  composeVisibleTaskGroups,
   todaysDailyTarget,
   WritableStore,
   type InsertTaskTarget,
@@ -13,6 +12,7 @@ import { TaskBreadcrumbs } from '@/components/tasks/task-breadcrumbs.tsx'
 import { TaskGroupHeader } from '@/components/tasks/task-group-header.tsx'
 import { TaskList } from '@/components/tasks/task-list.tsx'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
+import { useVisibleTaskGroups } from '@/lib/tasks/use-visible-task-groups.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
@@ -27,7 +27,6 @@ import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { routeForPath } from '@reflect/app'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useStore } from '@/lib/use-store.ts'
 
 interface MobileTasksProps {
   /**
@@ -82,25 +81,13 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
     selectText: true,
   })
 
-  const { open, completed, struck } = useStore(taskService)
-  useEffect(
-    () => (filters.archived ? taskService.includeCompleted() : undefined),
-    [taskService, filters.archived],
-  )
-  const ready = open !== undefined && (!filters.archived || completed !== undefined)
-
   // Defer the needle like the All tab defers its query: fast typing coalesces
   // while the input stays live. A cleared query applies immediately — the "+"
   // add clears it so the new row is visible, and a stale deferred needle must
   // not keep hiding that row while it catches up.
   const deferredQuery = useDeferredValue(query)
   const needle = (query === '' ? '' : deferredQuery).trim().toLowerCase()
-  const groups = useMemo(
-    () => composeVisibleTaskGroups({ open, completed, struck, filters, needle, today }),
-    [open, completed, struck, filters, needle, today],
-  )
-
-  const resetKey = useMemo(() => JSON.stringify([needle, filters]), [needle, filters])
+  const { groups, ready, struck, resetKey } = useVisibleTaskGroups({ needle, filters, today })
 
   // The task list scroller renders only while there are rows to show.
   const listRef = useRef<HTMLDivElement>(null)

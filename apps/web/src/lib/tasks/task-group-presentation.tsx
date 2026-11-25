@@ -2,13 +2,6 @@ import type { ReactElement } from 'react'
 import { AlarmClock, Calendar, FileText, Pin, Star } from 'lucide-react'
 import { todaysDailyTarget, type InsertTaskTarget, type TaskGroup } from '@reflect/core'
 
-/**
- * The presentation contract a task-group section shares across surfaces —
- * V1's per-bucket styling and add-target rule, one definition for the desktop
- * sections and the mobile groups so the two can't drift on bucket colours or
- * where "+ Add" writes.
- */
-
 export interface TaskGroupHeaderStyle {
   icon: ReactElement
   colorClass: string

@@ -22,6 +22,10 @@ export type TaskListRow =
        * Show the source note: date buckets hold tasks from many notes.
        */
       showSource: boolean
+      /**
+       * The last row of its group.
+       */
+      groupEnd: boolean
     }
 
 /**
@@ -32,7 +36,7 @@ export type TaskListItem = { kind: 'header'; key: string; group: TaskGroup } | T
 /**
  * Task groups as one flat list.
  */
-export interface TaskListItems {
+export interface FlatTaskList {
   items: TaskListItem[]
   /**
    * Indexes of the header items, ascending.
@@ -48,7 +52,7 @@ export interface TaskListItems {
  * Flattens task groups into one list: each group's header, then for each
  * outline context its breadcrumb (when it has a label) and its tasks.
  */
-export function flattenTaskGroups(groups: readonly TaskGroup[]): TaskListItems {
+export function flattenTaskGroups(groups: readonly TaskGroup[]): FlatTaskList {
   const items: TaskListItem[] = []
   const headerIndexes: number[] = []
   const indexByTaskId = new Map<string, number>()
@@ -68,8 +72,19 @@ export function flattenTaskGroups(groups: readonly TaskGroup[]): TaskListItems {
       }
       for (const task of context.tasks) {
         indexByTaskId.set(task.taskId, items.length)
-        items.push({ kind: 'task', key: `task:${groupKey}:${task.taskId}`, task, showSource })
+        items.push({
+          kind: 'task',
+          key: `task:${groupKey}:${task.taskId}`,
+          task,
+          showSource,
+          groupEnd: false,
+        })
       }
+    }
+    // A group holds at least one task, and a task ends it.
+    const last = items.at(-1)
+    if (last?.kind === 'task') {
+      last.groupEnd = true
     }
   }
   return { items, headerIndexes, indexByTaskId }

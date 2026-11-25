@@ -26,9 +26,10 @@ interface TaskGroupHeaderProps {
 }
 
 /**
- * The header of one group in a Tasks list (V1 design), colour-coded: a date
- * bucket (Current/Overdue/Upcoming) or a note, with its task count. A note
- * group's header opens the note. Current and note groups have an "Add" button.
+ * The header of one group in a Tasks list, colour-coded: a date bucket
+ * (Current/Overdue/Upcoming) or a note, with its task count. A note group's
+ * header opens the note. Current and note groups have an "Add" button. It
+ * fills the height of its parent.
  */
 export function TaskGroupHeader({
   group,
@@ -44,8 +45,8 @@ export function TaskGroupHeader({
   return (
     // `bg-surface-canvas` is opaque, so rows do not show through the translucent
     // dark-mode `bg-surface-sunken`.
-    <div className="bg-surface-canvas">
-      <div className={cn('flex h-8 items-center gap-2 bg-surface-sunken px-4', className)}>
+    <div className="h-full bg-surface-canvas">
+      <div className={cn('flex h-full items-center gap-2 bg-surface-sunken px-4', className)}>
         <h2 className={cn('flex min-w-0 items-center gap-2 text-sm font-medium', colorClass)}>
           {icon}
           {/* The pin icon alone is invisible to screen readers (aria-hidden). */}
@@ -70,7 +71,7 @@ export function TaskGroupHeader({
             type="button"
             aria-label={`Add a task to ${group.kind === 'current' ? 'today' : group.label}`}
             onClick={() => onAdd(addTarget)}
-            className="ml-auto flex h-8 flex-none items-center gap-1 text-xs font-medium text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none"
+            className="ml-auto flex h-full flex-none items-center gap-1 text-xs font-medium text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none"
           >
             <Plus aria-hidden className="size-3.5" />
             Add

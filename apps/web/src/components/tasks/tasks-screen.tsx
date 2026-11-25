@@ -8,7 +8,7 @@ import {
   type ReactElement,
 } from 'react'
 import { Archive, CalendarClock, List, Search } from 'lucide-react'
-import { composeVisibleTaskGroups, type InsertTaskTarget, type OpenTask } from '@reflect/core'
+import type { InsertTaskTarget, OpenTask } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { useNoteLinkNavigation, type ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
@@ -16,10 +16,10 @@ import { useTaskRowHandlers } from '@/lib/tasks/use-task-row-handlers.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
 import { useTaskKeyboard } from '@/lib/tasks/use-task-keyboard.ts'
 import { useTaskSelection } from '@/lib/tasks/use-task-selection.ts'
+import { useVisibleTaskGroups } from '@/lib/tasks/use-visible-task-groups.ts'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useStore } from '@/lib/use-store.ts'
 import { routeForPath } from '@reflect/app'
 import { TaskFiltersMenu } from './task-filters-menu.tsx'
 import { TaskBreadcrumbs } from './task-breadcrumbs.tsx'
@@ -52,12 +52,13 @@ function focusedSelectedKey(
 
 /**
  * The Tasks view (Plan 18), in V1's design: every open checkbox across the graph
- * grouped into sticky, colour-coded sections — Current / Overdue / Upcoming (by
+ * grouped under sticky, colour-coded headers — Current / Overdue / Upcoming (by
  * the task's due date, else its note's daily date) and then by note — read from
  * the SQLite projection and kept fresh by `TaskService`. A search
  * box filters by text; the "Task filters" menu toggles which buckets show and
- * reveals completed ("archived") tasks. Owns its scroll container so the sticky
- * headers and the toolbar stay put; per-entry scroll memory mirrors All Notes.
+ * reveals completed ("archived") tasks. Owns the scroll container of its
+ * virtualized list, so the sticky headers and the toolbar stay put; per-entry
+ * scroll memory mirrors All Notes.
  *
  * Rows are multi-selectable (V1 parity): click to select, ⌘/Shift to extend, and
  * keyboard shortcuts act on the selection — ⌘A select all, ↑/↓ (Shift to extend),
@@ -81,24 +82,11 @@ export function TasksScreen(): ReactElement {
   const scrollRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<TaskListHandle>(null)
-  const { open, completed, struck } = useStore(taskService)
-  useEffect(
-    () => (filters.archived ? taskService.includeCompleted() : undefined),
-    [taskService, filters.archived],
-  )
-
-  // When archived is on, the list merges open + completed, so the empty state
-  // must wait for both — else a graph with only completed tasks flashes "No
-  // tasks to show." while the completed query is still loading.
-  const ready = open !== undefined && (!filters.archived || completed !== undefined)
-  const { onScroll } = useScrollRestoration(scrollRef, ready)
-
   const needle = query.trim().toLowerCase()
-  const resetKey = useMemo(() => JSON.stringify([needle, filters]), [needle, filters])
-  const groups = useMemo(
-    () => composeVisibleTaskGroups({ open, completed, struck, filters, needle, today }),
-    [open, completed, struck, filters, needle, today],
-  )
+  // The empty state waits for `ready`: with archived on, a graph with only
+  // completed tasks would flash "No tasks to show." while they load.
+  const { groups, ready, struck, resetKey } = useVisibleTaskGroups({ needle, filters, today })
+  const { onScroll } = useScrollRestoration(scrollRef, ready)
 
   // The flat, render-order list of tasks the selection and its shortcuts act on.
   const orderedTasks = useMemo(() => groups.flatMap((group) => group.tasks), [groups])
@@ -311,7 +299,7 @@ export function TasksScreen(): ReactElement {
             rowHeight={TASK_ROW_HEIGHT}
             groupGap={GROUP_GAP}
             // The inline editor saves its draft and loses focus when it unmounts.
-            mountedTaskId={selection.selectedCount === 1 ? focusedKey : null}
+            keepMountedTaskId={selection.selectedCount === 1 ? focusedKey : null}
             renderHeader={(group) => (
               <TaskGroupHeader
                 group={group}

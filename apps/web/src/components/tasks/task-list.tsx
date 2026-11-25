@@ -16,17 +16,27 @@ import {
 import { isDeepEqual } from '@ocavue/utils'
 import type { TaskGroup } from '@reflect/core'
 import { Virtualizer, type CustomItemComponentProps, type VirtualizerHandle } from 'virtua'
-import { flattenTaskGroups, type TaskListRow } from '@/lib/tasks/task-list-items.ts'
+import {
+  flattenTaskGroups,
+  type TaskListItem,
+  type TaskListRow,
+} from '@/lib/tasks/task-list-items.ts'
 
 /**
- * Height (px) of a group header, which `renderHeader` must match: `h-8`.
+ * Height (px) of a group header.
  */
 const HEADER_HEIGHT = 32
 
 /**
- * How far (px) past the viewport a group keeps its header mounted.
+ * How far (px) past the viewport rows stay mounted.
  */
-const NEAR_BUFFER = 2000
+const ROW_BUFFER = 640
+
+/**
+ * How far (px) past the viewport a group keeps its header mounted. A header
+ * is one small item, so it mounts long before its rows do.
+ */
+const HEADER_BUFFER = 2000
 
 export interface TaskListHandle {
   /**
@@ -58,19 +68,18 @@ interface TaskListProps {
   /**
    * A task whose row stays mounted out of view, e.g. the one being edited.
    */
-  mountedTaskId?: string | null | undefined
+  keepMountedTaskId?: string | null | undefined
   /**
-   * Renders a group header, {@link HEADER_HEIGHT} tall.
+   * Renders a group header. It fills the header slot.
    */
   renderHeader: (group: TaskGroup) => ReactElement
   renderRow: (row: TaskListRow) => ReactElement
 }
 
 /**
- * The virtualized list of task groups, for the desktop and the mobile Tasks
- * screens. A group header sticks to the top while its group is in view: the
- * header item holds a track as tall as the group, and the header is sticky
- * inside the track.
+ * The virtualized list of task groups. A group header sticks to the top while
+ * its group is in view: the header item holds a track as tall as the group,
+ * and the header is sticky inside the track.
  */
 export function TaskList({ resetKey, ...props }: TaskListProps): ReactElement {
   const { scrollRef } = props
@@ -86,36 +95,25 @@ export function TaskList({ resetKey, ...props }: TaskListProps): ReactElement {
 }
 
 /**
- * The header item of a group near the viewport, and how tall (px) the track
- * of its header is.
+ * The items of the list and the space under each group, for an item's element.
  */
-interface GroupTrack {
-  index: number
-  height: number
-}
-
-/**
- * What an item needs to know about its place in its group.
- */
-interface GroupLayout {
-  headerIndexes: ReadonlySet<number>
-  /**
-   * Indexes of the last item of each group.
-   */
-  groupEndIndexes: ReadonlySet<number>
+interface ItemLayout {
+  items: readonly TaskListItem[]
   groupGap: number
 }
 
-const GroupLayoutContext = createContext<GroupLayout>({
-  headerIndexes: new Set(),
-  groupEndIndexes: new Set(),
-  groupGap: 0,
-})
+const ItemLayoutContext = createContext<ItemLayout>({ items: [], groupGap: 0 })
 
-function TaskListItem({ style, index, children, ref }: CustomItemComponentProps): ReactElement {
-  const { headerIndexes, groupEndIndexes, groupGap } = use(GroupLayoutContext)
-  const isHeader = headerIndexes.has(index)
-  const isGroupEnd = groupEndIndexes.has(index)
+function TaskListItemElement({
+  style,
+  index,
+  children,
+  ref,
+}: CustomItemComponentProps): ReactElement {
+  const { items, groupGap } = use(ItemLayoutContext)
+  const item = items[index]
+  const isHeader = item?.kind === 'header'
+  const isGroupEnd = item?.kind === 'task' && item.groupEnd
   const itemStyle = useMemo((): CSSProperties => {
     return {
       ...style,
@@ -131,41 +129,48 @@ function TaskListItem({ style, index, children, ref }: CustomItemComponentProps)
   )
 }
 
-function GroupedTaskList({
-  ref,
-  scrollRef,
-  groups,
-  rowHeight,
-  groupGap = 0,
-  mountedTaskId,
-  renderHeader,
-  renderRow,
-}: Omit<TaskListProps, 'resetKey'>): ReactElement {
-  const virtualizerRef = useRef<VirtualizerHandle>(null)
-  const listRef = useRef<HTMLDivElement>(null)
-  const [tracks, setTracks] = useState<GroupTrack[]>([])
+interface GroupTracksOptions {
+  virtualizerRef: RefObject<VirtualizerHandle | null>
+  /**
+   * The element whose height is the height of the list.
+   */
+  listRef: RefObject<HTMLElement | null>
+  headerIndexes: readonly number[]
+  groupGap: number
+}
 
-  const { items, headerIndexes, indexByTaskId } = useMemo(() => flattenTaskGroups(groups), [groups])
-  const layout = useMemo((): GroupLayout => {
-    const ends = headerIndexes.slice(1).map((index) => index - 1)
-    if (items.length > 0) {
-      ends.push(items.length - 1)
-    }
-    return {
-      headerIndexes: new Set(headerIndexes),
-      groupEndIndexes: new Set(ends),
-      groupGap,
-    }
-  }, [headerIndexes, items.length, groupGap])
+interface GroupTracks {
+  /**
+   * The height (px) of each group near the viewport, by the index of its
+   * header item.
+   */
+  heights: ReadonlyMap<number, number>
+  /**
+   * Reads the groups near the viewport again.
+   */
+  update: () => void
+}
 
-  const updateTracks = useCallback(() => {
+/**
+ * Tracks the groups near the viewport and how tall each is. The heights
+ * follow the scroll position and the measured sizes of the rows.
+ */
+function useGroupTracks({
+  virtualizerRef,
+  listRef,
+  headerIndexes,
+  groupGap,
+}: GroupTracksOptions): GroupTracks {
+  const [heights, setHeights] = useState<ReadonlyMap<number, number>>(() => new Map())
+
+  const update = useCallback(() => {
     const virtualizer = virtualizerRef.current
     if (virtualizer === null) {
       return
     }
-    const start = virtualizer.scrollOffset - NEAR_BUFFER
-    const end = virtualizer.scrollOffset + virtualizer.viewportSize + NEAR_BUFFER
-    const next: GroupTrack[] = []
+    const start = virtualizer.scrollOffset - HEADER_BUFFER
+    const end = virtualizer.scrollOffset + virtualizer.viewportSize + HEADER_BUFFER
+    const next = new Map<number, number>()
     for (const [position, index] of headerIndexes.entries()) {
       const top = virtualizer.getItemOffset(index)
       if (top > end) {
@@ -175,29 +180,50 @@ function GroupedTaskList({
       const bottom =
         nextIndex === undefined ? virtualizer.scrollSize : virtualizer.getItemOffset(nextIndex)
       if (bottom >= start) {
-        next.push({ index, height: bottom - top - groupGap })
+        next.set(index, bottom - top - groupGap)
       }
     }
-    setTracks((current) => (isDeepEqual(current, next) ? current : next))
-  }, [headerIndexes, groupGap])
+    setHeights((current) => (isDeepEqual([...current], [...next]) ? current : next))
+  }, [virtualizerRef, headerIndexes, groupGap])
 
   // A measured row moves the rows after it, which changes the list's height.
   useLayoutEffect(() => {
-    updateTracks()
+    update()
     const list = listRef.current
     if (list === null) {
       return
     }
-    const observer = new ResizeObserver(updateTracks)
+    const observer = new ResizeObserver(update)
     observer.observe(list)
     return () => observer.disconnect()
-  }, [updateTracks])
+  }, [update, listRef])
 
-  const mountedIndex = mountedTaskId == null ? undefined : indexByTaskId.get(mountedTaskId)
+  return { heights, update }
+}
+
+function GroupedTaskList({
+  ref,
+  scrollRef,
+  groups,
+  rowHeight,
+  groupGap = 0,
+  keepMountedTaskId,
+  renderHeader,
+  renderRow,
+}: Omit<TaskListProps, 'resetKey'>): ReactElement {
+  const virtualizerRef = useRef<VirtualizerHandle>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  const { items, headerIndexes, indexByTaskId } = useMemo(() => flattenTaskGroups(groups), [groups])
+  const layout = useMemo(() => ({ items, groupGap }), [items, groupGap])
+  const tracks = useGroupTracks({ virtualizerRef, listRef, headerIndexes, groupGap })
+
+  const keepMountedIndex =
+    keepMountedTaskId == null ? undefined : indexByTaskId.get(keepMountedTaskId)
   const keepMounted = useMemo(() => {
-    const indexes = tracks.map((track) => track.index)
-    return mountedIndex === undefined ? indexes : [...indexes, mountedIndex]
-  }, [tracks, mountedIndex])
+    const indexes = [...tracks.heights.keys()]
+    return keepMountedIndex === undefined ? indexes : [...indexes, keepMountedIndex]
+  }, [tracks.heights, keepMountedIndex])
 
   useImperativeHandle(ref, () => {
     return {
@@ -220,33 +246,40 @@ function GroupedTaskList({
 
   return (
     <div ref={listRef}>
-      <GroupLayoutContext value={layout}>
+      <ItemLayoutContext value={layout}>
         <Virtualizer
           ref={virtualizerRef}
           scrollRef={scrollRef}
           as="ul"
-          item={TaskListItem}
+          item={TaskListItemElement}
           data={items}
           itemSize={rowHeight}
-          bufferSize={640}
+          bufferSize={ROW_BUFFER}
           keepMounted={keepMounted}
-          onScroll={updateTracks}
+          onScroll={tracks.update}
         >
           {(item, index) => {
             if (item.kind !== 'header') {
               return <Fragment key={item.key}>{renderRow(item)}</Fragment>
             }
-            const height = tracks.find((track) => track.index === index)?.height
             return (
-              <div key={item.key} className="h-8">
-                <div className="pointer-events-none absolute inset-x-0 top-0" style={{ height }}>
-                  <div className="pointer-events-auto sticky top-0">{renderHeader(item.group)}</div>
+              <div key={item.key} style={{ height: HEADER_HEIGHT }}>
+                <div
+                  className="pointer-events-none absolute inset-x-0 top-0"
+                  style={{ height: tracks.heights.get(index) }}
+                >
+                  <div
+                    className="pointer-events-auto sticky top-0"
+                    style={{ height: HEADER_HEIGHT }}
+                  >
+                    {renderHeader(item.group)}
+                  </div>
                 </div>
               </div>
             )
           }}
         </Virtualizer>
-      </GroupLayoutContext>
+      </ItemLayoutContext>
     </div>
   )
 }
