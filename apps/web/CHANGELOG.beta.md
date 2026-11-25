@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.20.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.20.0-beta.4...v0.20.0-beta.5) (2026-11-25)
+
+
+### Features
+
+* **mobile:** iOS-style pill actions for swipe rows ([#2320](https://github.com/team-reflect/reflect-open/issues/2320)) ([8170934](https://github.com/team-reflect/reflect-open/commit/817093494eaed90b8d0395ec476db74829b8ca27))
+
+
+### Bug Fixes
+
+* **core:** retry a failed note save once ([#2316](https://github.com/team-reflect/reflect-open/issues/2316)) ([9651483](https://github.com/team-reflect/reflect-open/commit/9651483378cb9eec12bc0be358b0d9a28ef373e2))
+* **core:** retry every failed note save once ([#2318](https://github.com/team-reflect/reflect-open/issues/2318)) ([e94d1c7](https://github.com/team-reflect/reflect-open/commit/e94d1c7d7105fd8cdba5da56d1b53e5f6fa9b52c))
+* virtualize the Tasks list ([#2319](https://github.com/team-reflect/reflect-open/issues/2319)) ([33343f9](https://github.com/team-reflect/reflect-open/commit/33343f94cd5df01ccbec87d96f0920c02f8f3056))
+
 ## [0.20.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.20.0-beta.3...v0.20.0-beta.4) (2026-11-23)
 
 
