@@ -122,10 +122,10 @@ export function MobileTaskGroup({
                 task={task}
                 showSource={showSource}
                 onEdit={onEdit}
-                onToggle={() => onToggle(task)}
+                onToggle={onToggle}
                 revealedRow={revealedRow}
-                onOpenNote={() => onOpen(task.notePath)}
-                onDelete={() => onDelete(task)}
+                onOpenNote={onOpen}
+                onDelete={onDelete}
               />
             ))}
           </Fragment>
