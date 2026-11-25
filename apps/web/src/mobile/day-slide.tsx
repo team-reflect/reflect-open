@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type ReactElement } from 'react'
+import { useCallback, useDeferredValue, useEffect, useRef, type ReactElement } from 'react'
 import { NotePane } from '@/components/note-pane.tsx'
 import { dailyPath, formatDayLabel } from '@reflect/core'
 import { cn } from '@/lib/utils.ts'
@@ -30,7 +30,9 @@ interface DaySlideProps {
    * caret at the end of the day's content (the double-tap capture gesture).
    */
   focusRequested: boolean
-  /** Called after the focus request has been applied. */
+  /**
+   * Called after the focus request has been applied.
+   */
   onFocusConsumed: () => void
 }
 
@@ -53,6 +55,9 @@ export function DaySlide({
   onFocusConsumed,
 }: DaySlideProps): ReactElement {
   const dateFormat = useDateFormat()
+  // A slide that mounts off screen renders its note in a later, low-priority
+  // render, so the selected day's editor is the first one.
+  const contentMounted = useDeferredValue(true, selected)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const { handleScroll, resetToTop, cancelRestore } = useScrollRestore({
@@ -123,26 +128,62 @@ export function DaySlide({
         >
           {formatDayLabel(day, dateFormat)}
         </h2>
-        <NotePane
-          path={dailyPath(day)}
-          lazy
-          autoFocus={focusRequested}
-          // V1's double-tap-to-today is a capture gesture: the caret (and the
-          // scroll) land at the end of the day's content, ready to append.
-          autoFocusSelection="end"
-          onAutoFocused={handleAutoFocused}
-          showBacklinks={false}
-          className="flex grow flex-col"
-          gutterClassName={MOBILE_CONTENT_GUTTER}
-          // A floor for the day with no content and many backlinks, where the
-          // stretch leaves only a line of editor to tap.
-          editorClassName="grow min-h-24"
-        />
-        {/* The mobile section (touch chrome) replaces NotePane's built-in
-            desktop panel; a daily-note backlink swipes the carousel to that
-            date rather than pushing a screen. */}
-        <IncomingBacklinks path={dailyPath(day)} className={cn(MOBILE_CONTENT_GUTTER, 'pb-4')} />
+        {contentMounted && (
+          <DaySlideContent
+            day={day}
+            focusRequested={focusRequested}
+            onAutoFocused={handleAutoFocused}
+          />
+        )}
       </div>
     </div>
+  )
+}
+
+interface DaySlideContentProps {
+  /**
+   * The slide's ISO day.
+   */
+  day: string
+  /**
+   * True when the editor should focus as soon as its handle exists.
+   */
+  focusRequested: boolean
+  /**
+   * Called after the focus request has been applied.
+   */
+  onAutoFocused: () => void
+}
+
+/**
+ * The note editor of one day, and the backlinks under it.
+ */
+function DaySlideContent({
+  day,
+  focusRequested,
+  onAutoFocused,
+}: DaySlideContentProps): ReactElement {
+  return (
+    <>
+      <NotePane
+        path={dailyPath(day)}
+        lazy
+        autoFocus={focusRequested}
+        // V1's double-tap-to-today is a capture gesture: the caret (and the
+        // scroll) land at the end of the day's content, ready to append.
+        autoFocusSelection="end"
+        onAutoFocused={onAutoFocused}
+        showBacklinks={false}
+        className="flex grow flex-col"
+        gutterClassName={MOBILE_CONTENT_GUTTER}
+        // A floor for the day with no content and many backlinks, where the
+        // stretch leaves only a line of editor to tap.
+        editorClassName="grow min-h-24"
+      />
+      {/* The mobile section (touch chrome) replaces NotePane's built-in
+          desktop panel; a daily-note backlink swipes the carousel to that
+          date rather than pushing a screen. */}
+      <IncomingBacklinks path={dailyPath(day)} className={cn(MOBILE_CONTENT_GUTTER, 'pb-4')} />
+    </>
   )
 }
