@@ -1173,6 +1173,23 @@ describe('missing-note seed (new ordinary notes)', () => {
     expect(h.disk()).toBe('mine\n')
   })
 
+  it('a save after a failed retry retries too', async () => {
+    const h = harness()
+    h.session.load()
+    await settled()
+
+    h.failWrites('disk full')
+    h.session.editorChanged('# Edited\n')
+    await settled()
+    h.failWrites(null)
+
+    h.setDisk(null)
+    h.session.dispose()
+    await settled()
+
+    expect(h.disk()).toBe('# Edited\n')
+  })
+
   it('dispose retries a save whose file was deleted', async () => {
     const h = harness()
     h.session.load()
