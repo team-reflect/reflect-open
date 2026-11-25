@@ -148,11 +148,6 @@ class NoteSessionImpl implements NoteSession {
   // deleted, so rewriting it would recreate it).
   #discarded = false
 
-  /**
-   * True after a failed save retried once; a landed write clears it.
-   */
-  #retriedFailedSave = false
-
   #lastEmitted: NoteSessionSnapshot | null = null
 
   constructor(deps: NoteSessionServiceDeps, options: NoteSessionOptions) {
@@ -242,7 +237,10 @@ class NoteSessionImpl implements NoteSession {
     this.#onSnapshot(next)
   }
 
-  #save(): void {
+  /**
+   * Queue a write of the buffer. With `retryOnFailure`, a failed write queues one more.
+   */
+  #save(retryOnFailure: boolean): void {
     // A discarded session never writes: its file is being deleted, so any
     // save — including a teardown `flush()` (the pane unmounts via flush →
     // dispose) or an already-queued step, would recreate it.
@@ -272,7 +270,6 @@ class NoteSessionImpl implements NoteSession {
           const result = await write(this.path, content, this.#missing ? null : this.#writeBase)
           this.#missing = false // the landed write created the file if it was missing
           this.#error = null // a previous save failure is resolved by this success
-          this.#retriedFailedSave = false
           if (result.merged === null) {
             this.#disk = content
             this.#diskHash = result.hash
@@ -290,11 +287,9 @@ class NoteSessionImpl implements NoteSession {
       .catch(async (cause) => {
         this.#deps.logger.error('failed to save note:', cause)
         this.#error = errorMessage(cause)
-        const retry = !this.#retriedFailedSave
-        this.#retriedFailedSave = true
         await this.#reconcileFromDisk(false)
-        if (retry) {
-          this.#save()
+        if (retryOnFailure) {
+          this.#save(false)
         }
         this.#emit()
       })
@@ -337,7 +332,7 @@ class NoteSessionImpl implements NoteSession {
     }
     this.#saveTimer = this.#deps.clock.setTimeout(() => {
       this.#saveTimer = null
-      this.#save()
+      this.#save(true)
     }, this.#saveDebounceMs)
   }
 
@@ -351,7 +346,7 @@ class NoteSessionImpl implements NoteSession {
   flush(): Promise<void> {
     this.#reconcilePendingEditorInput()
     this.#cancelScheduledSave()
-    this.#save()
+    this.#save(true)
     return this.#settleSaves()
   }
 
@@ -481,7 +476,7 @@ class NoteSessionImpl implements NoteSession {
       }
       if (saveIfDirty) {
         this.#cancelScheduledSave()
-        this.#save()
+        this.#save(true)
       }
       return
     }
