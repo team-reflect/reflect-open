@@ -122,38 +122,36 @@ export function TasksScreen(): ReactElement {
     },
     [commands, selection],
   )
+  const { clickSelect, select, clear, getSelected } = selection
   // The tasks behind the current selection's keys, in selection order — what the
   // toolbar actions (schedule, convert) act on. A row whose key no longer
   // resolves (pruned by a reindex) is dropped rather than acted on.
   const selectedTasks = useCallback((): OpenTask[] => {
-    return [...selection.selected]
+    return [...getSelected()]
       .map((key) => tasksByKey.get(key))
       .filter((task): task is OpenTask => task !== undefined)
-  }, [selection, tasksByKey])
-  // A checkbox click toggles its row, with the text typed into it, and ends the edit.
+  }, [getSelected, tasksByKey])
+  // A checkbox click on a row of a multi-selection completes or reopens the
+  // selected rows together. On any other row it toggles that row, with the text
+  // typed into it, and ends the edit.
   const onCheckboxToggle = useCallback(
     (task: OpenTask) => {
-      void commands.toggle([task])
-      if (selection.isSoleSelected(task.taskId)) {
-        selection.clear()
-      }
-    },
-    [commands, selection],
-  )
-  const onSelectionCheckboxToggle = useCallback(
-    (task: OpenTask) => {
       const tasks = selectedTasks()
-      if (tasks.length <= 1 || !tasks.some((selectedTask) => selectedTask.taskId === task.taskId)) {
-        onCheckboxToggle(task)
+      if (tasks.length > 1 && tasks.some((selectedTask) => selectedTask.taskId === task.taskId)) {
+        if (task.checked) {
+          void commands.toggle(tasks.filter((selectedTask) => selectedTask.checked))
+        } else {
+          void commands.complete(tasks)
+        }
         return
       }
-      if (task.checked) {
-        void commands.toggle(tasks.filter((selectedTask) => selectedTask.checked))
-      } else {
-        void commands.complete(tasks)
+      void commands.toggle([task])
+      const selected = getSelected()
+      if (selected.size === 1 && selected.has(task.taskId)) {
+        clear()
       }
     },
-    [commands, onCheckboxToggle, selectedTasks],
+    [commands, selectedTasks, getSelected, clear],
   )
   // Schedule the current selection (the calendar / ⌘⇧S), then deselect (V1).
   const onSchedule = useCallback(
@@ -216,29 +214,25 @@ export function TasksScreen(): ReactElement {
         return (
           <TaskBreadcrumbs
             breadcrumbs={row.labels}
-            onSelect={() => selection.select(row.tasks.map((task) => task.taskId))}
+            onSelect={() => select(row.tasks.map((task) => task.taskId))}
           />
         )
       }
       const { task } = row
-      const key = task.taskId
-      const selected = selection.isSelected(key)
+      const selected = selectedTaskKeys.has(task.taskId)
       return (
         <TaskRow
           task={task}
           showSource={row.showSource}
           selected={selected}
-          editing={selection.isSoleSelected(key)}
-          togglesSelection={selected && selection.selectedCount > 1}
-          onSelect={(event) => selection.clickSelect(key, event)}
-          onCheckboxToggle={() => onCheckboxToggle(task)}
-          onSelectionCheckboxToggle={() => onSelectionCheckboxToggle(task)}
-          editHandlers={editHandlers(task)}
+          onSelect={clickSelect}
+          onCheckboxToggle={onCheckboxToggle}
+          editHandlers={selected && selectedTaskKeys.size === 1 ? editHandlers(task) : undefined}
           onOpen={openNote}
         />
       )
     },
-    [selection, onCheckboxToggle, onSelectionCheckboxToggle, editHandlers, openNote],
+    [select, selectedTaskKeys, clickSelect, onCheckboxToggle, editHandlers, openNote],
   )
 
   // Move focus into the Tasks surface on mount so the shortcuts work the moment

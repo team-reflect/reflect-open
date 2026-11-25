@@ -1,4 +1,4 @@
-import type { KeyboardEvent, MouseEvent, ReactElement } from 'react'
+import { memo, type KeyboardEvent, type MouseEvent, type ReactElement } from 'react'
 import { Circle, CircleCheck } from 'lucide-react'
 import type { OpenTask } from '@reflect/core'
 import { getIsComposing } from '@meowdown/core'
@@ -24,29 +24,18 @@ interface TaskRowProps {
    */
   selected: boolean
   /**
-   * Whether this row is the sole selection — it shows the inline editor.
+   * Select a task, honoring ⌘/Ctrl (toggle) and Shift (range) modifiers.
    */
-  editing: boolean
+  onSelect: (taskId: string, event: Pick<MouseEvent, 'metaKey' | 'ctrlKey' | 'shiftKey'>) => void
   /**
-   * Whether this checkbox click should apply to the whole multi-selection.
+   * A click on the checkbox of a task.
    */
-  togglesSelection: boolean
+  onCheckboxToggle: (task: OpenTask) => void
   /**
-   * Select the row, honoring ⌘/Ctrl (toggle) and Shift (range) modifiers.
+   * What the keys of the inline editor do for this row. Set while the row is
+   * the sole selection: it then shows the inline editor.
    */
-  onSelect: (event: Pick<MouseEvent, 'metaKey' | 'ctrlKey' | 'shiftKey'>) => void
-  /**
-   * Checkbox click on an unselected or solely selected row: toggle this task.
-   */
-  onCheckboxToggle: () => void
-  /**
-   * Checkbox click while part of a multi-selection: apply this row's next state to it.
-   */
-  onSelectionCheckboxToggle: () => void
-  /**
-   * What the keys of the inline editor do for this row.
-   */
-  editHandlers: TaskEditorHandlers
+  editHandlers: TaskEditorHandlers | undefined
   onOpen: (notePath: string, event?: ModClickEvent) => void
 }
 
@@ -60,18 +49,16 @@ interface TaskRowProps {
  * (completed) row shows struck through. A checkbox click on any selected row in
  * a multi-selection completes or reopens the selected rows together.
  */
-export function TaskRow({
+export const TaskRow = memo(function TaskRow({
   task,
   showSource,
   selected,
-  editing,
-  togglesSelection,
   onSelect,
   onCheckboxToggle,
-  onSelectionCheckboxToggle,
   editHandlers,
   onOpen,
 }: TaskRowProps): ReactElement {
+  const editing = editHandlers !== undefined
   const noteLabel = useNoteLabel()
   const done = task.checked
   const label = task.text || 'Empty task'
@@ -83,7 +70,11 @@ export function TaskRow({
       return
     }
     event.preventDefault()
-    onSelect({ metaKey: event.metaKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey })
+    onSelect(task.taskId, {
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+      shiftKey: event.shiftKey,
+    })
   }
   const selectFromRow = (event: MouseEvent<HTMLDivElement>): void => {
     if (editing) {
@@ -94,7 +85,7 @@ export function TaskRow({
     if (event.shiftKey) {
       event.preventDefault()
     }
-    onSelect(event)
+    onSelect(task.taskId, event)
   }
 
   return (
@@ -116,11 +107,7 @@ export function TaskRow({
         aria-label={task.checked ? `Reopen: ${label}` : `Complete: ${label}`}
         onClick={(event) => {
           event.stopPropagation()
-          if (togglesSelection) {
-            onSelectionCheckboxToggle()
-            return
-          }
-          onCheckboxToggle()
+          onCheckboxToggle(task)
         }}
         // h-6 matches the text/editor's 24px line so the circle centers on
         // the first line (items-start keeps it there when a task wraps).
@@ -132,7 +119,7 @@ export function TaskRow({
           <Circle aria-hidden className="size-[18px]" strokeWidth={2} />
         )}
       </button>
-      {editing ? (
+      {editHandlers !== undefined ? (
         <TaskEditor task={task} {...editHandlers} />
       ) : (
         <div
@@ -163,4 +150,4 @@ export function TaskRow({
       ) : null}
     </div>
   )
-}
+})

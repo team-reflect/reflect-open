@@ -19,6 +19,10 @@ import { isModEvent } from '@meowdown/core'
  */
 export interface ListSelection {
   selected: ReadonlySet<string>
+  /**
+   * The keys selected now, read live. The function keeps its identity.
+   */
+  getSelected: () => ReadonlySet<string>
   selectedCount: number
   isSelected: (key: string) => boolean
   /** Exactly this key is selected (e.g. the state that opens an inline editor). */
@@ -52,6 +56,10 @@ export function useListSelection(orderedKeys: readonly string[]): ListSelection 
   const orderRef = useRef(orderedKeys)
   useEffect(() => {
     orderRef.current = orderedKeys
+  })
+  const selectedRef = useRef(selected)
+  useEffect(() => {
+    selectedRef.current = selected
   })
   const anchorRef = useRef<string | null>(null)
   const cursorRef = useRef<string | null>(null)
@@ -183,9 +191,11 @@ export function useListSelection(orderedKeys: readonly string[]): ListSelection 
   )
 
   const activeKey = useCallback(() => cursorRef.current ?? anchorRef.current, [])
+  const getSelected = useCallback(() => selectedRef.current, [])
 
   return {
     selected,
+    getSelected,
     selectedCount: selected.size,
     isSelected: (key) => selected.has(key),
     isSoleSelected: (key) => selected.size === 1 && selected.has(key),

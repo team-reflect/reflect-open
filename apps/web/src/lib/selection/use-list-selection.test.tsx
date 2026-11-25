@@ -25,6 +25,16 @@ describe('useListSelection', () => {
     expect([...result.current.selected]).toEqual(['a', 'b', 'c'])
   })
 
+  it('reads the selection live through a function that keeps its identity', async () => {
+    const { result } = await renderHook(() => useListSelection(KEYS))
+    const { getSelected } = result.current
+
+    await act(() => result.current.clickSelect('b', noMods))
+
+    expect(result.current.getSelected).toBe(getSelected)
+    expect([...getSelected()]).toEqual(['b'])
+  })
+
   it('moves and extends with the arrows, clamping at the ends', async () => {
     const { result } = await renderHook(() => useListSelection(KEYS))
 
