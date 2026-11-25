@@ -163,12 +163,6 @@ jobs:
         with:
           cache-scope: node
 
-      - name: Verify the generated iOS CSP is current
-        run: |
-          pnpm gen:ios-csp
-          git diff --exit-code apple/Sources/WebHostKit/ContentSecurityPolicy.gen.swift \
-            || (echo "::error::ContentSecurityPolicy.gen.swift is stale. Run 'pnpm gen:ios-csp' and commit the result." && exit 1)
-
       - name: Typecheck
         run: pnpm turbo run typecheck --filter=//
 
@@ -410,13 +404,6 @@ jobs:
       - name: Unused dependencies
         if: matrix.name == 'Linux'
         run: cargo shear
-
-      - name: Verify the generated C header is current
-        if: matrix.name == 'Linux'
-        run: |
-          cargo xtask ffi-header
-          git diff --exit-code crates/ffi/include/reflect_core.h \
-            || (echo "::error::reflect_core.h is stale. Run 'pnpm build:ffi' and commit the result." && exit 1)
 
   # A single job for branch protection to require, instead of listing every
   # job as a required status check.

@@ -29,7 +29,8 @@ jobs:
         run: |
           if ! git diff --quiet HEAD^1 HEAD -- \
               '*.rs' \
-              rust-toolchain.toml; then
+              rust-toolchain.toml \
+              crates/ffi/cbindgen.toml; then
             echo "rust=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -59,6 +60,13 @@ jobs:
       - name: Generate types
         if: steps.changes.outputs.rust == 'true'
         run: pnpm gen:types
+
+      - name: Generate the C header
+        if: steps.changes.outputs.rust == 'true'
+        run: cargo xtask ffi-header
+
+      - name: Generate the iOS CSP
+        run: pnpm gen:ios-csp
 
       - name: Fix (Swift)
         run: scripts/check-swift.sh --fix
