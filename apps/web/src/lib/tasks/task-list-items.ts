@@ -24,10 +24,12 @@ export type TaskListRow =
       showSource: boolean
     }
 
+type TaskListHeader = { kind: 'header'; key: string; group: TaskGroup }
+
 /**
  * One item of a flat Tasks list: a group header or a row.
  */
-export type TaskListItem = { kind: 'header'; key: string; group: TaskGroup } | TaskListRow
+export type TaskListItem = TaskListHeader | TaskListRow
 
 /**
  * Task groups as one flat list.
