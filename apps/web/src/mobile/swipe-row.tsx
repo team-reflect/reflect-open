@@ -2,10 +2,8 @@ import {
   useCallback,
   useEffectEvent,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
   type ReactNode,
@@ -16,10 +14,6 @@ import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 import './swipe-row.css'
 
 interface SwipeRowProps {
-  /**
-   * Total width (px) of the trailing actions.
-   */
-  actionWidth: number
   revealed: boolean
   onReveal: () => void
   onClose: () => void
@@ -40,11 +34,6 @@ interface SwipeRowProps {
    * Classes for the opaque surface that covers the actions.
    */
   surfaceClassName: string
-  /**
-   * CSS color behind the actions, seen when an over-swipe pulls them past
-   * the trailing edge. Match the last action, e.g. `var(--color-destructive)`.
-   */
-  overscrollColor: string
   children: ReactNode
 }
 
@@ -56,7 +45,6 @@ interface SwipeRowProps {
  * where it settled and scrolls itself when `revealed` changes.
  */
 export function SwipeRow({
-  actionWidth,
   revealed,
   onReveal,
   onClose,
@@ -64,7 +52,6 @@ export function SwipeRow({
   actions,
   className,
   surfaceClassName,
-  overscrollColor,
   children,
 }: SwipeRowProps): ReactElement {
   const reducedMotion = usePrefersReducedMotion()
@@ -77,7 +64,7 @@ export function SwipeRow({
   const [lifts, setLifts] = useState(0)
 
   const reportSettled = useEffectEvent((scroller: HTMLElement) => {
-    const open = scroller.scrollLeft >= actionWidth / 2
+    const open = scroller.scrollLeft >= getOpenLeft(scroller) / 2
     if (open && !revealed) {
       onReveal()
     } else if (!open && revealed) {
@@ -91,7 +78,7 @@ export function SwipeRow({
       return
     }
     const controller = new AbortController()
-    // Ends the over-swipe color once the row rests closed.
+    // Ends the swipe styles once the row rests closed.
     const deactivateIfClosed = (): void => {
       if (Math.round(scroller.scrollLeft) === 0) {
         delete scroller.dataset.active
@@ -136,34 +123,30 @@ export function SwipeRow({
       return
     }
     heldAtRef.current = null
+    // An open row keeps the swipe styles, also when the row remounts open.
+    if (revealed) {
+      scroller.dataset.active = ''
+    }
     const first = !positionedRef.current
     positionedRef.current = true
-    const left = revealed ? actionWidth : 0
+    const left = revealed ? getOpenLeft(scroller) : 0
     if (Math.round(scroller.scrollLeft) === left) {
       return
     }
     // The first placement runs before paint, so a remounted open row never animates in.
     scroller.scrollTo({ left, behavior: first || reducedMotion ? 'instant' : 'smooth' })
-  }, [revealed, actionWidth, reducedMotion, lifts])
+  }, [revealed, reducedMotion, lifts])
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>): void => {
       if (event.isPrimary) {
-        // Turns on the over-swipe color behind the actions.
+        // Turns on the swipe styles in `swipe-row.css`.
         event.currentTarget.dataset.active = ''
         onBeginInteraction()
       }
     },
     [onBeginInteraction],
   )
-
-  const actionsStyle = useMemo(() => ({ width: actionWidth }), [actionWidth])
-  const scrollerStyle = useMemo(() => {
-    return {
-      '--swipe-row-overscroll-color': overscrollColor,
-      '--swipe-row-action-width': `${actionWidth}px`,
-    } as CSSProperties
-  }, [overscrollColor, actionWidth])
 
   return (
     <div
@@ -172,30 +155,25 @@ export function SwipeRow({
       // Marks a horizontal scroller.
       data-scroll-x=""
       onPointerDown={onPointerDown}
-      style={scrollerStyle}
       className={cn('swipe-row pager-x flex overflow-x-auto', className)}
     >
       <div
-        // `will-change-transform` gives the surface its own compositing layer, so
-        // WebKit keeps it above the sticky actions inside a stacking context
-        // (iOS 26 misorders them under virtua's `contain: layout` items).
         className={cn(
-          'relative z-10 w-full flex-none snap-start will-change-transform',
+          'swipe-row-surface relative z-10 w-full flex-none snap-start',
           surfaceClassName,
         )}
       >
         {children}
       </div>
       <div
-        className="sticky right-0 flex flex-none"
-        style={actionsStyle}
+        className="swipe-row-actions sticky right-0 flex flex-none gap-2 px-2"
         aria-hidden={!revealed || undefined}
         inert={!revealed}
       >
         {actions}
       </div>
       <span
-        // The open snap point: `snap-end` stops the row at scrollLeft = actionWidth.
+        // The open snap point: `snap-end` stops the row at the open position.
         // 1px wide because WebKit ignores zero-width snap areas; `-ml-px` cancels
         // the extra pixel. See also https://github.com/team-reflect/reflect-open/pull/1926
         aria-hidden
@@ -203,4 +181,11 @@ export function SwipeRow({
       ></span>
     </div>
   )
+}
+
+/**
+ * The scroll position of the open row: the actions are as wide as their content.
+ */
+function getOpenLeft(scroller: HTMLElement): number {
+  return scroller.scrollWidth - scroller.clientWidth
 }
