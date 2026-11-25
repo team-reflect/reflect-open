@@ -1000,23 +1000,32 @@ describe('MobileTasks', () => {
     view.container.style.height = '600px'
     const title = await view.findByRole('button', { name: 'N', exact: true })
     const scroller = title.closest<HTMLElement>('.overflow-y-auto')!
-    // The first task row below the stuck header, and where its top is.
+    // The first task row below the stuck header and where its top is, once
+    // two reads in a row agree.
+    let lastRead: string | undefined
     const topRow = (): string => {
-      const list = view.container.querySelector<HTMLElement>('.overflow-y-auto')!
-      const top = list.getBoundingClientRect().top + 32
-      const row = [...list.querySelectorAll('[data-task-key]')].find((element) => {
+      const list = view.container.querySelector<HTMLElement>('.overflow-y-auto')
+      const top = (list?.getBoundingClientRect().top ?? 0) + 32
+      const row = [...(list?.querySelectorAll('[data-task-key]') ?? [])].find((element) => {
         return element.getBoundingClientRect().bottom > top
-      })!
-      return `${row.getAttribute('data-task-key')} ${Math.round(row.getBoundingClientRect().top - top)}`
+      })
+      const read = row
+        ? `${row.getAttribute('data-task-key')} ${Math.round(row.getBoundingClientRect().top - top)}`
+        : undefined
+      const settled = read !== undefined && read === lastRead
+      lastRead = read
+      if (!settled) {
+        throw new Error('The list is still moving')
+      }
+      return read
     }
 
     await scrollElement({ element: scroller, top: 7000 })
-    await view.findByText('task 100', { exact: false })
-    const before = topRow()
+    const before = await waitFor(topRow)
 
     await userEvent.click(view.getByRole('button', { name: 'Remount' }))
     await userEvent.click(view.getByRole('button', { name: 'Remount' }))
-    await expect.poll(topRow).toBe(before)
+    await waitFor(() => expect(topRow()).toBe(before))
     await view.unmount()
   })
 
