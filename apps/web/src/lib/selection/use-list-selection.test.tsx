@@ -85,6 +85,6 @@ describe('useListSelection', () => {
     expect([...result.current.selected]).toEqual(['a', 'c'])
 
     await rerender({ keys: ['a'] })
-    expect(result.current.isSoleSelected('a')).toBe(true)
+    expect([...result.current.selected]).toEqual(['a'])
   })
 })

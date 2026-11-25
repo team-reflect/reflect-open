@@ -14,7 +14,6 @@ function makeSelection(over: Partial<TaskSelection> = {}): TaskSelection {
     getSelected: () => new Set<string>(),
     selectedCount: 0,
     isSelected: returnFalse,
-    isSoleSelected: returnFalse,
     clickSelect: vi.fn(),
     select: vi.fn(),
     selectAll: vi.fn(),

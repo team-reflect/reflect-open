@@ -131,13 +131,15 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
   const toggleTask = useCallback((task: OpenTask) => void commands.toggle([task]), [commands])
   const deleteTask = useCallback((task: OpenTask) => void commands.remove([task]), [commands])
 
+  const closeRevealedRow = useCallback(() => revealedRow.set(null), [revealedRow])
+
   const renderHeader = useCallback(
     (group: TaskGroup) => (
       <TaskGroupHeader
         group={group}
         today={today}
         onAdd={onAdd}
-        onOpen={(path) => {
+        onOpenNote={(path) => {
           hapticImpactLight(haptics)
           openNote(path)
         }}
@@ -220,20 +222,18 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
           ) : null}
         </div>
       ) : (
-        <div
-          // A stacking context, so WebKit composites the sticky headers and row
-          // surfaces inside this scroller, below the iOS scroll indicator.
-          className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-chrome-safe-offset-24"
-          onScroll={() => revealedRow.set(null)}
-        >
-          <TaskList
-            groups={groups}
-            ready={ready}
-            rowHeight={MOBILE_TASK_ROW_HEIGHT}
-            renderHeader={renderHeader}
-            renderRow={renderRow}
-          />
-        </div>
+        <TaskList
+          // `isolate` makes a stacking context, so WebKit composites the sticky
+          // headers and row surfaces inside the scroller, below the iOS scroll
+          // indicator.
+          className="isolate min-h-0 flex-1 px-safe pb-chrome-safe-offset-24"
+          onScroll={closeRevealedRow}
+          groups={groups}
+          ready={ready}
+          rowHeight={MOBILE_TASK_ROW_HEIGHT}
+          renderHeader={renderHeader}
+          renderRow={renderRow}
+        />
       )}
       {liveEditingTask !== null ? (
         <MobileTaskEditSheet

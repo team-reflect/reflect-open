@@ -16,7 +16,9 @@ interface TaskBreadcrumbsProps {
   className?: string
 }
 
-/** One V1-style outline-context row above the consecutive tasks it labels. */
+/**
+ * One outline-context row above the consecutive tasks it labels.
+ */
 export function TaskBreadcrumbs({
   breadcrumbs,
   onSelect,

@@ -25,8 +25,6 @@ export interface ListSelection {
   getSelected: () => ReadonlySet<string>
   selectedCount: number
   isSelected: (key: string) => boolean
-  /** Exactly this key is selected (e.g. the state that opens an inline editor). */
-  isSoleSelected: (key: string) => boolean
   /** Apply a row click, honoring ⌘/Ctrl (toggle) and Shift (range) modifiers. */
   clickSelect: (key: string, event: Pick<MouseEvent, 'metaKey' | 'ctrlKey' | 'shiftKey'>) => void
   /** Replace the selection with these visible keys, normalized to render order. */
@@ -198,7 +196,6 @@ export function useListSelection(orderedKeys: readonly string[]): ListSelection 
     getSelected,
     selectedCount: selected.size,
     isSelected: (key) => selected.has(key),
-    isSoleSelected: (key) => selected.size === 1 && selected.has(key),
     clickSelect,
     select,
     selectAll,

@@ -36,7 +36,7 @@ interface TaskRowProps {
    * the sole selection: it then shows the inline editor.
    */
   editHandlers: TaskEditorHandlers | undefined
-  onOpen: (notePath: string, event?: ModClickEvent) => void
+  onOpenNote: (notePath: string, event?: ModClickEvent) => void
 }
 
 /**
@@ -46,8 +46,8 @@ interface TaskRowProps {
  * Clicking the row body **selects** it (V1's
  * multi-select); a plain click selects exclusively, ⌘/Ctrl toggles, Shift
  * extends a range. Completing optimistically drops the row; an archived
- * (completed) row shows struck through. A checkbox click on any selected row in
- * a multi-selection completes or reopens the selected rows together.
+ * (completed) row shows struck through. The sole selection shows the inline
+ * editor in place of the content.
  */
 export function TaskRow({
   task,
@@ -56,7 +56,7 @@ export function TaskRow({
   onSelect,
   onCheckboxToggle,
   editHandlers,
-  onOpen,
+  onOpenNote,
 }: TaskRowProps): ReactElement {
   const editing = editHandlers !== undefined
   const noteLabel = useNoteLabel()
@@ -103,7 +103,6 @@ export function TaskRow({
     >
       <button
         type="button"
-        data-task-row
         aria-label={task.checked ? `Reopen: ${label}` : `Complete: ${label}`}
         onClick={(event) => {
           event.stopPropagation()
@@ -141,7 +140,7 @@ export function TaskRow({
           disabled={editing}
           onClick={(event) => {
             event.stopPropagation()
-            onOpen(task.notePath, event)
+            onOpenNote(task.notePath, event)
           }}
           className="flex h-6 shrink-0 items-center whitespace-nowrap text-xs text-text-muted transition-colors hover:text-accent focus-visible:text-accent focus-visible:outline-none"
         >

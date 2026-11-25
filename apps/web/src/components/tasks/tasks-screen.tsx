@@ -103,12 +103,15 @@ export function TasksScreen(): ReactElement {
     }
   }, [])
   const editHandlers = useTaskRowHandlers({ selection, orderedTasks, scrollToKey, setQuery })
+  const { clickSelect, select, clear, getSelected } = selection
   const selectedTaskKeys = selection.selected
   const activeTaskKey = selection.activeKey
   // Selection opens the focused task's inline editor, often after an async insert
   // and optimistic cache render. Scroll after the list holds that selection so
   // the focused row is always visible.
   const focusedKey = focusedSelectedKey(selectedTaskKeys, activeTaskKey)
+  // The sole selection: its row shows the inline editor.
+  const editingTaskId = selectedTaskKeys.size === 1 ? focusedKey : null
   useLayoutEffect(() => {
     scrollToKey(focusedKey)
   }, [focusedKey, orderedKeys, scrollToKey])
@@ -118,11 +121,10 @@ export function TasksScreen(): ReactElement {
     (target: InsertTaskTarget) => {
       setQuery('')
       const key = commands.add(target).taskId
-      selection.clickSelect(key, { metaKey: false, ctrlKey: false, shiftKey: false })
+      clickSelect(key, { metaKey: false, ctrlKey: false, shiftKey: false })
     },
-    [commands, selection],
+    [commands, clickSelect],
   )
-  const { clickSelect, select, clear, getSelected } = selection
   // The tasks behind the current selection's keys, in selection order — what the
   // toolbar actions (schedule, convert) act on. A row whose key no longer
   // resolves (pruned by a reindex) is dropped rather than acted on.
@@ -157,16 +159,16 @@ export function TasksScreen(): ReactElement {
   const onSchedule = useCallback(
     (isoDate: string | null) => {
       void commands.schedule(selectedTasks(), isoDate)
-      selection.clear()
+      clear()
     },
-    [commands, selection, selectedTasks],
+    [commands, clear, selectedTasks],
   )
   // Convert the current selection to plain bullets (the toolbar / ⌘⇧K): the rows
   // leave the Tasks view, so deselect after, like scheduling.
   const onConvertToBullet = useCallback(() => {
     void commands.convert(selectedTasks())
-    selection.clear()
-  }, [commands, selection, selectedTasks])
+    clear()
+  }, [commands, clear, selectedTasks])
   const openNote = useCallback(
     (path: string, event?: ModClickEvent) => {
       navigateNoteLink({
@@ -202,7 +204,7 @@ export function TasksScreen(): ReactElement {
         group={group}
         today={today}
         onAdd={onAdd}
-        onOpen={openNote}
+        onOpenNote={openNote}
         className="lg:px-12"
       />
     ),
@@ -227,12 +229,20 @@ export function TasksScreen(): ReactElement {
           selected={selected}
           onSelect={clickSelect}
           onCheckboxToggle={onCheckboxToggle}
-          editHandlers={selected && selectedTaskKeys.size === 1 ? editHandlers(task) : undefined}
-          onOpen={openNote}
+          editHandlers={task.taskId === editingTaskId ? editHandlers(task) : undefined}
+          onOpenNote={openNote}
         />
       )
     },
-    [select, selectedTaskKeys, clickSelect, onCheckboxToggle, editHandlers, openNote],
+    [
+      select,
+      selectedTaskKeys,
+      editingTaskId,
+      clickSelect,
+      onCheckboxToggle,
+      editHandlers,
+      openNote,
+    ],
   )
 
   // Move focus into the Tasks surface on mount so the shortcuts work the moment
@@ -316,27 +326,26 @@ export function TasksScreen(): ReactElement {
           onOpenChange={setFiltersOpen}
         />
       </header>
-      <div className="min-h-0 flex-1 overflow-auto pb-8">
-        {/* The empty state waits for `ready`: with archived on, a graph with only
-            completed tasks would flash "No tasks to show." while they load. */}
-        {ready && groups.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-text-muted lg:px-12">
-            {needle ? 'No matching tasks.' : 'No tasks to show.'}
-          </p>
-        ) : (
-          <TaskList
-            ref={listRef}
-            groups={groups}
-            ready={ready}
-            rowHeight={TASK_ROW_HEIGHT}
-            groupGap={GROUP_GAP}
-            // The inline editor saves its draft and loses focus when it unmounts.
-            keepMountedTaskId={selection.selectedCount === 1 ? focusedKey : null}
-            renderHeader={renderHeader}
-            renderRow={renderRow}
-          />
-        )}
-      </div>
+      {/* The empty state waits for `ready`: with archived on, a graph with only
+          completed tasks would flash "No tasks to show." while they load. */}
+      {ready && groups.length === 0 ? (
+        <p className="px-4 py-6 text-sm text-text-muted lg:px-12">
+          {needle ? 'No matching tasks.' : 'No tasks to show.'}
+        </p>
+      ) : (
+        <TaskList
+          ref={listRef}
+          className="min-h-0 flex-1 pb-8"
+          groups={groups}
+          ready={ready}
+          rowHeight={TASK_ROW_HEIGHT}
+          groupGap={GROUP_GAP}
+          // The inline editor saves its draft and loses focus when it unmounts.
+          keepMountedTaskId={editingTaskId}
+          renderHeader={renderHeader}
+          renderRow={renderRow}
+        />
+      )}
     </div>
   )
 }

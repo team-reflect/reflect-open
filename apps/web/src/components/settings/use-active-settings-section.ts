@@ -5,8 +5,8 @@ import { SETTINGS_SECTIONS, settingsSectionDomId, type SettingsSectionId } from 
 /**
  * The reading line: a section is active while it is the last one whose top
  * has crossed this many pixels below the container's top edge. Sits just
- * under the jump offset so clicking a navigator entry always lands with that
- * entry active.
+ * under where a jumped-to heading lands, so clicking a navigator entry always
+ * lands with that entry active.
  */
 const ACTIVATION_LINE_PX = SETTINGS_PAGE_PADDING_PX + 16
 

@@ -4,8 +4,8 @@ import { useListSelection, type ListSelection } from '@/lib/selection/use-list-s
  * Multi-select over a flat, ordered list of task ids, built on the generic
  * {@link useListSelection}.
  *
- * `isSoleSelected` is the state that mounts a task row's inline editor;
- * `activeKey()` is the row Return-to-add targets. Programmatic selection is
+ * A sole selection mounts that task row's inline editor; `activeKey()` is the
+ * row Return-to-add targets. Programmatic selection is
  * used by a task-context breadcrumb to select the rows it labels.
  */
 export type TaskSelection = ListSelection

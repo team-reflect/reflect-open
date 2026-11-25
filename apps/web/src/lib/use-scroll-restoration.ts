@@ -3,7 +3,7 @@ import { useRouterState, useRouterHandlers } from '@/routing/router.tsx'
 
 /**
  * Per-entry scroll memory for a route that owns its own scroll container — the
- * All Notes / Tasks shape, not `ScrollRestored`'s. Restores the saved offset on
+ * All Notes shape, not `ScrollRestored`'s. Restores the saved offset on
  * back/forward and resets to the top on re-arrival (the router clears the offset
  * for that case, so `arrivalSeq` re-runs the effect). `ready` gates the restore
  * on the content being loaded: restoring against an empty, zero-height container

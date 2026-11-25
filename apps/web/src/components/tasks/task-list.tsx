@@ -20,6 +20,7 @@ import {
   type TaskListItem,
   type TaskListRow,
 } from '@/lib/tasks/task-list-items.ts'
+import { cn } from '@/lib/utils.ts'
 import { useRouterHandlers, useRouterState } from '@/routing/router.tsx'
 
 /**
@@ -48,6 +49,14 @@ export interface TaskListHandle {
 
 interface TaskListProps {
   ref?: Ref<TaskListHandle> | undefined
+  /**
+   * Classes for the scroll container, e.g. its size and padding.
+   */
+  className?: string | undefined
+  /**
+   * Called when the list scrolls.
+   */
+  onScroll?: (() => void) | undefined
   groups: readonly TaskGroup[]
   /**
    * Whether `groups` holds every task to show. The saved scroll position is
@@ -201,13 +210,14 @@ function useScrollMemory(
 }
 
 /**
- * The virtualized list of task groups. It must be the direct child of its
- * scroll container. A group header sticks to the top while its group is in
- * view: the header item holds a track as tall as the group, and the header is
- * sticky inside the track.
+ * The virtualized list of task groups, in its own scroll container. A group
+ * header sticks to the top while its group is in view: the header item holds
+ * a track as tall as the group, and the header is sticky inside the track.
  */
 export function TaskList({
   ref,
+  className,
+  onScroll: onScrollProp,
   groups,
   ready,
   rowHeight,
@@ -260,48 +270,54 @@ export function TaskList({
     (offset: number) => {
       updateTracks()
       saveScroll(offset)
+      onScrollProp?.()
     },
-    [updateTracks, saveScroll],
+    [updateTracks, saveScroll, onScrollProp],
   )
 
   return (
-    <ItemsContext value={items}>
-      <Virtualizer
-        ref={virtualizerRef}
-        as="ul"
-        item={TaskListItemElement}
-        data={items}
-        itemSize={rowHeight}
-        bufferSize={ROW_BUFFER}
-        keepMounted={keepMounted}
-        onScroll={onScroll}
-        onResize={updateTracks}
-      >
-        {(item, index) => {
-          if (item.kind !== 'header') {
-            // The gap is padding inside the item, so the item's measured size includes it.
-            const next = items[index + 1]
-            const isGroupEnd = next === undefined || next.kind === 'header'
-            return (
-              <div key={item.key} style={{ paddingBottom: isGroupEnd ? groupGap : 0 }}>
-                {elements[index]}
-              </div>
-            )
-          }
-          return (
-            <div key={item.key} style={{ height: HEADER_HEIGHT }}>
-              <div
-                className="pointer-events-none absolute inset-x-0 top-0"
-                style={{ height: tracks.heights.get(index) }}
-              >
-                <div className="pointer-events-auto sticky top-0" style={{ height: HEADER_HEIGHT }}>
+    <div className={cn('overflow-y-auto', className)}>
+      <ItemsContext value={items}>
+        <Virtualizer
+          ref={virtualizerRef}
+          as="ul"
+          item={TaskListItemElement}
+          data={items}
+          itemSize={rowHeight}
+          bufferSize={ROW_BUFFER}
+          keepMounted={keepMounted}
+          onScroll={onScroll}
+          onResize={updateTracks}
+        >
+          {(item, index) => {
+            if (item.kind !== 'header') {
+              // The gap is padding inside the item, so the item's measured size includes it.
+              const next = items[index + 1]
+              const isGroupEnd = next === undefined || next.kind === 'header'
+              return (
+                <div key={item.key} style={{ paddingBottom: isGroupEnd ? groupGap : 0 }}>
                   {elements[index]}
                 </div>
+              )
+            }
+            return (
+              <div key={item.key} style={{ height: HEADER_HEIGHT }}>
+                <div
+                  className="pointer-events-none absolute inset-x-0 top-0"
+                  style={{ height: tracks.heights.get(index) }}
+                >
+                  <div
+                    className="pointer-events-auto sticky top-0"
+                    style={{ height: HEADER_HEIGHT }}
+                  >
+                    {elements[index]}
+                  </div>
+                </div>
               </div>
-            </div>
-          )
-        }}
-      </Virtualizer>
-    </ItemsContext>
+            )
+          }}
+        </Virtualizer>
+      </ItemsContext>
+    </div>
   )
 }

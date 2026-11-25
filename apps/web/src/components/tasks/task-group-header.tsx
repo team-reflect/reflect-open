@@ -18,7 +18,7 @@ interface TaskGroupHeaderProps {
   /**
    * Open a note group's source note.
    */
-  onOpen: (notePath: string, event: ModClickEvent) => void
+  onOpenNote: (notePath: string, event: ModClickEvent) => void
   /**
    * Classes for the header row, e.g. its horizontal padding.
    */
@@ -35,7 +35,7 @@ export function TaskGroupHeader({
   group,
   today,
   onAdd,
-  onOpen,
+  onOpenNote,
   className,
 }: TaskGroupHeaderProps): ReactElement {
   const { notePath } = group
@@ -56,7 +56,7 @@ export function TaskGroupHeader({
           {group.kind === 'note' && notePath !== null ? (
             <button
               type="button"
-              onClick={(event) => onOpen(notePath, event)}
+              onClick={(event) => onOpenNote(notePath, event)}
               className="truncate hover:underline focus-visible:underline focus-visible:outline-none"
             >
               {group.label}
