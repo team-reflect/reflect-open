@@ -74,6 +74,7 @@ export function TaskGroupHeader({
             className="ml-auto flex h-full flex-none items-center gap-1 text-xs font-medium text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none"
           >
             <Plus aria-hidden className="size-3.5" />
+            {/* FIXME: 1. add a <span> tag around Add. See https://www.npmjs.com/package/eslint-plugin-react-google-translate for reasons; 2. let's hide Add if TaskGroupHeader's width is small. Notice that this rule applies to both mobile and desktop. Also, notice that we are now using the container size instead of the viewport size.Ensure that in normal phone this "add" word will not be showing.*/}
             Add
           </button>
         ) : null}
