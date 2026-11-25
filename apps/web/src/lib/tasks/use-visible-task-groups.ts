@@ -30,10 +30,6 @@ interface VisibleTaskGroups {
    * The tasks completed in this run and not archived yet.
    */
   struck: readonly OpenTask[]
-  /**
-   * Changes when the search text or the filters change.
-   */
-  resetKey: string
 }
 
 /**
@@ -56,6 +52,5 @@ export function useVisibleTaskGroups({
     () => composeVisibleTaskGroups({ open, completed, struck, filters, needle, today }),
     [open, completed, struck, filters, needle, today],
   )
-  const resetKey = useMemo(() => JSON.stringify([needle, filters]), [needle, filters])
-  return { groups, ready, struck, resetKey }
+  return { groups, ready, struck }
 }

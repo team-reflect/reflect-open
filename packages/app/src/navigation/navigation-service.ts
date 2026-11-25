@@ -28,9 +28,20 @@ import {
  */
 
 /**
- * A view's saved scroll position: a pixel offset, or a daily-stream day.
+ * A list's scroll position: the item at the viewport top, by its key, and
+ * pixels into it.
  */
-export type ScrollPosition = number | DayScrollPosition
+export interface ItemScrollPosition {
+  readonly key: string
+  readonly offset: number
+  readonly date?: undefined
+}
+
+/**
+ * A view's saved scroll position: a pixel offset, a daily-stream day, or a
+ * list item.
+ */
+export type ScrollPosition = number | DayScrollPosition | ItemScrollPosition
 
 export interface NavigateOptions {
   /**

@@ -156,10 +156,25 @@ function ShellTasks(): ReactNode {
   return <MobileTasks query={query} onQueryChange={setQuery} />
 }
 
-function renderScreen() {
+/**
+ * The screen under a button that unmounts and mounts it again.
+ */
+function RemountableTasks(): ReactNode {
+  const [shown, setShown] = useState(true)
+  return (
+    <>
+      <button type="button" onClick={() => setShown((value) => !value)}>
+        Remount
+      </button>
+      {shown ? <ShellTasks /> : null}
+    </>
+  )
+}
+
+function renderScreen(screen: ReactNode = <ShellTasks />) {
   return renderInApp(
     <>
-      <ShellTasks />
+      {screen}
       <RouteProbe />
     </>,
     {
@@ -965,10 +980,43 @@ describe('MobileTasks', () => {
     }
 
     await scrollElement({ element: scroller, top: 2000 })
+    await scrollElement({ element: scroller, top: 2000 })
     await expect.poll(() => headerOffset('N')).toBe(0)
 
     await scrollElement({ element: scroller, top: scroller.scrollHeight })
     await expect.poll(() => headerOffset('Zoo')).toBe(0)
+    await view.unmount()
+  })
+
+  it('restores the task at the top of the list after a remount', async () => {
+    getOpenTasks.mockResolvedValue(
+      Array.from({ length: 200 }, (_, index) => {
+        // Every third task wraps, so a row is not as tall as the size hint.
+        const text = index % 3 === 0 ? `task ${index} ${'long text '.repeat(12)}` : `task ${index}`
+        return task({ text, astPath: [index] })
+      }),
+    )
+    const view = await renderScreen(<RemountableTasks />)
+    view.container.style.height = '600px'
+    const title = await view.findByRole('button', { name: 'N', exact: true })
+    const scroller = title.closest<HTMLElement>('.overflow-y-auto')!
+    // The first task row below the stuck header, and where its top is.
+    const topRow = (): string => {
+      const list = view.container.querySelector<HTMLElement>('.overflow-y-auto')!
+      const top = list.getBoundingClientRect().top + 32
+      const row = [...list.querySelectorAll('[data-task-key]')].find((element) => {
+        return element.getBoundingClientRect().bottom > top
+      })!
+      return `${row.getAttribute('data-task-key')} ${Math.round(row.getBoundingClientRect().top - top)}`
+    }
+
+    await scrollElement({ element: scroller, top: 7000 })
+    await view.findByText('task 100', { exact: false })
+    const before = topRow()
+
+    await userEvent.click(view.getByRole('button', { name: 'Remount' }))
+    await userEvent.click(view.getByRole('button', { name: 'Remount' }))
+    await expect.poll(topRow).toBe(before)
     await view.unmount()
   })
 

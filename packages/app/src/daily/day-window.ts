@@ -57,6 +57,7 @@ export interface DayWindow {
 export interface DayScrollPosition {
   readonly date: string
   readonly offset: number
+  readonly key?: undefined
 }
 
 /**

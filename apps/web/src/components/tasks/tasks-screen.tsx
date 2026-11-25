@@ -17,7 +17,6 @@ import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
 import { useTaskKeyboard } from '@/lib/tasks/use-task-keyboard.ts'
 import { useTaskSelection } from '@/lib/tasks/use-task-selection.ts'
 import { useVisibleTaskGroups } from '@/lib/tasks/use-visible-task-groups.ts'
-import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { routeForPath } from '@reflect/app'
@@ -57,8 +56,7 @@ function focusedSelectedKey(
  * the SQLite projection and kept fresh by `TaskService`. A search
  * box filters by text; the "Task filters" menu toggles which buckets show and
  * reveals completed ("archived") tasks. Owns the scroll container of its
- * virtualized list, so the sticky headers and the toolbar stay put; per-entry
- * scroll memory mirrors All Notes.
+ * virtualized list, so the sticky headers and the toolbar stay put.
  *
  * Rows are multi-selectable (V1 parity): click to select, ⌘/Shift to extend, and
  * keyboard shortcuts act on the selection — ⌘A select all, ↑/↓ (Shift to extend),
@@ -79,14 +77,12 @@ export function TasksScreen(): ReactElement {
   const [query, setQuery] = useState('')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [scheduleOpen, setScheduleOpen] = useState(false)
-  const scrollRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<TaskListHandle>(null)
   const needle = query.trim().toLowerCase()
   // The empty state waits for `ready`: with archived on, a graph with only
   // completed tasks would flash "No tasks to show." while they load.
-  const { groups, ready, struck, resetKey } = useVisibleTaskGroups({ needle, filters, today })
-  const { onScroll } = useScrollRestoration(scrollRef, ready)
+  const { groups, ready, struck } = useVisibleTaskGroups({ needle, filters, today })
 
   // The flat, render-order list of tasks the selection and its shortcuts act on.
   const orderedTasks = useMemo(() => groups.flatMap((group) => group.tasks), [groups])
@@ -285,7 +281,7 @@ export function TasksScreen(): ReactElement {
           onOpenChange={setFiltersOpen}
         />
       </header>
-      <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-auto pb-8">
+      <div className="min-h-0 flex-1 overflow-auto pb-8">
         {ready && groups.length === 0 ? (
           <p className="px-4 py-6 text-sm text-text-muted lg:px-12">
             {needle ? 'No matching tasks.' : 'No tasks to show.'}
@@ -293,9 +289,8 @@ export function TasksScreen(): ReactElement {
         ) : (
           <TaskList
             ref={listRef}
-            scrollRef={scrollRef}
             groups={groups}
-            resetKey={resetKey}
+            ready={ready}
             rowHeight={TASK_ROW_HEIGHT}
             groupGap={GROUP_GAP}
             // The inline editor saves its draft and loses focus when it unmounts.

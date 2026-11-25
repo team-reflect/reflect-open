@@ -1,14 +1,13 @@
 import {
   createContext,
-  Fragment,
   use,
   useCallback,
+  useEffectEvent,
   useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ReactElement,
   type Ref,
   type RefObject,
@@ -21,6 +20,7 @@ import {
   type TaskListItem,
   type TaskListRow,
 } from '@/lib/tasks/task-list-items.ts'
+import { useRouterHandlers, useRouterState } from '@/routing/router.tsx'
 
 /**
  * Height (px) of a group header.
@@ -48,15 +48,12 @@ export interface TaskListHandle {
 
 interface TaskListProps {
   ref?: Ref<TaskListHandle> | undefined
-  /**
-   * The scroll container. The list is its first content.
-   */
-  scrollRef: RefObject<HTMLElement | null>
   groups: readonly TaskGroup[]
   /**
-   * Remounts the list at the top when it changes. Pass the search text and filters.
+   * Whether `groups` holds every task to show. The saved scroll position is
+   * restored once it does.
    */
-  resetKey: string
+  ready: boolean
   /**
    * Size hint (px) for rows not measured yet: a single-line task row.
    */
@@ -76,33 +73,7 @@ interface TaskListProps {
   renderRow: (row: TaskListRow) => ReactElement
 }
 
-/**
- * The virtualized list of task groups. A group header sticks to the top while
- * its group is in view: the header item holds a track as tall as the group,
- * and the header is sticky inside the track.
- */
-export function TaskList({ resetKey, ...props }: TaskListProps): ReactElement {
-  const { scrollRef } = props
-  const resetKeyRef = useRef(resetKey)
-  // The scroll container outlives a remount, so a new list starts at the top.
-  useLayoutEffect(() => {
-    if (resetKeyRef.current !== resetKey) {
-      resetKeyRef.current = resetKey
-      scrollRef.current?.scrollTo({ top: 0 })
-    }
-  }, [resetKey, scrollRef])
-  return <GroupedTaskList key={resetKey} {...props} />
-}
-
-/**
- * The items of the list and the space under each group, for an item's element.
- */
-interface ItemLayout {
-  items: readonly TaskListItem[]
-  groupGap: number
-}
-
-const ItemLayoutContext = createContext<ItemLayout>({ items: [], groupGap: 0 })
+const ItemsContext = createContext<readonly TaskListItem[]>([])
 
 function TaskListItemElement({
   style,
@@ -110,33 +81,14 @@ function TaskListItemElement({
   children,
   ref,
 }: CustomItemComponentProps): ReactElement {
-  const { items, groupGap } = use(ItemLayoutContext)
-  const item = items[index]
-  const isHeader = item?.kind === 'header'
-  const isGroupEnd = item?.kind === 'task' && item.groupEnd
-  const itemStyle = useMemo((): CSSProperties => {
-    return {
-      ...style,
-      // A header reaches out of its item, over the rows of its group.
-      ...(isHeader ? { zIndex: 1 } : undefined),
-      ...(isGroupEnd ? { paddingBottom: groupGap } : undefined),
-    }
-  }, [style, isHeader, isGroupEnd, groupGap])
+  const isHeader = use(ItemsContext)[index]?.kind === 'header'
+  // A header reaches out of its item, over the rows of its group.
+  const itemStyle = useMemo(() => (isHeader ? { ...style, zIndex: 1 } : style), [style, isHeader])
   return (
     <li ref={ref} style={itemStyle}>
       {children}
     </li>
   )
-}
-
-interface GroupTracksOptions {
-  virtualizerRef: RefObject<VirtualizerHandle | null>
-  /**
-   * The element whose height is the height of the list.
-   */
-  listRef: RefObject<HTMLElement | null>
-  headerIndexes: readonly number[]
-  groupGap: number
 }
 
 interface GroupTracks {
@@ -152,15 +104,14 @@ interface GroupTracks {
 }
 
 /**
- * Tracks the groups near the viewport and how tall each is. The heights
- * follow the scroll position and the measured sizes of the rows.
+ * Tracks the groups near the viewport and how tall each is. The caller runs
+ * `update` when the list scrolls or an item changes size.
  */
-function useGroupTracks({
-  virtualizerRef,
-  listRef,
-  headerIndexes,
-  groupGap,
-}: GroupTracksOptions): GroupTracks {
+function useGroupTracks(
+  virtualizerRef: RefObject<VirtualizerHandle | null>,
+  headerIndexes: readonly number[],
+  groupGap: number,
+): GroupTracks {
   const [heights, setHeights] = useState<ReadonlyMap<number, number>>(() => new Map())
 
   const update = useCallback(() => {
@@ -186,37 +137,82 @@ function useGroupTracks({
     setHeights((current) => (isDeepEqual([...current], [...next]) ? current : next))
   }, [virtualizerRef, headerIndexes, groupGap])
 
-  // A measured row moves the rows after it, which changes the list's height.
-  useLayoutEffect(() => {
-    update()
-    const list = listRef.current
-    if (list === null) {
-      return
-    }
-    const observer = new ResizeObserver(update)
-    observer.observe(list)
-    return () => observer.disconnect()
-  }, [update, listRef])
+  useLayoutEffect(update, [update])
 
   return { heights, update }
 }
 
-function GroupedTaskList({
+/**
+ * Keeps the scroll position of the list per history entry: the item at the
+ * top and the pixels into it. Returns the function that saves an offset.
+ */
+function useScrollMemory(
+  virtualizerRef: RefObject<VirtualizerHandle | null>,
+  items: readonly TaskListItem[],
+  ready: boolean,
+): (offset: number) => void {
+  const { arrivalSeq, entryId } = useRouterState()
+  const { saveScrollState, savedScroll } = useRouterHandlers()
+
+  const restore = useEffectEvent(() => {
+    const virtualizer = virtualizerRef.current
+    if (virtualizer === null) {
+      return
+    }
+    const saved = savedScroll()
+    const position = typeof saved === 'object' && saved?.key !== undefined ? saved : null
+    const index = position === null ? -1 : items.findIndex((item) => item.key === position.key)
+    if (position !== null && index !== -1) {
+      virtualizer.scrollToIndex(index, { align: 'start', offset: position.offset })
+    } else if (virtualizer.scrollOffset !== 0) {
+      virtualizer.scrollTo(0)
+    }
+  })
+
+  // An arrival restores its saved position; a new one starts at the top.
+  useLayoutEffect(() => {
+    if (ready) {
+      restore()
+    }
+  }, [arrivalSeq, entryId, ready])
+
+  return useCallback(
+    (offset: number) => {
+      const virtualizer = virtualizerRef.current
+      if (virtualizer === null) {
+        return
+      }
+      const index = virtualizer.findItemIndex(offset)
+      const item = items[index]
+      if (item !== undefined) {
+        saveScrollState({ key: item.key, offset: offset - virtualizer.getItemOffset(index) })
+      }
+    },
+    [virtualizerRef, items, saveScrollState],
+  )
+}
+
+/**
+ * The virtualized list of task groups. It must be the direct child of its
+ * scroll container. A group header sticks to the top while its group is in
+ * view: the header item holds a track as tall as the group, and the header is
+ * sticky inside the track.
+ */
+export function TaskList({
   ref,
-  scrollRef,
   groups,
+  ready,
   rowHeight,
   groupGap = 0,
   keepMountedTaskId,
   renderHeader,
   renderRow,
-}: Omit<TaskListProps, 'resetKey'>): ReactElement {
+}: TaskListProps): ReactElement {
   const virtualizerRef = useRef<VirtualizerHandle>(null)
-  const listRef = useRef<HTMLDivElement>(null)
 
   const { items, headerIndexes, indexByTaskId } = useMemo(() => flattenTaskGroups(groups), [groups])
-  const layout = useMemo(() => ({ items, groupGap }), [items, groupGap])
-  const tracks = useGroupTracks({ virtualizerRef, listRef, headerIndexes, groupGap })
+  const tracks = useGroupTracks(virtualizerRef, headerIndexes, groupGap)
+  const saveScroll = useScrollMemory(virtualizerRef, items, ready)
 
   const keepMountedIndex =
     keepMountedTaskId == null ? undefined : indexByTaskId.get(keepMountedTaskId)
@@ -244,42 +240,52 @@ function GroupedTaskList({
     }
   }, [indexByTaskId])
 
+  const { update: updateTracks } = tracks
+  const onScroll = useCallback(
+    (offset: number) => {
+      updateTracks()
+      saveScroll(offset)
+    },
+    [updateTracks, saveScroll],
+  )
+
   return (
-    <div ref={listRef}>
-      <ItemLayoutContext value={layout}>
-        <Virtualizer
-          ref={virtualizerRef}
-          scrollRef={scrollRef}
-          as="ul"
-          item={TaskListItemElement}
-          data={items}
-          itemSize={rowHeight}
-          bufferSize={ROW_BUFFER}
-          keepMounted={keepMounted}
-          onScroll={tracks.update}
-        >
-          {(item, index) => {
-            if (item.kind !== 'header') {
-              return <Fragment key={item.key}>{renderRow(item)}</Fragment>
-            }
+    <ItemsContext value={items}>
+      <Virtualizer
+        ref={virtualizerRef}
+        as="ul"
+        item={TaskListItemElement}
+        data={items}
+        itemSize={rowHeight}
+        bufferSize={ROW_BUFFER}
+        keepMounted={keepMounted}
+        onScroll={onScroll}
+        onResize={updateTracks}
+      >
+        {(item, index) => {
+          if (item.kind !== 'header') {
+            // The gap is inside the item: virtua measures an item without its padding.
+            const gap = item.kind === 'task' && item.groupEnd ? groupGap : 0
             return (
-              <div key={item.key} style={{ height: HEADER_HEIGHT }}>
-                <div
-                  className="pointer-events-none absolute inset-x-0 top-0"
-                  style={{ height: tracks.heights.get(index) }}
-                >
-                  <div
-                    className="pointer-events-auto sticky top-0"
-                    style={{ height: HEADER_HEIGHT }}
-                  >
-                    {renderHeader(item.group)}
-                  </div>
-                </div>
+              <div key={item.key} style={{ paddingBottom: gap }}>
+                {renderRow(item)}
               </div>
             )
-          }}
-        </Virtualizer>
-      </ItemLayoutContext>
-    </div>
+          }
+          return (
+            <div key={item.key} style={{ height: HEADER_HEIGHT }}>
+              <div
+                className="pointer-events-none absolute inset-x-0 top-0"
+                style={{ height: tracks.heights.get(index) }}
+              >
+                <div className="pointer-events-auto sticky top-0" style={{ height: HEADER_HEIGHT }}>
+                  {renderHeader(item.group)}
+                </div>
+              </div>
+            </div>
+          )
+        }}
+      </Virtualizer>
+    </ItemsContext>
   )
 }

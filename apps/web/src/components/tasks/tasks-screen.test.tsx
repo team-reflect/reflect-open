@@ -550,6 +550,38 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
+  it('keeps the focus in the search box while a row is being edited', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/p.md', astPath: [2], text: 'first', noteTitle: 'Project' }),
+      task({ notePath: 'notes/p.md', astPath: [3], text: 'second', noteTitle: 'Project' }),
+    ])
+    const view = await renderScreen()
+    await userEvent.click(await view.findByRole('button', { name: 'first' }))
+    const search = view.getByRole('textbox', { name: 'Search tasks' })
+
+    await userEvent.click(search)
+    await userEvent.keyboard('fir')
+
+    expect((search.element() as HTMLInputElement).value).toBe('fir')
+    expect(document.activeElement).toBe(search.element())
+    await view.unmount()
+  })
+
+  it('leaves a gap between a group and the next group header', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/a.md', astPath: [2], text: 'first', noteTitle: 'A' }),
+      task({ notePath: 'notes/b.md', astPath: [2], text: 'second', noteTitle: 'B' }),
+    ])
+    const view = await renderScreen()
+
+    const row = (await view.findByRole('button', { name: 'first' })).closest('[data-task-key]')!
+    const header = view.getByRole('heading', { name: 'B' }).element()
+    await waitFor(() => {
+      expect(header.getBoundingClientRect().top).toBeGreaterThan(row.getBoundingClientRect().bottom)
+    })
+    await view.unmount()
+  })
+
   it('saves typed text when the row is left or on Escape, and deletes', async () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/p.md', astPath: [2], markdown: 'first', noteTitle: 'P' }),

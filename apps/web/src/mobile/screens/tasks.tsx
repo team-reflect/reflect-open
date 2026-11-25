@@ -22,7 +22,6 @@ import { MOBILE_TASK_ROW_HEIGHT, MobileTaskRow } from '@/mobile/task-row.tsx'
 import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import type { Focusable } from '@/mobile/chrome/screen-chrome.ts'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
-import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { routeForPath } from '@reflect/app'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
@@ -87,11 +86,7 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
   // not keep hiding that row while it catches up.
   const deferredQuery = useDeferredValue(query)
   const needle = (query === '' ? '' : deferredQuery).trim().toLowerCase()
-  const { groups, ready, struck, resetKey } = useVisibleTaskGroups({ needle, filters, today })
-
-  // The task list scroller renders only while there are rows to show.
-  const listRef = useRef<HTMLDivElement>(null)
-  const { onScroll } = useScrollRestoration(listRef, groups.length > 0)
+  const { groups, ready, struck } = useVisibleTaskGroups({ needle, filters, today })
 
   // The sheet edits the task's *live* row, not the snapshot taken when it
   // opened: a mutation or reindex can rewrite the row (raw, checked) while
@@ -183,16 +178,11 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
           // A stacking context, so WebKit composites the sticky headers and row
           // surfaces inside this scroller, below the iOS scroll indicator.
           className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-chrome-safe-offset-24"
-          ref={listRef}
-          onScroll={(event) => {
-            revealedRow.set(null)
-            onScroll(event)
-          }}
+          onScroll={() => revealedRow.set(null)}
         >
           <TaskList
-            scrollRef={listRef}
             groups={groups}
-            resetKey={resetKey}
+            ready={ready}
             rowHeight={MOBILE_TASK_ROW_HEIGHT}
             renderHeader={(group) => (
               <TaskGroupHeader
