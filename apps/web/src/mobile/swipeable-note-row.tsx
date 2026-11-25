@@ -1,4 +1,4 @@
-import type { ReactElement, ReactNode } from 'react'
+import { memo, type ReactElement, type ReactNode } from 'react'
 import { Pin, PinOff, Trash2 } from 'lucide-react'
 import { type HighlightSegment, formatRecencyLabel, type WritableStore } from '@reflect/core'
 import { SwipeActionButton } from '@/mobile/swipe-action-button.tsx'
@@ -29,9 +29,9 @@ interface SwipeableNoteRowProps {
    * The list's one revealed row, keyed by note path.
    */
   revealedRow: WritableStore<string | null>
-  onOpen: () => void
-  onTogglePin: () => void
-  onDelete: () => void
+  onOpen: (path: string) => void
+  onTogglePin: (row: NoteRowModel) => void
+  onDelete: (row: NoteRowModel) => void
 }
 
 function renderHighlightedSegments(segments: HighlightSegment[]): ReactNode {
@@ -51,7 +51,7 @@ function renderHighlightedSegments(segments: HighlightSegment[]): ReactNode {
  * {@link SwipeRow}. This component owns the note-specific content and
  * accessible action controls.
  */
-export function SwipeableNoteRow({
+export const SwipeableNoteRow = memo(function SwipeableNoteRow({
   row,
   revealedRow,
   onOpen,
@@ -67,7 +67,7 @@ export function SwipeableNoteRow({
       close()
       return
     }
-    onOpen()
+    onOpen(row.path)
   }
 
   return (
@@ -88,7 +88,7 @@ export function SwipeableNoteRow({
               className="bg-accent"
               onClick={() => {
                 close()
-                onTogglePin()
+                onTogglePin(row)
               }}
             />
             {row.canDelete ? (
@@ -97,7 +97,7 @@ export function SwipeableNoteRow({
                 label="Delete"
                 ariaLabel={`Delete ${title}`}
                 className="bg-destructive"
-                onClick={onDelete}
+                onClick={() => onDelete(row)}
               />
             ) : null}
           </>
@@ -131,4 +131,4 @@ export function SwipeableNoteRow({
       </SwipeRow>
     </div>
   )
-}
+})
