@@ -29,8 +29,7 @@ jobs:
         run: |
           if ! git diff --quiet HEAD^1 HEAD -- \
               '*.rs' \
-              rust-toolchain.toml \
-              crates/ffi/cbindgen.toml; then
+              rust-toolchain.toml; then
             echo "rust=true" >> "$GITHUB_OUTPUT"
           fi
 
