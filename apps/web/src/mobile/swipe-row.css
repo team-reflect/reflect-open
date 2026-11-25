@@ -1,9 +1,9 @@
-/* The surface turns into a rounded card as soon as the row moves. */
-@keyframes swipe-row-card {
+/* The surface gets a trailing edge line and a soft shadow as soon as the row moves. */
+@keyframes swipe-row-edge {
   to {
-    background-color: color-mix(in oklab, var(--text) 8%, var(--surface-canvas));
-    border-top-right-radius: 1.5rem;
-    border-bottom-right-radius: 1.5rem;
+    box-shadow:
+      1px 0 0 0 var(--border),
+      4px 0 8px -2px rgb(0 0 0 / 0.12);
   }
 }
 
@@ -33,7 +33,7 @@
    stacking context (iOS 26 misorders them under virtua's `contain: layout` items). */
 .swipe-row[data-active] .swipe-row-surface {
   will-change: transform;
-  animation: swipe-row-card linear both;
+  animation: swipe-row-edge linear both;
   animation-timeline: scroll(nearest inline);
   animation-range: 0 calc(var(--spacing) * 3);
 }
