@@ -8,6 +8,11 @@ import { TaskEditor, type TaskEditorHandlers } from './task-editor.tsx'
 import { TaskText } from './task-text.tsx'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
+/**
+ * Minimum height (px) of a row with its bottom border: a single-line row.
+ */
+export const TASK_ROW_HEIGHT = 41
+
 interface TaskRowProps {
   task: OpenTask
   /**
@@ -19,30 +24,19 @@ interface TaskRowProps {
    */
   selected: boolean
   /**
-   * Whether this row is the sole selection — it shows the inline editor.
+   * Select a task, honoring ⌘/Ctrl (toggle) and Shift (range) modifiers.
    */
-  editing: boolean
+  onSelect: (taskId: string, event: Pick<MouseEvent, 'metaKey' | 'ctrlKey' | 'shiftKey'>) => void
   /**
-   * Whether this checkbox click should apply to the whole multi-selection.
+   * A click on the checkbox of a task.
    */
-  togglesSelection: boolean
+  onCheckboxToggle: (task: OpenTask) => void
   /**
-   * Select the row, honoring ⌘/Ctrl (toggle) and Shift (range) modifiers.
+   * What the keys of the inline editor do for this row. Set while the row is
+   * the sole selection: it then shows the inline editor.
    */
-  onSelect: (event: Pick<MouseEvent, 'metaKey' | 'ctrlKey' | 'shiftKey'>) => void
-  /**
-   * Checkbox click on an unselected or solely selected row: toggle this task.
-   */
-  onCheckboxToggle: () => void
-  /**
-   * Checkbox click while part of a multi-selection: apply this row's next state to it.
-   */
-  onSelectionCheckboxToggle: () => void
-  /**
-   * What the keys of the inline editor do for this row.
-   */
-  editHandlers: TaskEditorHandlers
-  onOpen: (notePath: string, event?: ModClickEvent) => void
+  editHandlers: TaskEditorHandlers | undefined
+  onOpenNote: (notePath: string, event?: ModClickEvent) => void
 }
 
 /**
@@ -52,21 +46,19 @@ interface TaskRowProps {
  * Clicking the row body **selects** it (V1's
  * multi-select); a plain click selects exclusively, ⌘/Ctrl toggles, Shift
  * extends a range. Completing optimistically drops the row; an archived
- * (completed) row shows struck through. A checkbox click on any selected row in
- * a multi-selection completes or reopens the selected rows together.
+ * (completed) row shows struck through. The sole selection shows the inline
+ * editor in place of the content.
  */
 export function TaskRow({
   task,
   showSource,
   selected,
-  editing,
-  togglesSelection,
   onSelect,
   onCheckboxToggle,
-  onSelectionCheckboxToggle,
   editHandlers,
-  onOpen,
+  onOpenNote,
 }: TaskRowProps): ReactElement {
+  const editing = editHandlers !== undefined
   const noteLabel = useNoteLabel()
   const done = task.checked
   const label = task.text || 'Empty task'
@@ -78,9 +70,13 @@ export function TaskRow({
       return
     }
     event.preventDefault()
-    onSelect({ metaKey: event.metaKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey })
+    onSelect(task.taskId, {
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+      shiftKey: event.shiftKey,
+    })
   }
-  const selectFromRow = (event: MouseEvent<HTMLLIElement>): void => {
+  const selectFromRow = (event: MouseEvent<HTMLDivElement>): void => {
     if (editing) {
       return
     }
@@ -89,15 +85,16 @@ export function TaskRow({
     if (event.shiftKey) {
       event.preventDefault()
     }
-    onSelect(event)
+    onSelect(task.taskId, event)
   }
 
   return (
-    <li
+    <div
       data-task-key={task.taskId}
       onClick={selectFromRow}
+      style={{ minHeight: TASK_ROW_HEIGHT }}
       className={cn(
-        'group/task flex min-h-10 items-start gap-3 border-b border-border bg-surface-canvas px-4 py-2 lg:px-12',
+        'group/task flex items-start gap-3 border-b border-border bg-surface-canvas px-4 py-2 lg:px-12',
         !editing && 'cursor-pointer',
         selected
           ? 'bg-accent-soft ring-1 ring-inset ring-accent/20 dark:ring-accent/10'
@@ -106,15 +103,10 @@ export function TaskRow({
     >
       <button
         type="button"
-        data-task-row
         aria-label={task.checked ? `Reopen: ${label}` : `Complete: ${label}`}
         onClick={(event) => {
           event.stopPropagation()
-          if (togglesSelection) {
-            onSelectionCheckboxToggle()
-            return
-          }
-          onCheckboxToggle()
+          onCheckboxToggle(task)
         }}
         // h-6 matches the text/editor's 24px line so the circle centers on
         // the first line (items-start keeps it there when a task wraps).
@@ -126,7 +118,7 @@ export function TaskRow({
           <Circle aria-hidden className="size-[18px]" strokeWidth={2} />
         )}
       </button>
-      {editing ? (
+      {editHandlers !== undefined ? (
         <TaskEditor task={task} {...editHandlers} />
       ) : (
         <div
@@ -135,7 +127,7 @@ export function TaskRow({
           aria-pressed={selected}
           onKeyDown={selectFromKeyboard}
           className={cn(
-            'min-w-0 flex-1 break-words text-left text-sm leading-6 text-text focus-visible:outline-none',
+            'min-w-0 flex-1 wrap-break-word text-left text-sm leading-6 text-text focus-visible:outline-none',
             task.checked && 'text-text-muted line-through',
           )}
         >
@@ -148,13 +140,13 @@ export function TaskRow({
           disabled={editing}
           onClick={(event) => {
             event.stopPropagation()
-            onOpen(task.notePath, event)
+            onOpenNote(task.notePath, event)
           }}
           className="flex h-6 shrink-0 items-center whitespace-nowrap text-xs text-text-muted transition-colors hover:text-accent focus-visible:text-accent focus-visible:outline-none"
         >
           {noteLabel({ path: task.notePath, title: task.noteTitle })}
         </button>
       ) : null}
-    </li>
+    </div>
   )
 }

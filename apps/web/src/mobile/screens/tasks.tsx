@@ -1,30 +1,33 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { useCallback, useDeferredValue, useMemo, useRef, useState, type ReactElement } from 'react'
 import { CircleCheck } from 'lucide-react'
 import {
-  composeVisibleTaskGroups,
   todaysDailyTarget,
   WritableStore,
   type InsertTaskTarget,
   type OpenTask,
+  type TaskGroup,
 } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
+import { TaskBreadcrumbs } from '@/components/tasks/task-breadcrumbs.tsx'
+import { TaskGroupHeader } from '@/components/tasks/task-group-header.tsx'
+import { TaskList } from '@/components/tasks/task-list.tsx'
+import type { TaskListRow } from '@/lib/tasks/task-list-items.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
+import { useVisibleTaskGroups } from '@/lib/tasks/use-visible-task-groups.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet.tsx'
 import { TaskFiltersDrawer } from '@/mobile/task-filters-drawer.tsx'
-import { MobileTaskGroup } from '@/mobile/task-group.tsx'
+import { MOBILE_TASK_ROW_HEIGHT, MobileTaskRow } from '@/mobile/task-row.tsx'
 import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import type { Focusable } from '@/mobile/chrome/screen-chrome.ts'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
-import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { routeForPath } from '@reflect/app'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useStore } from '@/lib/use-store.ts'
 
 interface MobileTasksProps {
   /**
@@ -38,7 +41,7 @@ interface MobileTasksProps {
  * The Tasks tab (V1 mobile's third tab over Plan 18's shipped data layer): every
  * open task across the graph in desktop's exact groups — Current / Overdue /
  * Upcoming, then per-note — via the same task rows, grouping
- * ({@link composeVisibleTaskGroups}) and task commands the desktop view uses;
+ * ({@link useVisibleTaskGroups}) and task commands the desktop view uses;
  * this screen adds only the touch surface. Task taps, toggles, adds, filters, scheduling, and archival
  * get light haptics; tapping a row opens the quick-edit sheet (edit / schedule /
  * complete / convert / open note) instead of desktop's multi-select; the filter
@@ -79,27 +82,13 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
     selectText: true,
   })
 
-  const { open, completed, struck } = useStore(taskService)
-  useEffect(
-    () => (filters.archived ? taskService.includeCompleted() : undefined),
-    [taskService, filters.archived],
-  )
-  const ready = open !== undefined && (!filters.archived || completed !== undefined)
-
   // Defer the needle like the All tab defers its query: fast typing coalesces
   // while the input stays live. A cleared query applies immediately — the "+"
   // add clears it so the new row is visible, and a stale deferred needle must
   // not keep hiding that row while it catches up.
   const deferredQuery = useDeferredValue(query)
   const needle = (query === '' ? '' : deferredQuery).trim().toLowerCase()
-  const groups = useMemo(
-    () => composeVisibleTaskGroups({ open, completed, struck, filters, needle, today }),
-    [open, completed, struck, filters, needle, today],
-  )
-
-  // The task list scroller renders only while there are rows to show.
-  const listRef = useRef<HTMLDivElement>(null)
-  const { onScroll } = useScrollRestoration(listRef, groups.length > 0)
+  const { groups, ready, struck } = useVisibleTaskGroups({ needle, filters, today })
 
   // The sheet edits the task's *live* row, not the snapshot taken when it
   // opened: a mutation or reindex can rewrite the row (raw, checked) while
@@ -115,22 +104,68 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
     return groups.flatMap((group) => group.tasks).find((row) => row.taskId === key) ?? editingTask
   }, [groups, editingTask])
 
-  const editTask = (task: OpenTask, options?: { autoFocus?: boolean; haptic?: boolean }): void => {
-    if (options?.haptic !== false) {
-      hapticImpactLight(haptics)
-    }
-    setAutoFocusEditor(options?.autoFocus === true)
-    setEditingTask(task)
-    setSheetOpen(true)
-  }
+  const editTask = useCallback(
+    (task: OpenTask, options?: { autoFocus?: boolean; haptic?: boolean }): void => {
+      if (options?.haptic !== false) {
+        hapticImpactLight(haptics)
+      }
+      setAutoFocusEditor(options?.autoFocus === true)
+      setEditingTask(task)
+      setSheetOpen(true)
+    },
+    [haptics],
+  )
 
   // The group headers' "+" (V1): drop any search filter so the new row is
   // visible, then open its quick-edit sheet with the editor focused.
-  const onAdd = (target: InsertTaskTarget): void => {
-    hapticImpactLight(haptics)
-    onQueryChange('')
-    editTask(commands.add(target), { autoFocus: true, haptic: false })
-  }
+  const onAdd = useCallback(
+    (target: InsertTaskTarget): void => {
+      hapticImpactLight(haptics)
+      onQueryChange('')
+      editTask(commands.add(target), { autoFocus: true, haptic: false })
+    },
+    [haptics, onQueryChange, editTask, commands],
+  )
+
+  const openNote = useCallback((path: string) => navigate(routeForPath(path)), [navigate])
+  const toggleTask = useCallback((task: OpenTask) => void commands.toggle([task]), [commands])
+  const deleteTask = useCallback((task: OpenTask) => void commands.remove([task]), [commands])
+
+  const closeRevealedRow = useCallback(() => revealedRow.set(null), [revealedRow])
+
+  const renderHeader = useCallback(
+    (group: TaskGroup) => (
+      <TaskGroupHeader
+        group={group}
+        today={today}
+        onAdd={onAdd}
+        onOpenNote={(path) => {
+          hapticImpactLight(haptics)
+          openNote(path)
+        }}
+      />
+    ),
+    [today, onAdd, haptics, openNote],
+  )
+  const renderRow = useCallback(
+    (row: TaskListRow) => {
+      if (row.kind === 'breadcrumbs') {
+        return <TaskBreadcrumbs breadcrumbs={row.breadcrumbs} className="px-4 pb-1 pt-3" />
+      }
+      return (
+        <MobileTaskRow
+          task={row.task}
+          showSource={row.showSource}
+          onEdit={editTask}
+          onToggle={toggleTask}
+          revealedRow={revealedRow}
+          onOpenNote={openNote}
+          onDelete={deleteTask}
+        />
+      )
+    },
+    [editTask, toggleTask, revealedRow, openNote, deleteTask],
+  )
 
   const archiveCompleted = (): void => {
     hapticImpactLight(haptics)
@@ -187,30 +222,18 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
           ) : null}
         </div>
       ) : (
-        <div
-          // A stacking context, so WebKit composites the sticky headers and row
-          // surfaces inside this scroller, below the iOS scroll indicator.
-          className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-chrome-safe-offset-24"
-          ref={listRef}
-          onScroll={(event) => {
-            revealedRow.set(null)
-            onScroll(event)
-          }}
-        >
-          {groups.map((group) => (
-            <MobileTaskGroup
-              key={group.kind === 'note' ? `note:${group.notePath}` : group.kind}
-              group={group}
-              today={today}
-              onAdd={onAdd}
-              onEdit={editTask}
-              onToggle={(task) => void commands.toggle([task])}
-              onOpen={(path) => navigate(routeForPath(path))}
-              onDelete={(task) => void commands.remove([task])}
-              revealedRow={revealedRow}
-            />
-          ))}
-        </div>
+        <TaskList
+          // `isolate` makes a stacking context, so WebKit composites the sticky
+          // headers and row surfaces inside the scroller, below the iOS scroll
+          // indicator.
+          className="isolate min-h-0 flex-1 px-safe pb-chrome-safe-offset-24"
+          onScroll={closeRevealedRow}
+          groups={groups}
+          ready={ready}
+          rowHeight={MOBILE_TASK_ROW_HEIGHT}
+          renderHeader={renderHeader}
+          renderRow={renderRow}
+        />
       )}
       {liveEditingTask !== null ? (
         <MobileTaskEditSheet
@@ -219,7 +242,7 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
           open={sheetOpen}
           onOpenChange={setSheetOpen}
           today={today}
-          onOpenNote={(path) => navigate(routeForPath(path))}
+          onOpenNote={openNote}
           autoFocusEditor={autoFocusEditor}
         />
       ) : null}

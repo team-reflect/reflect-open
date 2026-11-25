@@ -12,7 +12,7 @@ import {
 } from '@reflect/core/testing'
 import type { OpenTask } from '@reflect/core'
 import { createTestSystemPreferencesService } from '@reflect/app/testing'
-import { useRouterState } from '@/routing/router.tsx'
+import { useRouterActions, useRouterState } from '@/routing/router.tsx'
 import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -20,7 +20,7 @@ import { spyOnTaskWrites, type TaskAction, type TaskWriteSpies } from '@/test-ut
 import { act } from '@/test-utils/act.ts'
 import { scrollElement } from '@/test-utils/scroll.ts'
 import { MobileTasks } from './tasks.tsx'
-import { noop, returnFalse } from '@ocavue/utils'
+import { noop, returnFalse, sleep } from '@ocavue/utils'
 
 let haptics: TestHapticsService
 
@@ -149,6 +149,25 @@ function RouteProbe(): ReactNode {
 }
 
 /**
+ * A button that navigates to the Tasks route again.
+ */
+function ArriveAgain(): ReactNode {
+  const { navigate } = useRouterActions()
+  return (
+    <button type="button" onClick={() => navigate({ kind: 'tasks' })}>
+      Arrive again
+    </button>
+  )
+}
+
+/**
+ * The scroll container of the task list.
+ */
+function getScroller(view: { getByRole: (role: 'list') => Locator }): HTMLElement {
+  return view.getByRole('list').element().parentElement!
+}
+
+/**
  * Holds the search text the way the shell does.
  */
 function ShellTasks(): ReactNode {
@@ -156,10 +175,25 @@ function ShellTasks(): ReactNode {
   return <MobileTasks query={query} onQueryChange={setQuery} />
 }
 
-function renderScreen() {
+/**
+ * The screen under a button that unmounts and mounts it again.
+ */
+function RemountableTasks(): ReactNode {
+  const [shown, setShown] = useState(true)
+  return (
+    <>
+      <button type="button" onClick={() => setShown((value) => !value)}>
+        Remount
+      </button>
+      {shown ? <ShellTasks /> : null}
+    </>
+  )
+}
+
+function renderScreen(screen: ReactNode = <ShellTasks />) {
   return renderInApp(
     <>
-      <ShellTasks />
+      {screen}
       <RouteProbe />
     </>,
     {
@@ -920,6 +954,141 @@ describe('MobileTasks', () => {
     await waitFor(() => expect(view.queryByRole('button', { name: 'Delete: buy milk' })).toBeNull())
     expect(scroller.scrollLeft).toBe(0)
     expect(page.getByRole('dialog').query()).toBeNull()
+    await view.unmount()
+  })
+
+  it('mounts only the rows near the viewport', async () => {
+    getOpenTasks.mockResolvedValue(
+      Array.from({ length: 300 }, (_, index) => task({ text: `task ${index}`, astPath: [index] })),
+    )
+    const view = await renderScreen()
+    view.container.style.height = '600px'
+
+    await view.findByText('task 0')
+    await expect
+      .poll(() => view.container.querySelectorAll('[data-task-key]').length)
+      .toBeLessThan(60)
+    await view.unmount()
+  })
+
+  it('keeps a group header at the top while its group is in view', async () => {
+    getOpenTasks.mockResolvedValue([
+      ...Array.from({ length: 100 }, (_, index) => {
+        return task({ text: `task ${index}`, astPath: [index] })
+      }),
+      ...Array.from({ length: 100 }, (_, index) => {
+        return task({
+          text: `zoo ${index}`,
+          notePath: 'notes/zoo.md',
+          noteTitle: 'Zoo',
+          astPath: [index],
+        })
+      }),
+    ])
+    const view = await renderScreen()
+    view.container.style.height = '600px'
+    await view.findByRole('heading', { name: 'N' })
+    const scroller = getScroller(view)
+    // How far the header of the group `name` is from the top of the scroller.
+    const headerOffset = (name: string): number | undefined => {
+      const heading = view.getByRole('heading', { name, exact: true }).query()
+      if (heading === null) {
+        return undefined
+      }
+      return heading.getBoundingClientRect().top - scroller.getBoundingClientRect().top
+    }
+    const atRest = headerOffset('N')
+
+    await scrollElement({ element: scroller, top: 2000 })
+    await expect.poll(() => headerOffset('N')).toBe(atRest)
+
+    await scrollElement({ element: scroller, top: scroller.scrollHeight })
+    await expect.poll(() => headerOffset('Zoo')).toBe(atRest)
+    await view.unmount()
+  })
+
+  it('restores the task at the top of the list after a remount', async () => {
+    getOpenTasks.mockResolvedValue(
+      Array.from({ length: 200 }, (_, index) => {
+        // Every third task wraps, so a row is not as tall as the size hint.
+        const text = index % 3 === 0 ? `task ${index} ${'long text '.repeat(12)}` : `task ${index}`
+        return task({ text, astPath: [index] })
+      }),
+    )
+    const view = await renderScreen(<RemountableTasks />)
+    view.container.style.height = '600px'
+    await view.findByRole('heading', { name: 'N' })
+    // The first task row below the stuck header and how far below it is.
+    const readTopRow = (): string | undefined => {
+      const header = view.getByRole('heading', { name: 'N' }).query()?.getBoundingClientRect()
+      const row = [...view.container.querySelectorAll('[data-task-key]')].find((element) => {
+        return header !== undefined && element.getBoundingClientRect().bottom > header.bottom
+      })
+      if (header === undefined || row === undefined) {
+        return undefined
+      }
+      const offset = Math.round(row.getBoundingClientRect().top - header.bottom)
+      return `${row.getAttribute('data-task-key')} ${offset}`
+    }
+    // Waits until the top row keeps its place over five reads, 50 ms apart:
+    // virtua moves the list for some time after a scroll, while it measures rows.
+    const waitForRest = async (): Promise<void> => {
+      let last: string | undefined
+      let same = 0
+      for (let reads = 0; same < 5; reads++) {
+        expect(reads, 'the list did not come to rest').toBeLessThan(100)
+        await sleep(50)
+        const read = readTopRow()
+        same = read !== undefined && read === last ? same + 1 : 0
+        last = read
+      }
+    }
+
+    await scrollElement({ element: getScroller(view), top: 7000 })
+    await waitForRest()
+
+    // Read the row and unmount in one task, so the list cannot move in between.
+    const remount = view.getByRole('button', { name: 'Remount' }).element() as HTMLElement
+    const before = readTopRow()
+    await act(() => remount.click())
+    await act(() => remount.click())
+    await waitFor(() => expect(readTopRow()).toBe(before))
+    await view.unmount()
+  })
+
+  it('starts at the top on a new arrival', async () => {
+    getOpenTasks.mockResolvedValue(
+      Array.from({ length: 100 }, (_, index) => task({ text: `task ${index}`, astPath: [index] })),
+    )
+    const view = await renderScreen(
+      <>
+        <ArriveAgain />
+        <ShellTasks />
+      </>,
+    )
+    view.container.style.height = '600px'
+    await view.findByText('task 0')
+    const scroller = getScroller(view)
+    await scrollElement({ element: scroller, top: 2000 })
+
+    await userEvent.click(view.getByRole('button', { name: 'Arrive again' }))
+
+    await expect.poll(() => scroller.scrollTop).toBe(0)
+    await view.unmount()
+  })
+
+  it('closes a revealed row when the list scrolls', async () => {
+    getOpenTasks.mockResolvedValue(
+      Array.from({ length: 60 }, (_, index) => task({ text: `task ${index}`, astPath: [index] })),
+    )
+    const view = await renderScreen()
+    view.container.style.height = '600px'
+    await revealSwipeActions(view, 'task 0')
+    await expect.element(view.getByRole('button', { name: 'Delete: task 0' })).toBeInTheDocument()
+
+    await scrollElement({ element: getScroller(view), top: 40 })
+
+    await waitFor(() => expect(view.queryByRole('button', { name: 'Delete: task 0' })).toBeNull())
     await view.unmount()
   })
 

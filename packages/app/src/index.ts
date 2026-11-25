@@ -102,7 +102,6 @@ export {
   indexWithin,
   neighborDate,
   PAST_DAYS,
-  type DayScrollPosition,
   type DayWindow,
   type DayWindowRadius,
 } from './daily/day-window.ts'
@@ -161,6 +160,7 @@ export {
   type NavigateOptions,
   type NavigationService,
   type NavigationState,
+  type ItemScrollPosition,
   type ScrollPosition,
 } from './navigation/navigation-service.ts'
 export {

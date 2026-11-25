@@ -196,7 +196,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
     const target = targetDateRef.current
     const saved = savedScroll()
     const restored = typeof saved === 'object' ? saved : null
-    const extended = extendDayWindowBack(dayWindow, restored?.date ?? target)
+    const extended = extendDayWindowBack(dayWindow, restored?.key ?? target)
     if (extended !== dayWindow) {
       // An arrival or restored day before the window grows it; the effect
       // re-runs on the new window to anchor there. Tracked indices move with it.
@@ -213,7 +213,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
       // otherwise steal focus when its row scrolls into view.
       focusPendingRef.current = null
       pendingFocusRef.current = null
-      virtualizerRef.current?.scrollToIndex(indexOfDate(dayWindow, restored.date), {
+      virtualizerRef.current?.scrollToIndex(indexOfDate(dayWindow, restored.key), {
         align: 'start',
         offset: restored.offset,
       })
@@ -234,7 +234,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
       if (!virtualizer) return
       const index = virtualizer.findItemIndex(scrollTop)
       saveScrollState({
-        date: dateAtIndex(dayWindow, index),
+        key: dateAtIndex(dayWindow, index),
         offset: scrollTop - virtualizer.getItemOffset(index),
       })
     },

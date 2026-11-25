@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { SETTINGS_PAGE_PADDING_PX } from '@/components/settings/section-scrolling.ts'
 import { SettingsNavigator } from '@/components/settings/settings-navigator.tsx'
 import { SettingsScreen } from '@/components/settings-screen.tsx'
 import { ScrollRestored } from '@/routing/scroll-restore.tsx'
@@ -9,7 +10,10 @@ export function SettingsRoute(): ReactElement {
   // only renders when the container query says the gutter can fit it:
   // the 42rem column plus a 12rem rail either side, with a little slack.
   return (
-    <ScrollRestored className="@container h-full overflow-auto px-6 py-8">
+    <ScrollRestored
+      className="@container h-full overflow-auto px-6"
+      style={{ paddingBlock: SETTINGS_PAGE_PADDING_PX }}
+    >
       <div className="relative mx-auto w-full max-w-2xl">
         <div className="absolute inset-y-0 right-full hidden w-48 pr-8 @min-[68rem]:block">
           <SettingsNavigator className="sticky top-8" />

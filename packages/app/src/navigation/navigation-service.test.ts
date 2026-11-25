@@ -388,14 +388,14 @@ describe('NavigationService', () => {
     it('returns Daily to its last day, never to a note opened from it', () => {
       const navigation = createNavigationService()
       navigation.navigate({ kind: 'daily', date: '2026-06-08' })
-      navigation.saveScrollState({ date: '2026-06-08', offset: 40 })
+      navigation.saveScrollState({ key: '2026-06-08', offset: 40 })
       navigation.navigate({ kind: 'note', path: 'notes/a.md' })
       navigation.navigate({ kind: 'tasks' })
 
       navigation.selectSection('daily')
 
       expect(navigation.get().route).toEqual({ kind: 'daily', date: '2026-06-08' })
-      expect(navigation.savedScroll()).toEqual({ date: '2026-06-08', offset: 40 })
+      expect(navigation.savedScroll()).toEqual({ key: '2026-06-08', offset: 40 })
     })
 
     it('restores the Tasks list scroll when the section is selected again', () => {

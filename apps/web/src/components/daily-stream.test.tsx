@@ -9,7 +9,7 @@ import {
   type RefObject,
 } from 'react'
 import { act } from '@/test-utils/act.ts'
-import type { DayScrollPosition } from '@reflect/app'
+import type { ItemScrollPosition } from '@reflect/app'
 import {
   createTestDatabaseService,
   createTestCoreServices,
@@ -74,7 +74,7 @@ function fixedClock(): ReturnType<typeof createTestClockService> {
 /**
  * Records `position` on the current history entry, as the stream's scroll would.
  */
-function SaveScrollProbe({ position }: { position: DayScrollPosition }): ReactElement | null {
+function SaveScrollProbe({ position }: { position: ItemScrollPosition }): ReactElement | null {
   const { saveScrollState } = useRouterHandlers()
   useEffect(() => {
     saveScrollState(position)
@@ -212,7 +212,7 @@ describe('DailyStream', () => {
   })
 
   it('grows its window to restore a saved day before it', async () => {
-    const saved = { date: '2004-03-01', offset: 0 }
+    const saved = { key: '2004-03-01', offset: 0 }
     const view = await renderStream(<SaveScrollProbe position={saved} />, fixedClock())
     await view.rerender(
       <Stream>
@@ -300,7 +300,7 @@ describe('DailyStream', () => {
   })
 
   it('mounts straight at a restored entry’s saved day, not the anchor', async () => {
-    const saved = { date: '2026-06-01', offset: 80 }
+    const saved = { key: '2026-06-01', offset: 80 }
     const view = await renderStream(<SaveScrollProbe position={saved} />, fixedClock())
     await view.rerender(
       <Stream>

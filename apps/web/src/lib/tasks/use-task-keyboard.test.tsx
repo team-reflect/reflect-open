@@ -11,9 +11,9 @@ import { useTaskKeyboard } from './use-task-keyboard.ts'
 function makeSelection(over: Partial<TaskSelection> = {}): TaskSelection {
   return {
     selected: new Set<string>(),
+    getSelected: () => new Set<string>(),
     selectedCount: 0,
     isSelected: returnFalse,
-    isSoleSelected: returnFalse,
     clickSelect: vi.fn(),
     select: vi.fn(),
     selectAll: vi.fn(),

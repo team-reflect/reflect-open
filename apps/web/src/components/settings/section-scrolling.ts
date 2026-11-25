@@ -1,11 +1,10 @@
 import { settingsSectionDomId, type SettingsSectionId } from './sections.ts'
 
 /**
- * Breathing room (px) left above a section's heading when jumping to it —
- * matches the settings page's `py-8` so a jumped-to heading sits exactly
- * where the page's own top padding would put it.
+ * Vertical padding (px) of the settings page. A jumped-to section heading
+ * lands this far below the top of the scroll container.
  */
-export const SECTION_JUMP_OFFSET_PX = 32
+export const SETTINGS_PAGE_PADDING_PX = 32
 
 /**
  * The nearest ancestor that actually scrolls. Used instead of
@@ -43,7 +42,7 @@ export function scrollToSettingsSection(
   const offset = target.getBoundingClientRect().top - container.getBoundingClientRect().top
   const behavior: ScrollBehavior = reducedMotion ? 'auto' : 'smooth'
   container.scrollTo({
-    top: Math.max(0, container.scrollTop + offset - SECTION_JUMP_OFFSET_PX),
+    top: Math.max(0, container.scrollTop + offset - SETTINGS_PAGE_PADDING_PX),
     behavior,
   })
 }

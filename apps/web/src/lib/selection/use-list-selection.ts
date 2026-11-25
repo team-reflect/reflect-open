@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
 import { isModEvent } from '@meowdown/core'
 
 /**
@@ -19,10 +19,12 @@ import { isModEvent } from '@meowdown/core'
  */
 export interface ListSelection {
   selected: ReadonlySet<string>
+  /**
+   * The keys selected now, read live. The function keeps its identity.
+   */
+  getSelected: () => ReadonlySet<string>
   selectedCount: number
   isSelected: (key: string) => boolean
-  /** Exactly this key is selected (e.g. the state that opens an inline editor). */
-  isSoleSelected: (key: string) => boolean
   /** Apply a row click, honoring ⌘/Ctrl (toggle) and Shift (range) modifiers. */
   clickSelect: (key: string, event: Pick<MouseEvent, 'metaKey' | 'ctrlKey' | 'shiftKey'>) => void
   /** Replace the selection with these visible keys, normalized to render order. */
@@ -52,6 +54,11 @@ export function useListSelection(orderedKeys: readonly string[]): ListSelection 
   const orderRef = useRef(orderedKeys)
   useEffect(() => {
     orderRef.current = orderedKeys
+  })
+  const selectedRef = useRef(selected)
+  // A layout effect, so a handler that runs right after a commit reads this selection.
+  useLayoutEffect(() => {
+    selectedRef.current = selected
   })
   const anchorRef = useRef<string | null>(null)
   const cursorRef = useRef<string | null>(null)
@@ -183,12 +190,13 @@ export function useListSelection(orderedKeys: readonly string[]): ListSelection 
   )
 
   const activeKey = useCallback(() => cursorRef.current ?? anchorRef.current, [])
+  const getSelected = useCallback(() => selectedRef.current, [])
 
   return {
     selected,
+    getSelected,
     selectedCount: selected.size,
     isSelected: (key) => selected.has(key),
-    isSoleSelected: (key) => selected.size === 1 && selected.has(key),
     clickSelect,
     select,
     selectAll,

@@ -14,6 +14,11 @@ import { useNoteLabel } from '@/hooks/use-note-label.ts'
 export const ALL_NOTES_GRID =
   'grid grid-cols-[minmax(0,15rem)_minmax(0,1fr)_minmax(0,8rem)_6rem] items-center gap-4 pl-12 pr-7'
 
+/**
+ * Height (px) of a row.
+ */
+export const ALL_NOTES_ROW_HEIGHT = 48
+
 interface AllNotesRowProps {
   note: NoteListEntry
   /** Whether this row is part of the current multi-selection. */
@@ -52,8 +57,9 @@ export const AllNotesRow = memo(function AllNotesRow({
         onSelect(note.path, event)
       }}
       onDoubleClick={(event) => onOpen(note.path, event)}
+      style={{ height: ALL_NOTES_ROW_HEIGHT }}
       className={cn(
-        'group/row relative h-12 cursor-default select-none',
+        'group/row relative cursor-default select-none',
         ALL_NOTES_GRID,
         selected
           ? 'border-y border-accent/20 bg-accent-soft text-text dark:border-accent/10 dark:text-text'

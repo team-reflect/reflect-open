@@ -1,9 +1,10 @@
-import { useEffect, useRef, type ReactElement, type ReactNode } from 'react'
+import { useEffect, useRef, type CSSProperties, type ReactElement, type ReactNode } from 'react'
 import { cn } from '@/lib/utils.ts'
 import { useRouterState, useRouterHandlers } from './router.tsx'
 
 interface ScrollRestoredProps {
   className?: string
+  style?: CSSProperties | undefined
   children: ReactNode
 }
 
@@ -18,7 +19,7 @@ interface ScrollRestoredProps {
  * with the content. Without it they escape to the workspace column at their
  * static offsets, overflowing the frame into a second scrollbar.
  */
-export function ScrollRestored({ className, children }: ScrollRestoredProps): ReactElement {
+export function ScrollRestored({ className, style, children }: ScrollRestoredProps): ReactElement {
   const { entryId } = useRouterState()
   const { saveScrollState, savedScroll } = useRouterHandlers()
   const ref = useRef<HTMLDivElement | null>(null)
@@ -37,6 +38,7 @@ export function ScrollRestored({ className, children }: ScrollRestoredProps): Re
     <div
       ref={ref}
       className={cn(className, 'relative')}
+      style={style}
       onScroll={(event) => saveScrollState(event.currentTarget.scrollTop)}
     >
       {children}

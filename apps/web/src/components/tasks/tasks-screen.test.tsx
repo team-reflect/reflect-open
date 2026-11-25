@@ -15,6 +15,7 @@ import { act } from '@/test-utils/act.ts'
 import { useRouterState } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { MOD_KEY } from '@/test-utils/mod-key.ts'
+import { scrollElement } from '@/test-utils/scroll.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { spyOnTaskWrites, type TaskAction, type TaskWriteSpies } from '@/test-utils/task-writes.ts'
@@ -55,6 +56,7 @@ function failWrites(kinds: TaskActionKind[], cause: Error): void {
 
 // Stub the real inline editor with buttons for its keys and for typing, over
 // the real draft hook, so selection and command routing is testable here.
+// tasks-screen-editor.test.tsx runs the screen with the real editor.
 vi.mock('./task-editor', () => ({
   TaskEditor: ({
     task,
@@ -104,6 +106,27 @@ vi.mock('./task-editor', () => ({
     )
   },
 }))
+
+/**
+ * `count` tasks of one note, named "task 0", "task 1", and so on.
+ */
+function manyTasks(count: number): OpenTask[] {
+  return Array.from({ length: count }, (_, index) => {
+    return task({
+      notePath: 'notes/p.md',
+      astPath: [index],
+      text: `task ${index}`,
+      noteTitle: 'Project',
+    })
+  })
+}
+
+/**
+ * The scroll container of the task list.
+ */
+function getScroller(view: { getByRole: (role: 'list') => Locator }): HTMLElement {
+  return view.getByRole('list').element().parentElement!
+}
 
 function RouteProbe(): ReactNode {
   const { route } = useRouterState()
@@ -511,20 +534,90 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
-  it('scrolls the focused task row into view after selection renders', async () => {
+  it('keeps the edited row mounted while it is out of view', async () => {
+    getOpenTasks.mockResolvedValue(manyTasks(200))
+    const view = await renderScreen()
+    view.container.style.height = '600px'
+    await userEvent.click(await view.findByRole('button', { name: 'task 0' }))
+    await waitFor(() => expect(view.queryByRole('button', { name: 'task 150' })).toBeNull())
+
+    await scrollElement({ element: getScroller(view), top: 5000 })
+
+    await view.findByRole('button', { name: 'task 125' })
+    expect(view.getByTestId('task-editor').element().textContent).toContain('task 0')
+    await view.unmount()
+  })
+
+  it('scrolls a row above the viewport into view, below the group header', async () => {
+    getOpenTasks.mockResolvedValue(manyTasks(200))
+    const view = await renderScreen()
+    view.container.style.height = '600px'
+    await userEvent.click(await view.findByRole('button', { name: 'task 0' }))
+    await scrollElement({ element: getScroller(view), top: 5000 })
+
+    await userEvent.keyboard('{ArrowDown}')
+
+    await waitFor(() => {
+      const editor = view.getByTestId('task-editor').element()
+      expect(editor.textContent).toContain('task 1')
+      const header = view.getByRole('heading', { name: 'Project' }).element()
+      expect(editor.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+        header.getBoundingClientRect().bottom,
+      )
+    })
+    await view.unmount()
+  })
+
+  it('scrolls a row below the viewport into view', async () => {
+    getOpenTasks.mockResolvedValue(manyTasks(200))
+    const view = await renderScreen()
+    view.container.style.height = '600px'
+    await userEvent.click(await view.findByRole('button', { name: 'task 0' }))
+    const scroller = getScroller(view)
+
+    for (let step = 0; step < 30; step++) {
+      await userEvent.keyboard('{ArrowDown}')
+    }
+
+    await waitFor(() => {
+      const editor = view.getByTestId('task-editor').element()
+      expect(editor.textContent).toContain('task 30')
+      expect(editor.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+        scroller.getBoundingClientRect().bottom,
+      )
+      expect(scroller.scrollTop).toBeGreaterThan(0)
+    })
+    await view.unmount()
+  })
+
+  it('keeps the focus in the search box while a row is being edited', async () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/p.md', astPath: [2], text: 'first', noteTitle: 'Project' }),
       task({ notePath: 'notes/p.md', astPath: [3], text: 'second', noteTitle: 'Project' }),
     ])
     const view = await renderScreen()
+    await userEvent.click(await view.findByRole('button', { name: 'first' }))
+    const search = view.getByRole('textbox', { name: 'Search tasks' })
 
-    await userEvent.click(await view.findByRole('button', { name: 'second' }))
-    const row = view.container.querySelectorAll('[data-task-key]')[1] as HTMLElement
+    await userEvent.click(search)
+    await userEvent.keyboard('fir')
 
+    expect((search.element() as HTMLInputElement).value).toBe('fir')
+    expect(document.activeElement).toBe(search.element())
+    await view.unmount()
+  })
+
+  it('leaves a gap between a group and the next group header', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/a.md', astPath: [2], text: 'first', noteTitle: 'A' }),
+      task({ notePath: 'notes/b.md', astPath: [2], text: 'second', noteTitle: 'B' }),
+    ])
+    const view = await renderScreen()
+
+    const row = (await view.findByRole('button', { name: 'first' })).closest('[data-task-key]')!
+    const header = view.getByRole('heading', { name: 'B' }).element()
     await waitFor(() => {
-      const rect = row.getBoundingClientRect()
-      expect(rect.top).toBeGreaterThanOrEqual(0)
-      expect(rect.bottom).toBeLessThanOrEqual(window.innerHeight)
+      expect(header.getBoundingClientRect().top).toBeGreaterThan(row.getBoundingClientRect().bottom)
     })
     await view.unmount()
   })

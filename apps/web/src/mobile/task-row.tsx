@@ -11,6 +11,11 @@ import { useRevealedRow } from '@/mobile/revealed-row.ts'
 import { SwipeRow } from '@/mobile/swipe-row.tsx'
 import { useDateFormat } from '@/providers/settings-provider.tsx'
 
+/**
+ * Minimum height (px) of a row with its bottom border: a single-line row.
+ */
+export const MOBILE_TASK_ROW_HEIGHT = 49
+
 interface MobileTaskRowProps {
   task: OpenTask
   /**
@@ -66,7 +71,11 @@ export function MobileTaskRow({
   const edit = (): void => onEdit(task)
 
   return (
-    <li data-task-key={key} className="border-b border-border">
+    <div
+      data-task-key={key}
+      className="border-b border-border"
+      style={{ minHeight: MOBILE_TASK_ROW_HEIGHT }}
+    >
       <SwipeRow
         revealed={revealed}
         onReveal={reveal}
@@ -110,7 +119,7 @@ export function MobileTaskRow({
               close()
             }
           }}
-          className="flex min-h-12 items-start"
+          className="flex items-start"
         >
           <button
             type="button"
@@ -156,7 +165,7 @@ export function MobileTaskRow({
           >
             <span
               className={cn(
-                'min-w-0 flex-1 break-words text-sm leading-6 text-text',
+                'min-w-0 flex-1 wrap-break-word text-sm leading-6 text-text',
                 task.checked && 'text-text-muted line-through',
               )}
             >
@@ -172,6 +181,6 @@ export function MobileTaskRow({
           </div>
         </div>
       </SwipeRow>
-    </li>
+    </div>
   )
 }
