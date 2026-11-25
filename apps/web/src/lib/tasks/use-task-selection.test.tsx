@@ -101,9 +101,8 @@ describe('useTaskSelection', () => {
     // 'b' and 'd' completed / filtered away — the selection drops them.
     await rerender({ keys: ['a', 'c'] })
     expect([...result.current.selected]).toEqual(['a', 'c'])
-    expect(result.current.isSoleSelected('a')).toBe(false)
 
     await rerender({ keys: ['a'] })
-    expect(result.current.isSoleSelected('a')).toBe(true)
+    expect([...result.current.selected]).toEqual(['a'])
   })
 })

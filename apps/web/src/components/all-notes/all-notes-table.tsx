@@ -4,7 +4,7 @@ import { Virtualizer, type VirtualizerHandle } from 'virtua'
 import type { ListSelection } from '@/lib/selection/use-list-selection.ts'
 import { cn } from '@/lib/utils.ts'
 import type { ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
-import { ALL_NOTES_GRID, AllNotesRow } from './all-notes-row.tsx'
+import { ALL_NOTES_GRID, ALL_NOTES_ROW_HEIGHT, AllNotesRow } from './all-notes-row.tsx'
 
 interface AllNotesTableProps {
   /** `undefined` while the index query settles (renders nothing, not "empty"). */
@@ -21,8 +21,6 @@ interface AllNotesTableProps {
    */
   registerScrollToIndex: (scrollToIndex: (index: number) => void) => void
 }
-
-const ESTIMATED_ROW_HEIGHT = 48
 
 /**
  * The All Notes table: a sticky header row over virtualized note rows. The
@@ -89,8 +87,8 @@ export function AllNotesTable({
           as="ul"
           item="li"
           data={rows}
-          itemSize={ESTIMATED_ROW_HEIGHT}
-          bufferSize={10 * ESTIMATED_ROW_HEIGHT}
+          itemSize={ALL_NOTES_ROW_HEIGHT}
+          bufferSize={10 * ALL_NOTES_ROW_HEIGHT}
         >
           {(note) => (
             <AllNotesRow

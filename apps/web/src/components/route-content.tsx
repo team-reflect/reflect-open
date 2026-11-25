@@ -47,8 +47,8 @@ function RouteContentBody(): ReactElement {
       // ScrollRestored wrapper — same shape as the daily stream.
       return <AllNotesScreen tag={route.tag} />
     case 'tasks':
-      // Owns its scroll container (a grouped list with a fixed header), so no
-      // ScrollRestored wrapper — same shape as All Notes.
+      // Its virtualized list owns the scroll container and the scroll memory,
+      // so no ScrollRestored wrapper.
       return <TasksScreen />
     case 'chat':
       // Owns its scroll container (the message list pins to the bottom while

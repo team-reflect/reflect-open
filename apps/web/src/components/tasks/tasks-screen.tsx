@@ -8,30 +8,32 @@ import {
   type ReactElement,
 } from 'react'
 import { Archive, CalendarClock, List, Search } from 'lucide-react'
-import {
-  composeVisibleTaskGroups,
-  type InsertTaskTarget,
-  type OpenTask,
-  type TaskGroup,
-} from '@reflect/core'
+import type { InsertTaskTarget, OpenTask, TaskGroup } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { useNoteLinkNavigation, type ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
-import { scrollTaskIntoView } from '@/lib/tasks/task-navigation.ts'
 import { useTaskRowHandlers } from '@/lib/tasks/use-task-row-handlers.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
+import type { TaskListRow } from '@/lib/tasks/task-list-items.ts'
 import { useTaskKeyboard } from '@/lib/tasks/use-task-keyboard.ts'
 import { useTaskSelection } from '@/lib/tasks/use-task-selection.ts'
-import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
+import { useVisibleTaskGroups } from '@/lib/tasks/use-visible-task-groups.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useStore } from '@/lib/use-store.ts'
 import { routeForPath } from '@reflect/app'
 import { TaskFiltersMenu } from './task-filters-menu.tsx'
-import { TaskGroupSection } from './task-group-section.tsx'
+import { TaskBreadcrumbs } from './task-breadcrumbs.tsx'
+import { TaskGroupHeader } from './task-group-header.tsx'
+import { TaskList, type TaskListHandle } from './task-list.tsx'
+import { TASK_ROW_HEIGHT, TaskRow } from './task-row.tsx'
 import { TaskScheduleCalendar } from './task-schedule-calendar.tsx'
 import { TaskToolbarCountBadge } from './task-toolbar-count-badge.tsx'
 import { isModEvent } from '@meowdown/core'
+
+/**
+ * Space (px) between the last row of a group and the next group's header.
+ */
+const GROUP_GAP = 24
 
 /**
  * The selected task that owns keyboard focus: the cursor/anchor, else the first row left selected.
@@ -50,12 +52,12 @@ function focusedSelectedKey(
 
 /**
  * The Tasks view (Plan 18), in V1's design: every open checkbox across the graph
- * grouped into sticky, colour-coded sections — Current / Overdue / Upcoming (by
+ * grouped under sticky, colour-coded headers — Current / Overdue / Upcoming (by
  * the task's due date, else its note's daily date) and then by note — read from
  * the SQLite projection and kept fresh by `TaskService`. A search
  * box filters by text; the "Task filters" menu toggles which buckets show and
- * reveals completed ("archived") tasks. Owns its scroll container so the sticky
- * headers and the toolbar stay put; per-entry scroll memory mirrors All Notes.
+ * reveals completed ("archived") tasks. The list scrolls inside `TaskList`,
+ * so the toolbar stays put.
  *
  * Rows are multi-selectable (V1 parity): click to select, ⌘/Shift to extend, and
  * keyboard shortcuts act on the selection — ⌘A select all, ↑/↓ (Shift to extend),
@@ -76,25 +78,10 @@ export function TasksScreen(): ReactElement {
   const [query, setQuery] = useState('')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [scheduleOpen, setScheduleOpen] = useState(false)
-  const scrollRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
-  const { open, completed, struck } = useStore(taskService)
-  useEffect(
-    () => (filters.archived ? taskService.includeCompleted() : undefined),
-    [taskService, filters.archived],
-  )
-
-  // When archived is on, the list merges open + completed, so the empty state
-  // must wait for both — else a graph with only completed tasks flashes "No
-  // tasks to show." while the completed query is still loading.
-  const ready = open !== undefined && (!filters.archived || completed !== undefined)
-  const { onScroll } = useScrollRestoration(scrollRef, ready)
-
+  const listRef = useRef<TaskListHandle>(null)
   const needle = query.trim().toLowerCase()
-  const groups = useMemo(
-    () => composeVisibleTaskGroups({ open, completed, struck, filters, needle, today }),
-    [open, completed, struck, filters, needle, today],
-  )
+  const { groups, ready, struck } = useVisibleTaskGroups({ needle, filters, today })
 
   // The flat, render-order list of tasks the selection and its shortcuts act on.
   const orderedTasks = useMemo(() => groups.flatMap((group) => group.tasks), [groups])
@@ -112,76 +99,82 @@ export function TasksScreen(): ReactElement {
   }
   const scrollToKey = useCallback((key: string | null) => {
     if (key !== null) {
-      scrollTaskIntoView(rootRef.current, key)
+      listRef.current?.revealTask(key)
     }
   }, [])
   const editHandlers = useTaskRowHandlers({ selection, orderedTasks, scrollToKey, setQuery })
-  const selectedTaskKeys = selection.selected
-  const activeTaskKey = selection.activeKey
+  const {
+    selected: selectedTaskKeys,
+    selectedCount,
+    activeKey,
+    clickSelect,
+    select,
+    clear,
+    getSelected,
+  } = selection
   // Selection opens the focused task's inline editor, often after an async insert
-  // and optimistic cache render. Scroll after the DOM reflects that selection so
+  // and optimistic cache render. Scroll after the list holds that selection so
   // the focused row is always visible.
+  const focusedKey = focusedSelectedKey(selectedTaskKeys, activeKey)
   useLayoutEffect(() => {
-    scrollToKey(focusedSelectedKey(selectedTaskKeys, activeTaskKey))
-  }, [activeTaskKey, orderedKeys, scrollToKey, selectedTaskKeys])
+    scrollToKey(focusedKey)
+  }, [focusedKey, orderedKeys, scrollToKey])
+  // The sole selection: its row shows the inline editor.
+  const editingTaskId = selectedCount === 1 ? focusedKey : null
   // The group headers' "+ Add" (V1): drop any search filter so the new row is
   // visible, then select it so its editor opens focused.
   const onAdd = useCallback(
     (target: InsertTaskTarget) => {
       setQuery('')
       const key = commands.add(target).taskId
-      selection.clickSelect(key, { metaKey: false, ctrlKey: false, shiftKey: false })
-      scrollToKey(key)
+      clickSelect(key, { metaKey: false, ctrlKey: false, shiftKey: false })
     },
-    [commands, selection, scrollToKey],
+    [commands, clickSelect],
   )
   // The tasks behind the current selection's keys, in selection order — what the
   // toolbar actions (schedule, convert) act on. A row whose key no longer
   // resolves (pruned by a reindex) is dropped rather than acted on.
   const selectedTasks = useCallback((): OpenTask[] => {
-    return [...selection.selected]
+    return [...getSelected()]
       .map((key) => tasksByKey.get(key))
       .filter((task): task is OpenTask => task !== undefined)
-  }, [selection, tasksByKey])
-  // A checkbox click toggles its row, with the text typed into it, and ends the edit.
+  }, [getSelected, tasksByKey])
+  // A checkbox click on a row of a multi-selection completes or reopens the
+  // selected rows together. On any other row it toggles that row, with the text
+  // typed into it, and ends the edit.
   const onCheckboxToggle = useCallback(
     (task: OpenTask) => {
-      void commands.toggle([task])
-      if (selection.isSoleSelected(task.taskId)) {
-        selection.clear()
-      }
-    },
-    [commands, selection],
-  )
-  const onSelectionCheckboxToggle = useCallback(
-    (task: OpenTask) => {
       const tasks = selectedTasks()
-      if (tasks.length <= 1 || !tasks.some((selectedTask) => selectedTask.taskId === task.taskId)) {
-        onCheckboxToggle(task)
+      if (tasks.length > 1 && tasks.some((selectedTask) => selectedTask.taskId === task.taskId)) {
+        if (task.checked) {
+          void commands.toggle(tasks.filter((selectedTask) => selectedTask.checked))
+        } else {
+          void commands.complete(tasks)
+        }
         return
       }
-      if (task.checked) {
-        void commands.toggle(tasks.filter((selectedTask) => selectedTask.checked))
-      } else {
-        void commands.complete(tasks)
+      void commands.toggle([task])
+      const selected = getSelected()
+      if (selected.size === 1 && selected.has(task.taskId)) {
+        clear()
       }
     },
-    [commands, onCheckboxToggle, selectedTasks],
+    [commands, selectedTasks, getSelected, clear],
   )
   // Schedule the current selection (the calendar / ⌘⇧S), then deselect (V1).
   const onSchedule = useCallback(
     (isoDate: string | null) => {
       void commands.schedule(selectedTasks(), isoDate)
-      selection.clear()
+      clear()
     },
-    [commands, selection, selectedTasks],
+    [commands, clear, selectedTasks],
   )
   // Convert the current selection to plain bullets (the toolbar / ⌘⇧K): the rows
   // leave the Tasks view, so deselect after, like scheduling.
   const onConvertToBullet = useCallback(() => {
     void commands.convert(selectedTasks())
-    selection.clear()
-  }, [commands, selection, selectedTasks])
+    clear()
+  }, [commands, clear, selectedTasks])
   const openNote = useCallback(
     (path: string, event?: ModClickEvent) => {
       navigateNoteLink({
@@ -211,6 +204,53 @@ export function TasksScreen(): ReactElement {
     onConvertToBullet,
   })
 
+  const renderHeader = useCallback(
+    (group: TaskGroup) => (
+      <TaskGroupHeader
+        group={group}
+        today={today}
+        onAdd={onAdd}
+        onOpenNote={openNote}
+        className="lg:px-12"
+      />
+    ),
+    [today, onAdd, openNote],
+  )
+  const renderRow = useCallback(
+    (row: TaskListRow) => {
+      if (row.kind === 'breadcrumbs') {
+        return (
+          <TaskBreadcrumbs
+            breadcrumbs={row.breadcrumbs}
+            onSelect={() => select(row.tasks.map((task) => task.taskId))}
+          />
+        )
+      }
+      const { task } = row
+      const selected = selectedTaskKeys.has(task.taskId)
+      return (
+        <TaskRow
+          task={task}
+          showSource={row.showSource}
+          selected={selected}
+          onSelect={clickSelect}
+          onCheckboxToggle={onCheckboxToggle}
+          editHandlers={task.taskId === editingTaskId ? editHandlers(task) : undefined}
+          onOpenNote={openNote}
+        />
+      )
+    },
+    [
+      select,
+      selectedTaskKeys,
+      editingTaskId,
+      clickSelect,
+      onCheckboxToggle,
+      editHandlers,
+      openNote,
+    ],
+  )
+
   // Move focus into the Tasks surface on mount so the shortcuts work the moment
   // you navigate here — without it, focus would linger on the sidebar link that
   // navigated, where the scoping guard (rightly) backs the shortcuts off.
@@ -239,7 +279,7 @@ export function TasksScreen(): ReactElement {
             className="h-9 border-none bg-transparent pl-8 shadow-none focus-visible:ring-0"
           />
         </div>
-        {selection.selectedCount > 0 ? (
+        {selectedCount > 0 ? (
           <TaskScheduleCalendar
             open={scheduleOpen}
             onOpenChange={setScheduleOpen}
@@ -249,27 +289,27 @@ export function TasksScreen(): ReactElement {
             <Button
               type="button"
               variant="ghost"
-              aria-label={`Schedule ${selection.selectedCount}`}
+              aria-label={`Schedule ${selectedCount}`}
               className="window-drag-control text-xs text-text-muted"
             >
               <CalendarClock aria-hidden className="size-3.5" />
               Schedule
-              <TaskToolbarCountBadge count={selection.selectedCount} />
+              <TaskToolbarCountBadge count={selectedCount} />
             </Button>
           </TaskScheduleCalendar>
         ) : null}
-        {selection.selectedCount > 0 ? (
+        {selectedCount > 0 ? (
           <Button
             type="button"
             variant="ghost"
-            aria-label={`Convert to bullet ${selection.selectedCount}`}
+            aria-label={`Convert to bullet ${selectedCount}`}
             onClick={onConvertToBullet}
             title="Drop the checkbox, keeping the line as a plain bullet — leaves the Tasks list"
             className="window-drag-control text-xs text-text-muted"
           >
             <List aria-hidden className="size-3.5" />
             Convert to bullet
-            <TaskToolbarCountBadge count={selection.selectedCount} />
+            <TaskToolbarCountBadge count={selectedCount} />
           </Button>
         ) : null}
         {struck.length > 0 ? (
@@ -292,29 +332,26 @@ export function TasksScreen(): ReactElement {
           onOpenChange={setFiltersOpen}
         />
       </header>
-      <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-auto pb-8">
-        {ready && groups.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-text-muted lg:px-12">
-            {needle ? 'No matching tasks.' : 'No tasks to show.'}
-          </p>
-        ) : (
-          <div className="flex flex-col gap-5">
-            {groups.map((group: TaskGroup) => (
-              <TaskGroupSection
-                key={group.kind === 'note' ? `note:${group.notePath}` : group.kind}
-                group={group}
-                selection={selection}
-                editHandlers={editHandlers}
-                onCheckboxToggle={onCheckboxToggle}
-                onSelectionCheckboxToggle={onSelectionCheckboxToggle}
-                today={today}
-                onAdd={onAdd}
-                onOpen={openNote}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      {/* The empty state waits for `ready`: with archived on, a graph with only
+          completed tasks would flash "No tasks to show." while they load. */}
+      {ready && groups.length === 0 ? (
+        <p className="px-4 py-6 text-sm text-text-muted lg:px-12">
+          {needle ? 'No matching tasks.' : 'No tasks to show.'}
+        </p>
+      ) : (
+        <TaskList
+          ref={listRef}
+          className="min-h-0 flex-1 pb-8"
+          groups={groups}
+          ready={ready}
+          rowHeight={TASK_ROW_HEIGHT}
+          groupGap={GROUP_GAP}
+          // The inline editor saves its draft and loses focus when it unmounts.
+          keepMountedTaskId={editingTaskId}
+          renderHeader={renderHeader}
+          renderRow={renderRow}
+        />
+      )}
     </div>
   )
 }
