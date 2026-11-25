@@ -56,6 +56,7 @@ function failWrites(kinds: TaskActionKind[], cause: Error): void {
 
 // Stub the real inline editor with buttons for its keys and for typing, over
 // the real draft hook, so selection and command routing is testable here.
+// tasks-screen-editor.test.tsx runs the screen with the real editor.
 vi.mock('./task-editor', () => ({
   TaskEditor: ({
     task,

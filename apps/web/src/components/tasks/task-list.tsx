@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactElement,
   type Ref,
   type RefObject,
@@ -87,7 +88,18 @@ interface TaskListProps {
   renderRow: (row: TaskListRow) => ReactElement
 }
 
-const ItemsContext = createContext<readonly TaskListItem[]>([])
+/**
+ * What an item element needs to know about the list.
+ */
+interface ItemLayout {
+  items: readonly TaskListItem[]
+  /**
+   * The index of the item that stays mounted out of view, or `undefined`.
+   */
+  keepMountedIndex: number | undefined
+}
+
+const ItemLayoutContext = createContext<ItemLayout>({ items: [], keepMountedIndex: undefined })
 
 function TaskListItemElement({
   style,
@@ -95,9 +107,18 @@ function TaskListItemElement({
   children,
   ref,
 }: CustomItemComponentProps): ReactElement {
-  const isHeader = use(ItemsContext)[index]?.kind === 'header'
-  // The item is a stacking context, so the z-index of its header goes on the item.
-  const itemStyle = useMemo(() => (isHeader ? { ...style, zIndex: 1 } : style), [style, isHeader])
+  const { items, keepMountedIndex } = use(ItemLayoutContext)
+  const isHeader = items[index]?.kind === 'header'
+  const isKeptMounted = index === keepMountedIndex
+  const itemStyle = useMemo((): CSSProperties => {
+    return {
+      ...style,
+      // The item is a stacking context, so the z-index of its header goes on the item.
+      ...(isHeader ? { zIndex: 1 } : undefined),
+      // virtua hides an item until it is measured, and a hidden editor cannot take the focus.
+      ...(isKeptMounted ? { visibility: 'visible' } : undefined),
+    }
+  }, [style, isHeader, isKeptMounted])
   return (
     <li ref={ref} style={itemStyle}>
       {children}
@@ -176,14 +197,17 @@ function useScrollMemory(
     const saved = savedScroll()
     const position = typeof saved === 'object' ? saved : null
     const index = position === null ? -1 : items.findIndex((item) => item.key === position.key)
-    if (position !== null && index !== -1) {
+    if (position === null) {
+      if (virtualizer.scrollOffset !== 0) {
+        virtualizer.scrollTo(0)
+      }
+    } else if (index !== -1) {
       virtualizer.scrollToIndex(index, { align: 'start', offset: position.offset })
-    } else if (virtualizer.scrollOffset !== 0) {
-      virtualizer.scrollTo(0)
     }
   })
 
-  // An arrival restores its saved position once; a new one starts at the top.
+  // An arrival restores its saved position once, and a new one starts at the
+  // top. A saved item that is gone leaves the list where it is.
   const restoredArrivalRef = useRef<string | null>(null)
   useLayoutEffect(() => {
     const arrival = `${entryId}:${arrivalSeq}`
@@ -241,6 +265,7 @@ export function TaskList({
 
   const keepMountedIndex =
     keepMountedTaskId == null ? undefined : indexByTaskId.get(keepMountedTaskId)
+  const layout = useMemo(() => ({ items, keepMountedIndex }), [items, keepMountedIndex])
   const keepMounted = useMemo(() => {
     const indexes = [...tracks.heights.keys()]
     return keepMountedIndex === undefined ? indexes : [...indexes, keepMountedIndex]
@@ -277,7 +302,7 @@ export function TaskList({
 
   return (
     <div className={cn('overflow-y-auto', className)}>
-      <ItemsContext value={items}>
+      <ItemLayoutContext value={layout}>
         <Virtualizer
           ref={virtualizerRef}
           as="ul"
@@ -317,7 +342,7 @@ export function TaskList({
             )
           }}
         </Virtualizer>
-      </ItemsContext>
+      </ItemLayoutContext>
     </div>
   )
 }

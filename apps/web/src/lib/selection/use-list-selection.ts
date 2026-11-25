@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
 import { isModEvent } from '@meowdown/core'
 
 /**
@@ -56,7 +56,8 @@ export function useListSelection(orderedKeys: readonly string[]): ListSelection 
     orderRef.current = orderedKeys
   })
   const selectedRef = useRef(selected)
-  useEffect(() => {
+  // A layout effect, so a handler that runs right after a commit reads this selection.
+  useLayoutEffect(() => {
     selectedRef.current = selected
   })
   const anchorRef = useRef<string | null>(null)

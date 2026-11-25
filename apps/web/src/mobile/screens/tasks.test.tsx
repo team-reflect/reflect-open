@@ -20,7 +20,7 @@ import { spyOnTaskWrites, type TaskAction, type TaskWriteSpies } from '@/test-ut
 import { act } from '@/test-utils/act.ts'
 import { scrollElement } from '@/test-utils/scroll.ts'
 import { MobileTasks } from './tasks.tsx'
-import { noop, returnFalse } from '@ocavue/utils'
+import { noop, returnFalse, sleep } from '@ocavue/utils'
 
 let haptics: TestHapticsService
 
@@ -1011,20 +1011,21 @@ describe('MobileTasks', () => {
       const offset = Math.round(row.getBoundingClientRect().top - header.bottom)
       return `${row.getAttribute('data-task-key')} ${offset}`
     }
-    // The top row once the list is at rest: two reads in a row agree.
-    let lastRead: string | undefined
-    const topRow = (): string => {
-      const read = readTopRow()
-      const atRest = read !== undefined && read === lastRead
-      lastRead = read
-      if (!atRest) {
-        throw new Error('The list is still moving')
+    // Waits until the top row keeps its place over five reads, 50 ms apart:
+    // virtua moves the list for some time after a scroll, while it measures rows.
+    const waitForRest = async (): Promise<void> => {
+      let last: string | undefined
+      let same = 0
+      while (same < 5) {
+        await sleep(50)
+        const read = readTopRow()
+        same = read !== undefined && read === last ? same + 1 : 0
+        last = read
       }
-      return read
     }
 
     await scrollElement({ element: view.getByRole('list').element().parentElement!, top: 7000 })
-    await waitFor(topRow)
+    await waitForRest()
 
     // Read the row and unmount in one task, so the list cannot move in between.
     const remount = view.getByRole('button', { name: 'Remount' }).element() as HTMLElement
@@ -1032,6 +1033,21 @@ describe('MobileTasks', () => {
     await act(() => remount.click())
     await act(() => remount.click())
     await waitFor(() => expect(readTopRow()).toBe(before))
+    await view.unmount()
+  })
+
+  it('closes a revealed row when the list scrolls', async () => {
+    getOpenTasks.mockResolvedValue(
+      Array.from({ length: 60 }, (_, index) => task({ text: `task ${index}`, astPath: [index] })),
+    )
+    const view = await renderScreen()
+    view.container.style.height = '600px'
+    await revealSwipeActions(view, 'task 0')
+    await expect.element(view.getByRole('button', { name: 'Delete: task 0' })).toBeInTheDocument()
+
+    await scrollElement({ element: view.getByRole('list').element().parentElement!, top: 40 })
+
+    await waitFor(() => expect(view.queryByRole('button', { name: 'Delete: task 0' })).toBeNull())
     await view.unmount()
   })
 
