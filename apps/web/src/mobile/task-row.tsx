@@ -20,7 +20,7 @@ interface MobileTaskRowProps {
   /**
    * Toggle the task's checkbox through the guarded write-back.
    */
-  onToggle: () => void
+  onToggle: (task: OpenTask) => void
   /**
    * Open the quick-edit sheet for this task (V1 mobile: tap edits in place).
    */
@@ -32,11 +32,11 @@ interface MobileTaskRowProps {
   /**
    * Navigate to the task's source note (the revealed Note action).
    */
-  onOpenNote: () => void
+  onOpenNote: (notePath: string) => void
   /**
    * Delete the task outright; no confirmation, matching the sheet's Delete.
    */
-  onDelete: () => void
+  onDelete: (task: OpenTask) => void
 }
 
 /**
@@ -83,7 +83,7 @@ export function MobileTaskRow({
               onClick={() => {
                 hapticImpactLight(haptics)
                 close()
-                onOpenNote()
+                onOpenNote(task.notePath)
               }}
             />
             <SwipeActionButton
@@ -94,7 +94,7 @@ export function MobileTaskRow({
               onClick={() => {
                 hapticImpactLight(haptics)
                 close()
-                onDelete()
+                onDelete(task)
               }}
             />
           </>
@@ -117,7 +117,7 @@ export function MobileTaskRow({
             aria-label={task.checked ? `Reopen: ${label}` : `Complete: ${label}`}
             onClick={() => {
               hapticImpactLight(haptics)
-              onToggle()
+              onToggle(task)
             }}
             // A generous touch target around the small glyph; self-stretch keeps
             // the circle vertically centered in the row as task text wraps.
