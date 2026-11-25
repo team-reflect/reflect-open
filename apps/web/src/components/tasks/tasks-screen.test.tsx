@@ -107,6 +107,27 @@ vi.mock('./task-editor', () => ({
   },
 }))
 
+/**
+ * `count` tasks of one note, named "task 0", "task 1", and so on.
+ */
+function manyTasks(count: number): OpenTask[] {
+  return Array.from({ length: count }, (_, index) => {
+    return task({
+      notePath: 'notes/p.md',
+      astPath: [index],
+      text: `task ${index}`,
+      noteTitle: 'Project',
+    })
+  })
+}
+
+/**
+ * The scroll container of the task list.
+ */
+function getScroller(view: { getByRole: (role: 'list') => Locator }): HTMLElement {
+  return view.getByRole('list').element().parentElement!
+}
+
 function RouteProbe(): ReactNode {
   const { route } = useRouterState()
   return <output data-testid="route">{JSON.stringify(route)}</output>
@@ -513,29 +534,29 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
-  it('keeps the edited row mounted while it is out of view, then scrolls the next selection into view', async () => {
-    getOpenTasks.mockResolvedValue(
-      Array.from({ length: 200 }, (_, index) => {
-        return task({
-          notePath: 'notes/p.md',
-          astPath: [index],
-          text: `task ${index}`,
-          noteTitle: 'Project',
-        })
-      }),
-    )
+  it('keeps the edited row mounted while it is out of view', async () => {
+    getOpenTasks.mockResolvedValue(manyTasks(200))
     const view = await renderScreen()
     view.container.style.height = '600px'
     await userEvent.click(await view.findByRole('button', { name: 'task 0' }))
-    const scroller = view.getByRole('list').element().parentElement!
     await waitFor(() => expect(view.queryByRole('button', { name: 'task 150' })).toBeNull())
 
-    await scrollElement({ element: scroller, top: 5000 })
+    await scrollElement({ element: getScroller(view), top: 5000 })
+
     await view.findByRole('button', { name: 'task 125' })
     expect(view.getByTestId('task-editor').element().textContent).toContain('task 0')
+    await view.unmount()
+  })
 
-    // The row lands below the stuck group header, not under it.
+  it('scrolls a row above the viewport into view, below the group header', async () => {
+    getOpenTasks.mockResolvedValue(manyTasks(200))
+    const view = await renderScreen()
+    view.container.style.height = '600px'
+    await userEvent.click(await view.findByRole('button', { name: 'task 0' }))
+    await scrollElement({ element: getScroller(view), top: 5000 })
+
     await userEvent.keyboard('{ArrowDown}')
+
     await waitFor(() => {
       const editor = view.getByTestId('task-editor').element()
       expect(editor.textContent).toContain('task 1')
@@ -543,7 +564,28 @@ describe('TasksScreen', () => {
       expect(editor.getBoundingClientRect().top).toBeGreaterThanOrEqual(
         header.getBoundingClientRect().bottom,
       )
-      expect(scroller.scrollTop).toBeLessThan(100)
+    })
+    await view.unmount()
+  })
+
+  it('scrolls a row below the viewport into view', async () => {
+    getOpenTasks.mockResolvedValue(manyTasks(200))
+    const view = await renderScreen()
+    view.container.style.height = '600px'
+    await userEvent.click(await view.findByRole('button', { name: 'task 0' }))
+    const scroller = getScroller(view)
+
+    for (let step = 0; step < 30; step++) {
+      await userEvent.keyboard('{ArrowDown}')
+    }
+
+    await waitFor(() => {
+      const editor = view.getByTestId('task-editor').element()
+      expect(editor.textContent).toContain('task 30')
+      expect(editor.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+        scroller.getBoundingClientRect().bottom,
+      )
+      expect(scroller.scrollTop).toBeGreaterThan(0)
     })
     await view.unmount()
   })

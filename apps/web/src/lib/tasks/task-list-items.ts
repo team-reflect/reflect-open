@@ -8,7 +8,7 @@ export type TaskListRow =
   | {
       kind: 'breadcrumbs'
       key: string
-      labels: readonly string[]
+      breadcrumbs: readonly string[]
       /**
        * The tasks this breadcrumb labels.
        */
@@ -64,7 +64,7 @@ export function flattenTaskGroups(groups: readonly TaskGroup[]): FlatTaskList {
         items.push({
           kind: 'breadcrumbs',
           key: `breadcrumbs:${groupKey}:${context.tasks[0]!.taskId}`,
-          labels: context.visibleBreadcrumbs,
+          breadcrumbs: context.visibleBreadcrumbs,
           tasks: context.tasks,
         })
       }

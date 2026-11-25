@@ -17,7 +17,8 @@ import {
  * Each history entry can carry a **scroll position** (Plan 06b): views report
  * theirs via `saveScrollState` (never notifies subscribers — safe from scroll
  * handlers) and read `savedScroll()` after a back/forward restores an entry.
- * Plain views save a pixel offset; lists save an {@link ItemScrollPosition}.
+ * Plain views save a pixel offset; the daily stream and the Tasks list save
+ * an {@link ItemScrollPosition}.
  *
  * Long-lived surfaces (the daily stream, shared by the today/daily routes,
  * and the All and Tasks lists) additionally keep a **surface position** — the

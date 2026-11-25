@@ -41,7 +41,7 @@ interface MobileTasksProps {
  * The Tasks tab (V1 mobile's third tab over Plan 18's shipped data layer): every
  * open task across the graph in desktop's exact groups — Current / Overdue /
  * Upcoming, then per-note — via the same task rows, grouping
- * ({@link composeVisibleTaskGroups}) and task commands the desktop view uses;
+ * ({@link useVisibleTaskGroups}) and task commands the desktop view uses;
  * this screen adds only the touch surface. Task taps, toggles, adds, filters, scheduling, and archival
  * get light haptics; tapping a row opens the quick-edit sheet (edit / schedule /
  * complete / convert / open note) instead of desktop's multi-select; the filter
@@ -150,7 +150,7 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
   const renderRow = useCallback(
     (row: TaskListRow) => {
       if (row.kind === 'breadcrumbs') {
-        return <TaskBreadcrumbs breadcrumbs={row.labels} className="px-4 pb-1 pt-3" />
+        return <TaskBreadcrumbs breadcrumbs={row.breadcrumbs} className="px-4 pb-1 pt-3" />
       }
       return (
         <MobileTaskRow

@@ -8,7 +8,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ReactElement,
   type Ref,
   type RefObject,
@@ -51,7 +50,8 @@ export interface TaskListHandle {
 interface TaskListProps {
   ref?: Ref<TaskListHandle> | undefined
   /**
-   * Classes for the scroll container, e.g. its size and padding.
+   * Classes for the scroll container: its size, and bottom or inline padding.
+   * The list starts at the top of the container.
    */
   className?: string | undefined
   /**
@@ -73,7 +73,8 @@ interface TaskListProps {
    */
   groupGap?: number | undefined
   /**
-   * A task whose row stays mounted out of view.
+   * A task whose row stays mounted out of view, and shows before the list
+   * measures it, so an editor in it can take the focus.
    */
   keepMountedTaskId?: string | null | undefined
   /**
@@ -88,18 +89,7 @@ interface TaskListProps {
   renderRow: (row: TaskListRow) => ReactElement
 }
 
-/**
- * What an item element needs to know about the list.
- */
-interface ItemLayout {
-  items: readonly TaskListItem[]
-  /**
-   * The index of the item that stays mounted out of view, or `undefined`.
-   */
-  keepMountedIndex: number | undefined
-}
-
-const ItemLayoutContext = createContext<ItemLayout>({ items: [], keepMountedIndex: undefined })
+const ItemsContext = createContext<readonly TaskListItem[]>([])
 
 function TaskListItemElement({
   style,
@@ -107,18 +97,9 @@ function TaskListItemElement({
   children,
   ref,
 }: CustomItemComponentProps): ReactElement {
-  const { items, keepMountedIndex } = use(ItemLayoutContext)
-  const isHeader = items[index]?.kind === 'header'
-  const isKeptMounted = index === keepMountedIndex
-  const itemStyle = useMemo((): CSSProperties => {
-    return {
-      ...style,
-      // The item is a stacking context, so the z-index of its header goes on the item.
-      ...(isHeader ? { zIndex: 1 } : undefined),
-      // virtua hides an item until it is measured, and a hidden editor cannot take the focus.
-      ...(isKeptMounted ? { visibility: 'visible' } : undefined),
-    }
-  }, [style, isHeader, isKeptMounted])
+  const isHeader = use(ItemsContext)[index]?.kind === 'header'
+  // The item is a stacking context, so the z-index of its header goes on the item.
+  const itemStyle = useMemo(() => (isHeader ? { ...style, zIndex: 1 } : style), [style, isHeader])
   return (
     <li ref={ref} style={itemStyle}>
       {children}
@@ -196,12 +177,15 @@ function useScrollMemory(
     }
     const saved = savedScroll()
     const position = typeof saved === 'object' ? saved : null
-    const index = position === null ? -1 : items.findIndex((item) => item.key === position.key)
     if (position === null) {
+      // A scroll job of virtua outlives the call, so none starts at the top.
       if (virtualizer.scrollOffset !== 0) {
         virtualizer.scrollTo(0)
       }
-    } else if (index !== -1) {
+      return
+    }
+    const index = items.findIndex((item) => item.key === position.key)
+    if (index !== -1) {
       virtualizer.scrollToIndex(index, { align: 'start', offset: position.offset })
     }
   })
@@ -260,16 +244,19 @@ export function TaskList({
       return item.kind === 'header' ? renderHeader(item.group) : renderRow(item)
     })
   }, [items, renderHeader, renderRow])
-  const tracks = useGroupTracks(virtualizerRef, headerIndexes, groupGap)
+  const { heights: trackHeights, update: updateTracks } = useGroupTracks(
+    virtualizerRef,
+    headerIndexes,
+    groupGap,
+  )
   const saveScroll = useScrollMemory(virtualizerRef, items, ready)
 
   const keepMountedIndex =
     keepMountedTaskId == null ? undefined : indexByTaskId.get(keepMountedTaskId)
-  const layout = useMemo(() => ({ items, keepMountedIndex }), [items, keepMountedIndex])
   const keepMounted = useMemo(() => {
-    const indexes = [...tracks.heights.keys()]
+    const indexes = [...trackHeights.keys()]
     return keepMountedIndex === undefined ? indexes : [...indexes, keepMountedIndex]
-  }, [tracks.heights, keepMountedIndex])
+  }, [trackHeights, keepMountedIndex])
 
   useImperativeHandle(ref, () => {
     return {
@@ -290,7 +277,6 @@ export function TaskList({
     }
   }, [indexByTaskId])
 
-  const { update: updateTracks } = tracks
   const onScroll = useCallback(
     (offset: number) => {
       updateTracks()
@@ -302,7 +288,7 @@ export function TaskList({
 
   return (
     <div className={cn('overflow-y-auto', className)}>
-      <ItemLayoutContext value={layout}>
+      <ItemsContext value={items}>
         <Virtualizer
           ref={virtualizerRef}
           as="ul"
@@ -319,8 +305,13 @@ export function TaskList({
               // The gap is padding inside the item, so the item's measured size includes it.
               const next = items[index + 1]
               const isGroupEnd = next === undefined || next.kind === 'header'
+              // virtua hides an item until it is measured, and a hidden editor cannot take the focus.
+              const visibility = index === keepMountedIndex ? 'visible' : undefined
               return (
-                <div key={item.key} style={{ paddingBottom: isGroupEnd ? groupGap : 0 }}>
+                <div
+                  key={item.key}
+                  style={{ paddingBottom: isGroupEnd ? groupGap : 0, visibility }}
+                >
                   {elements[index]}
                 </div>
               )
@@ -329,7 +320,7 @@ export function TaskList({
               <div key={item.key} style={{ height: HEADER_HEIGHT }}>
                 <div
                   className="pointer-events-none absolute inset-x-0 top-0"
-                  style={{ height: tracks.heights.get(index) }}
+                  style={{ height: trackHeights.get(index) }}
                 >
                   <div
                     className="pointer-events-auto sticky top-0"
@@ -342,7 +333,7 @@ export function TaskList({
             )
           }}
         </Virtualizer>
-      </ItemLayoutContext>
+      </ItemsContext>
     </div>
   )
 }

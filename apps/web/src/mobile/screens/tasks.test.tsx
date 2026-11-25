@@ -12,7 +12,7 @@ import {
 } from '@reflect/core/testing'
 import type { OpenTask } from '@reflect/core'
 import { createTestSystemPreferencesService } from '@reflect/app/testing'
-import { useRouterState } from '@/routing/router.tsx'
+import { useRouterActions, useRouterState } from '@/routing/router.tsx'
 import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -146,6 +146,25 @@ function asTextArea(element: Element): HTMLTextAreaElement {
 function RouteProbe(): ReactNode {
   const { route } = useRouterState()
   return <output data-testid="route">{JSON.stringify(route)}</output>
+}
+
+/**
+ * A button that navigates to the Tasks route again.
+ */
+function ArriveAgain(): ReactNode {
+  const { navigate } = useRouterActions()
+  return (
+    <button type="button" onClick={() => navigate({ kind: 'tasks' })}>
+      Arrive again
+    </button>
+  )
+}
+
+/**
+ * The scroll container of the task list.
+ */
+function getScroller(view: { getByRole: (role: 'list') => Locator }): HTMLElement {
+  return view.getByRole('list').element().parentElement!
 }
 
 /**
@@ -969,7 +988,7 @@ describe('MobileTasks', () => {
     const view = await renderScreen()
     view.container.style.height = '600px'
     await view.findByRole('heading', { name: 'N' })
-    const scroller = view.getByRole('list').element().parentElement!
+    const scroller = getScroller(view)
     // How far the header of the group `name` is from the top of the scroller.
     const headerOffset = (name: string): number | undefined => {
       const heading = view.getByRole('heading', { name, exact: true }).query()
@@ -1016,7 +1035,8 @@ describe('MobileTasks', () => {
     const waitForRest = async (): Promise<void> => {
       let last: string | undefined
       let same = 0
-      while (same < 5) {
+      for (let reads = 0; same < 5; reads++) {
+        expect(reads, 'the list did not come to rest').toBeLessThan(100)
         await sleep(50)
         const read = readTopRow()
         same = read !== undefined && read === last ? same + 1 : 0
@@ -1024,7 +1044,7 @@ describe('MobileTasks', () => {
       }
     }
 
-    await scrollElement({ element: view.getByRole('list').element().parentElement!, top: 7000 })
+    await scrollElement({ element: getScroller(view), top: 7000 })
     await waitForRest()
 
     // Read the row and unmount in one task, so the list cannot move in between.
@@ -1033,6 +1053,27 @@ describe('MobileTasks', () => {
     await act(() => remount.click())
     await act(() => remount.click())
     await waitFor(() => expect(readTopRow()).toBe(before))
+    await view.unmount()
+  })
+
+  it('starts at the top on a new arrival', async () => {
+    getOpenTasks.mockResolvedValue(
+      Array.from({ length: 100 }, (_, index) => task({ text: `task ${index}`, astPath: [index] })),
+    )
+    const view = await renderScreen(
+      <>
+        <ArriveAgain />
+        <ShellTasks />
+      </>,
+    )
+    view.container.style.height = '600px'
+    await view.findByText('task 0')
+    const scroller = getScroller(view)
+    await scrollElement({ element: scroller, top: 2000 })
+
+    await userEvent.click(view.getByRole('button', { name: 'Arrive again' }))
+
+    await expect.poll(() => scroller.scrollTop).toBe(0)
     await view.unmount()
   })
 
@@ -1045,7 +1086,7 @@ describe('MobileTasks', () => {
     await revealSwipeActions(view, 'task 0')
     await expect.element(view.getByRole('button', { name: 'Delete: task 0' })).toBeInTheDocument()
 
-    await scrollElement({ element: view.getByRole('list').element().parentElement!, top: 40 })
+    await scrollElement({ element: getScroller(view), top: 40 })
 
     await waitFor(() => expect(view.queryByRole('button', { name: 'Delete: task 0' })).toBeNull())
     await view.unmount()

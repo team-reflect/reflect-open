@@ -56,8 +56,8 @@ function focusedSelectedKey(
  * the task's due date, else its note's daily date) and then by note — read from
  * the SQLite projection and kept fresh by `TaskService`. A search
  * box filters by text; the "Task filters" menu toggles which buckets show and
- * reveals completed ("archived") tasks. Owns the scroll container of its
- * virtualized list, so the sticky headers and the toolbar stay put.
+ * reveals completed ("archived") tasks. The list scrolls inside `TaskList`,
+ * so the toolbar stays put.
  *
  * Rows are multi-selectable (V1 parity): click to select, ⌘/Shift to extend, and
  * keyboard shortcuts act on the selection — ⌘A select all, ↑/↓ (Shift to extend),
@@ -103,18 +103,24 @@ export function TasksScreen(): ReactElement {
     }
   }, [])
   const editHandlers = useTaskRowHandlers({ selection, orderedTasks, scrollToKey, setQuery })
-  const { clickSelect, select, clear, getSelected } = selection
-  const selectedTaskKeys = selection.selected
-  const activeTaskKey = selection.activeKey
+  const {
+    selected: selectedTaskKeys,
+    selectedCount,
+    activeKey,
+    clickSelect,
+    select,
+    clear,
+    getSelected,
+  } = selection
   // Selection opens the focused task's inline editor, often after an async insert
   // and optimistic cache render. Scroll after the list holds that selection so
   // the focused row is always visible.
-  const focusedKey = focusedSelectedKey(selectedTaskKeys, activeTaskKey)
-  // The sole selection: its row shows the inline editor.
-  const editingTaskId = selectedTaskKeys.size === 1 ? focusedKey : null
+  const focusedKey = focusedSelectedKey(selectedTaskKeys, activeKey)
   useLayoutEffect(() => {
     scrollToKey(focusedKey)
   }, [focusedKey, orderedKeys, scrollToKey])
+  // The sole selection: its row shows the inline editor.
+  const editingTaskId = selectedCount === 1 ? focusedKey : null
   // The group headers' "+ Add" (V1): drop any search filter so the new row is
   // visible, then select it so its editor opens focused.
   const onAdd = useCallback(
@@ -215,7 +221,7 @@ export function TasksScreen(): ReactElement {
       if (row.kind === 'breadcrumbs') {
         return (
           <TaskBreadcrumbs
-            breadcrumbs={row.labels}
+            breadcrumbs={row.breadcrumbs}
             onSelect={() => select(row.tasks.map((task) => task.taskId))}
           />
         )
@@ -273,7 +279,7 @@ export function TasksScreen(): ReactElement {
             className="h-9 border-none bg-transparent pl-8 shadow-none focus-visible:ring-0"
           />
         </div>
-        {selection.selectedCount > 0 ? (
+        {selectedCount > 0 ? (
           <TaskScheduleCalendar
             open={scheduleOpen}
             onOpenChange={setScheduleOpen}
@@ -283,27 +289,27 @@ export function TasksScreen(): ReactElement {
             <Button
               type="button"
               variant="ghost"
-              aria-label={`Schedule ${selection.selectedCount}`}
+              aria-label={`Schedule ${selectedCount}`}
               className="window-drag-control text-xs text-text-muted"
             >
               <CalendarClock aria-hidden className="size-3.5" />
               Schedule
-              <TaskToolbarCountBadge count={selection.selectedCount} />
+              <TaskToolbarCountBadge count={selectedCount} />
             </Button>
           </TaskScheduleCalendar>
         ) : null}
-        {selection.selectedCount > 0 ? (
+        {selectedCount > 0 ? (
           <Button
             type="button"
             variant="ghost"
-            aria-label={`Convert to bullet ${selection.selectedCount}`}
+            aria-label={`Convert to bullet ${selectedCount}`}
             onClick={onConvertToBullet}
             title="Drop the checkbox, keeping the line as a plain bullet — leaves the Tasks list"
             className="window-drag-control text-xs text-text-muted"
           >
             <List aria-hidden className="size-3.5" />
             Convert to bullet
-            <TaskToolbarCountBadge count={selection.selectedCount} />
+            <TaskToolbarCountBadge count={selectedCount} />
           </Button>
         ) : null}
         {struck.length > 0 ? (
