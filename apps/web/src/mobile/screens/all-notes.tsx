@@ -1,5 +1,5 @@
 import type { TagFacet } from '@reflect/types'
-import { useDeferredValue, useMemo, useRef, type ReactElement } from 'react'
+import { useCallback, useDeferredValue, useMemo, useRef, type ReactElement } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { FileText, SearchX } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner.tsx'
@@ -140,6 +140,7 @@ export function MobileAllNotes({
   )
 
   const clearRouteTag = (): void => navigate({ kind: 'allNotes', tag: null })
+  const openNote = useCallback((path: string) => navigate(routeForPath(path)), [navigate])
 
   const addPendingTag = (facet: TagFacet): void => {
     const key = foldTag(facet.tag)
@@ -204,7 +205,7 @@ export function MobileAllNotes({
           <Empty icon={<SearchX className="size-6" />} message="No matches" />
         )
       ) : (
-        <NoteRowList rows={rows} onOpen={(path) => navigate(routeForPath(path))} />
+        <NoteRowList rows={rows} onOpen={openNote} />
       )}
     </div>
   )

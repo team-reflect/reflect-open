@@ -1,5 +1,5 @@
 import { WritableStore } from '@reflect/core'
-import { useRef, useState, type ReactElement } from 'react'
+import { useCallback, useRef, useState, type ReactElement } from 'react'
 import { Virtualizer } from 'virtua'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { ConfirmDrawer } from '@/mobile/confirm-drawer.tsx'
@@ -30,9 +30,19 @@ export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
   const scrollRef = useRef<HTMLDivElement>(null)
   const { onScroll } = useScrollRestoration(scrollRef, true)
 
-  const togglePin = (row: NoteRowModel): void => {
-    void noteActions.togglePinned(row.path)
-  }
+  const togglePin = useCallback(
+    (row: NoteRowModel): void => {
+      void noteActions.togglePinned(row.path)
+    },
+    [noteActions],
+  )
+  const requestDelete = useCallback(
+    (row: NoteRowModel): void => {
+      revealedRow.set(null)
+      setDeletePath(row.path)
+    },
+    [revealedRow],
+  )
 
   return (
     <>
@@ -54,12 +64,9 @@ export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
               key={row.path}
               row={row}
               revealedRow={revealedRow}
-              onOpen={() => onOpen(row.path)}
-              onTogglePin={() => togglePin(row)}
-              onDelete={() => {
-                revealedRow.set(null)
-                setDeletePath(row.path)
-              }}
+              onOpen={onOpen}
+              onTogglePin={togglePin}
+              onDelete={requestDelete}
             />
           )}
         </Virtualizer>
