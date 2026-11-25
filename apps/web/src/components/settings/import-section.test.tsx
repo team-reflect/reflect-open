@@ -86,7 +86,9 @@ describe('ImportSection', () => {
     await importButton().click()
 
     // The running import shows its modal dialog, which hides the section from
-    // the accessibility tree: find the button by its text.
-    await expect.element(page.getByText('Importing...')).toBeDisabled()
+    // the accessibility tree.
+    await expect
+      .element(page.getByRole('button', { name: 'Importing...', includeHidden: true }))
+      .toBeDisabled()
   })
 })
