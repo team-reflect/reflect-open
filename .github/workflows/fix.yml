@@ -60,6 +60,13 @@ jobs:
         if: steps.changes.outputs.rust == 'true'
         run: pnpm gen:types
 
+      - name: Generate the C header
+        if: steps.changes.outputs.rust == 'true'
+        run: cargo xtask ffi-header
+
+      - name: Generate the iOS CSP
+        run: pnpm gen:ios-csp
+
       - name: Fix (Swift)
         run: scripts/check-swift.sh --fix
 
