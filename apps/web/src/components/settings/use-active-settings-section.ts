@@ -1,5 +1,5 @@
 import { useEffect, useState, type RefObject } from 'react'
-import { findScrollContainer, SECTION_JUMP_OFFSET_PX } from './section-scrolling.ts'
+import { findScrollContainer, SETTINGS_PAGE_PADDING_PX } from './section-scrolling.ts'
 import { SETTINGS_SECTIONS, settingsSectionDomId, type SettingsSectionId } from './sections.ts'
 
 /**
@@ -8,7 +8,7 @@ import { SETTINGS_SECTIONS, settingsSectionDomId, type SettingsSectionId } from 
  * under the jump offset so clicking a navigator entry always lands with that
  * entry active.
  */
-const ACTIVATION_LINE_PX = SECTION_JUMP_OFFSET_PX + 16
+const ACTIVATION_LINE_PX = SETTINGS_PAGE_PADDING_PX + 16
 
 /**
  * Tracks which settings section the user is reading. Listens to the settings
