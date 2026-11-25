@@ -26,7 +26,7 @@ import { useRouterHandlers, useRouterState } from '@/routing/router.tsx'
 /**
  * Height (px) of a group header.
  */
-const HEADER_HEIGHT = 40
+const HEADER_HEIGHT = 36
 
 /**
  * How far (px) past the viewport rows stay mounted.
