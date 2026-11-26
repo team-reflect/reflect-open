@@ -167,7 +167,6 @@ function DaySlideContent({
     <>
       <NotePane
         path={dailyPath(day)}
-        lazy
         autoFocus={focusRequested}
         // V1's double-tap-to-today is a capture gesture: the caret (and the
         // scroll) land at the end of the day's content, ready to append.

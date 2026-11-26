@@ -16,7 +16,7 @@ import {
 } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import type { NoteEditorHandle } from './note-editor.tsx'
-import { useNoteDocument } from './use-note-document.ts'
+import { useNoteSession } from './use-note-session.ts'
 import { noop, returnFalse } from '@ocavue/utils'
 
 /**
@@ -130,6 +130,14 @@ async function emitChange(changes: FileChange[]): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve))
 }
 
+/**
+ * The session of `path` and its snapshot, as an object.
+ */
+function useNoteDocument(path: string) {
+  const [session, snapshot] = useNoteSession(path)
+  return { session, snapshot }
+}
+
 async function readyHook() {
   const hook = await mount(() => useNoteDocument('notes/a.md'))
   await vi.waitFor(() => expect(hook.result.current.snapshot.status).toBe('ready'))
@@ -152,7 +160,7 @@ function seedGraph(files: Record<string, string>, indexed: readonly string[] = [
   )
 }
 
-describe('useNoteDocument', () => {
+describe('useNoteSession', () => {
   it('loads the note and seeds the editor content', async () => {
     const { result } = await readyHook()
     expect(result.current.snapshot.initialContent).toBe('# Hello\n')
@@ -173,18 +181,18 @@ describe('useNoteDocument', () => {
     expect(hook.result.current.snapshot.dirty).toBe(false)
   })
 
-  it('flushOpenDocuments persists a pending edit without waiting out the debounce (quit path)', async () => {
+  it('flushAll persists a pending edit without waiting out the debounce (quit path)', async () => {
     const hook = await mount(() => useNoteDocument('notes/a.md'))
     await act(() => clock.advance(0))
     expect(hook.result.current.snapshot.status).toBe('ready')
 
-    await act(() => hook.result.current.session?.editorChanged('# Quitting\n'))
+    await act(() => hook.result.current.session?.editorChanged('# Hello\n\nQuitting\n'))
     expect(writes()).toEqual([]) // still inside the 800ms debounce window
 
     // The quit path: the registry flush settles only once the write has
     // landed — no timer advance, the way a ⌘Q teardown would run it.
-    await act(() => core.openDocuments.flushAll())
-    expect(writes()).toEqual(['# Quitting\n'])
+    await act(() => core.noteSessions.flushAll())
+    expect(writes()).toEqual(['# Hello\n\nQuitting\n'])
     expect(hook.result.current.snapshot.dirty).toBe(false)
   })
 
@@ -192,29 +200,38 @@ describe('useNoteDocument', () => {
     const hook = await readyHook()
     const editor = fakeEditor()
     const getMarkdown = vi.fn(() => {
-      hook.result.current.session?.editorChanged('# 🧠 Business ideas\n')
-      return '# 🧠 Business ideas\n'
+      hook.result.current.session?.editorChanged('# Hello\n\n🧠 Business ideas\n')
+      return '# Hello\n\n🧠 Business ideas\n'
     })
     editor.getMarkdown = getMarkdown
 
     await act(() => hook.result.current.session?.attachEditor(editor))
     await act(() => hook.result.current.session?.attachEditor(null))
-    await act(() => core.openDocuments.flushAll())
+    await act(() => core.noteSessions.flushAll())
 
     expect(getMarkdown).toHaveBeenCalledOnce()
-    expect(writes()).toEqual(['# 🧠 Business ideas\n'])
+    expect(writes()).toEqual(['# Hello\n\n🧠 Business ideas\n'])
     await hook.unmount()
   })
 
-  it('unmounting unregisters the buffer from the quit-flush registry', async () => {
+  it('unmounting flushes the edit and keeps the session for the next mount', async () => {
     const hook = await readyHook()
-    await act(() => hook.result.current.session?.editorChanged('# Edited\n'))
-    await hook.unmount() // unmount itself flushes once (the existing final-flush path)
+    const { session } = hook.result.current
+    await act(() => session.editorChanged('# Hello\n\nEdited\n'))
+    await hook.unmount()
     await act(async () => {})
-    const writesAfterUnmount = writes().length
+    expect(writes()).toEqual(['# Hello\n\nEdited\n'])
+    const read = vi.spyOn(noteFile, 'readWithHash')
 
-    await core.openDocuments.flushAll() // the unmounted buffer must no longer be registered
-    expect(writes().length).toBe(writesAfterUnmount)
+    const again = await mount(() => useNoteDocument('notes/a.md'))
+
+    // The first render already holds the note: no loading state.
+    expect(again.result.current.session).toBe(session)
+    expect(again.result.current.snapshot.status).toBe('ready')
+    expect(again.result.current.session.editorSeed()).toBe('# Hello\n\nEdited\n')
+    await act(() => clock.advance(1000))
+    expect(read).not.toHaveBeenCalled()
+    expect(again.result.current.snapshot.dirty).toBe(false)
   })
 
   it('a settled title change rewrites inbound links and records the alias (Plan 07b)', async () => {
@@ -226,7 +243,7 @@ describe('useNoteDocument', () => {
       ['notes/a.md', 'notes/src.md'],
     )
 
-    const hook = await mount(() => useNoteDocument('notes/a.md', { trackRenames: true }))
+    const hook = await mount(() => useNoteDocument('notes/a.md'))
     await act(() => clock.advance(0))
     expect(hook.result.current.snapshot.status).toBe('ready')
 
@@ -236,7 +253,7 @@ describe('useNoteDocument', () => {
     // A settle point (window blur): the rewrite fires without waiting out the
     // quiet period, then the alias lands through the normal save pipeline.
     await act(() => {
-      core.openDocuments.settleAll()
+      core.noteSessions.settleAll()
     })
     await act(() => runAllTimers())
 
@@ -248,18 +265,18 @@ describe('useNoteDocument', () => {
     expect(file('notes/new-title.md')!.endsWith('# New Title\n')).toBe(true)
   })
 
-  it('the pane adopts its retargeted session when the route follows a move (Plan 17)', async () => {
+  it('the pane keeps its moved session when the route follows a move (Plan 17)', async () => {
     seedGraph({ 'notes/a.md': managedNote('# Old Title\n') })
 
     const hook = await mount(
       ({ path }: { path: string } = { path: 'notes/a.md' }) => {
-        return useNoteDocument(path, { trackRenames: true })
+        return useNoteDocument(path)
       },
       { initialProps: { path: 'notes/a.md' } },
     )
     await act(() => clock.advance(0))
     expect(hook.result.current.snapshot.status).toBe('ready')
-    const epochBefore = hook.result.current.epoch
+    const sessionBefore = hook.result.current.session
 
     await act(() => hook.result.current.session?.editorChanged('# New Title\n'))
     await act(() => clock.advance(1000)) // save lands
@@ -272,12 +289,12 @@ describe('useNoteDocument', () => {
     expect(file('notes/a.md')).toBeUndefined()
 
     // The router (subscribed to the note moves) re-renders the pane with the
-    // new path; the hook adopts the retargeted session — no reload, no new
-    // epoch, so the live editor (and its cursor) survives.
+    // new path; the hook keeps the moved session — no reload, the same
+    // id, so the live editor (and its cursor) survives.
     await hook.rerender({ path: 'notes/new-title.md' })
     await act(async () => {})
     expect(hook.result.current.snapshot.status).toBe('ready')
-    expect(hook.result.current.epoch).toBe(epochBefore)
+    expect(hook.result.current.session).toBe(sessionBefore)
     // The privacy subject follows at once, before any edit: a Lock or an
     // external `private: true` that changes no body must still be seen.
     expect(hook.result.current.snapshot.path).toBe('notes/new-title.md')
@@ -330,21 +347,21 @@ describe('useNoteDocument', () => {
     expect(noteFile.getWrites('notes/b.md')).toEqual([])
   })
 
-  it('a note switch gives the next note a new session epoch, so its editor remounts', async () => {
+  it('a note switch gives the next note another session id, so its editor remounts', async () => {
     noteFile.set('notes/b.md', '# B\n')
     const hook = await mount(
       ({ path }: { path: string } = { path: 'notes/a.md' }) => useNoteDocument(path),
       { initialProps: { path: 'notes/a.md' } },
     )
     await vi.waitFor(() => expect(hook.result.current.snapshot.status).toBe('ready'))
-    const epochOnA = hook.result.current.epoch
+    const idOnA = hook.result.current.session.id
 
     await hook.rerender({ path: 'notes/b.md' })
     await vi.waitFor(() => expect(hook.result.current.snapshot.initialContent).toBe('# B\n'))
 
-    // The editor is keyed on the epoch: reusing A's would leave A's text on
+    // The editor is keyed on the id: reusing A's would leave A's text on
     // screen, wired to B's session.
-    expect(hook.result.current.epoch).not.toBe(epochOnA)
+    expect(hook.result.current.session.id).not.toBe(idOnA)
   })
 
   it('every render pairs the content shown with the note it belongs to', async () => {
@@ -366,13 +383,6 @@ describe('useNoteDocument', () => {
     await hook.rerender({ path: 'notes/b.md' })
     await vi.waitFor(() => expect(hook.result.current.snapshot.initialContent).toBe('# B\n'))
 
-    // The render where the route has moved on but the editor still shows A:
-    // its privacy subject must be A, whose text the editor would send.
-    expect(renders).toContainEqual({
-      route: 'notes/b.md',
-      editorPath: 'notes/a.md',
-      content: '# Hello\n',
-    })
     const owner: Record<string, string> = { '# Hello\n': 'notes/a.md', '# B\n': 'notes/b.md' }
     for (const render of renders) {
       if (render.content !== null) {
@@ -389,7 +399,7 @@ describe('useNoteDocument', () => {
     )
     await vi.waitFor(() => expect(hook.result.current.snapshot.status).toBe('ready'))
     // The session A's editor was mounted with, as the pane hands it over.
-    const sessionA = hook.result.current.session!
+    const sessionA = hook.result.current.session
     const editor = fakeEditor()
     await act(() => sessionA.attachEditor(editor))
 
@@ -407,37 +417,6 @@ describe('useNoteDocument', () => {
 
     expect(noteFile.getWrites('notes/b.md')).toEqual([])
     expect(file('notes/b.md')).toBe('# B\n')
-  })
-
-  it('reconciles pending editor input during a same-path session rebind', async () => {
-    const hook = await mount(
-      ({ createIfMissing }: { createIfMissing: boolean } = { createIfMissing: false }) => {
-        return useNoteDocument('notes/a.md', { createIfMissing })
-      },
-      { initialProps: { createIfMissing: false } },
-    )
-    await act(() => clock.advance(0))
-    expect(hook.result.current.snapshot.status).toBe('ready')
-
-    const editor = fakeEditor()
-    let reconciled = false
-    editor.getMarkdown = vi.fn(() => {
-      if (!reconciled) {
-        reconciled = true
-        hook.result.current.session?.editorChanged('# Pending native input\n')
-      }
-      return '# Pending native input\n'
-    })
-    await act(() => hook.result.current.session?.attachEditor(editor))
-
-    // Changing a session option recreates the session without unmounting the
-    // editor. The outgoing session must remain discoverable while Meowdown
-    // synchronously reports reconciled native input from getMarkdown().
-    await hook.rerender({ createIfMissing: true })
-    await act(() => clock.advance(2000))
-
-    expect(editor.getMarkdown).toHaveBeenCalled()
-    expect(writes()).toContain('# Pending native input\n')
   })
 
   it('a same-graph generation bump keeps unsaved edits and saves with the new generation', async () => {

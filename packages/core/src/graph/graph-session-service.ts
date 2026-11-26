@@ -4,7 +4,7 @@ import type { IdService } from '../ports/id-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { NoteMoveService } from '../documents/note-move-service.ts'
 import type { NoteRowService } from '../documents/note-row-service.ts'
-import type { OpenDocumentsService } from '../documents/open-documents-service.ts'
+import type { NoteSessionService } from '../documents/note-session-types.ts'
 import { errorMessage } from '../errors.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
@@ -143,7 +143,7 @@ export interface GraphSessionServiceDeps<Services = unknown> {
   readonly role: GraphRole
   readonly mobileStorage: MobileStorageService
   readonly noteRows: NoteRowService
-  readonly openDocuments: OpenDocumentsService
+  readonly noteSessions: NoteSessionService
   readonly noteMove: NoteMoveService
   readonly icloudNative: ICloudNativeService
   readonly logger: LoggerService
@@ -297,6 +297,7 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
    */
   #release(reason: GraphReleaseReason): void {
     this.#deps.noteRows.reset()
+    this.#deps.noteSessions.releaseAll()
     for (const listener of this.#releasedListeners) {
       listener(reason)
     }
@@ -531,11 +532,11 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
         this.refreshIndex()
       }),
       // A completed reconcile read changed files into the index without
-      // per-file events; open sessions re-read so the visible note converges
-      // with the index (unchanged files are no-op reads).
+      // per-file events; observed sessions re-read so the visible note
+      // converges with the index (unchanged files are no-op reads).
       this.#deps.indexLifecycle.onReconciled((event) => {
         if (event.source === 'sync') {
-          this.#deps.openDocuments.reloadAll()
+          this.#deps.noteSessions.invalidateAll()
         }
       }),
       // External renames healed by id follow through to sessions and routes,

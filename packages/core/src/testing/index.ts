@@ -240,6 +240,8 @@ export {
   createTestNoteMoveService,
   type TestNoteMoveService,
   createTestNoteDocumentService,
+  createTestNoteSessionService,
+  type TestNoteSessionService,
 } from './documents.ts'
 export {
   createTestAppStoreEnvironmentService,

@@ -136,11 +136,11 @@ function setup(options?: {
   const logger = createTestLoggerService()
   const settingsService = createTestSettingsService()
   vi.spyOn(settingsService, 'flush').mockImplementation(settings.fn)
-  const { openDocuments } = createTestCoreServices({ database: createTestDatabaseService() })
-  vi.spyOn(openDocuments, 'flushAll').mockImplementation(documents.fn)
+  const { noteSessions } = createTestCoreServices({ database: createTestDatabaseService() })
+  vi.spyOn(noteSessions, 'flushAll').mockImplementation(documents.fn)
   const persistenceFlush = createPersistenceFlushService({
     settings: settingsService,
-    openDocuments,
+    noteSessions,
     logger,
   })
   disposers.push(persistenceFlush.registerFlusher('git-sync', gitSync.fn))

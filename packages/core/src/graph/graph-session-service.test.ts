@@ -3,8 +3,7 @@ import { AppError } from '../errors.ts'
 import { deriveStore } from '../store.ts'
 import type { GraphRole, GraphSession } from './graph-session.ts'
 import { createNoteRowService } from '../documents/note-row-service.ts'
-import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
-import { createTestNoteMoveService } from '../testing/documents.ts'
+import { createTestNoteSessionService, createTestNoteMoveService } from '../testing/documents.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createTestNoteFileService } from '../testing/graph.ts'
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
@@ -114,8 +113,8 @@ function setup(options?: SetupOptions) {
   const reloads: number[] = []
   const healedMoves: [string, string][] = []
   const built: { session: GraphSession; role: GraphRole; services: { id: number } }[] = []
-  const openDocuments = createOpenDocumentsService({ fileChanges })
-  vi.spyOn(openDocuments, 'reloadAll').mockImplementation(() => {
+  const noteSessions = createTestNoteSessionService()
+  vi.spyOn(noteSessions, 'invalidateAll').mockImplementation(() => {
     reloads.push(reloads.length + 1)
   })
   const noteMove = createTestNoteMoveService()
@@ -131,7 +130,7 @@ function setup(options?: SetupOptions) {
     role: options?.role ?? 'main',
     mobileStorage,
     noteRows,
-    openDocuments,
+    noteSessions,
     noteMove,
     icloudNative,
     logger,

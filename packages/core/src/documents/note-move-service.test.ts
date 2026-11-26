@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { createTestNoteSession } from '../testing/documents.ts'
-import { createTestFileChangeService } from '../testing/file-change.ts'
+import { createTestNoteSession, createTestNoteSessionService } from '../testing/documents.ts'
 import { createTestIndexStoreService } from '../testing/index-store.ts'
 import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createNoteMoveService, NOTE_MOVED_EVENT } from './note-move-service.ts'
-import { createOpenDocumentsService } from './open-documents-service.ts'
 import type { NoteSession } from './note-session-types.ts'
 
 /**
@@ -20,29 +18,29 @@ function setup(options?: { sessions?: readonly NoteSession[]; moveError?: Error 
   const indexStore = createTestIndexStoreService({
     fail: (call) => (call.method === 'moveIndexed' ? options?.moveError : undefined),
   })
-  const openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
+  const noteSessions = createTestNoteSessionService()
   for (const session of options?.sessions ?? []) {
-    openDocuments.register({ session })
+    noteSessions.register({ session })
   }
   const logger = createTestLoggerService()
-  const noteMove = createNoteMoveService({ ipc, indexStore, openDocuments, logger })
+  const noteMove = createNoteMoveService({ ipc, indexStore, noteSessions, logger })
   const moves: Array<[string, string]> = []
   noteMove.onMoved((from, to) => {
     moves.push([from, to])
   })
-  return { ipc, indexStore, openDocuments, logger, noteMove, moves }
+  return { ipc, indexStore, noteSessions, logger, noteMove, moves }
 }
 
 describe('moveNote', () => {
   it('flushes, retargets, re-keys, moves, and announces', async () => {
     const session = createTestNoteSession({ path: 'notes/a.md' })
-    const { noteMove, openDocuments, indexStore, moves } = setup({ sessions: [session] })
+    const { noteMove, noteSessions, indexStore, moves } = setup({ sessions: [session] })
 
     await noteMove.moveNote('notes/a.md', 'notes/b.md', 7)
 
     expect(session.getCalls('flush')).toHaveLength(1)
     expect(session.path).toBe('notes/b.md')
-    expect(openDocuments.sessionFor('notes/b.md')).toBe(session)
+    expect(noteSessions.existingSessionFor('notes/b.md')).toBe(session)
     expect(indexStore.calls()).toEqual([
       { method: 'moveIndexed', from: 'notes/a.md', to: 'notes/b.md', fileGeneration: 7 },
     ])
@@ -51,7 +49,7 @@ describe('moveNote', () => {
 
   it('a failed move with a carried session retargets and re-keys back', async () => {
     const session = createTestNoteSession({ path: 'notes/a.md' })
-    const { noteMove, openDocuments, moves } = setup({
+    const { noteMove, noteSessions, moves } = setup({
       sessions: [session],
       moveError: new Error('disk full'),
     })
@@ -59,15 +57,15 @@ describe('moveNote', () => {
     await expect(noteMove.moveNote('notes/a.md', 'notes/b.md', 7)).rejects.toThrow('disk full')
 
     expect(session.path).toBe('notes/a.md')
-    expect(openDocuments.sessionFor('notes/a.md')).toBe(session)
-    expect(openDocuments.sessionFor('notes/b.md')).toBeNull()
+    expect(noteSessions.existingSessionFor('notes/a.md')).toBe(session)
+    expect(noteSessions.existingSessionFor('notes/b.md')).toBeNull()
     expect(moves).toEqual([])
   })
 
   it("a failed move with no carried session never re-keys a foreign pane's document", async () => {
     // Another pane legitimately holds a note at the destination path.
     const foreign = createTestNoteSession({ path: 'notes/b.md' })
-    const { noteMove, openDocuments } = setup({
+    const { noteMove, noteSessions } = setup({
       sessions: [foreign],
       moveError: new Error('refused'),
     })
@@ -76,8 +74,8 @@ describe('moveNote', () => {
 
     // The foreign document stays exactly where it was — quit-time flush and
     // sessionFor lookups keep targeting the right path.
-    expect(openDocuments.sessionFor('notes/b.md')).toBe(foreign)
-    expect(openDocuments.sessionFor('notes/a.md')).toBeNull()
+    expect(noteSessions.existingSessionFor('notes/b.md')).toBe(foreign)
+    expect(noteSessions.existingSessionFor('notes/a.md')).toBeNull()
     expect(foreign.path).toBe('notes/b.md')
   })
 })
@@ -85,7 +83,7 @@ describe('moveNote', () => {
 describe('followHealedMove', () => {
   it('carries a live session to the healed path and announces', () => {
     const session = createTestNoteSession({ path: 'notes/a.md' })
-    const { noteMove, openDocuments, indexStore, moves } = setup({ sessions: [session] })
+    const { noteMove, noteSessions, indexStore, moves } = setup({ sessions: [session] })
 
     noteMove.followHealedMove('notes/a.md', 'notes/renamed.md')
 
@@ -93,8 +91,8 @@ describe('followHealedMove', () => {
     // writes the new path instead of resurrecting the dead one.
     expect(session.path).toBe('notes/renamed.md')
     expect(session.getCalls('flush')).toHaveLength(0)
-    expect(openDocuments.sessionFor('notes/renamed.md')).toBe(session)
-    expect(openDocuments.sessionFor('notes/a.md')).toBeNull()
+    expect(noteSessions.existingSessionFor('notes/renamed.md')).toBe(session)
+    expect(noteSessions.existingSessionFor('notes/a.md')).toBeNull()
     expect(indexStore.calls()).toEqual([])
     expect(moves).toEqual([['notes/a.md', 'notes/renamed.md']])
   })
@@ -144,14 +142,14 @@ describe('onMoved', () => {
 describe('followNativeMoves', () => {
   it('follows each `note:moved` broadcast until unlistened', async () => {
     const session = createTestNoteSession({ path: 'notes/a.md' })
-    const { noteMove, ipc, openDocuments, moves } = setup({ sessions: [session] })
+    const { noteMove, ipc, noteSessions, moves } = setup({ sessions: [session] })
 
     const unlisten = noteMove.followNativeMoves()
     await Promise.resolve()
     ipc.emit(NOTE_MOVED_EVENT, { from: 'notes/a.md', to: 'notes/b.md' })
 
     expect(session.path).toBe('notes/b.md')
-    expect(openDocuments.sessionFor('notes/b.md')).toBe(session)
+    expect(noteSessions.existingSessionFor('notes/b.md')).toBe(session)
     expect(moves).toEqual([['notes/a.md', 'notes/b.md']])
 
     unlisten()

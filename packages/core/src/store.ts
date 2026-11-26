@@ -23,6 +23,10 @@
  * - A value has one owner service. Other code reads it from that service and
  *   writes it through that service's methods. It never computes the value
  *   itself. For example, today's date comes from `TodayService`.
+ * - A view never creates, loads or destroys state. State keyed by an entity
+ *   lives in a service that returns the entity's `Store`
+ *   (`noteSessions.sessionFor(path)`). The view subscribes, and its
+ *   subscription is the only signal that it shows the entity.
  *
  * Rules:
  *

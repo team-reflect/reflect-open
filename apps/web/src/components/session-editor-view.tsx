@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, type ReactElement } from 'react'
+import { useCallback, useMemo, useRef, useState, type ReactElement } from 'react'
 import type { ExitBoundaryHandler, SearchStatus } from '@meowdown/core'
 import type { NoteSession } from '@reflect/core'
 import { NoteSaveAlerts } from '@/components/note-save-alerts.tsx'
@@ -41,8 +41,6 @@ interface SessionEditorViewProps {
    */
   path: string
   session: NoteSession
-  /** The body the editor opens on. */
-  initialContent: string
   /** The note's `private: true` flag, as its session holds it. */
   isPrivate: boolean
   /** The session's save error, if its last write failed. */
@@ -62,13 +60,12 @@ interface SessionEditorViewProps {
 
 /**
  * The editor of one note session. Mounted once per session (the pane keys it
- * on the session's epoch), so everything here belongs to that session alone:
+ * on the session's id), so everything here belongs to that session alone:
  * a rename re-renders it under the new path, a note switch replaces it.
  */
 export function SessionEditorView({
   path,
   session,
-  initialContent,
   isPrivate,
   saveError,
   dailyNote,
@@ -82,6 +79,8 @@ export function SessionEditorView({
   onExitBoundary,
 }: SessionEditorViewProps): ReactElement {
   const graph = useGraphInfo()
+  // The body the editor opens on: what the session holds when the editor mounts.
+  const [initialContent] = useState(() => session.editorSeed() ?? '')
   const dateFormat = useDateFormat()
   const timeFormat = useTimeFormat()
   const editorMarkdownSyntax = useEditorMarkdownSyntax()

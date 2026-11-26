@@ -1,7 +1,10 @@
 import { sha256HexSync } from '@reflect/utils'
 import { describe, expect, it, vi } from 'vitest'
-import { createTestNoteSession, type TestNoteSessionOptions } from '../testing/documents.ts'
-import { createTestFileChangeService } from '../testing/file-change.ts'
+import {
+  createTestNoteSession,
+  type TestNoteSessionOptions,
+  createTestNoteSessionService,
+} from '../testing/documents.ts'
 import {
   createTestNoteFileService,
   overrideNoteFileService,
@@ -10,7 +13,6 @@ import {
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createNoteDocumentService } from './note-document-service.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
-import { createOpenDocumentsService } from './open-documents-service.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 
 function setup(options?: {
@@ -38,15 +40,15 @@ function setup(options?: {
     options?.session === undefined
       ? null
       : createTestNoteSession({ path: 'notes/a.md', ...options.session })
-  const openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
+  const noteSessions = createTestNoteSessionService()
   if (session !== null) {
-    openDocuments.register({ session })
+    noteSessions.register({ session })
   }
   const indexLifecycle = createTestIndexLifecycleService()
   const indexNote = vi.spyOn(indexLifecycle, 'indexNote').mockResolvedValue(12)
   const logger = createTestLoggerService()
   const noteDocuments = createNoteDocumentService({
-    openDocuments,
+    noteSessions,
     noteFile: racedNoteFile,
     graphSession: createTestGraphSessionService({
       graph: {

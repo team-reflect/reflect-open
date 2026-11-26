@@ -42,7 +42,6 @@ export function MobileNote({ path }: { path: string }): ReactElement {
         <div className="flex min-h-full flex-col">
           <NotePane
             path={path}
-            lazy
             autoFocus={untitled}
             showBacklinks={false}
             // The daily surface gets its top inset from the date header; a

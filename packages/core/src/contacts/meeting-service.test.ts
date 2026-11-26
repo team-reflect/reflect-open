@@ -9,7 +9,7 @@ import {
   type MeetingService,
 } from './meeting-service.ts'
 import type { ContactMatch } from './commands.ts'
-import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
+import { createTestNoteSessionService } from '../testing/documents.ts'
 import { createSuggestionService } from '../indexing/suggestion-service.ts'
 import { createWikiResolverService } from '../indexing/wiki-resolver-service.ts'
 import {
@@ -17,7 +17,6 @@ import {
   createTestDatabaseService,
   createTestGraphSessionService,
   createTestLoggerService,
-  createTestFileChangeService,
   createTestNoteCreationService,
   createTestNoteDocumentService,
   createTestNoteFileService,
@@ -371,11 +370,11 @@ describe('addMeetingToDaily', () => {
   })
 
   it('appends to the buffer of an open daily', async () => {
-    const openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
+    const noteSessions = createTestNoteSessionService()
     const daily = createTestNoteSession({ path: DAILY, content: 'Unsaved draft\n' })
-    openDocuments.register({ session: daily })
+    noteSessions.register({ session: daily })
     const service = meetingService({
-      noteDocuments: createTestNoteDocumentService({ noteFile, openDocuments }),
+      noteDocuments: createTestNoteDocumentService({ noteFile, noteSessions }),
     })
 
     await service.addMeetingToDaily(input())

@@ -11,8 +11,7 @@ import { combineStores, WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { GraphInfo, RecentGraph } from '../graph/schemas.ts'
 import { createTestFileChangeService } from './file-change.ts'
-import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
-import { createTestNoteMoveService } from './documents.ts'
+import { createTestNoteMoveService, createTestNoteSessionService } from './documents.ts'
 import { createTestNoteFileService } from './graph.ts'
 import { createTestIdService } from './id.ts'
 import { createTestIndexLifecycleService } from './index-lifecycle.ts'
@@ -275,7 +274,7 @@ export function createTestGraphSessionService<Services = never>(
           subscribe: (listener) => testService.subscribe(listener),
         },
       }),
-    openDocuments: options?.openDocuments ?? createOpenDocumentsService({ fileChanges }),
+    noteSessions: options?.noteSessions ?? createTestNoteSessionService(),
     noteMove: options?.noteMove ?? createTestNoteMoveService(),
     icloudNative: options?.icloudNative ?? createTestICloudNativeService(),
     logger,

@@ -80,7 +80,7 @@ function sessionDeps(core: TestCoreServices) {
       icloudNative,
       fileChanges,
       indexLifecycle,
-      openDocuments: core.openDocuments,
+      noteSessions: core.noteSessions,
       activity,
       clock,
       logger,

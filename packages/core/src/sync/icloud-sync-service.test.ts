@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
+import { createTestNoteSessionService } from '../testing/documents.ts'
 import { AppError } from '../errors.ts'
 import type { IcloudScanOptions, IcloudSweepOutcome } from '../ipc/icloud-native-service.ts'
 import { createTestClockService, type TestClockService } from '../testing/clock.ts'
@@ -91,14 +91,14 @@ function service(overrides: { watch?: boolean } = {}) {
   vi.spyOn(indexLifecycle, 'markDirty').mockImplementation((changes, generation) => {
     dirtyMarks.push({ paths: changes.map((change) => change.path), generation })
   })
-  const openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
-  vi.spyOn(openDocuments, 'dirtyPaths').mockImplementation(() => dirtyPaths)
+  const noteSessions = createTestNoteSessionService()
+  vi.spyOn(noteSessions, 'dirtyPaths').mockImplementation(() => dirtyPaths)
   active = createICloudSyncService(
     {
       icloudNative: icloud,
       fileChanges,
       indexLifecycle,
-      openDocuments,
+      noteSessions,
       activity,
       clock,
       logger,

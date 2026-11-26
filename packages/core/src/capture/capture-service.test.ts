@@ -9,7 +9,7 @@ import { createBackgroundReconcilerFactory } from '../reconcile/background-recon
 import { AppError } from '../errors.ts'
 import { createAiCredentialService } from '../ai/ai-credential-service.ts'
 import { createAiProviderConfigService } from '../ai/ai-provider-config-service.ts'
-import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
+import { createTestNoteSessionService } from '../testing/documents.ts'
 import { dailyPath } from '../graph/paths.ts'
 import { createPrivacyService } from '../privacy/privacy-service.ts'
 import type { Settings } from '../settings/schema.ts'
@@ -65,7 +65,7 @@ function setup(options: { mobile?: boolean; settings?: Partial<Settings> } = {})
   const settings = createTestSettingsService(options.settings)
   const noteFile = createTestNoteFileService()
   const captureInbox = createTestCaptureInboxService()
-  const openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
+  const noteSessions = createTestNoteSessionService()
   const activity = createTestActivityPort()
   const fileChanges = createTestFileChangeService()
   const progress = createTestProgressPort()
@@ -74,7 +74,7 @@ function setup(options: { mobile?: boolean; settings?: Partial<Settings> } = {})
     captureInbox,
     noteFile,
     assetStore: createTestAssetStoreService(),
-    noteDocuments: createTestNoteDocumentService({ openDocuments, noteFile }),
+    noteDocuments: createTestNoteDocumentService({ noteSessions, noteFile }),
     backlinkTarget: { ensure: (title) => title },
     xArchive: createTestXArchiveService(),
     webFetch: createTestWebFetchService(),
@@ -104,7 +104,7 @@ function setup(options: { mobile?: boolean; settings?: Partial<Settings> } = {})
     settings,
     noteFile,
     captureInbox,
-    openDocuments,
+    noteSessions,
     activity,
     fileChanges,
     progress,
@@ -578,7 +578,7 @@ describe('CaptureService (X posts)', () => {
   it('routes an X post through the open daily document', async () => {
     const kit = setup()
     const daily = createTestNoteSession({ path: DAILY, content: 'Unsaved draft\n' })
-    kit.openDocuments.register({ session: daily })
+    kit.noteSessions.register({ session: daily })
     kit.captureInbox.add(`${X_POST.id}.json`, X_POST)
 
     const session = kit.capture.openSession({ generation: 3 })
@@ -595,7 +595,7 @@ describe('CaptureService (X posts)', () => {
   it('routes a text capture through the open daily document', async () => {
     const kit = setup()
     const daily = createTestNoteSession({ path: DAILY, content: 'Unsaved draft\n' })
-    kit.openDocuments.register({ session: daily })
+    kit.noteSessions.register({ session: daily })
     kit.captureInbox.add(`${TEXT.id}.json`, TEXT)
 
     const session = kit.capture.openSession({ generation: 3 })
@@ -609,7 +609,7 @@ describe('CaptureService (X posts)', () => {
 
   it('keeps the X post queued while the open daily with unsaved edits cannot take it', async () => {
     const kit = setup()
-    kit.openDocuments.register({
+    kit.noteSessions.register({
       session: createTestNoteSession({ path: DAILY, accepts: false, dirty: true }),
     })
     kit.captureInbox.add(`${X_POST.id}.json`, X_POST)

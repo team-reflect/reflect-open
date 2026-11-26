@@ -1,9 +1,11 @@
-import { useMemo, useState, type ReactElement } from 'react'
+import { useEffect, useMemo, useState, type ReactElement } from 'react'
 import { dateAtIndex } from '@reflect/app'
+import { dailyPath } from '@reflect/core'
 import { DaySlide } from '@/mobile/day-slide.tsx'
 import { useKeyboardVisible } from '@/mobile/use-keyboard.ts'
 import { useDayCarousel } from '@/mobile/use-day-carousel.ts'
 import { cn } from '@/lib/utils.ts'
+import { useCoreServices } from '@/services/services-provider.tsx'
 import { range } from '@ocavue/utils'
 
 interface DayCarouselProps {
@@ -71,6 +73,17 @@ export function DayCarousel({
     ))
   }, [dayWindow])
   const mountedIndexes = range(mountedRange.low, mountedRange.high + 1)
+
+  // The days next to the mounted range load ahead: a swipe mounts a slide whose note is ready.
+  const { noteSessions } = useCoreServices()
+  const { low, high } = mountedRange
+  useEffect(() => {
+    for (const index of [low - 1, high + 1]) {
+      if (index >= 0 && index < dayWindow.count) {
+        noteSessions.prefetch(dailyPath(dateAtIndex(dayWindow, index)))
+      }
+    }
+  }, [noteSessions, dayWindow, low, high])
 
   return (
     <div

@@ -326,7 +326,6 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
                 dailyDate={date}
                 registerHandle={registerHandle}
                 onExitBoundary={handleExitBoundary}
-                lazy
                 autoFocus={autoFocus}
                 autoFocusSelection={focusSelection ?? 'start'}
                 onAutoFocused={consumeFocus}

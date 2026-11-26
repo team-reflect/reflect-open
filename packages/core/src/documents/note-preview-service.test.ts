@@ -22,7 +22,7 @@ import { createAttachmentService } from './attachment-service.ts'
 import { createNoteDocumentService, type NoteDocumentService } from './note-document-service.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createNotePreviewService, type NotePreviewServiceDeps } from './note-preview-service.ts'
-import { createOpenDocumentsService } from './open-documents-service.ts'
+import { createTestNoteSessionService } from '../testing/documents.ts'
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 
 /**
@@ -52,7 +52,7 @@ function resolverWith(
  */
 function documentsWith(read: () => Promise<string>): NoteDocumentService {
   const noteDocuments = createNoteDocumentService({
-    openDocuments: createOpenDocumentsService({ fileChanges: createTestFileChangeService() }),
+    noteSessions: createTestNoteSessionService(),
     noteFile: createTestNoteFileService(),
     graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
     indexLifecycle: createTestIndexLifecycleService(),
@@ -74,7 +74,7 @@ function notePreviewOver(
     noteDocuments:
       options?.noteDocuments ??
       createNoteDocumentService({
-        openDocuments: createOpenDocumentsService({ fileChanges: createTestFileChangeService() }),
+        noteSessions: createTestNoteSessionService(),
         noteFile,
         graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
         indexLifecycle: createTestIndexLifecycleService(),
@@ -127,14 +127,14 @@ describe('previewWikiTarget', () => {
     const noteFile = createTestNoteFileService({
       files: { 'notes/alpha.md': '# Alpha\n\nOn disk' },
     })
-    const openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
-    openDocuments.register({
+    const noteSessions = createTestNoteSessionService()
+    noteSessions.register({
       session: createTestNoteSession({ path: 'notes/alpha.md', content: '# Alpha\n\nLive' }),
     })
     const notePreview = notePreviewOver({
       noteFile,
       noteDocuments: createNoteDocumentService({
-        openDocuments,
+        noteSessions,
         noteFile,
         graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
         indexLifecycle: createTestIndexLifecycleService(),

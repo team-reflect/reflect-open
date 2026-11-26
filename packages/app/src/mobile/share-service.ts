@@ -1,4 +1,4 @@
-import { splitFrontmatter, type OpenDocumentsService } from '@reflect/core'
+import { splitFrontmatter, type NoteSessionService } from '@reflect/core'
 
 /**
  * What a note hands to the OS share sheet.
@@ -33,8 +33,8 @@ export function noteShareContent(markdown: string, path: string): NoteShareConte
  */
 export interface ShareService {
   /**
-   * The share content of the note at `path`, read **synchronously** from the
-   * open editor session's live buffer. A Web Share call needs the tap's
+   * The share content of the note at `path`, read **synchronously** from its
+   * session's live buffer. A Web Share call needs the tap's
    * transient user activation, which any `await` before the call consumes.
    * The live buffer is the only synchronous source, and it holds the user's
    * latest typing. `liveContent()` answers that buffer once the session is
@@ -45,7 +45,7 @@ export interface ShareService {
 }
 
 export interface ShareServiceDeps {
-  readonly openDocuments: OpenDocumentsService
+  readonly noteSessions: NoteSessionService
 }
 
 class ShareServiceImpl implements ShareService {
@@ -56,7 +56,10 @@ class ShareServiceImpl implements ShareService {
   }
 
   noteContent(path: string): NoteShareContent {
-    return noteShareContent(this.#deps.openDocuments.sessionFor(path)?.liveContent() ?? '', path)
+    return noteShareContent(
+      this.#deps.noteSessions.existingSessionFor(path)?.liveContent() ?? '',
+      path,
+    )
   }
 }
 

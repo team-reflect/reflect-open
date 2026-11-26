@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
-import { createTestFileChangeService } from '../testing/index.ts'
+import { createTestNoteSessionService } from '../testing/documents.ts'
 import { createTestLoggerService, type TestLoggerService } from '../testing/logger.ts'
 import { createTestSettingsService } from '../testing/settings.ts'
 import type { Unlisten } from '../unlisten.ts'
@@ -75,11 +74,11 @@ function setup(): Setup {
   const logger = createTestLoggerService()
   const settingsService = createTestSettingsService()
   vi.spyOn(settingsService, 'flush').mockImplementation(settings.fn)
-  const openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
-  vi.spyOn(openDocuments, 'flushAll').mockImplementation(documents.fn)
+  const noteSessions = createTestNoteSessionService()
+  vi.spyOn(noteSessions, 'flushAll').mockImplementation(documents.fn)
   const service = createPersistenceFlushService({
     settings: settingsService,
-    openDocuments,
+    noteSessions,
     logger,
   })
   disposers.push(service.registerFlusher('git-sync', gitSync.fn))

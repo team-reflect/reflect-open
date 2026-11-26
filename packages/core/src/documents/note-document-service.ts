@@ -6,38 +6,43 @@ import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.
 import type { LoggerService } from '../ports/logger-service.ts'
 import { splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter.ts'
-import type { NoteSessionCommit, NoteSourceTransform } from './note-session-types.ts'
-import type { OpenDocumentsService } from './open-documents-service.ts'
+import type {
+  NoteSessionCommit,
+  NoteSessionService,
+  NoteSourceTransform,
+} from './note-session-types.ts'
 import { noop } from '@ocavue/utils'
 
 /**
  * The single safe way to read and write a note from an in-app action (pin,
- * private, gist publish): the open session when there is one, otherwise the
- * disk. It handles two sharp edges:
+ * private, gist publish): the note's session when it has one, otherwise the
+ * disk. A session that followed no file changes catches up with the note file
+ * first. A note with no session gets none: a bulk edit reads and writes the
+ * files directly. It handles two sharp edges:
  *
- * - **Reads** prefer the open session's *loaded* buffer, never a still-loading
+ * - **Reads** prefer the session's *loaded* buffer, never a still-loading
  *   one. A loading session reports `liveContent() === null` (its empty buffer
  *   isn't the truth yet), so we fall back to disk rather than act on a
  *   placeholder — the trap behind empty publishes and mis-read toggle states.
  * - **Writes** go through the session when it can take the patch (so our own
  *   write never races a dirty buffer), else a read-patch-write
- *   on disk that a loading/clean session reconciles like any external edit.
+ *   on disk that the session reconciles like any external edit.
  *   Both encode the flag through {@link frontmatterPatchToYaml}, so a value
  *   lands identically whichever channel wins.
  */
 export interface NoteDocumentService {
   /**
    * The note's current source, read from the freshest authoritative place: the
-   * open session's loaded buffer, or disk when no session has it loaded. A
+   * session's loaded buffer, or disk when no session has it loaded. A
    * missing file reads as an empty note.
    */
   readSource(path: string): Promise<string>
   /**
    * Read an existing note without disturbing its editor session.
    *
-   * An open session's live buffer is newer than disk and can be read without
+   * A session's live buffer is newer than disk and can be read without
    * reconciling pending native input (unlike `NoteEditorHandle.getMarkdown`). A
-   * closed note falls back to a generation-pinned read so a graph switch cannot
+   * note with no session falls back to a generation-pinned read so a graph switch cannot
    * return content from the newly active graph.
    */
   readExisting(path: string, generation: number): Promise<string>
@@ -57,14 +62,14 @@ export interface NoteDocumentService {
   ): Promise<void>
   /**
    * Apply a synchronous full-source `transform` ({@link NoteSourceTransform}) to the note and persist it,
-   * routing the same way every time: when the note is **open**, through its
-   * live session, which transforms its in-memory buffer synchronously, so
+   * routing the same way every time: when the note has a **session**, through
+   * it, which transforms its in-memory buffer synchronously, so
    * unsaved edits survive and there's no read-then-write gap for a concurrent
    * keystroke. The session declines only when it can't persist now (failed
-   * to load, protected/read-only, or disposed); a session still loading waits
+   * to load, protected, or disposed); a session still loading waits
    * for its load instead. A decline of a session with unsaved edits is
-   * surfaced as `notWritable` {@link NoteEditError}. When the note is **not**
-   * open, or its session declined and holds no unsaved edits, disk is the
+   * surfaced as `notWritable` {@link NoteEditError}. When the note has **no**
+   * session, or its session declined and holds no unsaved edits, disk is the
    * source of truth: read, transform, and write only while
    * the file still holds the text that was read. A file that changed in
    * between runs `transform` again on its new text, and
@@ -132,7 +137,7 @@ export function isOstensiblyEmptyNoteSource(source: string): boolean {
 }
 
 export interface NoteDocumentServiceDeps {
-  readonly openDocuments: OpenDocumentsService
+  readonly noteSessions: NoteSessionService
   readonly noteFile: WritableNoteFileService
   readonly graphSession: GraphSessionSource
   readonly indexLifecycle: IndexLifecycleService
@@ -146,9 +151,9 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
    * note, so two firing at once on the same note (two checkbox clicks, a bulk
    * delete racing a checkbox) could each read the pre-write source and clobber.
    * Routing every edit through the path's chain serializes them — the next only
-   * reads after the previous has written. (The open-note path is already
+   * reads after the previous has written. (The session path is already
    * serialized by the session's save chain; this closes the disk path and any
-   * open↔closed gap.)
+   * gap between the two.)
    */
   readonly #writeChains = new Map<string, Promise<unknown>>()
 
@@ -157,20 +162,19 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
   }
 
   async readSource(path: string): Promise<string> {
-    const { openDocuments, graphSession } = this.#deps
+    const { noteSessions, graphSession } = this.#deps
     const { generation } = requireGraphSession(graphSession)
-    return (
-      openDocuments.sessionFor(path)?.liveContent() ?? (await this.#readOrEmpty(path, generation))
-    )
+    const session = await noteSessions.currentSessionFor(path)
+    return session?.liveContent() ?? (await this.#readOrEmpty(path, generation))
   }
 
   async readExisting(path: string, generation: number): Promise<string> {
-    const { openDocuments, noteFile } = this.#deps
-    const session = openDocuments.sessionFor(path)
+    const { noteSessions, noteFile } = this.#deps
+    const session = await noteSessions.currentSessionFor(path)
     if (session !== null) {
       const liveContent = session.liveContent()
       if (liveContent !== null) {
-        // The index and open-document registry can briefly outlive an external
+        // The index and the session can briefly outlive an external
         // delete or iCloud eviction. Prove the generation-pinned file is still
         // locally readable before publishing a live buffer; the already-mounted
         // watcher guards changes that race this read.
@@ -186,10 +190,10 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
     patch: FrontmatterPatch | FrontmatterPatcher,
     generation: number,
   ): Promise<void> {
-    const { openDocuments } = this.#deps
+    const { noteSessions } = this.#deps
     const patchOf = typeof patch === 'function' ? patch : () => patch
     return this.#serializeByPath(path, async () => {
-      const owner = openDocuments.sessionFor(path)
+      const owner = await noteSessions.currentSessionFor(path)
       // Only a patcher reads the buffer of the session.
       const live = typeof patch === 'function' ? (owner?.liveContent() ?? null) : ''
       if (owner !== null && live !== null) {
@@ -221,11 +225,11 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
     transform: NoteSourceTransform,
     options: CommitSourceEditOptions,
   ): Promise<NoteCommitResult> {
-    const { openDocuments } = this.#deps
+    const { noteSessions } = this.#deps
     // Serialize per note: a concurrent change to the same note must not read the
     // pre-write source and clobber this one.
     return this.#serializeByPath(path, async (): Promise<NoteCommitResult> => {
-      const owner = openDocuments.sessionFor(path)
+      const owner = await noteSessions.currentSessionFor(path)
       if (owner !== null) {
         const commit = await owner.commitSourceEdit(transform)
         if (commit !== null) {

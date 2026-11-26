@@ -11,6 +11,7 @@ import type { WikiResolverService } from '../indexing/wiki-resolver-service.ts'
 import { placeOldTitleAlias } from './alias-placement.ts'
 import type { NoteDocumentService } from './note-document-service.ts'
 import type { NoteMoveService } from './note-move-service.ts'
+import type { SessionCoordinator } from './note-session-service.ts'
 import type { NoteContentOrigin } from './note-session-types.ts'
 import { composeRenameFailure, type RenamePhaseFailures } from './rename-failure.ts'
 import {
@@ -37,17 +38,15 @@ import {
  * A *birth* (the first authored title on an untitled note) runs phase 3 alone
  * for Reflect-managed notes; other notes already have their permanent path.
  *
- * Extracted from `useNoteDocument` for the same reason the session was —
- * lifecycle coupling (pane teardown, quit, note switches) belongs to an owned
- * object, not to effect-closure flags. The rename path holds no React ref and
- * no session of its own: session liveness comes from the open-documents
- * service at placement time, and status surfaces through the global
- * operations store — a rename is app-level background work, not pane state.
+ * The note session service creates one coordinator per session and disposes
+ * it with the session. The rename path holds no session of its own: it reads
+ * and writes through `NoteDocumentService`, and status surfaces through the
+ * global operations store — a rename is app-level background work, not pane
+ * state.
  *
- * The coordinator tracks its note's **current** path: a landed move retargets
- * the live session, the open-documents registration, and this coordinator in
- * place, so a follow-up rename in the same pane session continues the alias
- * chain against the right file.
+ * The coordinator tracks its note's **current** path: a move, in-app or
+ * healed by id, retargets the session and this coordinator in place, so a
+ * follow-up rename continues the alias chain against the right file.
  */
 
 export interface RenameCoordinatorOptions {
@@ -57,20 +56,15 @@ export interface RenameCoordinatorOptions {
   path: string
 }
 
-export interface RenameCoordinator {
+export interface RenameCoordinator extends SessionCoordinator {
   /**
    * Wire into the session's `onContent` stream (load/external/saved).
    */
   content(content: string, origin: NoteContentOrigin): void
   /**
-   * A settle point (blur, teardown, quit): fire any pending rename now.
-   */
-  settle(): void
-  /**
    * Resolves once settled renames' writes have landed (quit awaits this).
    */
   settled(): Promise<void>
-  dispose(): void
 }
 
 /**
@@ -78,7 +72,7 @@ export interface RenameCoordinator {
  */
 export interface TitleRenameService {
   /**
-   * The auto-rename lifecycle of one open note on the open graph; the caller
+   * The auto-rename lifecycle of one note on the open graph; the caller
    * disposes it. Each rename writes with that graph's generation as of when it
    * fires.
    */
@@ -165,6 +159,11 @@ class RenameCoordinatorImpl implements RenameCoordinator {
 
   settled(): Promise<void> {
     return this.#chain
+  }
+
+  retarget(path: string): void {
+    this.#currentPath = path
+    this.#tracker.retarget(path)
   }
 
   dispose(): void {

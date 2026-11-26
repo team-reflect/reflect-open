@@ -46,7 +46,7 @@ function graphDeps(core: TestCoreServices): GraphServicesDeps {
       icloudNative,
       fileChanges,
       indexLifecycle,
-      openDocuments: core.openDocuments,
+      noteSessions: core.noteSessions,
       activity,
       clock,
       logger,

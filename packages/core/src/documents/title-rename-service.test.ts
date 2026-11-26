@@ -10,14 +10,13 @@ import {
   createTestNoteSession,
   type TestNoteSession,
   createTestNoteDocumentService,
+  createTestNoteSessionService,
 } from '../testing/documents.ts'
-import { createTestFileChangeService } from '../testing/file-change.ts'
 import { createTestGraphSessionService, type TestOpenGraph } from '../testing/graph-session.ts'
 import { createTestNoteFileService, overrideNoteFileService } from '../testing/graph.ts'
 import { createTestIndexStoreService } from '../testing/index-store.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createTestProgressPort } from '../testing/ports.ts'
-import { createOpenDocumentsService } from './open-documents-service.ts'
 import { createTitleRenameService, type RenameCoordinator } from './title-rename-service.ts'
 
 /**
@@ -113,9 +112,9 @@ function setup(options?: SetupOptions) {
           content: options.session.content,
           accepts: options.session.accepts ?? true,
         })
-  const openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
+  const noteSessions = createTestNoteSessionService()
   if (session !== null) {
-    openDocuments.register({ session })
+    noteSessions.register({ session })
   }
   const indexStore = createTestIndexStoreService({
     database,
@@ -133,7 +132,7 @@ function setup(options?: SetupOptions) {
   })
   const noteMove = createTestNoteMoveService({
     indexStore,
-    openDocuments,
+    noteSessions,
     logger,
   })
   const wikiResolver = createWikiResolverService({ database })
@@ -159,7 +158,7 @@ function setup(options?: SetupOptions) {
           },
         })
   const titleRename = createTitleRenameService({
-    noteDocuments: createTestNoteDocumentService({ noteFile: failingNoteFile, openDocuments }),
+    noteDocuments: createTestNoteDocumentService({ noteFile: failingNoteFile, noteSessions }),
     wikiResolver,
     backlinks: createBacklinkService({
       database,
@@ -197,7 +196,7 @@ function setup(options?: SetupOptions) {
     noteFile,
     indexStore,
     noteMove,
-    openDocuments,
+    noteSessions,
     session,
     operationOutcomes,
     /**
@@ -433,7 +432,7 @@ describe('rename coordinator', () => {
   })
 
   it('moves the file onto the new slug: flush, retarget, registry re-key, then the move', async () => {
-    const { coordinator, session, indexStore, noteMove, openDocuments, operationOutcomes } = setup({
+    const { coordinator, session, indexStore, noteMove, noteSessions, operationOutcomes } = setup({
       path: PLACEHOLDER,
       session: { content: '# New Title\n' },
     })
@@ -445,8 +444,8 @@ describe('rename coordinator', () => {
       { method: 'moveIndexed', from: PLACEHOLDER, to: 'notes/new-title.md', fileGeneration: 7 },
     ])
     // The registry follows: lookups under the new path find the live session.
-    expect(openDocuments.sessionFor('notes/new-title.md')).toBe(session)
-    expect(openDocuments.sessionFor(PLACEHOLDER)).toBeNull()
+    expect(noteSessions.existingSessionFor('notes/new-title.md')).toBe(session)
+    expect(noteSessions.existingSessionFor(PLACEHOLDER)).toBeNull()
     expect(noteMove.moved()).toEqual([[PLACEHOLDER, 'notes/new-title.md']])
     expect((await operationOutcomes())[0]!.outcome).toBe('done')
   })
@@ -516,7 +515,7 @@ describe('rename coordinator', () => {
 
   it('a failed move retargets the session back and reports filename drift', async () => {
     const failure = new Error('disk full')
-    const { coordinator, session, openDocuments, logger, operationOutcomes } = setup({
+    const { coordinator, session, noteSessions, logger, operationOutcomes } = setup({
       path: PLACEHOLDER,
       session: { content: '# New Title\n' },
       moveError: failure,
@@ -525,7 +524,7 @@ describe('rename coordinator', () => {
 
     // Retargeted out and back: the session ends bound to its original path.
     expect(session!.getCalls('retarget')).toEqual([['notes/new-title.md'], [PLACEHOLDER]])
-    expect(openDocuments.sessionFor(PLACEHOLDER)).toBe(session)
+    expect(noteSessions.existingSessionFor(PLACEHOLDER)).toBe(session)
     const records = await operationOutcomes()
     expect(records[0]!.outcome).toBe('failed')
     expect(records[0]!.message).toContain('keeps its old name')
@@ -545,6 +544,24 @@ describe('rename coordinator', () => {
 
     expect(noteFile.writes()).toEqual([]) // collision: no alias claimed
     expect(indexStore.moved()).toEqual([{ from: PLACEHOLDER, to: 'notes/new-title.md' }])
+  })
+
+  it('a rename after a move healed by id works against the healed path', async () => {
+    const { coordinator, noteFile, indexStore } = setup({
+      path: PLACEHOLDER,
+      files: { 'notes/b.md': managed('# C\n') },
+    })
+    coordinator.content(managed('# B\n'), 'load')
+    coordinator.retarget('notes/b.md')
+
+    coordinator.content(managed('# C\n'), 'saved')
+    coordinator.settle()
+    await coordinator.settled()
+
+    expect(noteFile.getWrites('notes/b.md')).toEqual([
+      upsertFrontmatter(managed('# C\n'), { aliases: ['B'] }),
+    ])
+    expect(indexStore.moved()).toEqual([{ from: 'notes/b.md', to: 'notes/c.md' }])
   })
 
   it('a follow-up rename works against the moved path', async () => {

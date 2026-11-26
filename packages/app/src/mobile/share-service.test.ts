@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import type { NoteSession } from '@reflect/core'
-import { createTestDatabaseService, createTestCoreServices } from '@reflect/core/testing'
+import { createTestNoteSessionService } from '@reflect/core/testing'
 import { createShareService, noteShareContent } from './share-service.ts'
 
 /**
  * A share service with one open note whose live buffer is `liveContent`.
  */
 function setup(liveContent: string | null, path = 'notes/meeting-notes.md') {
-  const { openDocuments } = createTestCoreServices({ database: createTestDatabaseService() })
+  const noteSessions = createTestNoteSessionService()
   // A stand-in implements only what the service calls.
-  openDocuments.register({ session: { path, liveContent: () => liveContent } as NoteSession })
-  return createShareService({ openDocuments })
+  noteSessions.register({ session: { path, liveContent: () => liveContent } as NoteSession })
+  return createShareService({ noteSessions })
 }
 
 describe('noteShareContent', () => {

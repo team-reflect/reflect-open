@@ -1,4 +1,4 @@
-import type { OpenDocumentsService } from '../documents/open-documents-service.ts'
+import type { NoteSessionService } from '../documents/note-session-types.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
@@ -35,7 +35,7 @@ export interface PersistenceFlushService {
 
 export interface PersistenceFlushServiceDeps {
   readonly settings: SettingsService
-  readonly openDocuments: OpenDocumentsService
+  readonly noteSessions: NoteSessionService
   readonly logger: LoggerService
 }
 
@@ -46,7 +46,7 @@ class PersistenceFlushServiceImpl implements PersistenceFlushService {
   constructor(deps: PersistenceFlushServiceDeps) {
     this.#deps = deps
     this.#flushers = new Map<PersistenceFlusherKind, PersistenceFlusher>([
-      ['documents', () => deps.openDocuments.flushAll()],
+      ['documents', () => deps.noteSessions.flushAll()],
     ])
   }
 
