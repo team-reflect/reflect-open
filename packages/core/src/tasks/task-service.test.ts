@@ -854,6 +854,24 @@ describe('task list state', () => {
     expect(listener).not.toHaveBeenCalled()
   })
 
+  it('does not notify a new subscriber for a graph switch while nothing was subscribed', async () => {
+    const source = new WritableStore<{ session: GraphSession | null }>({ session: openGraph })
+    const switching = createTasks(source)
+    seedNotes(database, [{ path: A, markdown: '+ [ ] one\n' }])
+    const unsubscribe = switching.subscribe(noop)
+    await flushMicrotasks()
+    expect(markdowns(switching.get().open)).toEqual(['one'])
+    unsubscribe()
+
+    source.set({
+      session: createGraphSession({ root: '/h', name: 'h', generation: 8, indexGeneration: 1 }),
+    })
+    const listener = vi.fn()
+    switching.subscribe(listener)
+    expect(switching.get().open).toBeUndefined()
+    expect(listener).not.toHaveBeenCalled()
+  })
+
   it('drops the rows on a graph switch and reads the new graph', async () => {
     const source = new WritableStore<{ session: GraphSession | null }>({ session: openGraph })
     const switching = createTasks(source)
