@@ -19,9 +19,6 @@ const MENUS_TITLE = 'Menus for code blocks, images, and embeds'
 const MENUS_BODY =
   'Code blocks, images, X posts, and YouTube videos now have a menu to copy, convert, or delete them.'
 
-const PRINT_TITLE = 'Print notes'
-const PRINT_BODY = 'to print the note you are looking at, or the day in focus in your daily notes.'
-
 /**
  * User-facing changes keyed by marketing version. A beta appends to its
  * marketing version's list, and each update shows only the items not seen yet.
@@ -29,24 +26,52 @@ const PRINT_BODY = 'to print the note you are looking at, or the day in focus in
 export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
   '0.20.0': [
     {
+      id: 'recently-opened-notes-macos',
+      title: 'Recently opened notes',
+      body: 'Press ⌘K to see the notes you opened most recently.',
+      platforms: ['darwin'],
+    },
+    {
+      id: 'recently-opened-notes-windows-linux',
+      title: 'Recently opened notes',
+      body: 'Press Ctrl+K to see the notes you opened most recently.',
+      platforms: ['windows', 'linux'],
+    },
+    {
+      id: 'recently-opened-notes-ipad',
+      title: 'Recently opened notes',
+      body: 'On iPad, Quick Open shows the notes you opened most recently.',
+      platforms: ['ios'],
+    },
+    {
+      id: 'faster-note-switching',
+      title: 'Faster note switching',
+      body: 'Jump between notes without waiting. A note you return to is ready right away, with your edits in place.',
+      platforms: ALL_PLATFORMS,
+    },
+    {
+      id: 'faster-tasks-list',
+      title: 'Faster Tasks list',
+      body: 'The Tasks list scrolls smoothly, even with thousands of tasks.',
+      platforms: ALL_PLATFORMS,
+    },
+    {
       id: 'print-note-macos',
-      title: PRINT_TITLE,
-      body: `Press ⌘P ${PRINT_BODY}`,
+      title: 'Print notes',
+      body: 'Press ⌘P to print the current note.',
       platforms: ['darwin'],
     },
     {
       id: 'print-note-windows-linux',
-      title: PRINT_TITLE,
-      body: `Press Ctrl+P ${PRINT_BODY}`,
+      title: 'Print notes',
+      body: 'Press Ctrl+P to print the current note.',
       platforms: ['windows', 'linux'],
     },
-  ],
-  '0.19.1': [
     {
-      id: 'recently-opened-notes',
-      title: 'Recently opened notes in search',
-      body: 'Before you type, search now lists the notes you opened most recently.',
-      platforms: ALL_PLATFORMS,
+      id: 'cli-tasks',
+      title: 'Tasks in the CLI',
+      body: 'Agents can now run `reflect tasks` to list your open tasks. Set it up in Settings → Agents.',
+      platforms: ['darwin', 'windows', 'linux'],
     },
   ],
   '0.19.0': [
