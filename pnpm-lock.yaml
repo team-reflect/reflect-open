@@ -178,8 +178,8 @@ importers:
         specifier: ^0.85.1
         version: 0.85.1(@lezer/common@1.5.5)(@lezer/highlight@1.2.5)(@shikijs/types@4.6.0)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.13)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.5)(prosemirror-view@1.42.9)(react-dom@19.3.1)(react@19.3.1)(supports-color@8.1.1)(typescript@6.0.3)
       '@ocavue/utils':
-        specifier: ^1.12.0
-        version: 1.12.0
+        specifier: ^1.13.0
+        version: 1.13.0
       '@post-embed/schema':
         specifier: ^0.5.2
         version: 0.5.2(typescript@6.0.3)
@@ -338,8 +338,8 @@ importers:
   packages/app:
     dependencies:
       '@ocavue/utils':
-        specifier: ^1.12.0
-        version: 1.12.0
+        specifier: ^1.13.0
+        version: 1.13.0
       '@reflect/core':
         specifier: workspace:*
         version: link:../core
@@ -369,8 +369,8 @@ importers:
         specifier: ^0.78.0
         version: 0.78.0(typescript@6.0.3)
       '@ocavue/utils':
-        specifier: ^1.12.0
-        version: 1.12.0
+        specifier: ^1.13.0
+        version: 1.13.0
       '@post-embed/exporter':
         specifier: ^0.5.0
         version: 0.5.0(typescript@6.0.3)
@@ -1428,8 +1428,8 @@ packages:
   '@ocavue/tsconfig@0.7.1':
     resolution: {integrity: sha512-jw1LPUqi/f043s61WOYEWWA6P1ZSSYXR3KJXcNxBXXrxiUXhEAbuEBUmi6Qs8NduIVU3xCkbaYw5BU3UyL3G3A==}
 
-  '@ocavue/utils@1.12.0':
-    resolution: {integrity: sha512-PzQ6biw5KN0AKQd0TzngftFTzs3Jy22/NrYXHBKd1C60tew2Z8X5RNCr6x5ajQOQKILW+AGHbItXeDyy50Fj9Q==}
+  '@ocavue/utils@1.13.0':
+    resolution: {integrity: sha512-ijFatGrF/34hL15xZG+YmgO3k22+bKZH5VBjfAUvH6OY512RN99/kITo48GEgjVl8glzq9bbA/PX4szj5uyYSg==}
 
   '@opentelemetry/api@1.9.1':
     resolution: {integrity: sha512-gLyJlPHPZYdAk1JENA9LeHejZe1Ti77/pTeFm/nMXmQH/HFZlcS/O2XJB+L8fkbrNSqhdtlvjBVjxwUYanNH5Q==}
@@ -6369,7 +6369,7 @@ snapshots:
 
   '@aria-ui/core@0.2.1':
     dependencies:
-      '@ocavue/utils': 1.12.0
+      '@ocavue/utils': 1.13.0
       '@zag-js/dom-query': 1.47.0
       alien-signals: 3.2.1
       server-dom-shim: 1.1.0
@@ -7381,7 +7381,7 @@ snapshots:
       '@lezer/highlight': 1.2.5
       '@meowdown/embed': 0.3.3(typescript@6.0.3)
       '@meowdown/markdown': 0.78.0(typescript@6.0.3)
-      '@ocavue/utils': 1.12.0
+      '@ocavue/utils': 1.13.0
       '@post-embed/exporter': 0.5.0(typescript@6.0.3)
       '@post-embed/schema': 0.5.2(typescript@6.0.3)
       '@post-embed/types': 0.5.0
@@ -7447,7 +7447,7 @@ snapshots:
       '@meowdown/core': 0.85.0(@lezer/common@1.5.5)(@shikijs/types@4.6.0)(@types/hast@3.0.5)(prosemirror-model@1.25.13)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.5)(prosemirror-view@1.42.9)(supports-color@8.1.1)(typescript@6.0.3)
       '@meowdown/embed': 0.3.3(typescript@6.0.3)
       '@meowdown/markdown': 0.78.0(typescript@6.0.3)
-      '@ocavue/utils': 1.12.0
+      '@ocavue/utils': 1.13.0
       '@post-embed/types': 0.5.0
       '@prosekit/core': 0.13.5(prosemirror-model@1.25.13)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.5)
       '@prosekit/pm': 0.1.21
@@ -7558,7 +7558,7 @@ snapshots:
 
   '@ocavue/tsconfig@0.7.1': {}
 
-  '@ocavue/utils@1.12.0': {}
+  '@ocavue/utils@1.13.0': {}
 
   '@opentelemetry/api@1.9.1':
     optional: true
@@ -7919,7 +7919,7 @@ snapshots:
 
   '@post-embed/exporter@0.5.0(typescript@6.0.3)':
     dependencies:
-      '@ocavue/utils': 1.12.0
+      '@ocavue/utils': 1.13.0
       '@post-embed/schema': 0.5.2(typescript@6.0.3)
       '@post-embed/types': 0.5.0
       '@standard-schema/spec': 1.1.0
@@ -7942,7 +7942,7 @@ snapshots:
 
   '@prosekit/core@0.13.5(prosemirror-model@1.25.13)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.5)':
     dependencies:
-      '@ocavue/utils': 1.12.0
+      '@ocavue/utils': 1.13.0
       '@prosekit/pm': 0.1.21
       orderedmap: 2.1.1
       prosemirror-splittable: 1.1.0(prosemirror-model@1.25.13)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.5)
@@ -7954,7 +7954,7 @@ snapshots:
 
   '@prosekit/extensions@0.18.7(@lezer/common@1.5.5)(@lezer/highlight@1.2.5)(@shikijs/types@4.6.0)(@types/hast@3.0.5)(prosemirror-model@1.25.13)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.5)(prosemirror-view@1.42.9)':
     dependencies:
-      '@ocavue/utils': 1.12.0
+      '@ocavue/utils': 1.13.0
       '@prosekit/core': 0.13.5(prosemirror-model@1.25.13)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.5)
       '@prosekit/pm': 0.1.21
       prosemirror-changeset: 2.4.6
@@ -8028,7 +8028,7 @@ snapshots:
       '@aria-ui/elements': 0.2.0
       '@aria-ui/utils': 0.1.8
       '@floating-ui/dom': 1.8.0
-      '@ocavue/utils': 1.12.0
+      '@ocavue/utils': 1.13.0
       '@prosekit/core': 0.13.5(prosemirror-model@1.25.13)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.5)
       '@prosekit/extensions': 0.18.7(@lezer/common@1.5.5)(@lezer/highlight@1.2.5)(@shikijs/types@4.6.0)(@types/hast@3.0.5)(prosemirror-model@1.25.13)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.5)(prosemirror-view@1.42.9)
       '@prosekit/pm': 0.1.21
@@ -8053,7 +8053,7 @@ snapshots:
 
   '@prosemirror-adapter/core@0.5.5':
     dependencies:
-      '@ocavue/utils': 1.12.0
+      '@ocavue/utils': 1.13.0
       prosemirror-model: 1.25.13
       prosemirror-state: 1.4.4
       prosemirror-view: 1.42.9
@@ -11295,7 +11295,7 @@ snapshots:
 
   prosemirror-drop-indicator@0.1.4:
     dependencies:
-      '@ocavue/utils': 1.12.0
+      '@ocavue/utils': 1.13.0
       prosemirror-model: 1.25.13
       prosemirror-state: 1.4.4
       prosemirror-view: 1.42.9
@@ -11361,7 +11361,7 @@ snapshots:
 
   prosemirror-math@0.2.2:
     dependencies:
-      '@ocavue/utils': 1.12.0
+      '@ocavue/utils': 1.13.0
       prosemirror-enter-rules: 0.1.6
       prosemirror-inputrules: 1.5.1
       prosemirror-model: 1.25.13
