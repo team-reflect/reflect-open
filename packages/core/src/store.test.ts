@@ -207,6 +207,26 @@ describe('combineStores', () => {
     expect(source.get).toHaveBeenCalledTimes(2)
   })
 
+  it('subscribes to each store once, until the last subscriber leaves', () => {
+    const source = createOpaqueStore(1)
+    const combined = combineStores([source.store], (value) => value * 2)
+    const listeners = [vi.fn(), vi.fn(), vi.fn()]
+    const unlistens = listeners.map((listener) => combined.subscribe(listener))
+    expect(source.subscribe).toHaveBeenCalledOnce()
+
+    source.set(2)
+    for (const listener of listeners) {
+      expect(listener).toHaveBeenCalledOnce()
+    }
+
+    unlistens[0]!()
+    unlistens[0]!()
+    unlistens[1]!()
+    expect(source.unlisten).not.toHaveBeenCalled()
+    unlistens[2]!()
+    expect(source.unlisten).toHaveBeenCalledOnce()
+  })
+
   it('notifies a function subscribed twice once per subscription', () => {
     const source = new WritableStore(1)
     const combined = combineStores([source], (value) => value)
