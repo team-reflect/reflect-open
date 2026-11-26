@@ -121,10 +121,6 @@ class NoteSessionImpl implements ManagedNoteSession {
    */
   #applyingContent = false
   /**
-   * True while the initial `load()` read is in flight.
-   */
-  #loading = false
-  /**
    * A watcher event arrived during the load; replay reconciliation after it.
    */
   #missedChange = false
@@ -433,8 +429,8 @@ class NoteSessionImpl implements ManagedNoteSession {
     this.#dirty = false
     this.#missing = false // external content means the file exists on disk now
     // Re-gate: the content may have introduced (or removed) syntax the editor
-    // can't round-trip. When protection flips the pane remounts via
-    // initialContent; otherwise reload the live editor in place.
+    // can't round-trip. When protection flips the pane swaps the editor
+    // and the read-only view; otherwise reload the live editor in place.
     const unsafe = this.#classify(doc.body) === 'lossy'
     const flipped = unsafe !== this.#isProtected
     this.#isProtected = unsafe
@@ -562,7 +558,6 @@ class NoteSessionImpl implements ManagedNoteSession {
   }
 
   #load(): void {
-    this.#loading = true
     this.#missedChange = false
     this.#status = 'loading'
     this.#error = null
@@ -582,7 +577,6 @@ class NoteSessionImpl implements ManagedNoteSession {
         }
       } finally {
         if (!this.#disposed) {
-          this.#loading = false
           // A change event during the load was deferred (reconciling mid-load
           // could be overwritten by this load's older read committing later);
           // replay it now against the committed state.
@@ -616,8 +610,12 @@ class NoteSessionImpl implements ManagedNoteSession {
     if (this.#disposed) {
       return
     }
-    if (this.#loading) {
+    if (this.#status === 'loading') {
       this.#missedChange = true // deferred; replayed when the load commits
+      return
+    }
+    if (this.#status === 'error') {
+      this.#load() // the file may exist now
       return
     }
     void this.#reconcileFromDisk(true)
@@ -711,8 +709,7 @@ class NoteSessionImpl implements ManagedNoteSession {
   }
 
   dispose(): Promise<void> {
-    // The queued save step reads the buffer, which is frozen from here on. A
-    // discarded session writes nothing: `#save` refuses.
+    // A discarded session writes nothing: `#save` refuses.
     const flushed = this.flush()
     this.#disposed = true
     return flushed

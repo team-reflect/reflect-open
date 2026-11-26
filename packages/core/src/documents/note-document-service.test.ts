@@ -183,7 +183,7 @@ describe('commitSourceEdit', () => {
       merged: false,
       indexSeq: null,
     })
-    expect(session!.content()).toBe('LIVE\n')
+    expect(session!.liveContent()).toBe('LIVE\n')
     expect(noteFile.writes()).toEqual([])
   })
 

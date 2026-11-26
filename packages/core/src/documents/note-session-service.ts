@@ -93,8 +93,8 @@ class NoteSessionServiceImpl implements NoteSessionService {
       return null
     }
     await this.#catchUp(entry)
-    // The catch-up may have outlived the entry.
-    return this.#entries.get(path)?.session ?? null
+    // The catch-up may have outlived the entry, or the session may have moved.
+    return this.#entries.get(path) === entry ? entry.session : null
   }
 
   prefetch(path: string): void {
@@ -138,12 +138,9 @@ class NoteSessionServiceImpl implements NoteSessionService {
 
   async flushAll(): Promise<void> {
     await Promise.allSettled(
-      [...this.#entries.values()].map(async ({ session, coordinator }) => {
-        await session.flush()
-        // Settle after the flush so the rename tracker has seen the final title;
-        // settle() appends the rewrite synchronously, settled() awaits it.
-        coordinator?.settle()
-        await coordinator?.settled()
+      [...this.#entries.values()].map(async (entry) => {
+        await this.#flushAndSettle(entry)
+        await entry.coordinator?.settled()
       }),
     )
   }
@@ -209,7 +206,7 @@ class NoteSessionServiceImpl implements NoteSessionService {
       return
     }
     this.#idle.add(entry)
-    this.#settle(entry)
+    void this.#flushAndSettle(entry)
     this.#evict(MAX_IDLE_SESSIONS)
   }
 
@@ -225,25 +222,27 @@ class NoteSessionServiceImpl implements NoteSessionService {
    * Bring a stale session up to date with the note file.
    */
   #catchUp(entry: SessionEntry): Promise<void> {
-    if (entry.catchingUp !== null) {
-      return entry.catchingUp
-    }
-    if (!entry.stale) {
-      return Promise.resolve()
-    }
-    entry.stale = false
-    const catchingUp = entry.session.revalidate().finally(() => {
+    entry.catchingUp ??= this.#revalidate(entry).finally(() => {
       entry.catchingUp = null
     })
-    entry.catchingUp = catchingUp
-    return catchingUp
+    return entry.catchingUp
+  }
+
+  async #revalidate(entry: SessionEntry): Promise<void> {
+    // A change during a read makes the entry stale again.
+    while (entry.stale) {
+      entry.stale = false
+      await entry.session.revalidate()
+    }
   }
 
   /**
-   * Flush the session, then fire its settle-time work.
+   * Flush the session, then fire its settle-time work: the rename tracker
+   * must have seen the final title.
    */
-  #settle({ session, coordinator }: SessionEntry): void {
-    void session.flush().then(() => coordinator?.settle())
+  async #flushAndSettle({ session, coordinator }: SessionEntry): Promise<void> {
+    await session.flush()
+    coordinator?.settle()
   }
 
   #onFileChanges(changes: readonly FileChange[]): void {
@@ -253,14 +252,13 @@ class NoteSessionServiceImpl implements NoteSessionService {
         continue
       }
       const { session } = entry
-      if (entry.observed) {
-        if (change.kind === 'upsert') {
-          session.externalChanged()
-        }
-      } else if (change.kind === 'remove' && !session.isDirty() && !session.isSaving()) {
-        this.#drop(entry)
-      } else {
+      if (change.kind === 'upsert') {
+        this.#invalidate(entry)
+      } else if (entry.observed || session.isDirty() || session.isSaving()) {
+        // The session keeps its text; its next catch-up finds the file gone.
         entry.stale = true
+      } else {
+        this.#drop(entry)
       }
     }
   }

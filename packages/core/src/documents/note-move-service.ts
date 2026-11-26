@@ -90,7 +90,8 @@ class NoteMoveServiceImpl implements NoteMoveService {
 
   async moveNote(from: string, to: string, generation: number): Promise<void> {
     const { indexStore, noteSessions } = this.#deps
-    await noteSessions.existingSessionFor(from)?.flush()
+    const current = await noteSessions.currentSessionFor(from)
+    await current?.flush()
     const owner = noteSessions.moveSession(from, to)
     try {
       await indexStore.moveIndexed(from, to, generation)

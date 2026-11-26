@@ -36,7 +36,7 @@ away, a tab switches), the session flushes and its pending title rename
 settles, and the session stays: its text, its unsaved edits and its pending
 writes are still there for the next view, which renders them in its first
 commit. An unobserved session reads nothing; a file change marks it stale, and
-it catches up when it is next observed or committed to. The service keeps 32
+it catches up when it is next observed or committed to. The service keeps a bounded number of
 unobserved sessions and disposes the least recently observed clean ones.
 
 Tests drive the session and the service directly over test doubles

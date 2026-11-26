@@ -172,8 +172,6 @@ export interface NoteSession extends Store<NoteSessionSnapshot> {
    * can't die before the bytes land.
    */
   flush(): Promise<void>
-  /** The full current document (frontmatter + buffer), as a save would write it. */
-  content(): string
   /**
    * The live document **only when the session has loaded** (`status` is
    * `ready`), else `null`. Distinguishes a genuinely-empty loaded note (return
@@ -189,13 +187,6 @@ export interface NoteSession extends Store<NoteSessionSnapshot> {
    * Plan 21) — everything reactive should keep using snapshots.
    */
   isDirty(): boolean
-  /**
-   * Whether this lazy-created note still exists only in the editor session.
-   * Returns false while loading, once a file is known to exist, or while a
-   * first write is already in flight. An unpersisted session can be discarded
-   * without issuing a filesystem delete.
-   */
-  isUnpersisted(): boolean
   /**
    * Pause new saves and wait for the initial load plus any write already in
    * flight before deletion chooses between local discard and filesystem
@@ -269,6 +260,14 @@ export interface ManagedNoteSession extends NoteSession {
    * Whether a write is queued or in flight.
    */
   isSaving(): boolean
+  /** The full current document (frontmatter + buffer), as a save would write it. */
+  content(): string
+  /**
+   * Whether this lazy-created note still exists only in the editor session.
+   * Returns false while loading, once a file is known to exist, or while a
+   * first write is already in flight.
+   */
+  isUnpersisted(): boolean
   /**
    * Flush pending edits and detach: no further snapshots are emitted. Resolves
    * once the flushed write has settled.
@@ -307,8 +306,7 @@ export interface NoteSessionService {
    */
   prefetch(path: string): void
   /**
-   * Paths of sessions that hold unsaved edits right now. The iCloud conflict
-   * sweep (Plan 21) defers these.
+   * Paths of sessions that hold unsaved edits right now.
    */
   dirtyPaths(): string[]
   /**
@@ -318,10 +316,8 @@ export interface NoteSessionService {
   invalidate(path: string): void
   /**
    * The note files may have changed with no per-file event: observed sessions
-   * reconcile now, the others when they are next observed. The index
-   * lifecycle calls this after each completed reconcile pass. On iOS there is
-   * no file watcher, so a resume reconcile is the only signal a remote edit
-   * produces.
+   * reconcile now, the others when they are next observed. On iOS there is
+   * no file watcher, so this is the only signal a remote edit produces.
    */
   invalidateAll(): void
   /**

@@ -491,7 +491,8 @@ class NoteActionsServiceImpl implements NoteActionsService {
     }
     // Marked only once the file is gone: a note that fails stays listed.
     noteRows.setOverlay(path, generation, { trashed: true })
-    session?.discard()
+    // A view may have opened the note while the delete ran.
+    noteSessions.existingSessionFor(path)?.discard()
   }
 
   async #deepLinkFor(path: string, session: GraphSession): Promise<string> {

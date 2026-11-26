@@ -122,7 +122,8 @@ describe('an unobserved session', () => {
     await settled()
     expect(noteFile.files().get(PATH)).toBe('# A\n\ntyped\n')
     // The echo of the flush marked the session stale: one read brings it up to date.
-    await observe(noteSessions.sessionFor(PATH))
+    ;(await observe(session))()
+    await settled()
     const read = vi.spyOn(noteFile, 'readWithHash')
 
     const again = noteSessions.sessionFor(PATH)
@@ -189,6 +190,25 @@ describe('an unobserved session', () => {
     expect(current).toBe(session)
     expect(current?.liveContent()).toBe('# From the Mac\n')
     await expect(noteSessions.currentSessionFor('notes/b.md')).resolves.toBeNull()
+  })
+
+  it('reads again when the file changes during its catch-up', async () => {
+    const session = noteSessions.sessionFor(PATH)
+    ;(await observe(session))()
+    await settled()
+    noteFile.set(PATH, '# One\n')
+    noteSessions.invalidateAll()
+    const read = noteFile.readWithHash.bind(noteFile)
+    vi.spyOn(noteFile, 'readWithHash').mockImplementationOnce(async (path, generation) => {
+      const result = await read(path, generation)
+      noteFile.set(PATH, '# Two\n')
+      noteSessions.invalidateAll()
+      return result
+    })
+
+    const current = await noteSessions.currentSessionFor(PATH)
+
+    expect(current?.liveContent()).toBe('# Two\n')
   })
 
   it('is forgotten when its clean note file is removed', async () => {
@@ -291,6 +311,33 @@ describe('an observed session', () => {
 
     expect(session.editorSeed()).toBe('# From the Mac\n')
     expect(session.get().dirty).toBe(false)
+  })
+
+  it('shows a removed note as a fresh load does when a view returns', async () => {
+    const session = noteSessions.sessionFor(PATH)
+    const unlisten = await observe(session)
+    await noteFile.delete(PATH, 1)
+    fileChanges.emit({ changes: [{ path: PATH, kind: 'remove' }], source: 'external' })
+    await settled()
+    expect(session.editorSeed()).toBe('# A\n')
+
+    unlisten()
+    await settled()
+    await observe(noteSessions.sessionFor(PATH))
+
+    expect(noteSessions.sessionFor(PATH).get().status).toBe('error')
+  })
+
+  it('loads a note that failed to load when its file appears', async () => {
+    const session = noteSessions.sessionFor('notes/later.md')
+    await observe(session)
+    expect(session.get().status).toBe('error')
+
+    noteFile.set('notes/later.md', '# Later\n')
+    fileChanges.emit({ changes: [{ path: 'notes/later.md', kind: 'upsert' }], source: 'external' })
+    await settled()
+
+    expect(session.get().status).toBe('ready')
   })
 
   it('loads again when a view returns to a session that failed to load', async () => {

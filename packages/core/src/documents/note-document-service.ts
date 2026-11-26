@@ -176,8 +176,7 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
       if (liveContent !== null) {
         // The index and the session can briefly outlive an external
         // delete or iCloud eviction. Prove the generation-pinned file is still
-        // locally readable before publishing a live buffer; the already-mounted
-        // watcher guards changes that race this read.
+        // locally readable before publishing a live buffer.
         await noteFile.read(path, generation)
         return liveContent
       }

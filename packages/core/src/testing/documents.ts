@@ -20,7 +20,6 @@ import type {
   NoteSourceTransform,
   NoteSessionEditor,
 } from '../documents/note-session-types.ts'
-import type { MaybePromise } from '@reflect/utils'
 import { WritableStore } from '../store.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { createTestLoggerService } from './logger.ts'
@@ -130,6 +129,7 @@ class TestNoteSessionImpl implements TestNoteSession {
   retarget(to: string): void {
     this.#record('retarget', to)
     this.path = to
+    this.#store.set({ ...this.#store.get(), path: to })
   }
 
   editorChanged(markdown: string): void {
@@ -279,16 +279,10 @@ class TestNoteMoveServiceImpl implements TestNoteMoveService {
 }
 
 /**
- * A session of {@link TestNoteSessionService} with its settle-time work.
+ * A session of {@link TestNoteSessionService}.
  */
 export interface TestSessionRegistration {
   session: NoteSession
-  settle?: (() => void) | undefined
-  settled?: (() => MaybePromise<void>) | undefined
-}
-
-interface ManagedRegistration extends TestSessionRegistration {
-  session: ManagedNoteSession
 }
 
 export interface TestNoteSessionService extends NoteSessionService {
@@ -299,11 +293,11 @@ export interface TestNoteSessionService extends NoteSessionService {
 }
 
 class TestNoteSessionServiceImpl implements TestNoteSessionService {
-  readonly #registrations = new Map<string, ManagedRegistration>()
+  readonly #registrations = new Map<string, { session: ManagedNoteSession }>()
 
-  register({ session, settle, settled }: TestSessionRegistration): Unlisten {
+  register({ session }: TestSessionRegistration): Unlisten {
     // A test's stand-in implements only what the code under test calls.
-    const registration = { session: session as ManagedNoteSession, settle, settled }
+    const registration = { session: session as ManagedNoteSession }
     this.#registrations.set(session.path, registration)
     return () => {
       for (const [path, registered] of this.#registrations) {
@@ -366,11 +360,7 @@ class TestNoteSessionServiceImpl implements TestNoteSessionService {
 
   async flushAll(): Promise<void> {
     await Promise.allSettled(
-      [...this.#registrations.values()].map(async ({ session, settle, settled }) => {
-        await session.flush()
-        settle?.()
-        await settled?.()
-      }),
+      [...this.#registrations.values()].map(({ session }) => session.flush()),
     )
   }
 

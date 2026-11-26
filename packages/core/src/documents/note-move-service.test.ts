@@ -32,7 +32,7 @@ function setup(options?: { sessions?: readonly NoteSession[]; moveError?: Error 
 }
 
 describe('moveNote', () => {
-  it('flushes, retargets, re-keys, moves, and announces', async () => {
+  it('flushes, moves the session, moves the file, and announces', async () => {
     const session = createTestNoteSession({ path: 'notes/a.md' })
     const { noteMove, noteSessions, indexStore, moves } = setup({ sessions: [session] })
 
@@ -47,7 +47,7 @@ describe('moveNote', () => {
     expect(moves).toEqual([['notes/a.md', 'notes/b.md']])
   })
 
-  it('a failed move with a carried session retargets and re-keys back', async () => {
+  it('a failed move moves the carried session back', async () => {
     const session = createTestNoteSession({ path: 'notes/a.md' })
     const { noteMove, noteSessions, moves } = setup({
       sessions: [session],
@@ -62,7 +62,7 @@ describe('moveNote', () => {
     expect(moves).toEqual([])
   })
 
-  it("a failed move with no carried session never re-keys a foreign pane's document", async () => {
+  it('a failed move with no carried session leaves a session at the destination in place', async () => {
     // Another pane legitimately holds a note at the destination path.
     const foreign = createTestNoteSession({ path: 'notes/b.md' })
     const { noteMove, noteSessions } = setup({

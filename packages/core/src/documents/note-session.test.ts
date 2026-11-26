@@ -46,7 +46,7 @@ function toggleTransform(task: TaskLocator): NoteSourceTransform {
 
 /**
  * Direct tests of the document state machine, no React. The desktop hook test
- * in `use-note-document.test.tsx` covers only how the hook binds a session to
+ * in `use-note-session.test.tsx` covers only how the hook binds a session to
  * the editor.
  */
 
@@ -217,7 +217,7 @@ describe('createNoteSession', () => {
 
   it('reports the private flag from the loaded header, then follows every header change', async () => {
     const h = harness({ disk: '---\nprivate: true\n---\n# Secret\n' })
-    expect(h.snapshots.at(-1)?.isPrivate ?? true).toBe(true) // fail closed while loading
+    expect(h.session.get().isPrivate).toBe(true) // fail closed while loading
     void h.session.revalidate()
     await settled()
     expect(h.snapshots.at(-1)?.isPrivate).toBe(true)
