@@ -1,6 +1,6 @@
+import type { NoteSessionActions } from '@/editor/use-note-session.ts'
 import { useCallback, useMemo, useRef, useState, type ReactElement } from 'react'
 import type { ExitBoundaryHandler, SearchStatus } from '@meowdown/core'
-import type { NoteSession } from '@reflect/core'
 import { NoteSaveAlerts } from '@/components/note-save-alerts.tsx'
 import { SuggestedContactCard } from '@/components/suggested-contact-card.tsx'
 import { EditorAiKeymap } from '@/editor/ai-menu/editor-ai-keymap.tsx'
@@ -39,7 +39,7 @@ interface SessionEditorViewProps {
    * links, AI, the handle registry, Find) uses this one.
    */
   path: string
-  session: NoteSession
+  session: NoteSessionActions
   /** The note's `private: true` flag, as its session holds it. */
   isPrivate: boolean
   /** The session's save error, if its last write failed. */
