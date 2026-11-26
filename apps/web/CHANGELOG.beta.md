@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.20.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.20.0-beta.6...v0.20.0-beta.7) (2026-11-26)
+
+
+### Bug Fixes
+
+* **mobile:** apply a held row placement when a mouse press ends ([#2344](https://github.com/team-reflect/reflect-open/issues/2344)) ([cbf03f9](https://github.com/team-reflect/reflect-open/commit/cbf03f99cbad419064889753b8873513a190158e))
+* **mobile:** show swipe row actions during a trackpad swipe ([#2345](https://github.com/team-reflect/reflect-open/issues/2345)) ([a327893](https://github.com/team-reflect/reflect-open/commit/a327893a7b26f8001b672eda5b5cd2a26844c734))
+
 ## [0.20.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.20.0-beta.5...v0.20.0-beta.6) (2026-11-26)
 
 
