@@ -19,7 +19,7 @@ interface SwipeRowProps {
   onClose: () => void
   /**
    * Fires on every primary pointer down, before any scroll starts, so a tap
-   * triggers it too.
+   * triggers it too, and on every horizontal wheel event.
    */
   onBeginInteraction: () => void
   /**
@@ -63,6 +63,10 @@ export function SwipeRow({
   // Bumped when a press ends without moving the row, so the placement reruns.
   const [lifts, setLifts] = useState(0)
 
+  const beginInteraction = useEffectEvent(() => {
+    onBeginInteraction()
+  })
+
   const reportSettled = useEffectEvent((scroller: HTMLElement) => {
     const open = scroller.scrollLeft >= getOpenLeft(scroller) / 2
     if (open && !revealed) {
@@ -78,26 +82,50 @@ export function SwipeRow({
       return
     }
     const controller = new AbortController()
-    // Ends the swipe styles once the row rests closed.
-    const deactivateIfClosed = (): void => {
-      if (Math.round(scroller.scrollLeft) === 0) {
-        delete scroller.dataset.active
+    // Any horizontal scroll (finger, trackpad, keyboard) turns on the swipe
+    // styles in `swipe-row.css`.
+    scroller.addEventListener(
+      'scroll',
+      () => {
+        scroller.dataset.active = ''
+      },
+      { passive: true, signal: controller.signal },
+    )
+    // A horizontal trackpad swipe starts an interaction like a press does.
+    scroller.addEventListener(
+      'wheel',
+      (event) => {
+        if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+          beginInteraction()
+        }
+      },
+      { passive: true, signal: controller.signal },
+    )
+    // A row that rests where a press held back a placement runs that
+    // placement again. Returns whether it did.
+    const placeHeld = (): boolean => {
+      if (heldAtRef.current !== scroller.scrollLeft) {
+        return false
       }
+      setLifts((count) => count + 1)
+      return true
     }
     watchRef.current = watchScrollSettle({
       element: scroller,
       onSettle: () => {
-        deactivateIfClosed()
-        reportSettled(scroller)
-      },
-      // A press that ends without moving the row leaves no settle report, so
-      // the placement it held back runs again.
-      onPressEnd: () => {
-        deactivateIfClosed()
-        if (heldAtRef.current === scroller.scrollLeft) {
-          setLifts((count) => count + 1)
+        // Ends the swipe styles once the row rests closed.
+        if (Math.round(scroller.scrollLeft) === 0) {
+          delete scroller.dataset.active
+        }
+        // A settle report can still be waiting from a scroll before the press.
+        // When the press did not move the row, the held placement wins.
+        if (!placeHeld()) {
+          reportSettled(scroller)
         }
       },
+      // A press that ends without moving the row usually leaves no settle
+      // report, so the placement it held back runs again.
+      onPressEnd: placeHeld,
       signal: controller.signal,
     })
     return () => {
@@ -134,8 +162,6 @@ export function SwipeRow({
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>): void => {
       if (event.isPrimary) {
-        // Turns on the swipe styles in `swipe-row.css`.
-        event.currentTarget.dataset.active = ''
         onBeginInteraction()
       }
     },

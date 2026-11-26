@@ -172,29 +172,33 @@ describe('SwipeRow', () => {
     await vi.waitFor(() => expect(scroller.scrollLeft).toBe(ACTION_WIDTH))
   })
 
-  it('marks the row active from a pointer down until it settles closed', async () => {
+  it('marks the row active on its first scroll until it settles closed', async () => {
     const view = await mount(<Harness />)
     const scroller = getScroller(view.getByText('Row').element())
     expect(scroller).not.toHaveAttribute('data-active')
+    let activeOnFirstScroll: boolean | undefined
+    scroller.addEventListener(
+      'scroll',
+      () => {
+        activeOnFirstScroll = scroller.hasAttribute('data-active')
+      },
+      { once: true },
+    )
 
-    await pointer(view.getByText('Row').element(), 'pointerdown', 10, 10)
-    expect(scroller).toHaveAttribute('data-active')
+    await scrollElement({ element: scroller, left: ACTION_WIDTH })
+    expect(activeOnFirstScroll).toBe(true)
 
-    await scrollElement({ element: scroller, left: ACTION_WIDTH, touch: true })
-    await expect.element(view.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
-    expect(scroller).toHaveAttribute('data-active')
-
-    await scrollElement({ element: scroller, left: 0, touch: true })
+    await scrollElement({ element: scroller, left: 0 })
     await vi.waitFor(() => expect(scroller).not.toHaveAttribute('data-active'))
   })
 
-  it('clears the active mark when a finger lifts from a closed row', async () => {
+  it('leaves a tapped row inactive', async () => {
     const view = await mount(<Harness />)
     const scroller = getScroller(view.getByText('Row').element())
 
     await pointer(view.getByText('Row').element(), 'pointerdown', 10, 10)
     await touch(scroller, 'start')
-    expect(scroller).toHaveAttribute('data-active')
+    expect(scroller).not.toHaveAttribute('data-active')
     await touch(scroller, 'end')
 
     expect(scroller).not.toHaveAttribute('data-active')
@@ -205,6 +209,16 @@ describe('SwipeRow', () => {
 
     await pointer(view.getByText('Row').element(), 'pointerdown', 10, 10)
 
+    expect(onBeginInteraction).toHaveBeenCalledOnce()
+  })
+
+  it('reports the start of a horizontal wheel, and not of a vertical one', async () => {
+    const view = await mount(<Harness />)
+    const scroller = getScroller(view.getByText('Row').element())
+
+    scroller.dispatchEvent(new WheelEvent('wheel', { deltaX: 0, deltaY: 20 }))
+    expect(onBeginInteraction).not.toHaveBeenCalled()
+    scroller.dispatchEvent(new WheelEvent('wheel', { deltaX: 20, deltaY: 2 }))
     expect(onBeginInteraction).toHaveBeenCalledOnce()
   })
 })
