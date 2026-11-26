@@ -140,7 +140,6 @@ export {
   type NoteRowService,
 } from './documents/note-row-service.ts'
 export { updatePinOrder } from './documents/pin-order.ts'
-export { type RenameCoordinator } from './documents/title-rename-service.ts'
 export { type ResolvedArchivedPost } from './embeds/x-archive-service.ts'
 export { marketingVersion } from './ports/app-version.ts'
 export { reachWebStorage, type StorageService } from './ports/storage-service.ts'

@@ -1,3 +1,4 @@
+import { noop } from '@ocavue/utils'
 import { sha256HexSync } from '@reflect/utils'
 import type { Unlisten } from '../unlisten.ts'
 import {
@@ -131,16 +132,13 @@ class TestNoteSessionImpl implements TestNoteSession {
     this.path = to
   }
 
-  load(): void {
-    this.#record('load')
-  }
-
   editorChanged(markdown: string): void {
     this.#record('editorChanged', markdown)
   }
 
-  attachEditor(editor: NoteSessionEditor | null): void {
+  attachEditor(editor: NoteSessionEditor): Unlisten {
     this.#record('attachEditor', editor)
+    return noop
   }
 
   externalChanged(): void {
@@ -208,8 +206,9 @@ class TestNoteSessionImpl implements TestNoteSession {
     })
   }
 
-  dispose(): void {
+  dispose(): Promise<void> {
     this.#record('dispose')
+    return Promise.resolve()
   }
 
   discard(): void {
@@ -288,6 +287,10 @@ export interface TestSessionRegistration {
   settled?: (() => MaybePromise<void>) | undefined
 }
 
+interface ManagedRegistration extends TestSessionRegistration {
+  session: ManagedNoteSession
+}
+
 export interface TestNoteSessionService extends NoteSessionService {
   /**
    * Add `session` as the session of its path. The returned function removes it.
@@ -296,10 +299,12 @@ export interface TestNoteSessionService extends NoteSessionService {
 }
 
 class TestNoteSessionServiceImpl implements TestNoteSessionService {
-  readonly #registrations = new Map<string, TestSessionRegistration>()
+  readonly #registrations = new Map<string, ManagedRegistration>()
 
-  register(registration: TestSessionRegistration): Unlisten {
-    this.#registrations.set(registration.session.path, registration)
+  register({ session, settle, settled }: TestSessionRegistration): Unlisten {
+    // A test's stand-in implements only what the code under test calls.
+    const registration = { session: session as ManagedNoteSession, settle, settled }
+    this.#registrations.set(session.path, registration)
     return () => {
       for (const [path, registered] of this.#registrations) {
         if (registered === registration) {
@@ -352,7 +357,8 @@ class TestNoteSessionServiceImpl implements TestNoteSessionService {
     if (registration === undefined) {
       return null
     }
-    ;(registration.session as ManagedNoteSession).retarget(to)
+    void this.#registrations.get(to)?.session.dispose()
+    registration.session.retarget(to)
     this.#registrations.delete(from)
     this.#registrations.set(to, registration)
     return registration.session
@@ -368,15 +374,9 @@ class TestNoteSessionServiceImpl implements TestNoteSessionService {
     )
   }
 
-  settleAll(): void {
-    for (const { session, settle } of this.#registrations.values()) {
-      void session.flush().then(() => settle?.())
-    }
-  }
-
   releaseAll(): void {
     for (const { session } of this.#registrations.values()) {
-      ;(session as ManagedNoteSession).dispose()
+      void session.dispose()
     }
     this.#registrations.clear()
   }

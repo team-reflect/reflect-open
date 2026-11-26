@@ -1,4 +1,5 @@
 import type { Store } from '../store.ts'
+import type { Unlisten } from '../unlisten.ts'
 import type { FrontmatterPatch } from './note-session-frontmatter.ts'
 import type { RoundTripFidelity } from '@meowdown/markdown'
 
@@ -13,12 +14,9 @@ export interface NoteSessionSnapshot {
   path: string
   status: NoteSessionStatus
   /**
-   * Markdown to seed the editor with once `status` is `ready` — the body
-   * (the editor never sees frontmatter). While `protected` it is the **full**
-   * file instead: the read-only view's job is honest display of a file we
-   * refuse to touch, frontmatter included. It follows loads and external
-   * changes, not typing: an editor that mounts on a session takes
-   * {@link NoteSession.editorSeed}.
+   * The note's Markdown as of the last load or adopted file change: the body,
+   * or the **full** file while `protected` (the read-only view shows a file we
+   * refuse to touch, frontmatter included). It does not follow typing.
    */
   initialContent: string
   /**
@@ -162,14 +160,12 @@ export interface NoteSession extends Store<NoteSessionSnapshot> {
   /** Every editor document change enters the pipeline here. */
   editorChanged(markdown: string): void
   /**
-   * Attach the editor that shows this session, or detach it with `null`. One
-   * editor at a time: a second attach replaces the first. A detach reconciles
-   * the editor's pending input into the session first, so its last keystrokes
+   * Attach the editor that shows this session; returns the detach. One editor
+   * at a time: a second attach replaces the first. The detach reconciles the
+   * editor's pending input into the session first, so its last keystrokes
    * reach disk.
    */
-  attachEditor(editor: NoteSessionEditor | null): void
-  /** The watcher reported an on-disk change to this note; reconcile. */
-  externalChanged(): void
+  attachEditor(editor: NoteSessionEditor): Unlisten
   /**
    * Persist pending edits now (e.g. on window blur). Resolves once the
    * flushed write has settled — quit-time teardown awaits this so the webview
@@ -216,8 +212,8 @@ export interface NoteSession extends Store<NoteSessionSnapshot> {
    * pipeline. Returns false (and does nothing) when the session can't take
    * the patch — disposed, protected, or not yet `ready`. All three mean the
    * same thing to a caller: this channel is unavailable, use the fallback
-   * (the rename coordinator writes straight to disk, which a live session
-   * then reconciles like any external change).
+   * (a write to the note file, which a live session then reconciles like any
+   * external change).
    */
   updateFrontmatter(patch: FrontmatterPatch): boolean
   /**
@@ -259,21 +255,25 @@ export interface ManagedNoteSession extends NoteSession {
    * the old path.
    */
   retarget(to: string): void
-  /** Read the note and emit `ready` (or `error`). */
-  load(): void
+  /** The watcher reported an on-disk change to this note; reconcile. */
+  externalChanged(): void
   /**
-   * Bring a session that followed no file changes up to date with the note
-   * file. Resolves when the session holds the result. A clean session ends as
-   * a fresh load would, without passing through `loading`; a dirty one
-   * reconciles as for {@link NoteSession.externalChanged}.
+   * Bring the session up to date with the note file. Resolves when the session
+   * holds the result. A session that has not loaded, or failed to, loads. A
+   * loaded clean session ends as a fresh load would, without passing through
+   * `loading`; a dirty one reconciles as for
+   * {@link ManagedNoteSession.externalChanged}.
    */
   revalidate(): Promise<void>
   /**
    * Whether a write is queued or in flight.
    */
   isSaving(): boolean
-  /** Flush pending edits and detach: no further snapshots are emitted. */
-  dispose(): void
+  /**
+   * Flush pending edits and detach: no further snapshots are emitted. Resolves
+   * once the flushed write has settled.
+   */
+  dispose(): Promise<void>
 }
 
 /**
@@ -337,11 +337,6 @@ export interface NoteSessionService {
    * absorbed, never re-thrown.
    */
   flushAll(): Promise<void>
-  /**
-   * Flush every buffer now and fire each session's settle-time work once its
-   * flush has landed. The window-blur settle point: it does not wait.
-   */
-  settleAll(): void
   /**
    * Flush and dispose every session: the graph they belong to is going away.
    */

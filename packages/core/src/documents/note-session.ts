@@ -4,11 +4,7 @@ import type { LoggerService } from '../ports/logger-service.ts'
 import { errorMessage, isAppError, AppError } from '../errors.ts'
 import { WritableStore } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
-import type {
-  NoteRead,
-  NoteWriteResult,
-  WritableNoteFileService,
-} from '../graph/note-file-service.ts'
+import type { WritableNoteFileService } from '../graph/note-file-service.ts'
 import { hasAuthoredTitle, parseNote } from '../markdown/extract.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { notePrivate } from '../privacy/privacy-service.ts'
@@ -24,18 +20,6 @@ import type {
   NoteSessionSnapshot,
   NoteSessionStatus,
 } from './note-session-types.ts'
-
-/**
- * File access of one session, with the graph generation bound to its writes.
- */
-interface NoteSessionIo {
-  readonly read: (path: string) => Promise<NoteRead>
-  readonly write: (
-    path: string,
-    contents: string,
-    expectedContents?: string | null,
-  ) => Promise<NoteWriteResult>
-}
 
 const DEFAULT_SAVE_DEBOUNCE_MS = 800
 
@@ -56,13 +40,13 @@ export function createNoteSession(
   return new NoteSessionImpl(deps, options)
 }
 
-/**
- * The document session for one note. See note-session-types.ts for semantics.
- */
 class NoteSessionImpl implements ManagedNoteSession {
   readonly id: number
   readonly #deps: NoteSessionDeps
-  readonly #io: NoteSessionIo
+  /**
+   * The graph open at creation: every read and write is pinned to its generation.
+   */
+  readonly #graph: ReturnType<GraphSessionSource['get']>['session']
   readonly #classify: NoteSessionOptions['classify']
   readonly #onContent: NoteSessionOptions['onContent']
   readonly #onObservedChange: NoteSessionOptions['onObservedChange']
@@ -82,7 +66,7 @@ class NoteSessionImpl implements ManagedNoteSession {
    */
   path: string
 
-  // Snapshot state (surfaces via onSnapshot).
+  // Snapshot state.
   #status: NoteSessionStatus = 'loading'
   #initialContent = ''
   #isProtected = false
@@ -122,9 +106,9 @@ class NoteSessionImpl implements ManagedNoteSession {
    */
   #pendingSaves = 0
   /**
-   * Settles when the current initial load has committed its state.
+   * Settles when the latest load has committed its state; `null` before the first load.
    */
-  #loadPromise: Promise<void> = Promise.resolve()
+  #loadPromise: Promise<void> | null = null
   /**
    * Content of the write currently in flight (set when dispatched, before the
    * write resolves). The watcher event for our own save can arrive before the
@@ -133,7 +117,7 @@ class NoteSessionImpl implements ManagedNoteSession {
    */
   #inFlightWrite: string | null = null
   /**
-   * True while we push external content into the editor via `applyContent`.
+   * True while we push external content into the editor with `#applyToEditor`.
    */
   #applyingContent = false
   /**
@@ -149,31 +133,19 @@ class NoteSessionImpl implements ManagedNoteSession {
    * True while deletion has paused this session's persistence pipeline.
    */
   #deleting = false
-  // Set by `discard` — tells `dispose` to skip its flush (the file is being
-  // deleted, so rewriting it would recreate it).
+  /**
+   * Set by `discard`: the file is being deleted, so nothing writes it again.
+   */
   #discarded = false
 
   constructor(deps: NoteSessionDeps, options: NoteSessionOptions) {
     this.#deps = deps
-    const { noteFile, graphSession } = deps
     this.id = options.id
     this.#classify = options.classify
     this.#onContent = options.onContent
     this.#onObservedChange = options.onObservedChange
     this.#onDiscard = options.onDiscard
-    const graph = graphSession.get().session
-    const generation = (): number => {
-      if (graph === null) {
-        throw new AppError('noGraph', 'No graph is open.')
-      }
-      return writeGenerationFor(graphSession, graph)
-    }
-    this.#io = {
-      read: async (forPath) => await noteFile.readWithHash(forPath, generation()),
-      write: async (forPath, contents, expectedContents) => {
-        return await noteFile.write(forPath, contents, generation(), expectedContents)
-      },
-    }
+    this.#graph = deps.graphSession.get().session
     this.path = options.path
     this.#createIfMissing = options.createIfMissing ?? false
     this.#missingSeed = options.missingSeed
@@ -219,11 +191,14 @@ class NoteSessionImpl implements ManagedNoteSession {
     this.#emit()
   }
 
-  attachEditor(editor: NoteSessionEditor | null): void {
-    if (editor === null) {
-      this.#reconcilePendingEditorInput()
-    }
+  attachEditor(editor: NoteSessionEditor): Unlisten {
     this.#editor = editor
+    return () => {
+      if (this.#editor === editor) {
+        this.#reconcilePendingEditorInput()
+        this.#editor = null
+      }
+    }
   }
 
   content(): string {
@@ -255,6 +230,13 @@ class NoteSessionImpl implements ManagedNoteSession {
     }
   }
 
+  #generation(): number {
+    if (this.#graph === null) {
+      throw new AppError('noGraph', 'No graph is open.')
+    }
+    return writeGenerationFor(this.#deps.graphSession, this.#graph)
+  }
+
   #emit(): void {
     if (!this.#disposed) {
       this.#store.set(this.#snapshot())
@@ -266,12 +248,10 @@ class NoteSessionImpl implements ManagedNoteSession {
    */
   #save(retryOnFailure: boolean): void {
     // A discarded session never writes: its file is being deleted, so any
-    // save — including a teardown `flush()` (the pane unmounts via flush →
-    // dispose) or an already-queued step, would recreate it.
+    // save, including an already-queued step, would recreate it.
     if (this.#discarded || this.#deleting || !this.#dirty || this.#isProtected) {
       return
     }
-    const { write } = this.#io
     this.#pendingSaves += 1
     this.#saveChain = this.#saveChain
       .then(async () => {
@@ -286,7 +266,12 @@ class NoteSessionImpl implements ManagedNoteSession {
         const content = this.#header + this.#buffer
         this.#inFlightWrite = content
         try {
-          const result = await write(this.path, content, this.#missing ? null : this.#writeBase)
+          const result = await this.#deps.noteFile.write(
+            this.path,
+            content,
+            this.#generation(),
+            this.#missing ? null : this.#writeBase,
+          )
           this.#missing = false // the landed write created the file if it was missing
           this.#error = null // a previous save failure is resolved by this success
           if (result.merged === null) {
@@ -385,7 +370,7 @@ class NoteSessionImpl implements ManagedNoteSession {
 
   editorChanged(markdown: string): void {
     if (this.#applyingContent) {
-      // This change is our own applyContent pushing disk content, not a user
+      // This change is our own `#applyToEditor` pushing disk content, not a user
       // edit. The editor's serialization may normalize (trailing newline, loose
       // lists) and differ from the disk bytes — that must not dirty the buffer
       // or schedule a save, or a reload would rewrite a file the user never
@@ -470,7 +455,7 @@ class NoteSessionImpl implements ManagedNoteSession {
     let content: string
     let hash: string
     try {
-      ;({ content, hash } = await this.#io.read(this.path))
+      ;({ content, hash } = await this.#read())
     } catch (cause) {
       if (isAppError(cause) && cause.kind === 'notFound') {
         if (resetIfGone && !this.#dirty && !this.#missing && !this.#disposed) {
@@ -558,12 +543,16 @@ class NoteSessionImpl implements ManagedNoteSession {
     this.#onContent?.(content, 'load')
   }
 
+  async #read(): Promise<{ content: string; hash: string }> {
+    return await this.#deps.noteFile.readWithHash(this.path, this.#generation())
+  }
+
   /**
    * The initial read; with `createIfMissing`, a missing file is an empty note.
    */
   async #readInitial(): Promise<{ content: string; hash: string | null }> {
     try {
-      return await this.#io.read(this.path)
+      return await this.#read()
     } catch (cause) {
       if (this.#createIfMissing && isAppError(cause) && cause.kind === 'notFound') {
         return { content: '', hash: null } // lazy note: created by the first save
@@ -572,7 +561,7 @@ class NoteSessionImpl implements ManagedNoteSession {
     }
   }
 
-  load(): void {
+  #load(): void {
     this.#loading = true
     this.#missedChange = false
     this.#status = 'loading'
@@ -604,15 +593,14 @@ class NoteSessionImpl implements ManagedNoteSession {
         }
       }
     })()
-    void this.#loadPromise
   }
 
   async revalidate(): Promise<void> {
     if (this.#disposed) {
       return
     }
-    if (this.#status === 'error') {
-      this.load()
+    if (this.#loadPromise === null || this.#status === 'error') {
+      this.#load()
       await this.#loadPromise
       return
     }
@@ -674,22 +662,6 @@ class NoteSessionImpl implements ManagedNoteSession {
     }
   }
 
-  /**
-   * Apply an out-of-editor body edit (the Tasks view's toggle / edit / delete,
-   * the suggested-contact card's append) transactionally:
-   * `transform` rewrites the live document — header plus the unsaved buffer, so
-   * concurrent editor edits survive — then we land it now so the Tasks view
-   * refreshes promptly. A session still loading waits for the load first:
-   * navigating to a note (⌘D to today) opens its session in the same tick the
-   * Tasks view's unmount flush writes to it, and the pending read is a moment,
-   * not a reason to refuse. Returns `null` when the session can't safely take a
-   * body edit (no write channel, disposed, protected/read-only, or failed to
-   * load) so the caller refuses rather than clobber the buffer
-   * via disk. `transform` runs before any mutation, so a stale refusal (the
-   * marker can't be located) propagates with nothing changed. And the write is
-   * all-or-nothing: a failed flush reverts the in-memory edit so the editor and
-   * the Tasks list can't diverge, then re-throws the failure.
-   */
   async commitSourceEdit(transform: NoteSourceTransform): Promise<NoteSessionCommit | null> {
     // What the load can't change is refused at once; a stalled read must not
     // hold a session that could never write.
@@ -708,15 +680,11 @@ class NoteSessionImpl implements ManagedNoteSession {
     this.#reconcilePendingEditorInput()
     const previousHeader = this.#header
     const previousBuffer = this.#buffer
-    const previousInitialContent = this.#initialContent
     const source = this.#header + this.#buffer
     const edited = transform(source, source === this.#disk ? this.#diskHash : null)
     const doc = splitDoc(edited)
     this.#header = doc.header
     this.#buffer = doc.body
-    // The pane seeds a mounting editor from `initialContent`; after a wait on
-    // the load no editor is mounted yet, so the seed must carry the edit too.
-    this.#initialContent = doc.body
     this.#applyToEditor(doc.body) // an already open editor shows the edited line
     const applied = this.#buffer
     this.#dirty = this.#header + this.#buffer !== this.#disk
@@ -732,7 +700,6 @@ class NoteSessionImpl implements ManagedNoteSession {
       if (this.#header === doc.header) this.#header = previousHeader
       if (this.#buffer === applied) {
         this.#buffer = previousBuffer
-        this.#initialContent = previousInitialContent
         this.#applyToEditor(previousBuffer)
       }
       this.#dirty = this.#header + this.#buffer !== this.#disk
@@ -743,15 +710,12 @@ class NoteSessionImpl implements ManagedNoteSession {
     return { content: this.#disk, revision: this.#diskHash, merged: this.#disk !== edited }
   }
 
-  dispose(): void {
-    // A discarded session must not write: its file is being deleted, and a
-    // flush would recreate it. Otherwise flush first — the queued save step
-    // reads the (now frozen) buffer, so pending edits persist to this
-    // session's path.
-    if (!this.#discarded) {
-      void this.flush()
-    }
+  dispose(): Promise<void> {
+    // The queued save step reads the buffer, which is frozen from here on. A
+    // discarded session writes nothing: `#save` refuses.
+    const flushed = this.flush()
     this.#disposed = true
+    return flushed
   }
 
   discard(): void {
@@ -769,7 +733,7 @@ class NoteSessionImpl implements ManagedNoteSession {
     this.#cancelScheduledSave()
     await this.#loadPromise
     await this.#saveChain
-    return this.#status === 'ready' && this.#missing && this.#inFlightWrite === null
+    return this.isUnpersisted()
   }
 
   cancelDelete(): void {

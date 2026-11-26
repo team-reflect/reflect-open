@@ -67,17 +67,13 @@ export interface TitleRenameTracker {
    * A settle point (blur, teardown): fire any pending rename now.
    */
   settle(): void
-  /**
-   * The note moved to `path`.
-   */
-  retarget(path: string): void
   dispose(): void
 }
 
 const DEFAULT_QUIET_MS = 5000
 
 class TitleRenameTrackerImpl implements TitleRenameTracker {
-  #path: string
+  readonly #path: string
   readonly #onRename: (rename: TitleRename) => void
   readonly #clock: ClockService
   readonly #quietMs: number
@@ -92,10 +88,6 @@ class TitleRenameTrackerImpl implements TitleRenameTracker {
     this.#onRename = options.onRename
     this.#clock = options.clock
     this.#quietMs = options.quietMs ?? DEFAULT_QUIET_MS
-  }
-
-  retarget(path: string): void {
-    this.#path = path
   }
 
   baseline(content: string): void {

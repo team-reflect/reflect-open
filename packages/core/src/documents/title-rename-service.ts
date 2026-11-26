@@ -56,17 +56,6 @@ export interface RenameCoordinatorOptions {
   path: string
 }
 
-export interface RenameCoordinator extends SessionCoordinator {
-  /**
-   * Wire into the session's `onContent` stream (load/external/saved).
-   */
-  content(content: string, origin: NoteContentOrigin): void
-  /**
-   * Resolves once settled renames' writes have landed (quit awaits this).
-   */
-  settled(): Promise<void>
-}
-
 /**
  * Keeps inbound links, aliases and filenames following each note's settled title.
  */
@@ -76,7 +65,7 @@ export interface TitleRenameService {
    * disposes it. Each rename writes with that graph's generation as of when it
    * fires.
    */
-  createCoordinator(options: RenameCoordinatorOptions): RenameCoordinator
+  createCoordinator(options: RenameCoordinatorOptions): SessionCoordinator
 }
 
 export interface TitleRenameServiceDeps {
@@ -101,7 +90,7 @@ class TitleRenameServiceImpl implements TitleRenameService {
     this.#deps = deps
   }
 
-  createCoordinator(options: RenameCoordinatorOptions): RenameCoordinator {
+  createCoordinator(options: RenameCoordinatorOptions): SessionCoordinator {
     return new RenameCoordinatorImpl(this.#deps, options)
   }
 }
@@ -110,7 +99,7 @@ export function createTitleRenameService(deps: TitleRenameServiceDeps): TitleRen
   return new TitleRenameServiceImpl(deps)
 }
 
-class RenameCoordinatorImpl implements RenameCoordinator {
+class RenameCoordinatorImpl implements SessionCoordinator {
   readonly #deps: TitleRenameServiceDeps
   readonly #graph: ReturnType<GraphSessionSource['get']>['session']
   readonly #tracker: TitleRenameTracker
@@ -163,7 +152,6 @@ class RenameCoordinatorImpl implements RenameCoordinator {
 
   retarget(path: string): void {
     this.#currentPath = path
-    this.#tracker.retarget(path)
   }
 
   dispose(): void {

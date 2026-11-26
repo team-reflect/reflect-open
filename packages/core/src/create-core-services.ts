@@ -926,16 +926,6 @@ export function composeCoreServices(
   }
   const noteFile = create.noteFile({ ipc, clock, fileChanges })
   const assetStore = create.assetStore({ ipc, clock, fileChanges })
-  const noteSessions = create.noteSessions({
-    noteFile,
-    clock,
-    logger,
-    // Read at call time: these are built later.
-    graphSession: { get: () => graphSession.get() },
-    fileChanges,
-    untitledNoteSeed: () => noteCreation.untitledNoteSeed(),
-    createCoordinator: (path) => titleRename.createCoordinator({ path }),
-  })
   // Read at call time: the graph session is built later.
   const lateGraphSession: Store<GraphSessionState<GraphServices>> = {
     get: () => graphSession.get(),
@@ -962,6 +952,16 @@ export function composeCoreServices(
   })
   const noteLinkResolver = create.noteLinkResolver({ wikiResolver, noteFile })
   const noteCreation = create.noteCreation({ noteFile, noteLinkResolver, id })
+  const noteSessions = create.noteSessions({
+    noteFile,
+    clock,
+    logger,
+    graphSession: lateGraphSession,
+    fileChanges,
+    noteCreation,
+    // Read at call time: the title rename service is built later.
+    createCoordinator: (path) => titleRename.createCoordinator({ path }),
+  })
   const privacy = create.privacy({ noteFile, graphSession: lateGraphSession })
   const calendar = create.calendar({ ipc, logger })
   const contacts = create.contacts({ ipc, logger })

@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestClockService, type TestClockService } from '../testing/clock.ts'
 import { createTestFileChangeService, type TestFileChangeService } from '../testing/file-change.ts'
-import { createTestNoteFileService, type TestNoteFileService } from '../testing/graph.ts'
+import {
+  createTestNoteCreationService,
+  createTestNoteFileService,
+  type TestNoteFileService,
+} from '../testing/graph.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createNoteSessionService, type SessionCoordinator } from './note-session-service.ts'
@@ -24,7 +28,7 @@ function setup(files: Record<string, string>): void {
     logger: createTestLoggerService(),
     graphSession: createTestGraphSessionService({ graph: { generation: 1 } }),
     fileChanges,
-    untitledNoteSeed: () => '---\nid: seed\n---\n\n#\n',
+    noteCreation: createTestNoteCreationService(),
     createCoordinator: (path): SessionCoordinator => {
       const coordinator = { path, log: [] as string[] }
       coordinators.push(coordinator)
@@ -317,6 +321,21 @@ describe('moveSession', () => {
     expect(noteSessions.moveSession('notes/none.md', 'notes/c.md')).toBeNull()
   })
 
+  it('disposes a session already at the destination, after its flush', async () => {
+    setup({ [PATH]: '# A\n', 'notes/b.md': '# B\n' })
+    const session = noteSessions.sessionFor(PATH)
+    const occupant = noteSessions.sessionFor('notes/b.md')
+    await observe(session)
+    await observe(occupant)
+    occupant.editorChanged('# B\n\ntyped\n')
+
+    noteSessions.moveSession(PATH, 'notes/b.md')
+    await settled()
+
+    expect(noteSessions.existingSessionFor('notes/b.md')).toBe(session)
+    expect(noteFile.files().get('notes/b.md')).toBe('# B\n\ntyped\n')
+  })
+
   it('routes a change of the new path to the moved session', async () => {
     const session = noteSessions.sessionFor(PATH)
     await observe(session)
@@ -349,19 +368,6 @@ describe('teardown', () => {
     session.editorChanged('# A\n\ntyped\n')
 
     await noteSessions.flushAll()
-
-    expect(noteFile.files().get(PATH)).toBe('# A\n\ntyped\n')
-    expect(coordinators[0]?.log).toEqual(['settle'])
-  })
-
-  it('settleAll flushes without waiting, then settles', async () => {
-    const session = noteSessions.sessionFor(PATH)
-    await observe(session)
-    session.editorChanged('# A\n\ntyped\n')
-
-    noteSessions.settleAll()
-    expect(coordinators[0]?.log).toEqual([])
-    await settled()
 
     expect(noteFile.files().get(PATH)).toBe('# A\n\ntyped\n')
     expect(coordinators[0]?.log).toEqual(['settle'])

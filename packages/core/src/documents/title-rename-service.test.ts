@@ -17,7 +17,8 @@ import { createTestNoteFileService, overrideNoteFileService } from '../testing/g
 import { createTestIndexStoreService } from '../testing/index-store.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createTestProgressPort } from '../testing/ports.ts'
-import { createTitleRenameService, type RenameCoordinator } from './title-rename-service.ts'
+import type { SessionCoordinator } from './note-session-service.ts'
+import { createTitleRenameService } from './title-rename-service.ts'
 
 /**
  * The rename coordinator owns the riskiest background work in the app: a
@@ -209,7 +210,11 @@ function setup(options?: SetupOptions) {
 /**
  * Drive one settled rename: baseline at `from`, save `to`, settle, await.
  */
-async function renameOnce(coordinator: RenameCoordinator, from: string, to: string): Promise<void> {
+async function renameOnce(
+  coordinator: SessionCoordinator,
+  from: string,
+  to: string,
+): Promise<void> {
   coordinator.content(managed(`# ${from}\n`), 'load')
   coordinator.content(managed(`# ${to}\n`), 'saved')
   coordinator.settle()

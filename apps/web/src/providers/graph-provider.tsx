@@ -117,7 +117,7 @@ export function GraphProvider({
   // pending title rename fires.
   useEffect(() => {
     const controller = new AbortController()
-    window.addEventListener('blur', () => noteSessions.settleAll(), {
+    window.addEventListener('blur', () => void noteSessions.flushAll(), {
       signal: controller.signal,
     })
     return () => controller.abort()

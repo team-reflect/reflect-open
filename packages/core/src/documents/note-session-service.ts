@@ -1,6 +1,6 @@
 import type { MaybePromise } from '@reflect/utils'
 import { checkRoundTrip } from '@meowdown/markdown'
-import { deferredCreationPolicy } from '../graph/note-creation-service.ts'
+import { deferredCreationPolicy, type NoteCreationService } from '../graph/note-creation-service.ts'
 import type { FileChange, FileChangeService } from '../indexing/file-change-service.ts'
 import type { Unlisten } from '../unlisten.ts'
 import { createNoteSession, type NoteSessionDeps } from './note-session.ts'
@@ -41,10 +41,7 @@ export interface SessionCoordinator {
 
 export interface NoteSessionServiceDeps extends NoteSessionDeps {
   readonly fileChanges: FileChangeService
-  /**
-   * The buffer seed of a note born untitled.
-   */
-  readonly untitledNoteSeed: () => string
+  readonly noteCreation: NoteCreationService
   /**
    * Creates the coordinator of a note that tracks renames.
    */
@@ -59,15 +56,11 @@ interface SessionEntry {
    */
   observed: boolean
   /**
-   * Whether the initial load has started.
-   */
-  loaded: boolean
-  /**
-   * Whether the note file may have changed since the session last read it.
+   * Whether the note file may hold text the session has not read.
    */
   stale: boolean
   /**
-   * The running catch-up of a stale session.
+   * The running catch-up.
    */
   catchingUp: Promise<void> | null
 }
@@ -136,10 +129,10 @@ class NoteSessionServiceImpl implements NoteSessionService {
     if (occupant !== undefined) {
       this.#drop(occupant)
     }
-    entry.session.retarget(to)
-    entry.coordinator?.retarget(to)
     this.#entries.delete(from)
     this.#entries.set(to, entry)
+    entry.session.retarget(to)
+    entry.coordinator?.retarget(to)
     return entry.session
   }
 
@@ -155,12 +148,6 @@ class NoteSessionServiceImpl implements NoteSessionService {
     )
   }
 
-  settleAll(): void {
-    for (const entry of this.#entries.values()) {
-      this.#settle(entry)
-    }
-  }
-
   releaseAll(): void {
     for (const entry of this.#entries.values()) {
       this.#drop(entry)
@@ -172,7 +159,7 @@ class NoteSessionServiceImpl implements NoteSessionService {
     if (existing !== undefined) {
       return existing
     }
-    const { untitledNoteSeed, createCoordinator } = this.#deps
+    const { noteCreation, createCoordinator } = this.#deps
     const policy = deferredCreationPolicy(path)
     const coordinator = policy.trackRenames ? createCoordinator(path) : null
     const session = createNoteSession(this.#deps, {
@@ -180,7 +167,7 @@ class NoteSessionServiceImpl implements NoteSessionService {
       id: this.#nextId,
       classify: checkRoundTrip,
       createIfMissing: policy.lazyCreatable,
-      missingSeed: policy.seedsUntitled ? untitledNoteSeed() : undefined,
+      missingSeed: policy.seedsUntitled ? noteCreation.untitledNoteSeed() : undefined,
       onContent: coordinator
         ? (content, origin) => coordinator.content(content, origin)
         : undefined,
@@ -197,16 +184,15 @@ class NoteSessionServiceImpl implements NoteSessionService {
       session,
       coordinator,
       observed: false,
-      loaded: false,
-      stale: false,
+      stale: true,
       catchingUp: null,
     }
+    this.#evict(MAX_IDLE_SESSIONS - 1)
     this.#entries.set(path, entry)
     this.#idle.add(entry)
     this.#stopFileChanges ??= this.#deps.fileChanges.subscribe(({ changes }) => {
       this.#onFileChanges(changes)
     })
-    this.#evict()
     return entry
   }
 
@@ -214,6 +200,8 @@ class NoteSessionServiceImpl implements NoteSessionService {
     entry.observed = observed
     if (observed) {
       this.#idle.delete(entry)
+      // A view that returns to a failed note retries the load.
+      entry.stale ||= entry.session.get().status === 'error'
       void this.#catchUp(entry)
       return
     }
@@ -222,7 +210,7 @@ class NoteSessionServiceImpl implements NoteSessionService {
     }
     this.#idle.add(entry)
     this.#settle(entry)
-    this.#evict()
+    this.#evict(MAX_IDLE_SESSIONS)
   }
 
   #invalidate(entry: SessionEntry): void {
@@ -234,24 +222,17 @@ class NoteSessionServiceImpl implements NoteSessionService {
   }
 
   /**
-   * Load a session that has not loaded, and bring a stale or failed one up to date.
+   * Bring a stale session up to date with the note file.
    */
   #catchUp(entry: SessionEntry): Promise<void> {
-    const { session } = entry
-    if (!entry.loaded) {
-      entry.loaded = true
-      entry.stale = false
-      session.load()
-      return Promise.resolve()
-    }
     if (entry.catchingUp !== null) {
       return entry.catchingUp
     }
-    if (!entry.stale && session.get().status !== 'error') {
+    if (!entry.stale) {
       return Promise.resolve()
     }
     entry.stale = false
-    const catchingUp = session.revalidate().finally(() => {
+    const catchingUp = entry.session.revalidate().finally(() => {
       entry.catchingUp = null
     })
     entry.catchingUp = catchingUp
@@ -285,10 +266,10 @@ class NoteSessionServiceImpl implements NoteSessionService {
   }
 
   /**
-   * Dispose the least recently observed clean sessions beyond the idle limit.
+   * Dispose the least recently observed clean sessions beyond `limit` idle ones.
    */
-  #evict(): void {
-    let excess = this.#idle.size - MAX_IDLE_SESSIONS
+  #evict(limit: number): void {
+    let excess = this.#idle.size - limit
     for (const entry of this.#idle) {
       if (excess <= 0) {
         return
@@ -307,8 +288,7 @@ class NoteSessionServiceImpl implements NoteSessionService {
   #drop(entry: SessionEntry): void {
     const { session, coordinator } = entry
     this.#forget(entry)
-    const flushed = session.flush()
-    session.dispose()
+    const flushed = session.dispose()
     if (coordinator !== null) {
       void flushed.then(() => {
         coordinator.settle()

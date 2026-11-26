@@ -36,8 +36,7 @@ import { useCoreServices } from '@/services/services-provider.tsx'
 interface SessionEditorViewProps {
   /**
    * The session's path. Every path-addressed feature of the editor (assets,
-   * links, AI, the handle registry, Find) uses this one; during a note switch
-   * it briefly differs from the route's path.
+   * links, AI, the handle registry, Find) uses this one.
    */
   path: string
   session: NoteSession
@@ -131,7 +130,7 @@ export function SessionEditorView({
 
   const handleRef = useCallback(
     (handle: NoteEditorHandle) => {
-      session.attachEditor(handle)
+      const detachEditor = session.attachEditor(handle)
       editorRef.current = handle
       registerNoteEditorHandle(path, handle)
       if (dailyDate !== undefined) {
@@ -150,7 +149,7 @@ export function SessionEditorView({
       return () => {
         // Runs while the handle is still live, so the session can still read
         // the editor's last input.
-        session.attachEditor(null)
+        detachEditor()
         editorRef.current = null
         unregisterNoteEditorHandle(path, handle)
         if (dailyDate !== undefined) {

@@ -661,7 +661,7 @@ describe('trash', () => {
     const { actions } = setupWith(files, session)
     const deleteFile = vi.spyOn(files, 'delete')
     const discard = vi.spyOn(session, 'discard')
-    session.load()
+    void session.revalidate()
 
     await actions.trash('notes/new.md')
 
@@ -679,7 +679,7 @@ describe('trash', () => {
     })
     const { actions } = setupWith(files, session)
     const deleteFile = vi.spyOn(files, 'delete')
-    session.load()
+    void session.revalidate()
     await vi.waitFor(() => expect(snapshots.at(-1)?.status).toBe('ready'))
     session.editorChanged('# Draft\n')
     const flush = session.flush()

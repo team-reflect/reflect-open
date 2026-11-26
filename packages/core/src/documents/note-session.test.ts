@@ -203,12 +203,12 @@ async function settled(): Promise<void> {
 describe('createNoteSession', () => {
   it('dispose flushes the pending edit but emits no further snapshots', async () => {
     const { session, writes, snapshots } = harness()
-    session.load()
+    void session.revalidate()
     await settled()
 
     session.editorChanged('# Final\n')
     const emittedBeforeDispose = snapshots.length
-    session.dispose()
+    void session.dispose()
     await settled()
 
     expect(writes).toEqual([{ path: 'notes/a.md', contents: '# Final\n' }])
@@ -218,7 +218,7 @@ describe('createNoteSession', () => {
   it('reports the private flag from the loaded header, then follows every header change', async () => {
     const h = harness({ disk: '---\nprivate: true\n---\n# Secret\n' })
     expect(h.snapshots.at(-1)?.isPrivate ?? true).toBe(true) // fail closed while loading
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     expect(h.snapshots.at(-1)?.isPrivate).toBe(true)
 
@@ -239,7 +239,7 @@ describe('createNoteSession', () => {
     })
     const { session, writes } = harness({ reconcilePendingEditorInput })
     target = session
-    session.load()
+    void session.revalidate()
     await settled()
 
     session.editorChanged('# Business ideas\n')
@@ -251,7 +251,7 @@ describe('createNoteSession', () => {
 
   it('discard detaches without writing — even with a pending edit (delete path)', async () => {
     const { session, writes } = harness()
-    session.load()
+    void session.revalidate()
     await settled()
 
     session.editorChanged('# Unsaved edit\n')
@@ -264,14 +264,14 @@ describe('createNoteSession', () => {
     // The pane tears down via flush() → dispose() (document-binding); neither
     // may write after a discard, or the trashed file would come back.
     await session.flush()
-    session.dispose()
+    void session.dispose()
     await settled()
     expect(writes).toEqual([])
   })
 
   it('resumes a paused pending save when prepared deletion fails', async () => {
     const { session, writes } = harness()
-    session.load()
+    void session.revalidate()
     await settled()
 
     session.editorChanged('# Unsaved edit\n')
@@ -285,7 +285,7 @@ describe('createNoteSession', () => {
 
   it('does not re-emit identical snapshots', async () => {
     const { session, snapshots } = harness()
-    session.load()
+    void session.revalidate()
     await clock.advance(0)
 
     const afterLoad = snapshots.length
@@ -296,7 +296,7 @@ describe('createNoteSession', () => {
 
   it('an external change equal to the buffer saves cleanly', async () => {
     const { session, writes, snapshots, setDisk } = harness()
-    session.load()
+    void session.revalidate()
     await settled()
 
     session.editorChanged('# Same on both\n')
@@ -313,7 +313,7 @@ describe('createNoteSession', () => {
       return markdown.includes('+ [ ]') ? 'lossy' : 'exact'
     }
     const { session, snapshots, setDisk } = harness({ classify: lossyWhenTasks })
-    session.load()
+    void session.revalidate()
     await settled()
     expect(snapshots.at(-1)?.protected).toBe(false)
 
@@ -353,7 +353,7 @@ function replayRenames(
 describe('external changes and saves', () => {
   it('ignores an external event whose content matches the disk state (the echo of its own save)', async () => {
     const h = harness()
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.externalChanged()
@@ -365,7 +365,7 @@ describe('external changes and saves', () => {
 
   it('a dirty buffer saves at once when an external change arrives', async () => {
     const h = harness()
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('# Hello\n\nmine\n')
@@ -380,7 +380,7 @@ describe('external changes and saves', () => {
 
   it('an exact merge adopts the merged text and the session is clean', async () => {
     const h = harness()
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('# Hello\n\nmine\n')
@@ -405,7 +405,7 @@ describe('external changes and saves', () => {
       return markdown.includes('+ [ ]') ? 'lossy' : 'exact'
     }
     const h = harness({ classify: lossyWhenTasks })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('# Hello\n\nmine\n')
@@ -427,7 +427,7 @@ describe('external changes and saves', () => {
 
   it('a merged title change is reported as external before saved', async () => {
     const h = harness({ disk: '# Old title\n\nbody\n' })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('# Old title\n\nbody mine\n')
@@ -447,7 +447,7 @@ describe('external changes and saves', () => {
 
   it('a title typed by the user survives a merged write and renames the file', async () => {
     const h = harness({ disk: '# Old title\n\nbody\n' })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('# New title\n\nbody\n')
@@ -464,7 +464,7 @@ describe('external changes and saves', () => {
 
   it('a body-only merge after a pending rename is reported as saved and keeps the rename', async () => {
     const h = harness({ disk: '# Old title\n\nbody\n' })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('# New title\n\nbody\n')
@@ -483,7 +483,7 @@ describe('external changes and saves', () => {
 
   it('a merge that changes the title after a local rename is reported as external', async () => {
     const h = harness({ disk: '# Old title\n\nbody\n' })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('# New title\n\nbody\n')
@@ -506,7 +506,7 @@ describe('external changes and saves', () => {
         return release.promise
       },
     })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('# Hello\n\nmine\n')
@@ -540,14 +540,14 @@ describe('external changes and saves', () => {
         return release.promise
       },
     })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('# Hello\n\nmine\n')
     h.setDisk('# Hello\n\ntheirs\n')
     h.mergeNextWrite('# Hello\n\nmine\n\ntheirs\n')
     const flushed = h.session.flush()
-    h.session.dispose()
+    void h.session.dispose()
     await started.promise
     const emitted = h.snapshots.length
     release.resolve()
@@ -561,7 +561,7 @@ describe('external changes and saves', () => {
   it('treats an external event for an in-flight save as an echo', async () => {
     const hold = Promise.withResolvers<void>()
     const h = harness({ afterWrite: () => hold.promise })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('# Saved\n')
@@ -593,7 +593,7 @@ describe('external changes and saves', () => {
         }
       },
     })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('# A\n')
@@ -620,7 +620,7 @@ describe('external changes and saves', () => {
       onApply: (markdown) => target?.editorChanged(`${markdown}\n`),
     })
     target = h.session
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.setDisk('# Changed outside\n')
@@ -636,7 +636,7 @@ describe('external changes and saves', () => {
 
   it('a missing note without createIfMissing is an error', async () => {
     const h = harness({ disk: null })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     expect(h.snapshots.at(-1)?.status).toBe('error')
@@ -653,7 +653,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
       disk: `${FM}# Hello\n`,
       classify: (markdown) => (markdown.includes('---') ? 'lossy' : 'exact'),
     })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     const ready = h.snapshots.at(-1)
     expect(ready?.status).toBe('ready')
@@ -666,7 +666,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
       disk: `${FM}+ [ ] lossy body\n`,
       classify: (markdown) => (markdown.includes('+ [ ]') ? 'lossy' : 'exact'),
     })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     const ready = h.snapshots.at(-1)
     expect(ready?.protected).toBe(true)
@@ -677,7 +677,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
 
   it('writes with the generation of its graph reopened, never of another graph', async () => {
     const h = harness()
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     h.graph.setGraph({ generation: 2 })
     h.session.editorChanged('# Reopened\n')
@@ -692,7 +692,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
 
   it('saves rejoin the exact header bytes around the edited body', async () => {
     const h = harness({ disk: `${FM}# Hello\n` })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     h.session.editorChanged('# Hello edited\n')
     await settled()
@@ -702,7 +702,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
 
   it('updateFrontmatter patches the header and saves without touching the editor', async () => {
     const h = harness({ disk: '# Hello\n' })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     h.session.updateFrontmatter({ aliases: ['Old Title'] })
     await settled()
@@ -715,7 +715,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
 
   it('pinning writes the flag; unpinning removes the key, not `pinned: false`', async () => {
     const h = harness({ disk: '# Hello\n' })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     h.session.updateFrontmatter({ pinned: true })
     await settled()
@@ -730,7 +730,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
 
   it('marking private writes the flag; un-marking removes the key, not `private: false`', async () => {
     const h = harness({ disk: '# Hello\n' })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     h.session.updateFrontmatter({ private: true })
     await settled()
@@ -745,7 +745,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
 
   it('an external frontmatter-only change adopts cleanly', async () => {
     const h = harness({ disk: `${FM}# Hello\n` })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     h.setDisk(`---\naliases:\n  - Newer\n---\n# Hello\n`)
     h.session.externalChanged()
@@ -759,7 +759,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
 
   it('commitFrontmatter lands the patch immediately on a clean session', async () => {
     const h = harness({ disk: '# Hello\n' })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     await expect(h.session.commitFrontmatter({ pinned: true })).resolves.toBe(true)
     // Flushed, not riding the save debounce.
@@ -777,7 +777,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
       },
     })
     try {
-      h.session.load()
+      void h.session.revalidate()
       await settled()
       h.failWrites('disk full')
       const commit = h.session.commitFrontmatter({ pinned: true })
@@ -801,7 +801,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
   it('a no-op frontmatter commit does not report an earlier save error', async () => {
     const h = harness()
     try {
-      h.session.load()
+      void h.session.revalidate()
       await settled()
       h.failWrites('disk full')
       await expect(h.session.commitFrontmatter({ pinned: true })).rejects.toThrow('disk full')
@@ -816,7 +816,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
 
   it('commitFrontmatter reports a patch that landed through an exact merge', async () => {
     const h = harness()
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     h.setDisk('# Hello\n\ntheirs\n')
     h.mergeNextWrite('---\npinned: true\n---\n\n# Hello\n\ntheirs\n')
@@ -827,7 +827,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
 
   it('onContent reports full joined content with the right origins', async () => {
     const h = harness({ disk: `${FM}# Hello\n` })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     h.session.editorChanged('# Renamed\n')
     await settled()
@@ -846,7 +846,7 @@ describe('missing-note seed (new ordinary notes)', () => {
 
   it('a missing note opens ready with the seed, marked missing, and writes nothing', async () => {
     const h = harness({ disk: null, createIfMissing: true, missingSeed: SEED })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     const ready = h.snapshots.at(-1)
@@ -863,7 +863,7 @@ describe('missing-note seed (new ordinary notes)', () => {
 
   it('the editor echoing the seed back stays clean — no file is created', async () => {
     const h = harness({ disk: null, createIfMissing: true, missingSeed: SEED })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     // Mount-time serialization: the editor reports the document it was seeded
@@ -878,7 +878,7 @@ describe('missing-note seed (new ordinary notes)', () => {
 
   it('a pending first edit can still be discarded without creating a file', async () => {
     const h = harness({ disk: null, createIfMissing: true, missingSeed: SEED })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('# Draft\n')
@@ -891,7 +891,7 @@ describe('missing-note seed (new ordinary notes)', () => {
 
   it('clearing the seed back to empty writes nothing — the note stays unborn', async () => {
     const h = harness({ disk: null, createIfMissing: true, missingSeed: SEED })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     // The user deletes the seeded empty title without typing a replacement:
@@ -913,7 +913,7 @@ describe('missing-note seed (new ordinary notes)', () => {
 
   it('a real edit creates the file with the full content and clears missing', async () => {
     const h = harness({ disk: null, createIfMissing: true, missingSeed: SEED })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('# My Note\n\nFirst line.\n')
@@ -927,7 +927,7 @@ describe('missing-note seed (new ordinary notes)', () => {
 
   it('a missing note without a seed opens empty (the lazy daily contract)', async () => {
     const h = harness({ disk: null, createIfMissing: true })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     const ready = h.snapshots.at(-1)
@@ -939,7 +939,7 @@ describe('missing-note seed (new ordinary notes)', () => {
 
   it('an existing file ignores the seed entirely', async () => {
     const h = harness({ disk: '# Hello\n', createIfMissing: true, missingSeed: SEED })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     const ready = h.snapshots.at(-1)
@@ -950,7 +950,7 @@ describe('missing-note seed (new ordinary notes)', () => {
 
   it('an external write while the seed is showing adopts cleanly and clears missing', async () => {
     const h = harness({ disk: null, createIfMissing: true, missingSeed: SEED })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.setDisk('# Created elsewhere\n')
@@ -966,7 +966,7 @@ describe('missing-note seed (new ordinary notes)', () => {
 
   it('a file created elsewhere under unsaved seed edits merges against the seed', async () => {
     const h = harness({ disk: null, createIfMissing: true, missingSeed: SEED })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('# Mine\n')
@@ -984,7 +984,7 @@ describe('missing-note seed (new ordinary notes)', () => {
     // The read equals the adopted baseline, so there is nothing to reconcile —
     // but the file exists on disk now, and the snapshot must say so.
     const h = harness({ disk: null, createIfMissing: true, missingSeed: SEED })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     expect(h.snapshots.at(-1)?.missing).toBe(true)
 
@@ -1002,7 +1002,7 @@ describe('missing-note seed (new ordinary notes)', () => {
     // createIfMissing applies only to the initial load; a deletion mid-session
     // must not error the session or empty the editor — the buffer is the user's.
     const h = harness({ disk: '# Hello\n' })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.setDisk(null) // deleted out from under us
@@ -1022,7 +1022,7 @@ describe('missing-note seed (new ordinary notes)', () => {
 
   it('a delete racing unsaved edits keeps them', async () => {
     const h = harness({ disk: '# Hello\n' })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('# Unsaved\n')
@@ -1038,7 +1038,7 @@ describe('missing-note seed (new ordinary notes)', () => {
 
   it('a failed save surfaces the error and a later save clears it', async () => {
     const h = harness()
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.failWrites('disk full')
@@ -1079,7 +1079,7 @@ describe('missing-note seed (new ordinary notes)', () => {
         return Promise.resolve()
       },
     })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.mergeNextWrite('# Other\n\nEdited\n')
@@ -1091,7 +1091,7 @@ describe('missing-note seed (new ordinary notes)', () => {
 
   it('flush after a failed save retries the same buffer', async () => {
     const h = harness()
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.failWrites('disk full')
@@ -1119,12 +1119,12 @@ describe('missing-note seed (new ordinary notes)', () => {
         return Promise.resolve()
       },
     })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.mergeNextWrite('theirs\nmine\n')
     h.session.editorChanged('mine\n')
-    h.session.dispose()
+    void h.session.dispose()
     await settled()
 
     expect(h.expectedContents).toEqual([null, ''])
@@ -1133,12 +1133,12 @@ describe('missing-note seed (new ordinary notes)', () => {
 
   it('dispose retries a save that found an empty file where none was expected', async () => {
     const h = harness({ disk: null, createIfMissing: true })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('mine\n')
     h.setDisk('')
-    h.session.dispose()
+    void h.session.dispose()
     await settled()
 
     expect(h.expectedContents).toEqual([null, ''])
@@ -1147,7 +1147,7 @@ describe('missing-note seed (new ordinary notes)', () => {
 
   it('a save after a failed retry retries too', async () => {
     const h = harness()
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.failWrites('disk full')
@@ -1156,7 +1156,7 @@ describe('missing-note seed (new ordinary notes)', () => {
     h.failWrites(null)
 
     h.setDisk(null)
-    h.session.dispose()
+    void h.session.dispose()
     await settled()
 
     expect(h.disk()).toBe('# Edited\n')
@@ -1164,12 +1164,12 @@ describe('missing-note seed (new ordinary notes)', () => {
 
   it('dispose retries a save whose file was deleted', async () => {
     const h = harness()
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('# Edited\n')
     h.setDisk(null)
-    h.session.dispose()
+    void h.session.dispose()
     await settled()
 
     expect(h.expectedContents).toEqual(['# Hello\n', null])
@@ -1185,7 +1185,7 @@ describe('default-bullet editor seed (daily notes)', () => {
   // note it is, never written, so a future placeholder stays uncreated.
   it('an empty-bullet serialization on a missing daily note writes nothing', async () => {
     const h = harness({ disk: null, createIfMissing: true })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     expect(h.snapshots.at(-1)?.missing).toBe(true)
 
@@ -1208,7 +1208,7 @@ describe('default-bullet editor seed (daily notes)', () => {
 describe('retarget (Plan 17)', () => {
   it('rebinds reads and writes to the new path without touching document state', async () => {
     const h = harness()
-    h.session.load()
+    void h.session.revalidate()
     await vi.waitFor(() => expect(h.snapshots.at(-1)?.status).toBe('ready'))
 
     h.session.editorChanged('# Hello\n\nfirst edit\n')
@@ -1232,7 +1232,7 @@ describe('retarget (Plan 17)', () => {
 
   it('keeps frontmatter ownership across a retarget', async () => {
     const h = harness({ disk: '---\nid: 01abc\n---\n\n# Hello\n' })
-    h.session.load()
+    void h.session.revalidate()
     await vi.waitFor(() => expect(h.snapshots.at(-1)?.status).toBe('ready'))
 
     h.session.retarget('notes/hello.md')
@@ -1250,7 +1250,7 @@ describe('commitSourceEdit', () => {
   it('applies a task toggle to the live buffer, preserving unsaved edits, and reflects it in the editor', async () => {
     const source = '# Todo\n\n+ [ ] buy milk\n'
     const h = harness({ disk: source })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     // The user appends a line below the task — unsaved when the toggle arrives.
@@ -1271,7 +1271,7 @@ describe('commitSourceEdit', () => {
   it('returns the merged text when the flush merged with a newer disk text', async () => {
     const source = '# Todo\n\n+ [ ] buy milk\n'
     const h = harness({ disk: source })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.setDisk('# Todo\n\n+ [ ] buy milk\n\ntheirs\n')
@@ -1291,7 +1291,7 @@ describe('commitSourceEdit', () => {
       onApply: (markdown) => target?.editorChanged(markdown.replaceAll('\n\n+', '\n+')),
     })
     target = h.session
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     h.setDisk(loose)
     h.session.externalChanged()
@@ -1308,7 +1308,7 @@ describe('commitSourceEdit', () => {
   it('gives the transform no revision while the buffer holds unsaved edits', async () => {
     const source = '+ [ ] ship it\n'
     const h = harness({ disk: source })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     h.session.editorChanged('+ [ ] ship it\n\njot\n')
 
@@ -1322,7 +1322,7 @@ describe('commitSourceEdit', () => {
   it('keeps the frontmatter around a body transform', async () => {
     const source = '---\nid: 01abc\n---\n\n+ [ ] ship it\n'
     const h = harness({ disk: source })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     expect(
@@ -1340,7 +1340,7 @@ describe('commitSourceEdit', () => {
       disk: source,
       beforeRead: () => pendingRead.promise,
     })
-    h.session.load()
+    void h.session.revalidate()
     expect(h.session.get().status).toBe('loading')
 
     let result: NoteSessionCommit | null | undefined
@@ -1363,10 +1363,8 @@ describe('commitSourceEdit', () => {
     })
     expect(h.writes.at(-1)?.contents).toBe('# Todo\n\n+ [ ] buy oat milk\n')
     expect(h.applied.at(-1)).toBe('# Todo\n\n+ [ ] buy oat milk\n')
-    // The pane mounts its editor from `initialContent` only after the ready
-    // snapshot renders, so `setMarkdown` above reached no editor yet: the seed
-    // must already carry the edit or the editor opens on the pre-edit body.
-    expect(h.snapshots.at(-1)?.initialContent).toBe('# Todo\n\n+ [ ] buy oat milk\n')
+    // An editor that mounts after the ready snapshot opens on the edit.
+    expect(h.session.editorSeed()).toBe('# Todo\n\n+ [ ] buy oat milk\n')
   })
 
   it('refuses (returns null) a note that loads as protected while the edit waits', async () => {
@@ -1377,7 +1375,7 @@ describe('commitSourceEdit', () => {
       classify: () => 'lossy',
       beforeRead: () => pendingRead.promise,
     })
-    h.session.load()
+    void h.session.revalidate()
 
     const transform = vi.fn(toggleTransform(firstTask('+ [ ] x\n')))
     const commit = h.session.commitSourceEdit(transform)
@@ -1393,7 +1391,7 @@ describe('commitSourceEdit', () => {
       disk: '+ [ ] x\n',
       beforeRead: () => Promise.reject(new Error('read failed')),
     })
-    h.session.load()
+    void h.session.revalidate()
 
     const transform = vi.fn(toggleTransform(firstTask('+ [ ] x\n')))
     expect(await h.session.commitSourceEdit(transform)).toBeNull()
@@ -1404,7 +1402,7 @@ describe('commitSourceEdit', () => {
 
   it('refuses (returns null) a protected note rather than write', async () => {
     const h = harness({ disk: '+ [ ] x\n', classify: () => 'lossy' })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     const transform = vi.fn(toggleTransform(firstTask('+ [ ] x\n')))
@@ -1416,7 +1414,7 @@ describe('commitSourceEdit', () => {
   it('reverts the edit and surfaces the error when the write fails', async () => {
     const source = '+ [ ] x\n'
     const h = harness({ disk: source })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.failWrites('disk full')
@@ -1439,7 +1437,7 @@ describe('commitSourceEdit', () => {
       onApply: (markdown) => target?.editorChanged(`${markdown}\n`),
     })
     target = h.session
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.failWrites('disk full')
@@ -1453,7 +1451,7 @@ describe('commitSourceEdit', () => {
   it('propagates an error the transform throws, such as a stale refusal, without writing', async () => {
     const source = '+ [ ] gone\n'
     const h = harness({ disk: source })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
 
     h.session.editorChanged('+ [ ] something else entirely\n')
@@ -1466,7 +1464,7 @@ describe('commitSourceEdit', () => {
 
   it('keeps dirty body text while committing metadata and a bookmark together', async () => {
     const h = harness()
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     h.session.editorChanged('# My unsaved thought\n')
     expect(
@@ -1484,7 +1482,7 @@ it.each([null, '# Hello\n'])(
   'sends the last disk revision for checked writes: %s',
   async (disk) => {
     const h = harness({ disk, createIfMissing: true })
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     h.session.editorChanged('# First edit\n')
     await h.session.flush()
@@ -1505,7 +1503,7 @@ it('a rejected source edit preserves typing made while its write was pending', a
     },
   })
   try {
-    h.session.load()
+    void h.session.revalidate()
     await settled()
     h.failWrites('disk full')
     const commit = h.session.commitSourceEdit(
@@ -1527,7 +1525,7 @@ it('a rejected source edit preserves typing made while its write was pending', a
 describe('frontmatter separator line', () => {
   it('keeps the separator line out of the editor body', async () => {
     const { session, snapshots } = harness({ disk: '---\nid: x\n---\n\n# T\n' })
-    session.load()
+    void session.revalidate()
     await settled()
 
     expect(snapshots.at(-1)?.initialContent).toBe('# T\n')
@@ -1535,7 +1533,7 @@ describe('frontmatter separator line', () => {
 
   it('keeps a blank line added above the body across a reopen', async () => {
     const first = harness({ disk: '---\nid: x\n---\n# T\n' })
-    first.session.load()
+    void first.session.revalidate()
     await settled()
     first.session.editorChanged('\n# T\n')
     await first.session.flush()
@@ -1544,14 +1542,14 @@ describe('frontmatter separator line', () => {
     expect(first.writes.at(-1)?.contents).toBe(saved)
 
     const second = harness({ disk: saved })
-    second.session.load()
+    void second.session.revalidate()
     await settled()
     expect(second.snapshots.at(-1)?.initialContent).toBe('\n# T\n')
   })
 
   it('keeps a leading blank line through a source edit', async () => {
     const { session, applied } = harness({ disk: '---\nid: x\n---\n# T\n' })
-    session.load()
+    void session.revalidate()
     await settled()
     session.editorChanged('\n+ [ ] a\n')
 
@@ -1562,7 +1560,7 @@ describe('frontmatter separator line', () => {
 
   it('keeps the frontmatter when the file ends at the closing fence', async () => {
     const { session, writes } = harness({ disk: '---\nid: x\n---' })
-    session.load()
+    void session.revalidate()
     await settled()
     session.editorChanged('hello')
     await session.flush()

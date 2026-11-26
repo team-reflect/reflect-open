@@ -133,13 +133,13 @@ async function emitChange(changes: FileChange[]): Promise<void> {
 /**
  * The session of `path` and its snapshot, as an object.
  */
-function useNoteDocument(path: string) {
+function useSessionAndSnapshot(path: string) {
   const [session, snapshot] = useNoteSession(path)
   return { session, snapshot }
 }
 
 async function readyHook() {
-  const hook = await mount(() => useNoteDocument('notes/a.md'))
+  const hook = await mount(() => useSessionAndSnapshot('notes/a.md'))
   await vi.waitFor(() => expect(hook.result.current.snapshot.status).toBe('ready'))
   return hook
 }
@@ -168,7 +168,7 @@ describe('useNoteSession', () => {
   })
 
   it('debounces edits into an atomic write and clears dirty', async () => {
-    const hook = await mount(() => useNoteDocument('notes/a.md'))
+    const hook = await mount(() => useSessionAndSnapshot('notes/a.md'))
     await act(() => clock.advance(0))
     expect(hook.result.current.snapshot.status).toBe('ready')
 
@@ -182,7 +182,7 @@ describe('useNoteSession', () => {
   })
 
   it('flushAll persists a pending edit without waiting out the debounce (quit path)', async () => {
-    const hook = await mount(() => useNoteDocument('notes/a.md'))
+    const hook = await mount(() => useSessionAndSnapshot('notes/a.md'))
     await act(() => clock.advance(0))
     expect(hook.result.current.snapshot.status).toBe('ready')
 
@@ -205,8 +205,8 @@ describe('useNoteSession', () => {
     })
     editor.getMarkdown = getMarkdown
 
-    await act(() => hook.result.current.session?.attachEditor(editor))
-    await act(() => hook.result.current.session?.attachEditor(null))
+    const detachEditor = hook.result.current.session.attachEditor(editor)
+    await act(() => detachEditor())
     await act(() => core.noteSessions.flushAll())
 
     expect(getMarkdown).toHaveBeenCalledOnce()
@@ -223,7 +223,7 @@ describe('useNoteSession', () => {
     expect(writes()).toEqual(['# Hello\n\nEdited\n'])
     const read = vi.spyOn(noteFile, 'readWithHash')
 
-    const again = await mount(() => useNoteDocument('notes/a.md'))
+    const again = await mount(() => useSessionAndSnapshot('notes/a.md'))
 
     // The first render already holds the note: no loading state.
     expect(again.result.current.session).toBe(session)
@@ -243,7 +243,7 @@ describe('useNoteSession', () => {
       ['notes/a.md', 'notes/src.md'],
     )
 
-    const hook = await mount(() => useNoteDocument('notes/a.md'))
+    const hook = await mount(() => useSessionAndSnapshot('notes/a.md'))
     await act(() => clock.advance(0))
     expect(hook.result.current.snapshot.status).toBe('ready')
 
@@ -252,9 +252,7 @@ describe('useNoteSession', () => {
 
     // A settle point (window blur): the rewrite fires without waiting out the
     // quiet period, then the alias lands through the normal save pipeline.
-    await act(() => {
-      core.noteSessions.settleAll()
-    })
+    await act(() => core.noteSessions.flushAll())
     await act(() => runAllTimers())
 
     expect(file('notes/src.md')).toBe('see [[New Title]]\n')
@@ -270,7 +268,7 @@ describe('useNoteSession', () => {
 
     const hook = await mount(
       ({ path }: { path: string } = { path: 'notes/a.md' }) => {
-        return useNoteDocument(path)
+        return useSessionAndSnapshot(path)
       },
       { initialProps: { path: 'notes/a.md' } },
     )
@@ -318,7 +316,7 @@ describe('useNoteSession', () => {
   it('reloads a clean buffer on a real external change', async () => {
     const { result } = await readyHook()
     const editor = fakeEditor()
-    await act(() => result.current.session?.attachEditor(editor))
+    result.current.session.attachEditor(editor)
 
     noteFile.set('notes/a.md', '# Changed outside\n')
     await act(() => emitChange([{ path: 'notes/a.md', kind: 'upsert' }]))
@@ -330,7 +328,7 @@ describe('useNoteSession', () => {
     noteFile.set('notes/b.md', '# Hello\n')
 
     const hook = await mount(
-      ({ path }: { path: string } = { path: 'notes/a.md' }) => useNoteDocument(path),
+      ({ path }: { path: string } = { path: 'notes/a.md' }) => useSessionAndSnapshot(path),
       {
         initialProps: { path: 'notes/a.md' },
       },
@@ -350,7 +348,7 @@ describe('useNoteSession', () => {
   it('a note switch gives the next note another session id, so its editor remounts', async () => {
     noteFile.set('notes/b.md', '# B\n')
     const hook = await mount(
-      ({ path }: { path: string } = { path: 'notes/a.md' }) => useNoteDocument(path),
+      ({ path }: { path: string } = { path: 'notes/a.md' }) => useSessionAndSnapshot(path),
       { initialProps: { path: 'notes/a.md' } },
     )
     await vi.waitFor(() => expect(hook.result.current.snapshot.status).toBe('ready'))
@@ -369,7 +367,7 @@ describe('useNoteSession', () => {
     const renders: { route: string; editorPath: string | null; content: string | null }[] = []
     const hook = await mount(
       ({ path }: { path: string } = { path: 'notes/a.md' }) => {
-        const document = useNoteDocument(path)
+        const document = useSessionAndSnapshot(path)
         renders.push({
           route: path,
           editorPath: document.snapshot.path,
@@ -394,14 +392,14 @@ describe('useNoteSession', () => {
   it("an editor's input reaches only the note it was opened on", async () => {
     noteFile.set('notes/b.md', '# B\n')
     const hook = await mount(
-      ({ path }: { path: string } = { path: 'notes/a.md' }) => useNoteDocument(path),
+      ({ path }: { path: string } = { path: 'notes/a.md' }) => useSessionAndSnapshot(path),
       { initialProps: { path: 'notes/a.md' } },
     )
     await vi.waitFor(() => expect(hook.result.current.snapshot.status).toBe('ready'))
     // The session A's editor was mounted with, as the pane hands it over.
     const sessionA = hook.result.current.session
     const editor = fakeEditor()
-    await act(() => sessionA.attachEditor(editor))
+    const detachEditor = sessionA.attachEditor(editor)
 
     await hook.rerender({ path: 'notes/b.md' })
     await vi.waitFor(() => expect(hook.result.current.snapshot.initialContent).toBe('# B\n'))
@@ -412,7 +410,7 @@ describe('useNoteSession', () => {
       sessionA.editorChanged('# Hello\n\ntyped on A\n')
       return '# Hello\n\ntyped on A\n'
     }
-    await act(() => sessionA.attachEditor(null))
+    await act(() => detachEditor())
     await act(() => clock.advance(2000))
 
     expect(noteFile.getWrites('notes/b.md')).toEqual([])
@@ -420,7 +418,7 @@ describe('useNoteSession', () => {
   })
 
   it('a same-graph generation bump keeps unsaved edits and saves with the new generation', async () => {
-    const hook = await mount(() => useNoteDocument('notes/a.md'))
+    const hook = await mount(() => useSessionAndSnapshot('notes/a.md'))
     await act(() => clock.advance(0))
 
     // Reopening the same graph bumps the generation without remounting the
