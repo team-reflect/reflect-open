@@ -163,7 +163,7 @@ function seedGraph(files: Record<string, string>, indexed: readonly string[] = [
 describe('useNoteSession', () => {
   it('loads the note and seeds the editor content', async () => {
     const { result } = await readyHook()
-    expect(result.current.snapshot.initialContent).toBe('# Hello\n')
+    expect(result.current.snapshot.loadedContent).toBe('# Hello\n')
     expect(result.current.snapshot.dirty).toBe(false)
   })
 
@@ -353,7 +353,7 @@ describe('useNoteSession', () => {
     const idOnA = hook.result.current.session.id
 
     await hook.rerender({ path: 'notes/b.md' })
-    await vi.waitFor(() => expect(hook.result.current.snapshot.initialContent).toBe('# B\n'))
+    await vi.waitFor(() => expect(hook.result.current.snapshot.loadedContent).toBe('# B\n'))
 
     // The editor is keyed on the id: reusing A's would leave A's text on
     // screen, wired to B's session.
@@ -369,7 +369,7 @@ describe('useNoteSession', () => {
         renders.push({
           route: path,
           editorPath: document.snapshot.path,
-          content: document.snapshot.status === 'ready' ? document.snapshot.initialContent : null,
+          content: document.snapshot.status === 'ready' ? document.snapshot.loadedContent : null,
         })
         return document
       },
@@ -377,7 +377,7 @@ describe('useNoteSession', () => {
     )
     await vi.waitFor(() => expect(hook.result.current.snapshot.status).toBe('ready'))
     await hook.rerender({ path: 'notes/b.md' })
-    await vi.waitFor(() => expect(hook.result.current.snapshot.initialContent).toBe('# B\n'))
+    await vi.waitFor(() => expect(hook.result.current.snapshot.loadedContent).toBe('# B\n'))
 
     const owner: Record<string, string> = { '# Hello\n': 'notes/a.md', '# B\n': 'notes/b.md' }
     for (const render of renders) {

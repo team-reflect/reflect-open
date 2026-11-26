@@ -321,7 +321,7 @@ describe('createNoteSession', () => {
     session.externalChanged()
     await settled()
     expect(snapshots.at(-1)?.protected).toBe(true)
-    expect(snapshots.at(-1)?.initialContent).toBe('+ [ ] now has tasks\n')
+    expect(snapshots.at(-1)?.loadedContent).toBe('+ [ ] now has tasks\n')
   })
 })
 
@@ -418,7 +418,7 @@ describe('external changes and saves', () => {
     expect(h.snapshots.at(-1)).toMatchObject({
       dirty: false,
       protected: true,
-      initialContent: '# Hello\n\nmine\n\n+ [ ] theirs\n',
+      loadedContent: '# Hello\n\nmine\n\n+ [ ] theirs\n',
     })
     h.session.editorChanged('# Hello\n\nmine\n')
     await settled()
@@ -658,7 +658,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
     const ready = h.snapshots.at(-1)
     expect(ready?.status).toBe('ready')
     expect(ready?.protected).toBe(false)
-    expect(ready?.initialContent).toBe('# Hello\n')
+    expect(ready?.loadedContent).toBe('# Hello\n')
   })
 
   it('a protected note shows the full file, frontmatter included', async () => {
@@ -672,7 +672,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
     expect(ready?.protected).toBe(true)
     // The read-only view's job is honest display of a file we refuse to
     // touch — hiding the frontmatter would misrepresent it.
-    expect(ready?.initialContent).toBe(`${FM}+ [ ] lossy body\n`)
+    expect(ready?.loadedContent).toBe(`${FM}+ [ ] lossy body\n`)
   })
 
   it('writes with the generation of its graph reopened, never of another graph', async () => {
@@ -852,7 +852,7 @@ describe('missing-note seed (new ordinary notes)', () => {
     const ready = h.snapshots.at(-1)
     expect(ready?.status).toBe('ready')
     expect(ready?.missing).toBe(true)
-    expect(ready?.initialContent).toBe(SEED)
+    expect(ready?.loadedContent).toBe(SEED)
     expect(ready?.dirty).toBe(false)
     expect(h.writes).toEqual([]) // opening never litters the graph
     // The rename tracker baselines on the real (empty) disk content, never
@@ -930,7 +930,7 @@ describe('missing-note seed (new ordinary notes)', () => {
     const ready = h.snapshots.at(-1)
     expect(ready?.status).toBe('ready')
     expect(ready?.missing).toBe(true)
-    expect(ready?.initialContent).toBe('')
+    expect(ready?.loadedContent).toBe('')
     expect(h.writes).toEqual([])
   })
 
@@ -941,7 +941,7 @@ describe('missing-note seed (new ordinary notes)', () => {
 
     const ready = h.snapshots.at(-1)
     expect(ready?.missing).toBe(false)
-    expect(ready?.initialContent).toBe('# Hello\n')
+    expect(ready?.loadedContent).toBe('# Hello\n')
     expect(h.contents).toEqual([{ content: '# Hello\n', origin: 'load' }])
   })
 
@@ -1422,7 +1422,7 @@ describe('commitSourceEdit', () => {
     // the un-toggled line (no divergence with the rolled-back Tasks list).
     expect(h.session.liveContent()).toBe('+ [ ] x\n')
     expect(h.applied.at(-1)).toBe('+ [ ] x\n')
-    expect(h.snapshots.at(-1)?.initialContent).toBe('+ [ ] x\n')
+    expect(h.snapshots.at(-1)?.loadedContent).toBe('+ [ ] x\n')
     expect(h.snapshots.at(-1)?.error).toBeNull()
   })
 
@@ -1525,7 +1525,7 @@ describe('frontmatter separator line', () => {
     void session.revalidate()
     await settled()
 
-    expect(snapshots.at(-1)?.initialContent).toBe('# T\n')
+    expect(snapshots.at(-1)?.loadedContent).toBe('# T\n')
   })
 
   it('keeps a blank line added above the body across a reopen', async () => {
@@ -1541,7 +1541,7 @@ describe('frontmatter separator line', () => {
     const second = harness({ disk: saved })
     void second.session.revalidate()
     await settled()
-    expect(second.snapshots.at(-1)?.initialContent).toBe('\n# T\n')
+    expect(second.snapshots.at(-1)?.loadedContent).toBe('\n# T\n')
   })
 
   it('keeps a leading blank line through a source edit', async () => {

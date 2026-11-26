@@ -96,7 +96,7 @@ class TestNoteSessionImpl implements TestNoteSession {
     this.#store = new WritableStore<NoteSessionSnapshot>({
       path: options.path,
       status: this.#loaded ? 'ready' : 'loading',
-      initialContent: this.#content,
+      loadedContent: this.#content,
       protected: false,
       dirty: options.dirty ?? false,
       isPrivate: false,
