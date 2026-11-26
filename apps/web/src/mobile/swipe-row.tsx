@@ -58,9 +58,9 @@ export function SwipeRow({
   const scrollerRef = useRef<HTMLDivElement>(null)
   const watchRef = useRef<ScrollSettleWatch | null>(null)
   const positionedRef = useRef(false)
-  // Where the row was when a finger held back a placement, or `null`.
+  // Where the row was when a press held back a placement, or `null`.
   const heldAtRef = useRef<number | null>(null)
-  // Bumped when a still finger lifts, so the placement below runs again.
+  // Bumped when a press ends without moving the row, so the placement reruns.
   const [lifts, setLifts] = useState(0)
 
   const reportSettled = useEffectEvent((scroller: HTMLElement) => {
@@ -90,20 +90,14 @@ export function SwipeRow({
         deactivateIfClosed()
         reportSettled(scroller)
       },
-      signal: controller.signal,
-    })
-    // A finger that lifts without moving the row leaves no settle report, so
-    // the placement it held back runs again. These listeners run after the
-    // watch's own, so `isTouching` is already up to date.
-    const placeHeld = (): void => {
-      deactivateIfClosed()
-      if (heldAtRef.current === scroller.scrollLeft) {
-        setLifts((count) => count + 1)
-      }
-    }
-    scroller.addEventListener('touchend', placeHeld, { passive: true, signal: controller.signal })
-    scroller.addEventListener('touchcancel', placeHeld, {
-      passive: true,
+      // A press that ends without moving the row leaves no settle report, so
+      // the placement it held back runs again.
+      onPressEnd: () => {
+        deactivateIfClosed()
+        if (heldAtRef.current === scroller.scrollLeft) {
+          setLifts((count) => count + 1)
+        }
+      },
       signal: controller.signal,
     })
     return () => {
@@ -112,7 +106,7 @@ export function SwipeRow({
     }
   }, [])
 
-  // A finger on the row owns its position; the settle report reconciles later.
+  // A press on the row owns its position; the settle report reconciles later.
   useLayoutEffect(() => {
     const scroller = scrollerRef.current
     if (scroller === null) {
