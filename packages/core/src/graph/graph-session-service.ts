@@ -345,6 +345,8 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
     const run = async (): Promise<boolean> => {
       let opened = false
       try {
+        // The open re-roots the backend, which then refuses the prior graph's writes.
+        await this.#deps.noteSessions.flushAll()
         const info = await this.#deps.ipc.call('graph_open', { path: root })
         if (seq !== this.#openSeq) {
           return false // superseded by a newer open

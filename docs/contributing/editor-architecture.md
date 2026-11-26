@@ -29,15 +29,17 @@ decides how long each lives. A view never creates, loads or destroys a
 session: `use-note-session.ts` gets the session of a path and subscribes to
 it.
 
-The subscription is the only thing a view contributes. A session with a
-subscriber is **observed**: it reconciles with the note file on every change.
+The subscription is the only thing a view contributes to a session's
+lifetime. A session with a subscriber is **observed**: it reconciles with the
+note file on every write to it.
 When the last subscriber leaves (the pane unmounts, a virtual row scrolls
 away, a tab switches), the session flushes and its pending title rename
-settles, and the session stays: its text, its unsaved edits and its pending
-writes are still there for the next view, which renders them in its first
+settles, and the session stays: its text, and any edit a failed write left
+unsaved, are still there for the next view, which renders them in its first
 commit. An unobserved session reads nothing; a file change marks it stale, and
-it catches up when it is next observed or committed to. The service keeps a bounded number of
-unobserved sessions and disposes the least recently observed clean ones.
+it catches up when it is next observed or committed to. The service keeps a
+bounded number of unobserved sessions and disposes the least recently
+observed clean ones.
 
 Tests drive the session and the service directly over test doubles
 (`note-session.test.ts`, `note-session-service.test.ts`, with

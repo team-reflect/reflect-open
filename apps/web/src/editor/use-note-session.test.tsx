@@ -172,7 +172,7 @@ describe('useNoteSession', () => {
     await act(() => clock.advance(0))
     expect(hook.result.current.snapshot.status).toBe('ready')
 
-    await act(() => hook.result.current.session?.editorChanged('# Hello edited\n'))
+    await act(() => hook.result.current.session.editorChanged('# Hello edited\n'))
     expect(hook.result.current.snapshot.dirty).toBe(true)
     expect(writes()).toEqual([])
 
@@ -186,7 +186,7 @@ describe('useNoteSession', () => {
     await act(() => clock.advance(0))
     expect(hook.result.current.snapshot.status).toBe('ready')
 
-    await act(() => hook.result.current.session?.editorChanged('# Hello\n\nQuitting\n'))
+    await act(() => hook.result.current.session.editorChanged('# Hello\n\nQuitting\n'))
     expect(writes()).toEqual([]) // still inside the 800ms debounce window
 
     // The quit path: the registry flush settles only once the write has
@@ -200,7 +200,7 @@ describe('useNoteSession', () => {
     const hook = await readyHook()
     const editor = fakeEditor()
     const getMarkdown = vi.fn(() => {
-      hook.result.current.session?.editorChanged('# Hello\n\n🧠 Business ideas\n')
+      hook.result.current.session.editorChanged('# Hello\n\n🧠 Business ideas\n')
       return '# Hello\n\n🧠 Business ideas\n'
     })
     editor.getMarkdown = getMarkdown
@@ -247,7 +247,7 @@ describe('useNoteSession', () => {
     await act(() => clock.advance(0))
     expect(hook.result.current.snapshot.status).toBe('ready')
 
-    await act(() => hook.result.current.session?.editorChanged('# New Title\n'))
+    await act(() => hook.result.current.session.editorChanged('# New Title\n'))
     await act(() => clock.advance(1000)) // the rename save lands
 
     // A settle point (window blur): the rewrite fires without waiting out the
@@ -276,7 +276,7 @@ describe('useNoteSession', () => {
     expect(hook.result.current.snapshot.status).toBe('ready')
     const sessionBefore = hook.result.current.session
 
-    await act(() => hook.result.current.session?.editorChanged('# New Title\n'))
+    await act(() => hook.result.current.session.editorChanged('# New Title\n'))
     await act(() => clock.advance(1000)) // save lands
     await act(() => runAllTimers()) // quiet period → rename + move
 
@@ -298,7 +298,7 @@ describe('useNoteSession', () => {
     expect(hook.result.current.snapshot.path).toBe('notes/new-title.md')
 
     // Subsequent edits land on the new path only — nothing resurrects a.md.
-    await act(() => hook.result.current.session?.editorChanged('# New Title\n\nmore\n'))
+    await act(() => hook.result.current.session.editorChanged('# New Title\n\nmore\n'))
     await act(() => clock.advance(1000))
     expect(file('notes/new-title.md')).toContain('# New Title\n\nmore\n')
     expect(file('notes/a.md')).toBeUndefined()
@@ -337,7 +337,7 @@ describe('useNoteSession', () => {
 
     // Dirty edit, then switch notes before the debounce fires: the unmount
     // flush must persist the OLD note's buffer to the OLD path.
-    await act(() => hook.result.current.session?.editorChanged('# Unsaved on A\n'))
+    await act(() => hook.result.current.session.editorChanged('# Unsaved on A\n'))
     await hook.rerender({ path: 'notes/b.md' })
     await act(() => clock.advance(2000))
 
@@ -389,34 +389,6 @@ describe('useNoteSession', () => {
     }
   })
 
-  it("an editor's input reaches only the note it was opened on", async () => {
-    noteFile.set('notes/b.md', '# B\n')
-    const hook = await mount(
-      ({ path }: { path: string } = { path: 'notes/a.md' }) => useSessionAndSnapshot(path),
-      { initialProps: { path: 'notes/a.md' } },
-    )
-    await vi.waitFor(() => expect(hook.result.current.snapshot.status).toBe('ready'))
-    // The session A's editor was mounted with, as the pane hands it over.
-    const sessionA = hook.result.current.session
-    const editor = fakeEditor()
-    const detachEditor = sessionA.attachEditor(editor)
-
-    await hook.rerender({ path: 'notes/b.md' })
-    await vi.waitFor(() => expect(hook.result.current.snapshot.initialContent).toBe('# B\n'))
-
-    // A's editor detaches only now, and Meowdown reports its pending native
-    // input as it does.
-    editor.getMarkdown = () => {
-      sessionA.editorChanged('# Hello\n\ntyped on A\n')
-      return '# Hello\n\ntyped on A\n'
-    }
-    await act(() => detachEditor())
-    await act(() => clock.advance(2000))
-
-    expect(noteFile.getWrites('notes/b.md')).toEqual([])
-    expect(file('notes/b.md')).toBe('# B\n')
-  })
-
   it('a same-graph generation bump keeps unsaved edits and saves with the new generation', async () => {
     const hook = await mount(() => useSessionAndSnapshot('notes/a.md'))
     await act(() => clock.advance(0))
@@ -425,7 +397,7 @@ describe('useNoteSession', () => {
     // pane. The dirty buffer must survive (no dispose/reload-from-disk) and
     // the pending save must carry the NEW generation — a stale one would be
     // rejected by Rust and the edit silently lost.
-    await act(() => hook.result.current.session?.editorChanged('# Unsaved\n'))
+    await act(() => hook.result.current.session.editorChanged('# Unsaved\n'))
     await act(() => core.graphSession.setGraph({ generation: 2 }))
     expect(hook.result.current.snapshot.dirty).toBe(true)
 

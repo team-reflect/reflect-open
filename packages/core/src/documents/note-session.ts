@@ -31,7 +31,7 @@ export interface NoteSessionDeps {
 }
 
 /**
- * Creates the state machine of one note. {@link NoteSessionService} owns the result.
+ * Creates the state machine of one note.
  */
 export function createNoteSession(
   deps: NoteSessionDeps,
@@ -74,7 +74,7 @@ class NoteSessionImpl implements ManagedNoteSession {
   #missing = false
   #error: string | null = null
 
-  // Pipeline state (never surfaces).
+  // Pipeline state.
   /**
    * The **body** as of the last editor change (the editor never sees frontmatter).
    */
@@ -154,16 +154,13 @@ class NoteSessionImpl implements ManagedNoteSession {
   }
 
   readonly subscribe = (listener: VoidFunction): Unlisten => {
-    const unlisten = this.#store.subscribe(listener)
     if (!this.#observed) {
       this.#observed = true
       this.#onObservedChange?.(true)
     }
+    const unlisten = this.#store.subscribe(listener)
     return () => {
       unlisten()
-      if (this.#store.subscribed()) {
-        return
-      }
       // A view that swaps its subscription within one task is still a view.
       queueMicrotask(() => {
         if (this.#observed && !this.#store.subscribed()) {
@@ -254,8 +251,7 @@ class NoteSessionImpl implements ManagedNoteSession {
         // Re-check at execution time and take the freshest buffer — a queued
         // step can run behind a slow prior write, during which the user may
         // have reverted or kept typing, or the session may have been discarded
-        // for a delete. (After dispose the buffer is frozen, so this same step
-        // doubles as the final flush.)
+        // for a delete.
         if (this.#discarded || this.#deleting || !this.#dirty || this.#isProtected) {
           return
         }
@@ -287,7 +283,7 @@ class NoteSessionImpl implements ManagedNoteSession {
       .catch(async (cause) => {
         this.#deps.logger.error('failed to save note:', cause)
         this.#error = errorMessage(cause)
-        await this.#reconcileFromDisk(false)
+        await this.#reconcileFromDisk(false, false)
         if (retryOnFailure) {
           this.#save(false)
         }
@@ -447,7 +443,7 @@ class NoteSessionImpl implements ManagedNoteSession {
    * Re-read the note and reconcile the buffer with what's on disk (the
    * external-change path).
    */
-  async #reconcileFromDisk(saveIfDirty: boolean, resetIfGone = false): Promise<void> {
+  async #reconcileFromDisk(saveIfDirty: boolean, resetIfGone: boolean): Promise<void> {
     let content: string
     let hash: string
     try {
@@ -582,7 +578,7 @@ class NoteSessionImpl implements ManagedNoteSession {
           // replay it now against the committed state.
           if (this.#missedChange) {
             this.#missedChange = false
-            void this.#reconcileFromDisk(true)
+            this.externalChanged()
           }
         }
       }
@@ -618,7 +614,7 @@ class NoteSessionImpl implements ManagedNoteSession {
       this.#load() // the file may exist now
       return
     }
-    void this.#reconcileFromDisk(true)
+    void this.#reconcileFromDisk(true, false)
   }
 
   updateFrontmatter(patch: FrontmatterPatch): boolean {
@@ -661,11 +657,6 @@ class NoteSessionImpl implements ManagedNoteSession {
   }
 
   async commitSourceEdit(transform: NoteSourceTransform): Promise<NoteSessionCommit | null> {
-    // What the load can't change is refused at once; a stalled read must not
-    // hold a session that could never write.
-    if (this.#disposed) {
-      return null
-    }
     if (this.#status === 'loading') {
       // Never rejects: a failed load settles as `status === 'error'`, which the
       // gate below refuses like any other unready session.

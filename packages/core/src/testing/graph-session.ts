@@ -250,6 +250,7 @@ export function createTestGraphSessionService<Services = never>(
   const logger = options?.logger ?? createTestLoggerService()
   const role = options?.role ?? 'main'
   const createServices = options?.createServices
+  const noteSessions = options?.noteSessions ?? createTestNoteSessionService()
   const inner: GraphSessionService<Services> = createGraphSessionService<Services>({
     ipc: options?.ipc ?? createDefaultIpc(),
     indexLifecycle:
@@ -274,8 +275,8 @@ export function createTestGraphSessionService<Services = never>(
           subscribe: (listener) => testService.subscribe(listener),
         },
       }),
-    noteSessions: options?.noteSessions ?? createTestNoteSessionService(),
-    noteMove: options?.noteMove ?? createTestNoteMoveService(),
+    noteSessions,
+    noteMove: options?.noteMove ?? createTestNoteMoveService({ noteSessions }),
     icloudNative: options?.icloudNative ?? createTestICloudNativeService(),
     logger,
     createServices,

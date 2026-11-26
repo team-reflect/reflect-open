@@ -262,7 +262,7 @@ describe('an unobserved session', () => {
     await settled()
 
     for (let i = 0; i < 32; i += 1) {
-      noteSessions.sessionFor(`daily/2026-01-${String(i + 1).padStart(2, '0')}.md`)
+      noteSessions.prefetch(`daily/2026-01-${String(i + 1).padStart(2, '0')}.md`)
     }
 
     expect(noteSessions.existingSessionFor(PATH)).toBeNull()
@@ -278,7 +278,7 @@ describe('an unobserved session', () => {
     await settled()
 
     for (let i = 0; i < 40; i += 1) {
-      noteSessions.sessionFor(`daily/2026-01-${String(i + 1).padStart(2, '0')}.md`)
+      noteSessions.prefetch(`daily/2026-01-${String(i + 1).padStart(2, '0')}.md`)
     }
 
     expect(noteSessions.existingSessionFor(PATH)).toBe(dirty)

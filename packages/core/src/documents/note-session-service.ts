@@ -52,7 +52,7 @@ interface SessionEntry {
   readonly session: ManagedNoteSession
   readonly coordinator: SessionCoordinator | null
   /**
-   * Whether the session has a subscriber.
+   * Whether a view shows the session.
    */
   observed: boolean
   /**
@@ -92,13 +92,19 @@ class NoteSessionServiceImpl implements NoteSessionService {
     if (entry === undefined) {
       return null
     }
-    await this.#catchUp(entry)
+    if (entry.observed) {
+      // An observed session follows the note file by itself.
+      await entry.catchingUp
+    } else {
+      await this.#catchUp(entry)
+    }
     // The catch-up may have outlived the entry, or the session may have moved.
     return this.#entries.get(path) === entry ? entry.session : null
   }
 
   prefetch(path: string): void {
     void this.#catchUp(this.#entryFor(path))
+    this.#evict()
   }
 
   dirtyPaths(): string[] {
@@ -184,7 +190,6 @@ class NoteSessionServiceImpl implements NoteSessionService {
       stale: true,
       catchingUp: null,
     }
-    this.#evict(MAX_IDLE_SESSIONS - 1)
     this.#entries.set(path, entry)
     this.#idle.add(entry)
     this.#stopFileChanges ??= this.#deps.fileChanges.subscribe(({ changes }) => {
@@ -207,7 +212,7 @@ class NoteSessionServiceImpl implements NoteSessionService {
     }
     this.#idle.add(entry)
     void this.#flushAndSettle(entry)
-    this.#evict(MAX_IDLE_SESSIONS)
+    this.#evict()
   }
 
   #invalidate(entry: SessionEntry): void {
@@ -255,7 +260,8 @@ class NoteSessionServiceImpl implements NoteSessionService {
       if (change.kind === 'upsert') {
         this.#invalidate(entry)
       } else if (entry.observed || session.isDirty() || session.isSaving()) {
-        // The session keeps its text; its next catch-up finds the file gone.
+        // The session keeps its text. A view that shows it keeps it too: the
+        // next view finds the file gone.
         entry.stale = true
       } else {
         this.#drop(entry)
@@ -264,10 +270,10 @@ class NoteSessionServiceImpl implements NoteSessionService {
   }
 
   /**
-   * Dispose the least recently observed clean sessions beyond `limit` idle ones.
+   * Dispose the least recently observed clean sessions beyond the idle limit.
    */
-  #evict(limit: number): void {
-    let excess = this.#idle.size - limit
+  #evict(): void {
+    let excess = this.#idle.size - MAX_IDLE_SESSIONS
     for (const entry of this.#idle) {
       if (excess <= 0) {
         return
@@ -280,9 +286,6 @@ class NoteSessionServiceImpl implements NoteSessionService {
     }
   }
 
-  /**
-   * Flush and dispose the session, then settle and dispose its coordinator.
-   */
   #drop(entry: SessionEntry): void {
     const { session, coordinator } = entry
     this.#forget(entry)

@@ -551,7 +551,7 @@ describe('rename coordinator', () => {
     expect(indexStore.moved()).toEqual([{ from: PLACEHOLDER, to: 'notes/new-title.md' }])
   })
 
-  it('a rename after a move healed by id works against the healed path', async () => {
+  it('a rename after a retarget works against the new path', async () => {
     const { coordinator, noteFile, indexStore } = setup({
       path: PLACEHOLDER,
       files: { 'notes/b.md': managed('# C\n') },

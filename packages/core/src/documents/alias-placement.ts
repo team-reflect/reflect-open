@@ -8,10 +8,8 @@ import type { NoteDocumentService } from './note-document-service.ts'
  * note records the title it renamed *away from* as an alias, so any inbound
  * link the rewrite missed (or couldn't reach) still resolves to this note.
  *
- * Placement routes through the live session whenever the note is open — in
- * the renaming pane or a *reopened* one (the open-documents service is the
- * one liveness signal). A direct disk write under a reopened dirty buffer
- * would race the buffer's own save. Only when no session can take the patch
+ * Placement routes through the note's session whenever it has one. A direct
+ * disk write under a dirty buffer would race the buffer's own save. Only when no session can take the patch
  * does the alias go straight to disk; a loading/clean session reconciles it
  * like any external change, and a header-only patch is body-safe even for
  * protected notes.

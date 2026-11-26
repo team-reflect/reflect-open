@@ -98,9 +98,7 @@ export interface NoteSessionOptions {
   /**
    * Treat a missing file as an empty note on load instead of an error; the
    * file is then created by the first save — Plan 06's lazy daily-note
-   * contract: opening a day never litters the graph, writing does. Applies
-   * only to the initial load: a note deleted mid-session still reconciles to
-   * a no-op rather than silently emptying the editor.
+   * contract: opening a day never litters the graph, writing does.
    */
   createIfMissing?: boolean | undefined
   /**
@@ -289,7 +287,7 @@ export interface ManagedNoteSession extends NoteSession {
  */
 export interface NoteSessionService {
   /**
-   * Returns the session of `path`. Creates it on first use, without reading the file.
+   * Returns the session of `path`. Creates it on first use, with no other effect: a render may call it.
    */
   sessionFor(path: string): NoteSession
   /**
