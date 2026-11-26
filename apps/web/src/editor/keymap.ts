@@ -35,6 +35,13 @@ const EDITOR_BINDINGS = Object.fromEntries(
 export const AI_MENU_BINDING = 'Mod-Shift-j'
 
 /**
+ * Opens the language picker of the code block under the caret. Shared with the
+ * app like `Mod-k`, so not registered editor-scope: the handler declines
+ * outside a code block and `Mod-p` falls through to the app's Print.
+ */
+export const CODE_BLOCK_LANGUAGE_BINDING = 'Mod-p'
+
+/**
  * Reflect's own editor-scope bindings (bound via `useKeymap` inside the
  * editor, not by meowdown's engine). Declared here, next to meowdown's, so
  * the shortcuts UI lists them — a feature registering its key elsewhere
