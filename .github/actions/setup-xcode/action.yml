@@ -10,7 +10,7 @@ runs:
   steps:
     - name: Turn off Spotlight
       shell: bash
-      run: '"$GITHUB_WORKSPACE/scripts/ci-spotlight-off.sh"'
+      run: ./scripts/ci-spotlight-off.sh
 
     - name: List installed Xcode versions
       shell: bash
