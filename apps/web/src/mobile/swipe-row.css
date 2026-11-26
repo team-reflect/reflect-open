@@ -6,14 +6,6 @@
   }
 }
 
-/* Index from the trailing edge: the outermost (primary) action is 0. */
-.swipe-action:nth-last-child(1) {
-  --swipe-action-index: 0;
-}
-.swipe-action:nth-last-child(2) {
-  --swipe-action-index: 1;
-}
-
 /* An idle row paints no actions, so the surface needs no layer of its own. */
 .swipe-row:not([data-active]) .swipe-row-actions {
   visibility: hidden;
@@ -27,10 +19,11 @@
 }
 
 /* Only a touched or open row animates, so a long list holds no idle animations.
-   The spacing units match the `w-20` buttons and the `gap-2` / `px-2` actions box. */
-.swipe-row[data-active] .swipe-action-body {
+   Each action has an equal share of the scroll range, counted from the trailing
+   edge, and it grows over the second half of that share. */
+.swipe-row[data-active] .swipe-action {
   animation: swipe-action-grow linear both;
   animation-timeline: scroll(nearest inline);
-  animation-range: calc(var(--spacing) * (22 * var(--swipe-action-index) + 12))
-    calc(var(--spacing) * (22 * var(--swipe-action-index) + 24));
+  animation-range: calc((sibling-count() - sibling-index() + 0.5) / sibling-count() * 100%)
+    calc((sibling-count() - sibling-index() + 1) / sibling-count() * 100%);
 }

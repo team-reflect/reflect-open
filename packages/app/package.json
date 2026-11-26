@@ -9,7 +9,7 @@
     "./testing": "./src/testing/index.ts"
   },
   "dependencies": {
-    "@ocavue/utils": "^1.12.0",
+    "@ocavue/utils": "^1.13.0",
     "@reflect/core": "workspace:*",
     "@reflect/utils": "workspace:*",
     "zod": "^4.6.7"
