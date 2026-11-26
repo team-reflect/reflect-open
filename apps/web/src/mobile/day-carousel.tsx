@@ -4,6 +4,7 @@ import { DaySlide } from '@/mobile/day-slide.tsx'
 import { useKeyboardVisible } from '@/mobile/use-keyboard.ts'
 import { useDayCarousel } from '@/mobile/use-day-carousel.ts'
 import { cn } from '@/lib/utils.ts'
+import { range } from '@ocavue/utils'
 
 interface DayCarouselProps {
   /** The selected day (from the route). Drives the carousel position. */
@@ -69,10 +70,7 @@ export function DayCarousel({
       />
     ))
   }, [dayWindow])
-  const mountedIndexes = Array.from(
-    { length: mountedRange.high - mountedRange.low + 1 },
-    (_, offset) => mountedRange.low + offset,
-  )
+  const mountedIndexes = range(mountedRange.low, mountedRange.high + 1)
 
   return (
     <div
