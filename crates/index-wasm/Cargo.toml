@@ -21,4 +21,9 @@ serde_json = { workspace = true }
 [target.'cfg(target_family = "wasm")'.dependencies]
 console_error_panic_hook = { workspace = true }
 js-sys = { workspace = true }
+sqlite-wasm-rs = { workspace = true }
 wasm-bindgen = { workspace = true }
+
+[package.metadata.cargo-shear]
+# Linked only for its `wasm-bindgen` host functions.
+ignored = ["sqlite-wasm-rs"]

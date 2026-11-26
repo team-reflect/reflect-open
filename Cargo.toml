@@ -96,8 +96,8 @@ reconcile-text = "0.14.3"
 regex = "1.13.1"
 # reqwest 0.12 rides the exact version tauri-plugin-http already compiles.
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
-rusqlite = { version = "0.41.0", features = ["bundled"] }
-rusqlite_migration = "2.6.0"
+rusqlite = { version = "0.43.0", features = ["bundled"] }
+rusqlite_migration = "2.9.0"
 saphyr = "0.4.0"
 sea-query = { version = "1.0.2", default-features = false, features = ["backend-sqlite", "derive"] }
 serde = { version = "1.0.229", features = ["derive"] }
@@ -109,6 +109,7 @@ specta-swift = "=0.0.6"
 specta-typescript = "=0.0.15"
 specta-util = "=0.0.15"
 sqlite-vec = "0.1.9"
+sqlite-wasm-rs = { version = "0.6.3", default-features = false, features = ["wasm-bindgen"] }
 sqlite-wasm-vec = "0.1.3"
 strum = { version = "0.28.0", features = ["derive"] }
 tauri = "2.12.7"
