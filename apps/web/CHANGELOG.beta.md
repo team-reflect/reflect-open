@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.20.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.20.0-beta.5...v0.20.0-beta.6) (2026-11-26)
+
+
+### Bug Fixes
+
+* keep a note's session when its view unmounts ([#2335](https://github.com/team-reflect/reflect-open/issues/2335)) ([7b91b57](https://github.com/team-reflect/reflect-open/commit/7b91b5776fa237b7e1749ec8bacd76a461662c9f))
+* make the task group header and its add button larger ([#2330](https://github.com/team-reflect/reflect-open/issues/2330)) ([17c7007](https://github.com/team-reflect/reflect-open/commit/17c7007d60754ece52ec73d7931dfcc911ffffa1))
+* **mobile:** give a swiped row a soft shadow ([#2331](https://github.com/team-reflect/reflect-open/issues/2331)) ([113a68d](https://github.com/team-reflect/reflect-open/commit/113a68d75277b5c1f0e470257a53955eea5fa776))
+* **mobile:** size a swipe action button to its content ([#2333](https://github.com/team-reflect/reflect-open/issues/2333)) ([5579c14](https://github.com/team-reflect/reflect-open/commit/5579c1497e32323ca30bcae4e35406eea15513f6))
+
 ## [0.20.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.20.0-beta.4...v0.20.0-beta.5) (2026-11-25)
 
 
