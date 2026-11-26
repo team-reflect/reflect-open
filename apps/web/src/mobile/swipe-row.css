@@ -11,14 +11,14 @@
   visibility: hidden;
 }
 
-/* The surface of a touched or open row has its own compositing layer. It keeps
+/* The surface of a swiped or open row has its own compositing layer. It keeps
    the surface above the sticky actions inside a stacking context (iOS 26
    misorders them under virtua's `contain: layout` items). */
 .swipe-row[data-active] .swipe-row-surface {
   will-change: transform;
 }
 
-/* Only a touched or open row animates, so a long list holds no idle animations.
+/* Only a swiped or open row animates, so a long list holds no idle animations.
    Each action has an equal share of the scroll range, counted from the trailing
    edge, and it grows over the second half of that share. */
 .swipe-row[data-active] .swipe-action {

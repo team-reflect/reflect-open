@@ -78,22 +78,27 @@ export function SwipeRow({
       return
     }
     const controller = new AbortController()
-    // Ends the swipe styles once the row rests closed.
-    const deactivateIfClosed = (): void => {
-      if (Math.round(scroller.scrollLeft) === 0) {
-        delete scroller.dataset.active
-      }
-    }
+    // Any horizontal scroll (finger, trackpad, keyboard) turns on the swipe
+    // styles in `swipe-row.css`.
+    scroller.addEventListener(
+      'scroll',
+      () => {
+        scroller.dataset.active = ''
+      },
+      { passive: true, signal: controller.signal },
+    )
     watchRef.current = watchScrollSettle({
       element: scroller,
       onSettle: () => {
-        deactivateIfClosed()
+        // Ends the swipe styles once the row rests closed.
+        if (Math.round(scroller.scrollLeft) === 0) {
+          delete scroller.dataset.active
+        }
         reportSettled(scroller)
       },
       // A press that ends without moving the row leaves no settle report, so
       // the placement it held back runs again.
       onPressEnd: () => {
-        deactivateIfClosed()
         if (heldAtRef.current === scroller.scrollLeft) {
           setLifts((count) => count + 1)
         }
@@ -134,8 +139,6 @@ export function SwipeRow({
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>): void => {
       if (event.isPrimary) {
-        // Turns on the swipe styles in `swipe-row.css`.
-        event.currentTarget.dataset.active = ''
         onBeginInteraction()
       }
     },
