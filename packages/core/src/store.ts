@@ -179,10 +179,7 @@ export function combineStores<T extends unknown[], U>(
   let unlistens: Unlisten[] = []
 
   const onChange = () => {
-    for (const subscriber of [...subscribers]) {
-      if (!subscribers.has(subscriber)) {
-        continue
-      }
+    for (const subscriber of subscribers) {
       const next = get()
       if (next !== subscriber.last) {
         subscriber.last = next
