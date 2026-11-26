@@ -87,6 +87,15 @@ export function SwipeRow({
       },
       { passive: true, signal: controller.signal },
     )
+    // A row that rests where a press held back a placement runs that
+    // placement again. Returns whether it did.
+    const placeHeld = (): boolean => {
+      if (heldAtRef.current !== scroller.scrollLeft) {
+        return false
+      }
+      setLifts((count) => count + 1)
+      return true
+    }
     watchRef.current = watchScrollSettle({
       element: scroller,
       onSettle: () => {
@@ -94,15 +103,15 @@ export function SwipeRow({
         if (Math.round(scroller.scrollLeft) === 0) {
           delete scroller.dataset.active
         }
-        reportSettled(scroller)
-      },
-      // A press that ends without moving the row leaves no settle report, so
-      // the placement it held back runs again.
-      onPressEnd: () => {
-        if (heldAtRef.current === scroller.scrollLeft) {
-          setLifts((count) => count + 1)
+        // A settle report can still be waiting from a scroll before the press.
+        // When the press did not move the row, the held placement wins.
+        if (!placeHeld()) {
+          reportSettled(scroller)
         }
       },
+      // A press that ends without moving the row usually leaves no settle
+      // report, so the placement it held back runs again.
+      onPressEnd: placeHeld,
       signal: controller.signal,
     })
     return () => {
