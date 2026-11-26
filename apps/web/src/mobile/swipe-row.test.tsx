@@ -198,6 +198,7 @@ describe('SwipeRow', () => {
 
     await pointer(view.getByText('Row').element(), 'pointerdown', 10, 10)
     await touch(scroller, 'start')
+    expect(scroller).not.toHaveAttribute('data-active')
     await touch(scroller, 'end')
 
     expect(scroller).not.toHaveAttribute('data-active')
@@ -208,6 +209,16 @@ describe('SwipeRow', () => {
 
     await pointer(view.getByText('Row').element(), 'pointerdown', 10, 10)
 
+    expect(onBeginInteraction).toHaveBeenCalledOnce()
+  })
+
+  it('reports the start of a horizontal wheel, and not of a vertical one', async () => {
+    const view = await mount(<Harness />)
+    const scroller = getScroller(view.getByText('Row').element())
+
+    scroller.dispatchEvent(new WheelEvent('wheel', { deltaX: 0, deltaY: 20 }))
+    expect(onBeginInteraction).not.toHaveBeenCalled()
+    scroller.dispatchEvent(new WheelEvent('wheel', { deltaX: 20, deltaY: 2 }))
     expect(onBeginInteraction).toHaveBeenCalledOnce()
   })
 })

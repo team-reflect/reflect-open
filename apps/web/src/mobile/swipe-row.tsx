@@ -19,7 +19,7 @@ interface SwipeRowProps {
   onClose: () => void
   /**
    * Fires on every primary pointer down, before any scroll starts, so a tap
-   * triggers it too.
+   * triggers it too, and on every horizontal wheel event.
    */
   onBeginInteraction: () => void
   /**
@@ -63,6 +63,10 @@ export function SwipeRow({
   // Bumped when a press ends without moving the row, so the placement reruns.
   const [lifts, setLifts] = useState(0)
 
+  const beginInteraction = useEffectEvent(() => {
+    onBeginInteraction()
+  })
+
   const reportSettled = useEffectEvent((scroller: HTMLElement) => {
     const open = scroller.scrollLeft >= getOpenLeft(scroller) / 2
     if (open && !revealed) {
@@ -84,6 +88,16 @@ export function SwipeRow({
       'scroll',
       () => {
         scroller.dataset.active = ''
+      },
+      { passive: true, signal: controller.signal },
+    )
+    // A horizontal trackpad swipe starts an interaction like a press does.
+    scroller.addEventListener(
+      'wheel',
+      (event) => {
+        if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+          beginInteraction()
+        }
       },
       { passive: true, signal: controller.signal },
     )
