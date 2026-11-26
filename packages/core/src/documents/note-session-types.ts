@@ -18,7 +18,7 @@ export interface NoteSessionSnapshot {
    * or the **full** file while `protected` (the read-only view shows a file we
    * refuse to touch, frontmatter included). It does not follow typing.
    */
-  initialContent: string
+  loadedContent: string
   /**
    * True when the editor cannot faithfully round-trip this note (a converter
    * gap, e.g. task lists today) — the note opens read-only and is **never**

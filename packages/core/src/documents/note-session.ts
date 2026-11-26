@@ -67,7 +67,7 @@ class NoteSessionImpl implements ManagedNoteSession {
 
   // Snapshot state.
   #status: NoteSessionStatus = 'loading'
-  #initialContent = ''
+  #loadedContent = ''
   #isProtected = false
   #dirty = false
   #missing = false
@@ -208,7 +208,7 @@ class NoteSessionImpl implements ManagedNoteSession {
     return {
       path: this.path,
       status: this.#status,
-      initialContent: this.#initialContent,
+      loadedContent: this.#loadedContent,
       protected: this.#isProtected,
       dirty: this.#dirty,
       isPrivate: this.#status === 'ready' ? notePrivate(this.#header) : true,
@@ -424,7 +424,7 @@ class NoteSessionImpl implements ManagedNoteSession {
     const unsafe = this.#classify(doc.body) === 'lossy'
     const flipped = unsafe !== this.#isProtected
     this.#isProtected = unsafe
-    this.#initialContent = unsafe ? content : doc.body
+    this.#loadedContent = unsafe ? content : doc.body
     this.#emit()
     // While protected there is no live editor mounted (the pane shows the
     // read-only view), and unsafe content must never enter one regardless.
@@ -521,7 +521,7 @@ class NoteSessionImpl implements ManagedNoteSession {
     this.#missing = fileMissing
     // The data-loss gate: a note the editor can't reproduce opens read-only.
     this.#isProtected = this.#classify(doc.body) === 'lossy'
-    this.#initialContent = this.#isProtected ? adopted : doc.body
+    this.#loadedContent = this.#isProtected ? adopted : doc.body
     this.#status = 'ready'
     this.#emit()
     // The real disk content, not the seed: the rename tracker must

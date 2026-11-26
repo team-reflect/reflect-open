@@ -101,7 +101,7 @@ export function NotePaneComponent({
   const [session, snapshot] = useNoteSession(path)
 
   const editorContent =
-    snapshot.status === 'ready' && !snapshot.protected ? snapshot.initialContent : null
+    snapshot.status === 'ready' && !snapshot.protected ? snapshot.loadedContent : null
   const xPostsReady = useXPostPreload(editorContent)
 
   if (snapshot.status === 'loading' || (editorContent !== null && !xPostsReady)) {
@@ -121,7 +121,7 @@ export function NotePaneComponent({
   if (snapshot.protected) {
     return (
       <div className={cn(gutterClassName, className)}>
-        <ProtectedNoteView content={snapshot.initialContent} />
+        <ProtectedNoteView content={snapshot.loadedContent} />
         {showBacklinks ? (
           <div className="print:hidden">
             <BacklinksPanel path={path} />
