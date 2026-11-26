@@ -69,6 +69,17 @@ describe('createTodayService', () => {
     expect(seen).toEqual(['2026-06-10'])
   })
 
+  it('does not notify a new subscriber for a date that changed while nothing was subscribed', () => {
+    const clock = createTestClockService({ now: new Date(2026, 5, 9, 12, 0, 0).getTime() })
+    const today = createTodayService({ clock })
+    clock.setNow(new Date(2026, 5, 10, 12, 0, 0).getTime())
+    const listener = vi.fn()
+    const unsubscribe = today.subscribe(listener)
+    expect(today.get()).toBe('2026-06-10')
+    expect(listener).not.toHaveBeenCalled()
+    unsubscribe()
+  })
+
   it('does not notify while the date stays the same', async () => {
     const clock = createTestClockService({ now: new Date(2026, 5, 9, 12, 0, 0).getTime() })
     const today = createTodayService({ clock })

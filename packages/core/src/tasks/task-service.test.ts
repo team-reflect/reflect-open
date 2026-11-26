@@ -819,6 +819,15 @@ describe('task list state', () => {
     expect(reads.count()).toBe(2)
   })
 
+  it('reads nothing for a second subscription', async () => {
+    const reads = watchReads()
+    await subscribed()
+
+    tasks.subscribe(noop)
+    await flushMicrotasks()
+    expect(reads.count()).toBe(1)
+  })
+
   it('reads again on the next subscription after the last one ended', async () => {
     const reads = watchReads()
     const { unsubscribe } = await subscribed()
@@ -842,6 +851,24 @@ describe('task list state', () => {
     emitCommitted(null)
     await flushMicrotasks()
     expect(tasks.get()).toBe(state)
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('does not notify a new subscriber for a graph switch while nothing was subscribed', async () => {
+    const source = new WritableStore<{ session: GraphSession | null }>({ session: openGraph })
+    const switching = createTasks(source)
+    seedNotes(database, [{ path: A, markdown: '+ [ ] one\n' }])
+    const unsubscribe = switching.subscribe(noop)
+    await flushMicrotasks()
+    expect(markdowns(switching.get().open)).toEqual(['one'])
+    unsubscribe()
+
+    source.set({
+      session: createGraphSession({ root: '/h', name: 'h', generation: 8, indexGeneration: 1 }),
+    })
+    const listener = vi.fn()
+    switching.subscribe(listener)
+    expect(switching.get().open).toBeUndefined()
     expect(listener).not.toHaveBeenCalled()
   })
 
