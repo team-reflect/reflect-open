@@ -169,7 +169,7 @@ describe('addToNote', () => {
 
     await service.addToNote(PATH, ADA)
 
-    expect(session.content()).toBe(`# Ada Lovelace\n\n${ADA_BLOCK}\n`)
+    expect(session.liveContent()).toBe(`# Ada Lovelace\n\n${ADA_BLOCK}\n`)
     // No frontmatter mark: the appended details suppress the card by content.
     expect(session.getCalls('commitFrontmatter')).toEqual([])
     expect(noteFile.writes()).toEqual([])
@@ -207,7 +207,7 @@ describe('addToNote', () => {
     const session = openNote('# Grace Hopper\n')
 
     await expect(service.addToNote(PATH, ADA)).rejects.toThrow(/no longer matches/)
-    expect(session.content()).toBe('# Grace Hopper\n')
+    expect(session.liveContent()).toBe('# Grace Hopper\n')
     expect(noteFile.writes()).toEqual([])
   })
 
@@ -216,7 +216,7 @@ describe('addToNote', () => {
 
     await service.addToNote(PATH, ADA)
 
-    expect(session.content()).toBe(
+    expect(session.liveContent()).toBe(
       '# Ada Lovelace\n\n- Type: #person\n\n- Email: ada@example.com\n- Phone: +1 555 0100\n',
     )
   })
@@ -236,7 +236,7 @@ describe('addToNote', () => {
 
     await service.addToNote(PATH, ADA)
 
-    expect(session.content()).toBe('# Ada Lovelace\n\nWork mail ada@work.com\n')
+    expect(session.liveContent()).toBe('# Ada Lovelace\n\nWork mail ada@work.com\n')
     expect(noteFile.writes()).toEqual([])
   })
 

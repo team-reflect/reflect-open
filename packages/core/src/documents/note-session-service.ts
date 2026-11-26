@@ -137,6 +137,15 @@ class NoteSessionServiceImpl implements NoteSessionService {
     return entry.session
   }
 
+  discardSession(path: string): void {
+    const entry = this.#entries.get(path)
+    if (entry !== undefined) {
+      this.#forget(entry)
+      entry.session.discard()
+      entry.coordinator?.dispose()
+    }
+  }
+
   async flushAll(): Promise<void> {
     await Promise.allSettled(
       [...this.#entries.values()].map(async (entry) => {
@@ -171,10 +180,6 @@ class NoteSessionServiceImpl implements NoteSessionService {
         : undefined,
       onObservedChange: (observed) => {
         this.#observedChanged(entry, observed)
-      },
-      onDiscard: () => {
-        this.#forget(entry)
-        coordinator?.dispose()
       },
     })
     this.#nextId += 1

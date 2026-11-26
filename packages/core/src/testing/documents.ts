@@ -55,7 +55,7 @@ export interface TestNoteSessionOptions {
    */
   unpersisted?: boolean
   /**
-   * False makes `updateFrontmatter`, `commitFrontmatter` and
+   * False makes `commitFrontmatter` and
    * `commitSourceEdit` refuse. Defaults to true.
    */
   accepts?: boolean
@@ -150,20 +150,12 @@ class TestNoteSessionImpl implements TestNoteSession {
     return Promise.resolve()
   }
 
-  content(): string {
-    return this.#content
-  }
-
   liveContent(): string | null {
     return this.#loaded ? this.#content : null
   }
 
   isDirty(): boolean {
     return this.#options.dirty ?? false
-  }
-
-  isUnpersisted(): boolean {
-    return this.#options.unpersisted ?? false
   }
 
   prepareDelete(): Promise<boolean> {
@@ -173,15 +165,6 @@ class TestNoteSessionImpl implements TestNoteSession {
 
   cancelDelete(): void {
     this.#record('cancelDelete')
-  }
-
-  updateFrontmatter(patch: FrontmatterPatch): boolean {
-    this.#record('updateFrontmatter', patch)
-    if (!this.#accepts) {
-      return false
-    }
-    this.#content = upsertFrontmatter(this.#content, frontmatterPatchToYaml(patch))
-    return true
   }
 
   commitFrontmatter(patch: FrontmatterPatch): Promise<boolean> {
@@ -356,6 +339,11 @@ class TestNoteSessionServiceImpl implements TestNoteSessionService {
     this.#registrations.delete(from)
     this.#registrations.set(to, registration)
     return registration.session
+  }
+
+  discardSession(path: string): void {
+    this.#registrations.get(path)?.session.discard()
+    this.#registrations.delete(path)
   }
 
   async flushAll(): Promise<void> {

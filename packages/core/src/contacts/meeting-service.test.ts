@@ -379,7 +379,7 @@ describe('addMeetingToDaily', () => {
 
     await service.addMeetingToDaily(input())
 
-    expect(daily.content()).toBe('Unsaved draft\n\n## Meetings\n\n- [[Standup]]\n')
+    expect(daily.liveContent()).toBe('Unsaved draft\n\n## Meetings\n\n- [[Standup]]\n')
     expect(dailyWrites()).toEqual([])
   })
 

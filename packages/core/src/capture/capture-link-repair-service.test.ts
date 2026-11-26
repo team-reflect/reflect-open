@@ -202,7 +202,7 @@ describe('CaptureLinkRepairService', () => {
 
     await repair.sweep(3)
 
-    expect(session.content()).toBe(`- ${TITLED_LINK}\n- unsaved typing\n`)
+    expect(session.liveContent()).toBe(`- ${TITLED_LINK}\n- unsaved typing\n`)
     expect(write).not.toHaveBeenCalled()
   })
 
@@ -220,7 +220,7 @@ describe('CaptureLinkRepairService', () => {
 
     await repair.sweep(3)
 
-    expect(session.content()).toBe(daily)
+    expect(session.liveContent()).toBe(daily)
     expect(noteFile.files().get(DAILY)).toBe(daily)
   })
 

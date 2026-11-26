@@ -84,10 +84,6 @@ export interface NoteSessionOptions {
    */
   onObservedChange?: ((observed: boolean) => void) | undefined
   /**
-   * Called when {@link NoteSession.discard} runs.
-   */
-  onDiscard?: (() => void) | undefined
-  /**
    * Receives the full document (frontmatter + body) whenever it transitions
    * to a known-on-disk state: the initial load, an adopted external change
    * (including a save that merged with a newer disk text), or a landed save.
@@ -189,7 +185,7 @@ export interface NoteSession extends Store<NoteSessionSnapshot> {
    * Pause new saves and wait for the initial load plus any write already in
    * flight before deletion chooses between local discard and filesystem
    * trash. Returns true when no backing file exists. The caller must finish
-   * with {@link NoteSession.discard} on success or
+   * with {@link NoteSessionService.discardSession} on success or
    * {@link NoteSession.cancelDelete} when filesystem deletion fails.
    */
   prepareDelete(): Promise<boolean>
@@ -197,17 +193,10 @@ export interface NoteSession extends Store<NoteSessionSnapshot> {
   cancelDelete(): void
   /**
    * Patch frontmatter keys (e.g. `aliases`, Plan 07b) without touching the
-   * editor: the header is updated in place and saved through the normal
-   * pipeline. Returns false (and does nothing) when the session can't take
-   * the patch — disposed, protected, or not yet `ready`. All three mean the
-   * same thing to a caller: this channel is unavailable, use the fallback
-   * (a write to the note file, which a live session then reconciles like any
-   * external change).
-   */
-  updateFrontmatter(patch: FrontmatterPatch): boolean
-  /**
-   * {@link NoteSession.updateFrontmatter}, but the patch **lands on disk now**
-   * through a flush. Same gating and false-return as `updateFrontmatter`.
+   * editor, and land the patch on disk now through a flush. Returns false
+   * (and does nothing) when the session can't take the patch: disposed,
+   * protected, or not yet `ready`. The caller then writes the note file,
+   * which the session reconciles like any external change.
    */
   commitFrontmatter(patch: FrontmatterPatch): Promise<boolean>
   /**
@@ -223,13 +212,6 @@ export interface NoteSession extends Store<NoteSessionSnapshot> {
    * rethrowing.
    */
   commitSourceEdit(transform: NoteSourceTransform): Promise<NoteSessionCommit | null>
-  /**
-   * Detach **without** flushing — for deleting the note: a flush would rewrite
-   * the buffer and recreate the file we are removing. Pending saves are
-   * cancelled, no further snapshots are emitted, and the service forgets the
-   * session.
-   */
-  discard(): void
 }
 
 /**
@@ -258,14 +240,12 @@ export interface ManagedNoteSession extends NoteSession {
    * Whether a write is queued or in flight.
    */
   isSaving(): boolean
-  /** The full current document (frontmatter + buffer), as a save would write it. */
-  content(): string
   /**
-   * Whether this lazy-created note still exists only in the editor session.
-   * Returns false while loading, once a file is known to exist, or while a
-   * first write is already in flight.
+   * Detach **without** flushing, for a deleted note: a flush would rewrite the
+   * buffer and recreate the file. Pending saves are cancelled and no further
+   * snapshots are emitted.
    */
-  isUnpersisted(): boolean
+  discard(): void
   /**
    * Flush pending edits and detach: no further snapshots are emitted. Resolves
    * once the flushed write has settled.
@@ -324,6 +304,11 @@ export interface NoteSessionService {
    * disposed. Returns the moved session, or `null` when `from` has none.
    */
   moveSession(from: string, to: string): NoteSession | null
+  /**
+   * Discard the session of `path`, if any, without a flush: its note was
+   * deleted. The service forgets it.
+   */
+  discardSession(path: string): void
   /**
    * Flush every buffer, fire each session's pending settle-time work, and
    * settle once all of it has landed. Failures are surfaced per session by the

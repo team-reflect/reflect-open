@@ -396,12 +396,12 @@ describe('moveSession', () => {
   })
 })
 
-describe('discard', () => {
+describe('discardSession', () => {
   it('forgets the session and disposes its coordinator without settling', async () => {
     const session = noteSessions.sessionFor(PATH)
     await observe(session)
 
-    session.discard()
+    noteSessions.discardSession(PATH)
 
     expect(noteSessions.existingSessionFor(PATH)).toBeNull()
     expect(coordinators[0]?.log).toEqual(['dispose'])
@@ -439,7 +439,7 @@ describe('teardown', () => {
     expect(fileChanges.listenerCount().changes).toBe(1)
 
     await observe(session)
-    session.discard()
+    noteSessions.discardSession(PATH)
 
     expect(fileChanges.listenerCount().changes).toBe(0)
   })

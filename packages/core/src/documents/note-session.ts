@@ -50,7 +50,6 @@ class NoteSessionImpl implements ManagedNoteSession {
   readonly #classify: NoteSessionOptions['classify']
   readonly #onContent: NoteSessionOptions['onContent']
   readonly #onObservedChange: NoteSessionOptions['onObservedChange']
-  readonly #onDiscard: NoteSessionOptions['onDiscard']
   readonly #store: WritableStore<NoteSessionSnapshot>
   /**
    * Whether the session has had a subscriber since it last reported none.
@@ -140,7 +139,6 @@ class NoteSessionImpl implements ManagedNoteSession {
     this.#classify = options.classify
     this.#onContent = options.onContent
     this.#onObservedChange = options.onObservedChange
-    this.#onDiscard = options.onDiscard
     this.#graph = deps.graphSession.get().session
     this.path = options.path
     this.#createIfMissing = options.createIfMissing ?? false
@@ -194,10 +192,6 @@ class NoteSessionImpl implements ManagedNoteSession {
     }
   }
 
-  content(): string {
-    return this.#header + this.#buffer
-  }
-
   liveContent(): string | null {
     return this.#status === 'ready' ? this.#header + this.#buffer : null
   }
@@ -206,7 +200,7 @@ class NoteSessionImpl implements ManagedNoteSession {
     return this.#dirty
   }
 
-  isUnpersisted(): boolean {
+  #isUnpersisted(): boolean {
     return this.#status === 'ready' && this.#missing && this.#inFlightWrite === null
   }
 
@@ -617,7 +611,7 @@ class NoteSessionImpl implements ManagedNoteSession {
     void this.#reconcileFromDisk(true, false)
   }
 
-  updateFrontmatter(patch: FrontmatterPatch): boolean {
+  #updateFrontmatter(patch: FrontmatterPatch): boolean {
     if (this.#disposed || this.#isProtected || this.#status !== 'ready') {
       return false
     }
@@ -634,7 +628,7 @@ class NoteSessionImpl implements ManagedNoteSession {
 
   async commitFrontmatter(patch: FrontmatterPatch): Promise<boolean> {
     const previousHeader = this.#header
-    if (!this.updateFrontmatter(patch)) {
+    if (!this.#updateFrontmatter(patch)) {
       return false
     }
     const attemptedHeader = this.#header
@@ -708,12 +702,8 @@ class NoteSessionImpl implements ManagedNoteSession {
 
   discard(): void {
     this.#cancelScheduledSave()
-    const discarded = this.#discarded
     this.#discarded = true
     this.#disposed = true
-    if (!discarded) {
-      this.#onDiscard?.()
-    }
   }
 
   async prepareDelete(): Promise<boolean> {
@@ -721,7 +711,7 @@ class NoteSessionImpl implements ManagedNoteSession {
     this.#cancelScheduledSave()
     await this.#loadPromise
     await this.#saveChain
-    return this.isUnpersisted()
+    return this.#isUnpersisted()
   }
 
   cancelDelete(): void {

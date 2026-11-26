@@ -391,7 +391,7 @@ describe('external changes and saves', () => {
 
     expect(h.disk()).toBe('# Hello\n\nmine\n\ntheirs\n')
     expect(h.applied).toEqual(['# Hello\n\nmine\n\ntheirs\n'])
-    expect(h.session.content()).toBe('# Hello\n\nmine\n\ntheirs\n')
+    expect(h.session.liveContent()).toBe('# Hello\n\nmine\n\ntheirs\n')
     expect(h.snapshots.at(-1)).toMatchObject({ dirty: false, protected: false, error: null })
 
     h.session.editorChanged('# Hello\n\nmine\n\ntheirs\n\nmore\n')
@@ -519,7 +519,7 @@ describe('external changes and saves', () => {
     await clock.advance(0)
 
     expect(h.applied).toEqual([]) // the newer keystrokes are not replaced
-    expect(h.session.content()).toBe('# Hello\n\nmine typed on\n')
+    expect(h.session.liveContent()).toBe('# Hello\n\nmine typed on\n')
     expect(h.snapshots.at(-1)?.dirty).toBe(true)
 
     h.mergeNextWrite('# Hello\n\nmine typed on\n\ntheirs\n')
@@ -527,7 +527,7 @@ describe('external changes and saves', () => {
     // The second write names the text the keystrokes were typed on, which the
     // first write already merged into the file.
     expect(h.expectedContents).toEqual(['# Hello\n', '# Hello\n\nmine\n'])
-    expect(h.session.content()).toBe('# Hello\n\nmine typed on\n\ntheirs\n')
+    expect(h.session.liveContent()).toBe('# Hello\n\nmine typed on\n\ntheirs\n')
     expect(h.snapshots.at(-1)?.dirty).toBe(false)
   })
 
@@ -700,11 +700,11 @@ describe('frontmatter ownership (Plan 07b)', () => {
     expect(h.snapshots.at(-1)?.dirty).toBe(false)
   })
 
-  it('updateFrontmatter patches the header and saves without touching the editor', async () => {
+  it('commitFrontmatter patches the header and saves without touching the editor', async () => {
     const h = harness({ disk: '# Hello\n' })
     void h.session.revalidate()
     await settled()
-    h.session.updateFrontmatter({ aliases: ['Old Title'] })
+    void h.session.commitFrontmatter({ aliases: ['Old Title'] })
     await settled()
     const written = h.writes.at(-1)?.contents ?? ''
     expect(written).toContain('aliases:')
@@ -717,11 +717,11 @@ describe('frontmatter ownership (Plan 07b)', () => {
     const h = harness({ disk: '# Hello\n' })
     void h.session.revalidate()
     await settled()
-    h.session.updateFrontmatter({ pinned: true })
+    void h.session.commitFrontmatter({ pinned: true })
     await settled()
     expect(h.writes.at(-1)?.contents).toBe('---\npinned: true\n---\n\n# Hello\n')
 
-    h.session.updateFrontmatter({ pinned: false })
+    void h.session.commitFrontmatter({ pinned: false })
     await settled()
     // The only metadata was the pin — the note returns to no frontmatter at all.
     expect(h.writes.at(-1)?.contents).toBe('# Hello\n')
@@ -732,11 +732,11 @@ describe('frontmatter ownership (Plan 07b)', () => {
     const h = harness({ disk: '# Hello\n' })
     void h.session.revalidate()
     await settled()
-    h.session.updateFrontmatter({ private: true })
+    void h.session.commitFrontmatter({ private: true })
     await settled()
     expect(h.writes.at(-1)?.contents).toBe('---\nprivate: true\n---\n\n# Hello\n')
 
-    h.session.updateFrontmatter({ private: false })
+    void h.session.commitFrontmatter({ private: false })
     await settled()
     // Same contract as the pin: not-private is the absence of the flag.
     expect(h.writes.at(-1)?.contents).toBe('# Hello\n')
@@ -787,7 +787,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
       writeFinished.resolve()
       await rejected
 
-      expect(h.session.content()).toBe('# Typed during pin\n')
+      expect(h.session.liveContent()).toBe('# Typed during pin\n')
       expect(h.snapshots.at(-1)?.dirty).toBe(true)
       expect(h.snapshots.at(-1)?.error).toBe('disk full')
       h.failWrites(null)
@@ -805,7 +805,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
       await settled()
       h.failWrites('disk full')
       await expect(h.session.commitFrontmatter({ pinned: true })).rejects.toThrow('disk full')
-      expect(h.session.content()).toBe('# Hello\n')
+      expect(h.session.liveContent()).toBe('# Hello\n')
       expect(h.snapshots.at(-1)?.dirty).toBe(false)
       await expect(h.session.commitFrontmatter({})).resolves.toBe(true)
       expect(h.writes).toEqual([])
@@ -822,7 +822,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
     h.mergeNextWrite('---\npinned: true\n---\n\n# Hello\n\ntheirs\n')
 
     await expect(h.session.commitFrontmatter({ pinned: true })).resolves.toBe(true)
-    expect(h.session.content()).toBe('---\npinned: true\n---\n\n# Hello\n\ntheirs\n')
+    expect(h.session.liveContent()).toBe('---\npinned: true\n---\n\n# Hello\n\ntheirs\n')
   })
 
   it('onContent reports full joined content with the right origins', async () => {
@@ -854,7 +854,6 @@ describe('missing-note seed (new ordinary notes)', () => {
     expect(ready?.missing).toBe(true)
     expect(ready?.initialContent).toBe(SEED)
     expect(ready?.dirty).toBe(false)
-    expect(h.session.isUnpersisted()).toBe(true)
     expect(h.writes).toEqual([]) // opening never litters the graph
     // The rename tracker baselines on the real (empty) disk content, never
     // the seed, so the first authored title is a birth, not a rename.
@@ -882,7 +881,6 @@ describe('missing-note seed (new ordinary notes)', () => {
     await settled()
 
     h.session.editorChanged('# Draft\n')
-    expect(h.session.isUnpersisted()).toBe(true)
     h.session.discard()
     await settled()
 
@@ -920,7 +918,6 @@ describe('missing-note seed (new ordinary notes)', () => {
     await settled()
 
     expect(h.writes).toEqual([{ path: 'notes/a.md', contents: '# My Note\n\nFirst line.\n' }])
-    expect(h.session.isUnpersisted()).toBe(false)
     expect(h.snapshots.at(-1)?.missing).toBe(false)
     expect(h.snapshots.at(-1)?.dirty).toBe(false)
   })
@@ -976,7 +973,7 @@ describe('missing-note seed (new ordinary notes)', () => {
     await settled()
 
     expect(h.expectedContents).toEqual([SEED])
-    expect(h.session.content()).toBe('# Mine\n\nCreated elsewhere\n')
+    expect(h.session.liveContent()).toBe('# Mine\n\nCreated elsewhere\n')
     expect(h.snapshots.at(-1)).toMatchObject({ dirty: false, missing: false })
   })
 
@@ -1423,7 +1420,7 @@ describe('commitSourceEdit', () => {
     )
     // Transactional: nothing persisted, so the buffer and the editor revert to
     // the un-toggled line (no divergence with the rolled-back Tasks list).
-    expect(h.session.content()).toBe('+ [ ] x\n')
+    expect(h.session.liveContent()).toBe('+ [ ] x\n')
     expect(h.applied.at(-1)).toBe('+ [ ] x\n')
     expect(h.snapshots.at(-1)?.initialContent).toBe('+ [ ] x\n')
     expect(h.snapshots.at(-1)?.error).toBeNull()
@@ -1445,7 +1442,7 @@ describe('commitSourceEdit', () => {
       'disk full',
     )
 
-    expect(h.session.content()).toBe('+ [ ] x\n\n')
+    expect(h.session.liveContent()).toBe('+ [ ] x\n\n')
   })
 
   it('propagates an error the transform throws, such as a stale refusal, without writing', async () => {
@@ -1459,7 +1456,7 @@ describe('commitSourceEdit', () => {
       h.session.commitSourceEdit(toggleTransform(firstTask(source))),
     ).rejects.toMatchObject({ kind: 'stale' })
     expect(h.writes).toEqual([])
-    expect(h.session.content()).toBe('+ [ ] something else entirely\n')
+    expect(h.session.liveContent()).toBe('+ [ ] something else entirely\n')
   })
 
   it('keeps dirty body text while committing metadata and a bookmark together', async () => {
@@ -1514,7 +1511,7 @@ it('a rejected source edit preserves typing made while its write was pending', a
     h.session.editorChanged('# Typed during capture\n')
     finished.resolve()
     await failure
-    expect(h.session.content()).toBe('# Typed during capture\n')
+    expect(h.session.liveContent()).toBe('# Typed during capture\n')
     expect(h.snapshots.at(-1)?.dirty).toBe(true)
     expect(h.writes).toEqual([])
   } finally {
@@ -1553,7 +1550,7 @@ describe('frontmatter separator line', () => {
     await settled()
     session.editorChanged('\n+ [ ] a\n')
 
-    await session.commitSourceEdit(toggleTransform(firstTask(session.content())))
+    await session.commitSourceEdit(toggleTransform(firstTask(session.liveContent() ?? '')))
 
     expect(applied.at(-1)).toBe('\n+ [x] a\n')
   })

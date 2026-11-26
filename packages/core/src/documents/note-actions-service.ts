@@ -480,7 +480,7 @@ class NoteActionsServiceImpl implements NoteActionsService {
     const unpersisted = await session?.prepareDelete()
     if (session !== null && unpersisted === true) {
       noteRows.setOverlay(path, generation, { trashed: true })
-      session.discard()
+      noteSessions.discardSession(path)
       return
     }
     try {
@@ -492,7 +492,7 @@ class NoteActionsServiceImpl implements NoteActionsService {
     // Marked only once the file is gone: a note that fails stays listed.
     noteRows.setOverlay(path, generation, { trashed: true })
     // A view may have opened the note while the delete ran.
-    noteSessions.existingSessionFor(path)?.discard()
+    noteSessions.discardSession(path)
   }
 
   async #deepLinkFor(path: string, session: GraphSession): Promise<string> {
