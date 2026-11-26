@@ -819,6 +819,15 @@ describe('task list state', () => {
     expect(reads.count()).toBe(2)
   })
 
+  it('reads nothing for a second subscription', async () => {
+    const reads = watchReads()
+    await subscribed()
+
+    tasks.subscribe(noop)
+    await flushMicrotasks()
+    expect(reads.count()).toBe(1)
+  })
+
   it('reads again on the next subscription after the last one ended', async () => {
     const reads = watchReads()
     const { unsubscribe } = await subscribed()
