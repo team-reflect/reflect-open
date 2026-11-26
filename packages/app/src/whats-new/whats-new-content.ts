@@ -70,7 +70,7 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
     {
       id: 'cli-tasks',
       title: 'Tasks in the CLI',
-      body: 'Run `reflect tasks` to list your open tasks.',
+      body: 'Agents can now run `reflect tasks` to list your open tasks. Set it up in Settings → Agents.',
       platforms: ['darwin', 'windows', 'linux'],
     },
   ],
