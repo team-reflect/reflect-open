@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
-# Turns off Spotlight indexing on every volume of a GitHub-hosted macOS runner.
-#
-# Spotlight indexes every file that the build writes. Right after the runner
-# boots, a volume can be in the `kMDConfigSearchLevelTransitioning` state, and
-# then `mdutil` exits with an error. This script runs `mdutil` again after a
-# short wait. Spotlight only slows the build, so a final failure is a warning.
+# Turns off Spotlight indexing on every volume of a macOS runner.
 
 set -uo pipefail
 
