@@ -151,7 +151,8 @@ export function deriveStore<T, U>(
  * notified.
  *
  * `derive` runs again only when one of `stores` returns a new reference. The
- * combined store subscribes to `stores` only while it has subscribers.
+ * combined store subscribes to each of `stores` once, only while it has
+ * subscribers.
  */
 export function combineStores<T extends unknown[], U>(
   stores: { [K in keyof T]: Store<T[K]> },
@@ -174,19 +175,32 @@ export function combineStores<T extends unknown[], U>(
     return derived
   }
 
-  const subscribe = (listener: VoidFunction): Unlisten => {
-    let last = get()
-    const onChange = () => {
+  const subscribers = new Set<{ listener: VoidFunction; last: U }>()
+  let unlistens: Unlisten[] = []
+
+  const onChange = () => {
+    for (const subscriber of subscribers) {
       const next = get()
-      if (next !== last) {
-        last = next
-        listener()
+      if (next !== subscriber.last) {
+        subscriber.last = next
+        subscriber.listener()
       }
     }
-    const unlistens = stores.map((store) => store.subscribe(onChange))
+  }
+
+  const subscribe = (listener: VoidFunction): Unlisten => {
+    const subscriber = { listener, last: get() }
+    subscribers.add(subscriber)
+    if (subscribers.size === 1) {
+      unlistens = stores.map((store) => store.subscribe(onChange))
+    }
     return () => {
-      for (const unlisten of unlistens) {
-        unlisten()
+      subscribers.delete(subscriber)
+      if (subscribers.size === 0) {
+        for (const unlisten of unlistens) {
+          unlisten()
+        }
+        unlistens = []
       }
     }
   }
