@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { combineStores, deriveStore, WritableStore, type Store } from './store.ts'
+import type { Unlisten } from './unlisten.ts'
 import { noop } from '@ocavue/utils'
 
 describe('WritableStore', () => {
@@ -274,7 +275,7 @@ describe('combineStores', () => {
     const source = new WritableStore(1)
     const combined = combineStores([source], (value) => value)
     const second = vi.fn()
-    let unlistenSecond = noop
+    let unlistenSecond: Unlisten = noop
     combined.subscribe(() => {
       unlistenSecond()
     })
