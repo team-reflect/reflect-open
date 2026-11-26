@@ -1,3 +1,5 @@
+import { PINNED_NOTE_COMMANDS, type PinnedNoteCommandId } from './pinned-note-commands.ts'
+
 /**
  * The id of an app command.
  */
@@ -11,6 +13,7 @@ export type AppCommandId =
   | 'graph.switch7'
   | 'graph.switch8'
   | 'graph.switch9'
+  | PinnedNoteCommandId
   | 'nav.today'
   | 'nav.allNotes'
   | 'nav.tasks'
@@ -106,23 +109,28 @@ export const APP_COMMANDS = {
   'graph.switch6': {
     title: 'Switch to graph 6',
     keywords: graphSwitchKeywords,
-    keybinding: 'Mod-6',
+    // ⌘6 opens a pinned note instead.
+    keybinding: undefined,
   },
   'graph.switch7': {
     title: 'Switch to graph 7',
     keywords: graphSwitchKeywords,
-    keybinding: 'Mod-7',
+    // ⌘7 opens a pinned note instead.
+    keybinding: undefined,
   },
   'graph.switch8': {
     title: 'Switch to graph 8',
     keywords: graphSwitchKeywords,
-    keybinding: 'Mod-8',
+    // ⌘8 opens a pinned note instead.
+    keybinding: undefined,
   },
   'graph.switch9': {
     title: 'Switch to graph 9',
     keywords: graphSwitchKeywords,
-    keybinding: 'Mod-9',
+    // ⌘9 opens a pinned note instead.
+    keybinding: undefined,
   },
+  ...PINNED_NOTE_COMMANDS,
   'nav.today': {
     title: 'Go to today',
     keywords: ['daily', 'now'],

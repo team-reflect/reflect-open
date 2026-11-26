@@ -41,7 +41,7 @@ const GRAPH_SWITCH_COMMAND_IDS = [
 
 function graphSwitchBindingFor(index: number): string | null {
   const id = GRAPH_SWITCH_COMMAND_IDS[index]
-  return id === undefined ? null : APP_COMMANDS[id].keybinding
+  return id === undefined ? null : (APP_COMMANDS[id].keybinding ?? null)
 }
 
 type SyncStatus = Extract<GitSyncState, { phase: 'connected' }>['status']
