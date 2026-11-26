@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { combineStores, deriveStore, WritableStore } from './store.ts'
+import { combineStores, deriveStore, WritableStore, type Store } from './store.ts'
 import { noop } from '@ocavue/utils'
 
 describe('WritableStore', () => {
@@ -183,4 +183,102 @@ describe('combineStores', () => {
     a.set(10)
     expect(listener).not.toHaveBeenCalled()
   })
+
+  it('derives once and notifies once per write in a diamond', () => {
+    const source = new WritableStore(1)
+    const doubled = deriveStore(source, (value) => value * 2)
+    const derive = vi.fn((value: number, double: number) => value + double)
+    const combined = combineStores([source, doubled], derive)
+    const listener = vi.fn()
+    combined.subscribe(listener)
+    derive.mockClear()
+
+    source.set(2)
+    expect(combined.get()).toBe(6)
+    expect(derive).toHaveBeenCalledOnce()
+    expect(listener).toHaveBeenCalledOnce()
+  })
+
+  it('reads a store on every `get` while nothing is subscribed', () => {
+    const source = createOpaqueStore(1)
+    const combined = combineStores([source.store], (value) => value)
+    combined.get()
+    combined.get()
+    expect(source.get).toHaveBeenCalledTimes(2)
+  })
+
+  it('notifies a function subscribed twice once per subscription', () => {
+    const source = new WritableStore(1)
+    const combined = combineStores([source], (value) => value)
+    const listener = vi.fn()
+    const first = combined.subscribe(listener)
+    combined.subscribe(listener)
+    source.set(2)
+    expect(listener).toHaveBeenCalledTimes(2)
+
+    first()
+    source.set(3)
+    expect(listener).toHaveBeenCalledTimes(3)
+  })
+
+  it('notifies a later subscriber only of the latest value after a write in a listener', () => {
+    const source = new WritableStore(0)
+    const combined = combineStores([source], (value) => value)
+    combined.subscribe(() => {
+      if (combined.get() === 1) {
+        source.set(2)
+      }
+    })
+    const seen: number[] = []
+    combined.subscribe(() => {
+      seen.push(combined.get())
+    })
+
+    source.set(1)
+    expect(seen).toEqual([2])
+  })
+
+  it('does not notify a subscriber that joins during a notification of that change', () => {
+    const source = new WritableStore(1)
+    const combined = combineStores([source], (value) => value)
+    const late = vi.fn()
+    combined.subscribe(() => {
+      combined.subscribe(late)
+    })
+
+    source.set(2)
+    expect(late).not.toHaveBeenCalled()
+  })
+
+  it('does not notify a subscriber that leaves during a notification', () => {
+    const source = new WritableStore(1)
+    const combined = combineStores([source], (value) => value)
+    const second = vi.fn()
+    let unlistenSecond = noop
+    combined.subscribe(() => {
+      unlistenSecond()
+    })
+    unlistenSecond = combined.subscribe(second)
+
+    source.set(2)
+    expect(second).not.toHaveBeenCalled()
+  })
 })
+
+/**
+ * A store whose `get` and `subscribe` are spies, like a service that wraps them.
+ */
+function createOpaqueStore(initial: number) {
+  const inner = new WritableStore(initial)
+  const unlisten = vi.fn()
+  const get = vi.fn(() => inner.get())
+  const subscribe = vi.fn((listener: VoidFunction) => {
+    const stop = inner.subscribe(listener)
+    return () => {
+      unlisten()
+      stop()
+    }
+  })
+  const store: Store<number> = { get, subscribe }
+  return { store, get, subscribe, unlisten, set: inner.set }
+}
