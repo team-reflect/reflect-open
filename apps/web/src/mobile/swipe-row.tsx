@@ -179,7 +179,7 @@ export function SwipeRow({
     >
       <div
         className={cn(
-          // The edge shadow lies past the trailing edge, so it shows only on a moved row.
+          // The edge shadow lies past both side edges, so it shows only on a moved row.
           'swipe-row-surface relative z-10 w-full flex-none snap-start shadow-edge',
           surfaceClassName,
         )}
