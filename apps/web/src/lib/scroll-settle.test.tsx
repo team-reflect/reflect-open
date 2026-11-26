@@ -186,6 +186,24 @@ describe('watchScrollSettle', () => {
     expect(onRelease).toHaveBeenCalledOnce()
   })
 
+  it('reports a press end when the last finger lifts, after a tap too', async () => {
+    const element = mountScroller()
+    const onPressEnd = vi.fn()
+    const watch = watchScrollSettle({
+      element,
+      onSettle: vi.fn(),
+      onPressEnd: () => {
+        onPressEnd(watch.isTouching())
+      },
+      signal: listeners.controller.signal,
+    })
+
+    await touch(element, 'start')
+    expect(onPressEnd).not.toHaveBeenCalled()
+    await touch(element, 'end')
+    expect(onPressEnd).toHaveBeenCalledExactlyOnceWith(false)
+  })
+
   it('counts a scrolling touch and a wheel as gestures, and a tap or a program scroll as none', async () => {
     const element = mountScroller()
     const watch = watchScrollSettle({
@@ -258,6 +276,46 @@ describe('watchScrollSettle', () => {
       expect(element.scrollLeft).toBe(150)
       expect(watch.isTouching()).toBe(false)
       expect(onClick).not.toHaveBeenCalled()
+    })
+
+    it('reports a press end after the release scroll settles', async () => {
+      const element = mountSnapScroller()
+      const calls: string[] = []
+      watchScrollSettle({
+        element,
+        onSettle: () => {
+          calls.push('settle')
+        },
+        onPressEnd: () => {
+          calls.push('press end')
+        },
+        signal: listeners.controller.signal,
+      })
+
+      await mouseTo(element, 95)
+      await mouse.down()
+      await mouseTo(element, 45)
+      await mouse.up()
+      expect(calls).toEqual([])
+
+      await vi.waitFor(() => expect(calls).toEqual(['settle', 'press end']))
+    })
+
+    it('reports a press end when a click is released', async () => {
+      const element = mountSnapScroller()
+      const onPressEnd = vi.fn()
+      watchScrollSettle({
+        element,
+        onSettle: vi.fn(),
+        onPressEnd,
+        signal: listeners.controller.signal,
+      })
+
+      await mouseTo(element, 50)
+      await mouse.down()
+      expect(onPressEnd).not.toHaveBeenCalled()
+      await mouse.up()
+      expect(onPressEnd).toHaveBeenCalledOnce()
     })
 
     it('settles at the snap target nearest the release, not only at an end', async () => {

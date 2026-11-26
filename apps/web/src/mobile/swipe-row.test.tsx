@@ -1,5 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mouse } from 'vitest-browser-commands/playwright'
 import { createTestSystemPreferencesService } from '@reflect/app/testing'
 import { act } from '@/test-utils/act.ts'
 import { pointer } from '@/test-utils/swipe.ts'
@@ -142,6 +143,23 @@ describe('SwipeRow', () => {
 
     // The finger did not move the row, so no settle report follows.
     await touch(scroller, 'end')
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe(0))
+  })
+
+  it('keeps its position during a mouse drag, and applies the change once the press ends', async () => {
+    const view = await mount(<Harness initiallyRevealed />)
+    const scroller = getScroller(view.getByText('Row').element())
+    const box = scroller.getBoundingClientRect()
+
+    // Dragging an open row further open moves nothing, so no settle report follows.
+    await mouse.move(box.left + 200, box.top + 10)
+    await mouse.down()
+    await mouse.move(box.left + 150, box.top + 10, { steps: 5 })
+    await toggle(view)
+    await vi.waitFor(() => expect(view.getByRole('button', { name: 'Delete' }).query()).toBeNull())
+    expect(scroller.scrollLeft).toBe(ACTION_WIDTH)
+
+    await mouse.up()
     await vi.waitFor(() => expect(scroller.scrollLeft).toBe(0))
   })
 

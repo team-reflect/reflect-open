@@ -31,6 +31,12 @@ export interface ScrollSettleOptions {
    */
   onRelease?: (() => void) | undefined
   /**
+   * Called when a press on the element ends: the last finger lifts, a mouse
+   * click is released, or the release scroll of a mouse drag stops. It runs
+   * after any settle report of that press, with `isTouching` already false.
+   */
+  onPressEnd?: (() => void) | undefined
+  /**
    * Stops the watch and any mouse drag in progress.
    */
   signal: AbortSignal
@@ -78,6 +84,7 @@ export function watchScrollSettle({
   element,
   onSettle,
   onRelease,
+  onPressEnd,
   signal,
   isSettled,
   dragHandle = element,
@@ -152,18 +159,17 @@ export function watchScrollSettle({
     for (const touch of event.changedTouches) {
       fingers.delete(touch.identifier)
     }
-    if (fingers.size === 0) {
-      gesture.abort()
-      if (touchScrolled) {
-        onRelease?.()
-      }
-    }
-    if (isTouching()) {
+    if (fingers.size > 0) {
       return
     }
-    if (pending) {
+    gesture.abort()
+    if (touchScrolled) {
+      onRelease?.()
+    }
+    if (!mouseDragging && pending) {
       settleOrWait()
     }
+    onPressEnd?.()
   }
   element.addEventListener(
     'wheel',
@@ -261,6 +267,7 @@ export function watchScrollSettle({
     const finish = (): void => {
       controller.abort()
       flush()
+      onPressEnd?.()
     }
 
     // On the window, so the drag goes on when the mouse leaves the element.
@@ -288,6 +295,7 @@ export function watchScrollSettle({
       released.abort()
       if (!dragging) {
         controller.abort()
+        onPressEnd?.()
         return
       }
       suppressNextClick()
