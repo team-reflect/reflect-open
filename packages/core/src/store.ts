@@ -195,7 +195,8 @@ export function combineStores<T extends unknown[], U>(
       unlistens = stores.map((store) => store.subscribe(onChange))
     }
     return () => {
-      if (subscribers.delete(subscriber) && subscribers.size === 0) {
+      subscribers.delete(subscriber)
+      if (subscribers.size === 0) {
         for (const unlisten of unlistens) {
           unlisten()
         }
