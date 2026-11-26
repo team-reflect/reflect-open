@@ -142,7 +142,7 @@ describe('NotePane', () => {
       expect(noteFile.files().get('notes/beta.md')).toBe(note('Beta'))
     })
 
-    it('shows what was typed, without a read, when the pane returns to a note', async () => {
+    it('shows what was typed when the pane returns to a note', async () => {
       const { noteFile, clock, switchTo } = await renderPane({
         files: { 'notes/alpha.md': note('Alpha'), 'notes/beta.md': note('Beta') },
         path: 'notes/alpha.md',
@@ -155,11 +155,9 @@ describe('NotePane', () => {
 
       // The switch lands before the save debounce: the edit is still unsaved.
       await switchTo('notes/beta.md', 'Beta')
-      const read = vi.spyOn(noteFile, 'readWithHash')
       await switchTo('notes/alpha.md', 'Alpha')
 
       expect(editor().element().textContent).toContain('typed')
-      expect(read).not.toHaveBeenCalled()
       await clock.advance(2000)
       expect(noteFile.files().get('notes/alpha.md')).toContain('typed ')
       expect(noteFile.files().get('notes/beta.md')).toBe(note('Beta'))

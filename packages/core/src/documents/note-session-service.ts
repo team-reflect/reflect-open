@@ -92,12 +92,7 @@ class NoteSessionServiceImpl implements NoteSessionService {
     if (entry === undefined) {
       return null
     }
-    if (entry.observed) {
-      // An observed session follows the note file by itself.
-      await entry.catchingUp
-    } else {
-      await this.#catchUp(entry)
-    }
+    await this.#catchUp(entry)
     // The catch-up may have outlived the entry, or the session may have moved.
     return this.#entries.get(path) === entry ? entry.session : null
   }
@@ -202,8 +197,6 @@ class NoteSessionServiceImpl implements NoteSessionService {
     entry.observed = observed
     if (observed) {
       this.#idle.delete(entry)
-      // A view that returns to a failed note retries the load.
-      entry.stale ||= entry.session.get().status === 'error'
       void this.#catchUp(entry)
       return
     }
@@ -211,6 +204,8 @@ class NoteSessionServiceImpl implements NoteSessionService {
       return
     }
     this.#idle.add(entry)
+    // No event reaches an unobserved session reliably: the next view checks the file.
+    entry.stale = true
     void this.#flushAndSettle(entry)
     this.#evict()
   }
@@ -259,11 +254,7 @@ class NoteSessionServiceImpl implements NoteSessionService {
       const { session } = entry
       if (change.kind === 'upsert') {
         this.#invalidate(entry)
-      } else if (entry.observed || session.isDirty() || session.isSaving()) {
-        // The session keeps its text. A view that shows it keeps it too: the
-        // next view finds the file gone.
-        entry.stale = true
-      } else {
+      } else if (!entry.observed && !session.isDirty() && !session.isSaving()) {
         this.#drop(entry)
       }
     }

@@ -221,7 +221,6 @@ describe('useNoteSession', () => {
     await hook.unmount()
     await act(async () => {})
     expect(writes()).toEqual(['# Hello\n\nEdited\n'])
-    const read = vi.spyOn(noteFile, 'readWithHash')
 
     const again = await mount(() => useSessionAndSnapshot('notes/a.md'))
 
@@ -230,7 +229,6 @@ describe('useNoteSession', () => {
     expect(again.result.current.snapshot.status).toBe('ready')
     expect(again.result.current.session.editorSeed()).toBe('# Hello\n\nEdited\n')
     await act(() => clock.advance(1000))
-    expect(read).not.toHaveBeenCalled()
     expect(again.result.current.snapshot.dirty).toBe(false)
   })
 

@@ -36,8 +36,8 @@ When the last subscriber leaves (the pane unmounts, a virtual row scrolls
 away, a tab switches), the session flushes and its pending title rename
 settles, and the session stays: its text, and any edit a failed write left
 unsaved, are still there for the next view, which renders them in its first
-commit. An unobserved session reads nothing; a file change marks it stale, and
-it catches up when it is next observed or committed to. The service keeps a
+commit. An unobserved session reads nothing and is stale: it catches up with
+the note file when it is next observed or committed to. The service keeps a
 bounded number of unobserved sessions and disposes the least recently
 observed clean ones.
 

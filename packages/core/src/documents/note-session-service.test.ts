@@ -114,26 +114,26 @@ describe('sessionFor', () => {
 })
 
 describe('an unobserved session', () => {
-  it('keeps its text when the last view leaves, and the next view reads nothing', async () => {
+  it('keeps its text when the last view leaves, and shows it to the next view at once', async () => {
     const session = noteSessions.sessionFor(PATH)
     const unlisten = await observe(session)
     session.editorChanged('# A\n\ntyped\n')
     unlisten()
     await settled()
     expect(noteFile.files().get(PATH)).toBe('# A\n\ntyped\n')
-    // The echo of the flush marked the session stale: one read brings it up to date.
-    ;(await observe(session))()
-    await settled()
-    const read = vi.spyOn(noteFile, 'readWithHash')
 
     const again = noteSessions.sessionFor(PATH)
-    const leave = await observe(again)
-    leave()
+    const statuses: string[] = []
+    again.subscribe(() => {
+      statuses.push(again.get().status)
+    })
 
+    // Before its check of the file resolves.
     expect(again).toBe(session)
     expect(again.get().status).toBe('ready')
     expect(again.editorSeed()).toBe('# A\n\ntyped\n')
-    expect(read).not.toHaveBeenCalled()
+    await settled()
+    expect(statuses).not.toContain('loading')
   })
 
   it('settles its coordinator after the flush when the last view leaves', async () => {

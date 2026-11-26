@@ -279,8 +279,8 @@ export interface ManagedNoteSession extends NoteSession {
  * session, its text, and its pending writes in place.
  *
  * A session with a subscriber is **observed**: it reconciles with the note
- * file on every change. An unobserved session reads nothing; a change to its
- * file marks it stale, and it catches up when it is next observed or
+ * file on every write to it. An unobserved session reads nothing and is
+ * stale: it catches up with the note file when it is next observed or
  * committed to. When the last subscriber leaves, the session flushes and its
  * pending title rename settles. The service keeps a bounded number of
  * unobserved sessions and disposes the least recently observed clean ones.
