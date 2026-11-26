@@ -118,6 +118,7 @@ Cascade layer order, low to high priority.
   --shadow-md: var(--ds-shadow-md);
   --shadow-pop: var(--ds-shadow-pop);
   --shadow-app-input: var(--ds-shadow-app-input);
+  --shadow-edge: var(--ds-shadow-edge);
 
   /* 12px chrome text (V1's `text-xs`; the DS `--text-xs` is 13px). */
   --text-2xs: var(--ds-text-2xs);
@@ -189,6 +190,7 @@ Cascade layer order, low to high priority.
   --ds-shadow-md: var(--shadow-md);
   --ds-shadow-pop: var(--shadow-pop);
   --ds-shadow-app-input: var(--shadow-app-input);
+  --ds-shadow-edge: var(--shadow-edge);
   --ds-text-2xs: var(--text-2xs);
   --ds-font-shortcut: var(--font-shortcut);
 }

@@ -1,12 +1,3 @@
-/* The surface turns into a rounded card as soon as the row moves. */
-@keyframes swipe-row-card {
-  to {
-    background-color: color-mix(in oklab, var(--text) 8%, var(--surface-canvas));
-    border-top-right-radius: 1.5rem;
-    border-bottom-right-radius: 1.5rem;
-  }
-}
-
 /* Each pill grows and fades in while the surface edge crosses its slot. */
 @keyframes swipe-action-grow {
   from {
@@ -28,17 +19,15 @@
   visibility: hidden;
 }
 
-/* Only a touched or open row animates, so a long list holds no idle animations.
-   Its own compositing layer keeps the surface above the sticky actions inside a
-   stacking context (iOS 26 misorders them under virtua's `contain: layout` items). */
+/* The surface of a touched or open row has its own compositing layer. It keeps
+   the surface above the sticky actions inside a stacking context (iOS 26
+   misorders them under virtua's `contain: layout` items). */
 .swipe-row[data-active] .swipe-row-surface {
   will-change: transform;
-  animation: swipe-row-card linear both;
-  animation-timeline: scroll(nearest inline);
-  animation-range: 0 calc(var(--spacing) * 3);
 }
 
-/* The spacing units match the `w-20` buttons and the `gap-2` / `px-2` actions box. */
+/* Only a touched or open row animates, so a long list holds no idle animations.
+   The spacing units match the `w-20` buttons and the `gap-2` / `px-2` actions box. */
 .swipe-row[data-active] .swipe-action-body {
   animation: swipe-action-grow linear both;
   animation-timeline: scroll(nearest inline);
