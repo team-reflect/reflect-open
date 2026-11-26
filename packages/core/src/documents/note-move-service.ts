@@ -4,7 +4,7 @@ import type { LoggerService } from '../ports/logger-service.ts'
 import type { IndexStoreService } from '../indexing/index-store-service.ts'
 import { listenNow, type IpcBridgeService } from '../ipc/ipc-service.ts'
 import type { Unlisten } from '../unlisten.ts'
-import type { OpenDocumentsService } from './open-documents-service.ts'
+import type { NoteSessionService } from './note-session-types.ts'
 
 /**
  * Event name the Rust move commands emit after their rows commit.
@@ -21,7 +21,7 @@ export type NoteMovedListener = (from: string, to: string) => void
 export interface NoteMoveServiceDeps {
   readonly ipc: IpcBridgeService
   readonly indexStore: IndexStoreService
-  readonly openDocuments: OpenDocumentsService
+  readonly noteSessions: NoteSessionService
   readonly logger: LoggerService
 }
 
@@ -30,23 +30,17 @@ export interface NoteMoveServiceDeps {
  * fan-out that tells the rest of the app a note now lives somewhere else. The
  * rename pipeline and the id-healing path announce here after a move lands;
  * the router rewrites its history entries so the current route (and
- * back/forward) follow the file, and the owning pane adopts its retargeted
- * session instead of reloading. App-global, like the open-documents service,
- * because a move can settle from teardown or quit paths where no pane is
- * mounted.
+ * back/forward) follow the file, and the pane keeps the moved session.
  */
 export interface NoteMoveService {
   /**
-   * Move a note's file + projection, carrying any live editor session along
-   * (Plan 17). Ordering is the mechanism: flush, retarget the session (so any
-   * later save writes the *new* path), re-key the open-documents registry, then
-   * move file + index rows in one Rust transaction. A failure — including an
-   * occupied destination, which Rust always refuses — undoes exactly what was
-   * done: the session retargets back only if one was carried, and the registry
-   * re-key is identity-guarded so it can never grab a different pane's
-   * document; then it rethrows. On success every subscriber (the router's
-   * history rewrite, adopting panes) hears about it. Shared by the rename
-   * pipeline and the 17c migration.
+   * Move a note's file + projection, carrying its session along (Plan 17).
+   * Ordering is the mechanism: flush, move the session (so any later save
+   * writes the *new* path), then move file + index rows in one Rust
+   * transaction. A failure — including an occupied destination, which Rust
+   * always refuses — moves the session back, then rethrows. On success every
+   * subscriber (the router's history rewrite) hears about it. Shared by the
+   * rename pipeline and the 17c migration.
    *
    * Retarget-before-move is deliberate. A save can only land mid-move if the
    * user edits inside the single IPC round-trip that follows a flush behind a
@@ -62,11 +56,12 @@ export interface NoteMoveService {
   /**
    * Follow a move the index healed by id (Plan 17): an external rename —
    * Finder, Obsidian, a sync pull — already relocated the file, and the
-   * reconcile/watcher just moved the rows to match. Carry any live session to
-   * the new path and announce, so the route, history, and open pane follow the
-   * file exactly as for an in-app rename. No flush and no compensation: the
-   * move already happened; this only updates what points at it — and without
-   * it, an open pane's next save would resurrect the dead path.
+   * reconcile/watcher just moved the rows to match. Carry the note's session
+   * and its rename coordinator to the new path and announce, so the route,
+   * history, and open pane follow the file exactly as for an in-app rename.
+   * No flush and no compensation: the move already happened; this only
+   * updates what points at it — and without it, the session's next save
+   * would resurrect the dead path.
    */
   followHealedMove(from: string, to: string): void
   /**
@@ -94,19 +89,15 @@ class NoteMoveServiceImpl implements NoteMoveService {
   }
 
   async moveNote(from: string, to: string, generation: number): Promise<void> {
-    const { indexStore, openDocuments } = this.#deps
-    const owner = openDocuments.sessionFor(from)
-    if (owner !== null) {
-      await owner.flush()
-      owner.retarget(to)
-      openDocuments.retarget(from, to, owner)
-    }
+    const { indexStore, noteSessions } = this.#deps
+    const current = await noteSessions.currentSessionFor(from)
+    await current?.flush()
+    const owner = noteSessions.moveSession(from, to)
     try {
       await indexStore.moveIndexed(from, to, generation)
     } catch (cause) {
-      if (owner !== null) {
-        owner.retarget(from)
-        openDocuments.retarget(to, from, owner)
+      if (owner !== null && noteSessions.existingSessionFor(to) === owner) {
+        noteSessions.moveSession(to, from)
       }
       throw cause
     }
@@ -114,12 +105,10 @@ class NoteMoveServiceImpl implements NoteMoveService {
   }
 
   followHealedMove(from: string, to: string): void {
-    const { openDocuments } = this.#deps
-    const owner = openDocuments.sessionFor(from)
-    if (owner !== null) {
-      owner.retarget(to)
-      openDocuments.retarget(from, to, owner)
-    }
+    const { noteSessions } = this.#deps
+    noteSessions.moveSession(from, to)
+    // The file moved outside the app, so its text may have changed too.
+    noteSessions.invalidate(to)
     this.#emitMoved(from, to)
   }
 

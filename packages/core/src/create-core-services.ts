@@ -173,10 +173,6 @@ import {
 import { createNoteSessionService } from './documents/note-session-service.ts'
 import type { NoteSessionService } from './documents/note-session-types.ts'
 import {
-  createOpenDocumentsService,
-  type OpenDocumentsService,
-} from './documents/open-documents-service.ts'
-import {
   createNoteLinkResolverService,
   type NoteLinkResolverService,
 } from './graph/note-link-resolver-service.ts'
@@ -376,13 +372,9 @@ export interface CoreServices {
    */
   readonly attachments: AttachmentService
   /**
-   * Creates the document session of each open note.
+   * The note sessions of the open graph, one per note path.
    */
   readonly noteSessions: NoteSessionService
-  /**
-   * The open note documents, as one app-global registry.
-   */
-  readonly openDocuments: OpenDocumentsService
   /**
    * Moves note files, and tells the rest of the app that a note now lives somewhere else.
    */
@@ -623,7 +615,6 @@ export const coreServiceFactories = {
   mobileAudioMemo: createMobileAudioMemoService,
   noteFile: createNoteFileService,
   assetStore: createAssetStoreService,
-  openDocuments: createOpenDocumentsService,
   indexQuery: createIndexQueryService,
   wikiResolver: createWikiResolverService,
   backlinks: createBacklinkService,
@@ -935,7 +926,6 @@ export function composeCoreServices(
   }
   const noteFile = create.noteFile({ ipc, clock, fileChanges })
   const assetStore = create.assetStore({ ipc, clock, fileChanges })
-  const openDocuments = create.openDocuments({ fileChanges })
   // Read at call time: the graph session is built later.
   const lateGraphSession: Store<GraphSessionState<GraphServices>> = {
     get: () => graphSession.get(),
@@ -962,6 +952,16 @@ export function composeCoreServices(
   })
   const noteLinkResolver = create.noteLinkResolver({ wikiResolver, noteFile })
   const noteCreation = create.noteCreation({ noteFile, noteLinkResolver, id })
+  const noteSessions = create.noteSessions({
+    noteFile,
+    clock,
+    logger,
+    graphSession: lateGraphSession,
+    fileChanges,
+    noteCreation,
+    // Read at call time: the title rename service is built later.
+    createCoordinator: (path) => titleRename.createCoordinator({ path }),
+  })
   const privacy = create.privacy({ noteFile, graphSession: lateGraphSession })
   const calendar = create.calendar({ ipc, logger })
   const contacts = create.contacts({ ipc, logger })
@@ -972,7 +972,7 @@ export function composeCoreServices(
   })
   const path = create.path({ transport: adapters.path })
   const mobileStorage = create.mobileStorage({ ipc })
-  const noteMove = create.noteMove({ ipc, indexStore, openDocuments, logger })
+  const noteMove = create.noteMove({ ipc, indexStore, noteSessions, logger })
   const captureInbox = create.captureInbox({ ipc })
   const webFetch = create.webFetch({ ipc })
   const pageDescriber = create.pageDescriber({ languageModel })
@@ -1004,7 +1004,7 @@ export function composeCoreServices(
     role: adapters.role,
   })
   const noteDocuments = create.noteDocuments({
-    openDocuments,
+    noteSessions,
     noteFile,
     graphSession: lateGraphSession,
     indexLifecycle,
@@ -1025,7 +1025,7 @@ export function composeCoreServices(
     role: adapters.role,
     mobileStorage,
     noteRows,
-    openDocuments,
+    noteSessions,
     noteMove,
     icloudNative,
     logger,
@@ -1056,7 +1056,7 @@ export function composeCoreServices(
   })
   const persistenceFlush = create.persistenceFlush({
     settings,
-    openDocuments,
+    noteSessions,
     logger,
   })
   const gitRepository = create.gitRepository({ ipc })
@@ -1155,13 +1155,24 @@ export function composeCoreServices(
     icloudNative,
     fileChanges,
     indexLifecycle,
-    openDocuments,
+    noteSessions,
     activity,
     clock,
     logger,
     progress,
   }
   const icloudDownloadDeps: ICloudDownloadServiceDeps = { icloudNative, activity, clock, logger }
+  const titleRename = create.titleRename({
+    noteDocuments,
+    wikiResolver,
+    backlinks,
+    notePath,
+    noteMove,
+    progress,
+    clock,
+    logger,
+    graphSession,
+  })
   const services: CoreServices = {
     ipc,
     logger,
@@ -1240,25 +1251,9 @@ export function composeCoreServices(
     classicAccess,
     fileChanges,
     attachments,
-    noteSessions: create.noteSessions({
-      noteFile,
-      clock,
-      logger,
-      graphSession,
-    }),
-    openDocuments,
+    noteSessions,
     noteMove,
-    titleRename: create.titleRename({
-      noteDocuments,
-      wikiResolver,
-      backlinks,
-      notePath,
-      noteMove,
-      progress,
-      clock,
-      logger,
-      graphSession,
-    }),
+    titleRename,
     noteDocuments,
     notePreview: create.notePreview({
       noteLinkResolver,
@@ -1278,7 +1273,7 @@ export function composeCoreServices(
     noteActions: create.noteActions({
       noteDocuments,
       noteFile,
-      openDocuments,
+      noteSessions,
       indexQuery,
       noteRows,
       progress,
@@ -1295,7 +1290,7 @@ export function composeCoreServices(
       indexQuery,
       notePath,
       noteMove,
-      openDocuments,
+      noteSessions,
       progress,
       graphSession,
     }),

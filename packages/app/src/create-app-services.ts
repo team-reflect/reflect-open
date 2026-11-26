@@ -344,7 +344,7 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
     operations: host.operations,
     keyboard: createKeyboardService(),
     nativeChrome: createNativeChromeService({ host: host.nativeChrome, clock: core.clock }),
-    share: createShareService({ openDocuments: core.openDocuments }),
+    share: createShareService({ noteSessions: core.noteSessions }),
     autocompleteSuggestions: createAutocompleteSuggestionService({
       suggestions: core.suggestions,
       noteCreation: core.noteCreation,

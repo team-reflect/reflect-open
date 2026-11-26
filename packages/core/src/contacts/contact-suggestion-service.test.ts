@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   createTestContactsService,
-  createTestFileChangeService,
   createTestGraphSessionService,
   createTestLoggerService,
   createTestNoteFileService,
@@ -13,10 +12,7 @@ import {
 } from '../testing/index.ts'
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createNoteDocumentService } from '../documents/note-document-service.ts'
-import {
-  createOpenDocumentsService,
-  type OpenDocumentsService,
-} from '../documents/open-documents-service.ts'
+import { createTestNoteSessionService, type TestNoteSessionService } from '../testing/documents.ts'
 import type { ContactMatch, ContactsAuthorization } from './commands.ts'
 import {
   canPromptForContacts,
@@ -45,7 +41,7 @@ const ADA_BLOCK = '- Type: #person\n- Email: ada@example.com\n- Phone: +1 555 01
 
 let contacts: TestContactsService
 let noteFile: TestNoteFileService
-let openDocuments: OpenDocumentsService
+let noteSessions: TestNoteSessionService
 let service: ContactSuggestionService
 
 /**
@@ -55,19 +51,17 @@ let service: ContactSuggestionService
  */
 function contactSuggestionsOver(deps?: {
   contacts?: ContactsService
-  openDocuments?: OpenDocumentsService
+  noteSessions?: TestNoteSessionService
   noteFile?: WritableNoteFileService
   settings?: SettingsService
   graphSession?: GraphSessionService
 }): ContactSuggestionService {
-  const openDocuments =
-    deps?.openDocuments ??
-    createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
+  const noteSessions = deps?.noteSessions ?? createTestNoteSessionService()
   const noteFile = deps?.noteFile ?? createTestNoteFileService()
   return createContactSuggestionService({
     contacts: deps?.contacts ?? createTestContactsService(),
     noteDocuments: createNoteDocumentService({
-      openDocuments,
+      noteSessions,
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
       indexLifecycle: createTestIndexLifecycleService(),
@@ -86,15 +80,15 @@ function contactSuggestionsOver(deps?: {
  */
 function openNote(content: string): TestNoteSession {
   const session = createTestNoteSession({ path: PATH, content })
-  openDocuments.register({ session })
+  noteSessions.register({ session })
   return session
 }
 
 beforeEach(() => {
   contacts = createTestContactsService({ contacts: [ADA] })
   noteFile = createTestNoteFileService()
-  openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
-  service = contactSuggestionsOver({ contacts, noteFile, openDocuments })
+  noteSessions = createTestNoteSessionService()
+  service = contactSuggestionsOver({ contacts, noteFile, noteSessions })
 })
 
 describe('suggestionFor', () => {
@@ -129,7 +123,7 @@ describe('suggestionFor', () => {
   it('answers null without a lookup for an untitled note', async () => {
     const untitled = contactSuggestionsOver({
       contacts,
-      openDocuments,
+      noteSessions,
       noteFile: createTestNoteFileService({ files: { 'notes/.md': '\n' } }),
     })
 
@@ -175,14 +169,14 @@ describe('addToNote', () => {
 
     await service.addToNote(PATH, ADA)
 
-    expect(session.content()).toBe(`# Ada Lovelace\n\n${ADA_BLOCK}\n`)
+    expect(session.liveContent()).toBe(`# Ada Lovelace\n\n${ADA_BLOCK}\n`)
     // No frontmatter mark: the appended details suppress the card by content.
     expect(session.getCalls('commitFrontmatter')).toEqual([])
     expect(noteFile.writes()).toEqual([])
   })
 
   it('refuses rather than clobber when a session with unsaved edits cannot take the append', async () => {
-    openDocuments.register({
+    noteSessions.register({
       session: createTestNoteSession({
         path: PATH,
         content: '# Ada Lovelace\n',
@@ -213,7 +207,7 @@ describe('addToNote', () => {
     const session = openNote('# Grace Hopper\n')
 
     await expect(service.addToNote(PATH, ADA)).rejects.toThrow(/no longer matches/)
-    expect(session.content()).toBe('# Grace Hopper\n')
+    expect(session.liveContent()).toBe('# Grace Hopper\n')
     expect(noteFile.writes()).toEqual([])
   })
 
@@ -222,7 +216,7 @@ describe('addToNote', () => {
 
     await service.addToNote(PATH, ADA)
 
-    expect(session.content()).toBe(
+    expect(session.liveContent()).toBe(
       '# Ada Lovelace\n\n- Type: #person\n\n- Email: ada@example.com\n- Phone: +1 555 0100\n',
     )
   })
@@ -242,7 +236,7 @@ describe('addToNote', () => {
 
     await service.addToNote(PATH, ADA)
 
-    expect(session.content()).toBe('# Ada Lovelace\n\nWork mail ada@work.com\n')
+    expect(session.liveContent()).toBe('# Ada Lovelace\n\nWork mail ada@work.com\n')
     expect(noteFile.writes()).toEqual([])
   })
 

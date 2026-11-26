@@ -38,7 +38,6 @@ export function SingleNoteView({ path, dailyDate, heading }: SingleNoteViewProps
         <NotePane
           path={path}
           dailyDate={dailyDate}
-          lazy
           autoFocus
           className="flex grow flex-col"
           gutterClassName="reflect-content-gutter"

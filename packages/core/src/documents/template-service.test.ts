@@ -6,12 +6,11 @@ import {
   createTestNoteDocumentService,
   createTestNoteMoveService,
   createTestNoteSession,
+  createTestNoteSessionService,
 } from '../testing/documents.ts'
-import { createTestFileChangeService } from '../testing/file-change.ts'
 import { createTestNoteFileService } from '../testing/graph.ts'
 import { createTestIndexStoreService } from '../testing/index-store.ts'
 import { createTestProgressPort } from '../testing/ports.ts'
-import { createOpenDocumentsService } from './open-documents-service.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createTemplateService, type TemplateInsertTarget } from './template-service.ts'
 import { returnNull } from '@ocavue/utils'
@@ -25,7 +24,7 @@ function setup(options?: { files?: Record<string, string>; indexed?: readonly Te
       Object.entries(options?.files ?? {}).map(([path, markdown]) => ({ path, markdown })),
   )
   const progress = createTestProgressPort()
-  const openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
+  const noteSessions = createTestNoteSessionService()
   const indexStore = createTestIndexStoreService()
   const moveIndexed = indexStore.moveIndexed.bind(indexStore)
   // The native command moves the file along with its rows.
@@ -39,20 +38,20 @@ function setup(options?: { files?: Record<string, string>; indexed?: readonly Te
   })
   const noteMove = createTestNoteMoveService({
     indexStore,
-    openDocuments,
+    noteSessions,
   })
   const graph = createTestGraphSessionService({ graph: { generation: 7 } })
   const templates = createTemplateService({
     noteFile,
-    noteDocuments: createTestNoteDocumentService({ noteFile, openDocuments }),
+    noteDocuments: createTestNoteDocumentService({ noteFile, noteSessions }),
     indexQuery: createIndexQueryService({ database }),
     notePath: createNotePathService({ database, noteFile }),
     noteMove,
-    openDocuments,
+    noteSessions,
     progress,
     graphSession: graph,
   })
-  return { templates, noteFile, database, progress, openDocuments, noteMove, graph }
+  return { templates, noteFile, database, progress, noteSessions, noteMove, graph }
 }
 
 function fakeEditor(): { inserted: string[]; focused: number } & TemplateInsertTarget {
@@ -221,14 +220,14 @@ describe('renameTemplate', () => {
   })
 
   it('flushes the open session before a rename that skips the move', async () => {
-    const { templates, openDocuments } = setup({
+    const { templates, noteSessions } = setup({
       files: { 'templates/journal.md': '# Journal\n\nMood:\n' },
     })
     const session = createTestNoteSession({
       path: 'templates/journal.md',
       content: '# Journal\n\nMood:\n',
     })
-    openDocuments.register({ session })
+    noteSessions.register({ session })
 
     await templates.renameTemplate('templates/journal.md', 'Journal')
     expect(session.getCalls('flush')).toHaveLength(1)

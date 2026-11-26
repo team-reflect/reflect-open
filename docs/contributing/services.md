@@ -66,7 +66,7 @@ and is not exported:
 export interface NoteMoveServiceDeps {
   readonly ipc: IpcBridgeService
   readonly indexStore: IndexStoreService
-  readonly openDocuments: OpenDocumentsService
+  readonly noteSessions: NoteSessionService
   readonly logger: LoggerService
 }
 
@@ -201,7 +201,7 @@ sits in a domain directory. A file that exports a service is named after it:
 1. Add the field to `CoreServices`.
 2. Add the factory to `coreServiceFactories`.
 3. Build it in `composeCoreServices` through the table, after the services it
-   depends on: `const noteMove = create.noteMove({ ipc, indexStore, openDocuments, logger })`.
+   depends on: `const noteMove = create.noteMove({ ipc, indexStore, noteSessions, logger })`.
 4. Export from `packages/core/src/index.ts` only the names another
    package imports. Apps import only from the package root and `/testing`.
 
@@ -316,9 +316,12 @@ An app-scoped service lives as long as the webview. Make it a factory, or give
 it an `openSession(options)` method, when an instance must start and stop with
 something shorter-lived. Examples: a loop for one open graph
 (`createGitSyncService(deps, { root, generation, indexGeneration })`,
-`capture.openSession({ generation })`), state that must not survive a graph
-switch (`chatSessions.create({ session })`), or one instance per note pane
-(`noteSessions.create(options)`).
+`capture.openSession({ generation })`), or state that must not survive a graph
+switch (`chatSessions.create({ session })`).
+
+Do not make one instance per view. State that a React effect creates and
+destroys is lost each time the view unmounts. Keep it in the service, keyed by
+what it is (`noteSessions.sessionFor(path)`), and let the view subscribe.
 
 - A per-graph factory goes in `graphServiceFactories`, and `GraphServicesDeps`
   carries its deps (`packages/core/src/create-graph-services.ts`).

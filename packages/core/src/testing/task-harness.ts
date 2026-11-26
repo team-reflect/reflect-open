@@ -4,7 +4,7 @@ import {
   createNoteDocumentService,
   type NoteDocumentService,
 } from '../documents/note-document-service.ts'
-import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
+import { createTestNoteSessionService } from './documents.ts'
 import { createGraphSession, type GraphSession } from '../graph/graph-session.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import type { FileChange } from '../indexing/file-change-service.ts'
@@ -203,7 +203,7 @@ export class TaskHarness {
       },
     }
     this.documents = createNoteDocumentService({
-      openDocuments: createOpenDocumentsService({ fileChanges: this.fileChanges }),
+      noteSessions: createTestNoteSessionService(),
       noteFile: steppedFiles,
       graphSession,
       indexLifecycle: this.index,

@@ -3,7 +3,7 @@ import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
-import type { OpenDocumentsService } from '../documents/open-documents-service.ts'
+import type { NoteSessionService } from '../documents/note-session-types.ts'
 import { isNotePath } from '../graph/paths.ts'
 import type { FileChange, FileChangeService } from '../indexing/file-change-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
@@ -82,7 +82,7 @@ export interface ICloudSyncServiceDeps {
   /**
    * Notes with unsaved edits; their conflicts defer to the next sweep.
    */
-  readonly openDocuments: OpenDocumentsService
+  readonly noteSessions: NoteSessionService
   readonly activity: ActivityPort
   readonly clock: ClockService
   readonly logger: LoggerService
@@ -331,7 +331,7 @@ class ICloudSyncServiceImpl implements ICloudSyncService {
   }
 
   async #runScan(): Promise<void> {
-    const { icloudNative, openDocuments, clock, logger, progress } = this.#deps
+    const { icloudNative, noteSessions, clock, logger, progress } = this.#deps
     const { generation } = this.#options
     if (this.#disposed || this.#scanSuspended()) {
       return
@@ -352,7 +352,7 @@ class ICloudSyncServiceImpl implements ICloudSyncService {
     try {
       const outcome = await icloudNative.conflictsScan({
         generation,
-        skipPaths: openDocuments.dirtyPaths(),
+        skipPaths: noteSessions.dirtyPaths(),
         ingestedPaths: ingested,
         recordBaseline,
         scope,

@@ -1,3 +1,4 @@
+import { noop } from '@ocavue/utils'
 import { sha256HexSync } from '@reflect/utils'
 import type { Unlisten } from '../unlisten.ts'
 import {
@@ -11,17 +12,19 @@ import {
   type FrontmatterPatch,
 } from '../documents/note-session-frontmatter.ts'
 import type {
+  ManagedNoteSession,
   NoteSession,
   NoteSessionCommit,
+  NoteSessionService,
+  NoteSessionSnapshot,
   NoteSourceTransform,
   NoteSessionEditor,
 } from '../documents/note-session-types.ts'
+import { WritableStore } from '../store.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { createTestLoggerService } from './logger.ts'
 import { createTestIndexStoreService } from './index-store.ts'
 import { createTestIpcBridgeService } from './ipc.ts'
-import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
-import { createTestFileChangeService } from './file-change.ts'
 import {
   createNoteDocumentService,
   type NoteDocumentService,
@@ -52,18 +55,18 @@ export interface TestNoteSessionOptions {
    */
   unpersisted?: boolean
   /**
-   * False makes `updateFrontmatter`, `commitFrontmatter` and
+   * False makes `commitFrontmatter` and
    * `commitSourceEdit` refuse. Defaults to true.
    */
   accepts?: boolean
 }
 
 export interface NoteSessionCall {
-  method: keyof NoteSession
+  method: keyof ManagedNoteSession
   args: readonly unknown[]
 }
 
-export interface TestNoteSession extends NoteSession {
+export interface TestNoteSession extends ManagedNoteSession {
   /**
    * Every method call, in order.
    */
@@ -71,7 +74,7 @@ export interface TestNoteSession extends NoteSession {
   /**
    * The arguments of every call of `method`, in order.
    */
-  getCalls(method: keyof NoteSession): ReadonlyArray<readonly unknown[]>
+  getCalls(method: keyof ManagedNoteSession): ReadonlyArray<readonly unknown[]>
 }
 
 class TestNoteSessionImpl implements TestNoteSession {
@@ -79,7 +82,9 @@ class TestNoteSessionImpl implements TestNoteSession {
   readonly #accepts: boolean
   readonly #options: TestNoteSessionOptions
   readonly #callLog: NoteSessionCall[] = []
+  readonly #store: WritableStore<NoteSessionSnapshot>
   #content: string
+  readonly id = 1
   path: string
 
   constructor(options: TestNoteSessionOptions) {
@@ -88,23 +93,52 @@ class TestNoteSessionImpl implements TestNoteSession {
     this.#loaded = options.loaded ?? true
     this.#accepts = options.accepts ?? true
     this.path = options.path
+    this.#store = new WritableStore<NoteSessionSnapshot>({
+      path: options.path,
+      status: this.#loaded ? 'ready' : 'loading',
+      initialContent: this.#content,
+      protected: false,
+      dirty: options.dirty ?? false,
+      isPrivate: false,
+      missing: options.unpersisted ?? false,
+      error: null,
+    })
+  }
+
+  readonly get = (): NoteSessionSnapshot => {
+    return this.#store.get()
+  }
+
+  readonly subscribe = (listener: VoidFunction): Unlisten => {
+    return this.#store.subscribe(listener)
+  }
+
+  editorSeed(): string | null {
+    return this.#loaded ? this.#content : null
+  }
+
+  revalidate(): Promise<void> {
+    this.#record('revalidate')
+    return Promise.resolve()
+  }
+
+  isSaving(): boolean {
+    return false
   }
 
   retarget(to: string): void {
     this.#record('retarget', to)
     this.path = to
-  }
-
-  load(): void {
-    this.#record('load')
+    this.#store.set({ ...this.#store.get(), path: to })
   }
 
   editorChanged(markdown: string): void {
     this.#record('editorChanged', markdown)
   }
 
-  attachEditor(editor: NoteSessionEditor | null): void {
+  attachEditor(editor: NoteSessionEditor): Unlisten {
     this.#record('attachEditor', editor)
+    return noop
   }
 
   externalChanged(): void {
@@ -116,20 +150,12 @@ class TestNoteSessionImpl implements TestNoteSession {
     return Promise.resolve()
   }
 
-  content(): string {
-    return this.#content
-  }
-
   liveContent(): string | null {
     return this.#loaded ? this.#content : null
   }
 
   isDirty(): boolean {
     return this.#options.dirty ?? false
-  }
-
-  isUnpersisted(): boolean {
-    return this.#options.unpersisted ?? false
   }
 
   prepareDelete(): Promise<boolean> {
@@ -139,15 +165,6 @@ class TestNoteSessionImpl implements TestNoteSession {
 
   cancelDelete(): void {
     this.#record('cancelDelete')
-  }
-
-  updateFrontmatter(patch: FrontmatterPatch): boolean {
-    this.#record('updateFrontmatter', patch)
-    if (!this.#accepts) {
-      return false
-    }
-    this.#content = upsertFrontmatter(this.#content, frontmatterPatchToYaml(patch))
-    return true
   }
 
   commitFrontmatter(patch: FrontmatterPatch): Promise<boolean> {
@@ -172,8 +189,9 @@ class TestNoteSessionImpl implements TestNoteSession {
     })
   }
 
-  dispose(): void {
+  dispose(): Promise<void> {
     this.#record('dispose')
+    return Promise.resolve()
   }
 
   discard(): void {
@@ -184,11 +202,11 @@ class TestNoteSessionImpl implements TestNoteSession {
     return [...this.#callLog]
   }
 
-  getCalls(method: keyof NoteSession): ReadonlyArray<readonly unknown[]> {
+  getCalls(method: keyof ManagedNoteSession): ReadonlyArray<readonly unknown[]> {
     return this.#callLog.filter((call) => call.method === method).map((call) => call.args)
   }
 
-  #record(method: keyof NoteSession, ...args: unknown[]): void {
+  #record(method: keyof ManagedNoteSession, ...args: unknown[]): void {
     this.#callLog.push({ method, args })
   }
 }
@@ -244,7 +262,113 @@ class TestNoteMoveServiceImpl implements TestNoteMoveService {
 }
 
 /**
- * The real {@link NoteMoveService} over `ipc`, `indexStore`, `openDocuments`
+ * A session of {@link TestNoteSessionService}.
+ */
+export interface TestSessionRegistration {
+  session: NoteSession
+}
+
+export interface TestNoteSessionService extends NoteSessionService {
+  /**
+   * Add `session` as the session of its path. The returned function removes it.
+   */
+  register(registration: TestSessionRegistration): Unlisten
+}
+
+class TestNoteSessionServiceImpl implements TestNoteSessionService {
+  readonly #registrations = new Map<string, { session: ManagedNoteSession }>()
+
+  register({ session }: TestSessionRegistration): Unlisten {
+    // A test's stand-in implements only what the code under test calls.
+    const registration = { session: session as ManagedNoteSession }
+    this.#registrations.set(session.path, registration)
+    return () => {
+      for (const [path, registered] of this.#registrations) {
+        if (registered === registration) {
+          this.#registrations.delete(path)
+        }
+      }
+    }
+  }
+
+  sessionFor(path: string): NoteSession {
+    const existing = this.#registrations.get(path)
+    if (existing !== undefined) {
+      return existing.session
+    }
+    const session = createTestNoteSession({ path })
+    this.#registrations.set(path, { session })
+    return session
+  }
+
+  existingSessionFor(path: string): NoteSession | null {
+    return this.#registrations.get(path)?.session ?? null
+  }
+
+  currentSessionFor(path: string): Promise<NoteSession | null> {
+    return Promise.resolve(this.existingSessionFor(path))
+  }
+
+  prefetch(path: string): void {
+    this.sessionFor(path)
+  }
+
+  dirtyPaths(): string[] {
+    return [...this.#registrations.values()]
+      .filter(({ session }) => session.isDirty())
+      .map(({ session }) => session.path)
+  }
+
+  invalidate(path: string): void {
+    this.#registrations.get(path)?.session.externalChanged()
+  }
+
+  invalidateAll(): void {
+    for (const { session } of this.#registrations.values()) {
+      session.externalChanged()
+    }
+  }
+
+  moveSession(from: string, to: string): NoteSession | null {
+    const registration = this.#registrations.get(from)
+    if (registration === undefined) {
+      return null
+    }
+    void this.#registrations.get(to)?.session.dispose()
+    registration.session.retarget(to)
+    this.#registrations.delete(from)
+    this.#registrations.set(to, registration)
+    return registration.session
+  }
+
+  discardSession(path: string): void {
+    this.#registrations.get(path)?.session.discard()
+    this.#registrations.delete(path)
+  }
+
+  async flushAll(): Promise<void> {
+    await Promise.allSettled(
+      [...this.#registrations.values()].map(({ session }) => session.flush()),
+    )
+  }
+
+  releaseAll(): void {
+    for (const { session } of this.#registrations.values()) {
+      void session.dispose()
+    }
+    this.#registrations.clear()
+  }
+}
+
+/**
+ * An in-memory {@link NoteSessionService} that holds the sessions a test registers.
+ */
+export function createTestNoteSessionService(): TestNoteSessionService {
+  return new TestNoteSessionServiceImpl()
+}
+
+/**
+ * The real {@link NoteMoveService} over `ipc`, `indexStore`, `noteSessions`
  * and `logger` (fresh test doubles by default).
  */
 export function createTestNoteMoveService(
@@ -254,9 +378,7 @@ export function createTestNoteMoveService(
     createNoteMoveService({
       ipc: options?.ipc ?? createTestIpcBridgeService(),
       indexStore: options?.indexStore ?? createTestIndexStoreService(),
-      openDocuments:
-        options?.openDocuments ??
-        createOpenDocumentsService({ fileChanges: createTestFileChangeService() }),
+      noteSessions: options?.noteSessions ?? createTestNoteSessionService(),
       logger: options?.logger ?? createTestLoggerService(),
     }),
   )
@@ -270,9 +392,7 @@ export function createTestNoteDocumentService(
   deps?: Partial<NoteDocumentServiceDeps>,
 ): NoteDocumentService {
   return createNoteDocumentService({
-    openDocuments:
-      deps?.openDocuments ??
-      createOpenDocumentsService({ fileChanges: createTestFileChangeService() }),
+    noteSessions: deps?.noteSessions ?? createTestNoteSessionService(),
     noteFile: deps?.noteFile ?? createTestNoteFileService(),
     graphSession: deps?.graphSession ?? { get: () => ({ session: null }) },
     indexLifecycle: deps?.indexLifecycle ?? createTestIndexLifecycleService(),

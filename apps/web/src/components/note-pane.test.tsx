@@ -57,7 +57,6 @@ interface RenderPaneOptions {
   path: string
   /** Files that also have an index row. Default: every file. */
   indexed?: readonly string[] | undefined
-  lazy?: boolean | undefined
   autoFocus?: boolean | undefined
   /** Spies go here: the providers read services during the first render. */
   prepare?: ((core: TestCoreServices) => void) | undefined
@@ -67,7 +66,7 @@ interface RenderPaneOptions {
  * Render one `NotePane` with the real editor over test services.
  */
 async function renderPane(options: RenderPaneOptions) {
-  const { files, path, indexed = Object.keys(files), lazy, autoFocus, prepare } = options
+  const { files, path, indexed = Object.keys(files), autoFocus, prepare } = options
   const clock = createTestClockService()
   const noteFile = createTestNoteFileService({ files })
   const database = createTestDatabaseService()
@@ -86,7 +85,7 @@ async function renderPane(options: RenderPaneOptions) {
   function Pane(): ReactElement {
     const [panePath, setPanePath] = useState(path)
     setPath = setPanePath
-    return <NotePane path={panePath} lazy={lazy} autoFocus={autoFocus} />
+    return <NotePane path={panePath} autoFocus={autoFocus} />
   }
   await renderInApp(
     <PaletteProvider>
@@ -143,6 +142,27 @@ describe('NotePane', () => {
       expect(noteFile.files().get('notes/beta.md')).toBe(note('Beta'))
     })
 
+    it('shows what was typed when the pane returns to a note', async () => {
+      const { noteFile, clock, switchTo } = await renderPane({
+        files: { 'notes/alpha.md': note('Alpha'), 'notes/beta.md': note('Beta') },
+        path: 'notes/alpha.md',
+      })
+      await expect.element(page.getByText('Alpha body')).toBeVisible()
+      await act(noop)
+      const alphaEditor = noteEditorHandleFor('notes/alpha.md')
+      alphaEditor?.setSelection('end')
+      alphaEditor?.insertMarkdown('typed ')
+
+      // The switch lands before the save debounce: the edit is still unsaved.
+      await switchTo('notes/beta.md', 'Beta')
+      await switchTo('notes/alpha.md', 'Alpha')
+
+      expect(editor().element().textContent).toContain('typed')
+      await clock.advance(2000)
+      expect(noteFile.files().get('notes/alpha.md')).toContain('typed ')
+      expect(noteFile.files().get('notes/beta.md')).toBe(note('Beta'))
+    })
+
     it('keeps the next note out of AI until its own privacy is known', async () => {
       const { core, switchTo } = await renderPane({
         files: { 'notes/alpha.md': note('Alpha'), 'notes/beta.md': privateNote('Beta') },
@@ -189,14 +209,13 @@ describe('NotePane', () => {
       const { core, noteFile } = await renderPane({
         files: {},
         path: NEW_NOTE_PATH,
-        lazy: true,
         autoFocus: true,
       })
 
       // The caret lands in the seed's empty H1, ghosted "Untitled".
       await expect.element(editor().locate('h1')).toHaveTextContent('')
       await expect.element(editor()).toHaveFocus()
-      await act(() => core.openDocuments.flushAll())
+      await act(() => core.noteSessions.flushAll())
       expect(noteFile.writes()).toEqual([])
     })
 
@@ -204,13 +223,12 @@ describe('NotePane', () => {
       const { core, noteFile } = await renderPane({
         files: {},
         path: NEW_NOTE_PATH,
-        lazy: true,
         autoFocus: true,
       })
       await expect.element(editor()).toHaveFocus()
 
       await userEvent.keyboard('Manifesto')
-      await act(() => core.openDocuments.flushAll())
+      await act(() => core.noteSessions.flushAll())
 
       // The file is born with the seed's `id:` frontmatter plus what the user typed.
       expect(noteFile.files().get(NEW_NOTE_PATH)).toMatch(
@@ -222,7 +240,6 @@ describe('NotePane', () => {
       const { core, noteFile } = await renderPane({
         files: {},
         path: 'Projects/missing.md',
-        lazy: true,
       })
 
       await expect
@@ -231,7 +248,7 @@ describe('NotePane', () => {
         )
         .toBeVisible()
       await expect.element(editor()).not.toBeInTheDocument()
-      await act(() => core.openDocuments.flushAll())
+      await act(() => core.noteSessions.flushAll())
       expect(noteFile.writes()).toEqual([])
     })
   })
@@ -247,7 +264,7 @@ describe('NotePane', () => {
 
     await userEvent.keyboard('{ControlOrMeta>}a{/ControlOrMeta}')
     await userEvent.keyboard('# New Title')
-    await act(() => core.openDocuments.flushAll())
+    await act(() => core.noteSessions.flushAll())
 
     expect(noteFile.files().get(path)).toBe(
       upsertFrontmatter('# New Title\n', { aliases: ['Old Title'] }),

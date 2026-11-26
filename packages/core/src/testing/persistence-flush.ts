@@ -1,5 +1,5 @@
 import type { Unlisten } from '../unlisten.ts'
-import type { OpenDocumentsService } from '../documents/open-documents-service.ts'
+import type { NoteSessionService } from '../documents/note-session-types.ts'
 import type {
   PersistenceFlusher,
   PersistenceFlusherKind,
@@ -11,9 +11,9 @@ export type TestPersistenceFlushService = PersistenceFlushService
 class TestPersistenceFlushServiceImpl implements TestPersistenceFlushService {
   readonly #flushers = new Map<PersistenceFlusherKind, PersistenceFlusher>()
 
-  constructor(openDocuments: OpenDocumentsService | undefined) {
-    if (openDocuments !== undefined) {
-      this.#flushers.set('documents', () => openDocuments.flushAll())
+  constructor(noteSessions: NoteSessionService | undefined) {
+    if (noteSessions !== undefined) {
+      this.#flushers.set('documents', () => noteSessions.flushAll())
     }
   }
 
@@ -45,7 +45,7 @@ class TestPersistenceFlushServiceImpl implements TestPersistenceFlushService {
  * An in-memory {@link PersistenceFlushService}.
  */
 export function createTestPersistenceFlushService(deps?: {
-  openDocuments?: OpenDocumentsService
+  noteSessions?: NoteSessionService
 }): TestPersistenceFlushService {
-  return new TestPersistenceFlushServiceImpl(deps?.openDocuments)
+  return new TestPersistenceFlushServiceImpl(deps?.noteSessions)
 }

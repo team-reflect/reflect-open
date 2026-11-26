@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createNoteDocumentService } from '../documents/note-document-service.ts'
-import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
+import { createTestNoteSessionService } from '../testing/documents.ts'
 import { createPrivacyService } from '../privacy/privacy-service.ts'
 import {
-  createTestFileChangeService,
   createTestGraphSessionService,
   createTestNoteFileService,
   createTestWebFetchService,
@@ -25,7 +24,7 @@ function setup(source: string) {
   })
   const linkPreview = createLinkPreviewService({
     noteDocuments: createNoteDocumentService({
-      openDocuments: createOpenDocumentsService({ fileChanges: createTestFileChangeService() }),
+      noteSessions: createTestNoteSessionService(),
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
       indexLifecycle: createTestIndexLifecycleService(),

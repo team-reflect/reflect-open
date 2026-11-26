@@ -4,12 +4,11 @@ import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createNoteDocumentService } from '../documents/note-document-service.ts'
 import { createNoteRowService } from '../documents/note-row-service.ts'
 import type { NoteSession } from '../documents/note-session-types.ts'
-import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
+import { createTestNoteSessionService } from '../testing/documents.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { gistBodyHash } from '../markdown/gist.ts'
 import { createPrivacyService } from '../privacy/privacy-service.ts'
 import {
-  createTestFileChangeService,
   createTestGraphSessionService,
   createTestHttpService,
   createTestNoteFileService,
@@ -76,9 +75,9 @@ function setup(options?: SetupOptions) {
       return await files.write(...args)
     },
   })
-  const openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
+  const noteSessions = createTestNoteSessionService()
   if (options?.session !== undefined) {
-    openDocuments.register({ session: options.session })
+    noteSessions.register({ session: options.session })
   }
   const tokenReads = { count: 0 }
   const graph = createTestGraphSessionService({ graph: { generation: 3 } })
@@ -93,7 +92,7 @@ function setup(options?: SetupOptions) {
     gists: createGistService({ http }),
     githubAuth,
     noteDocuments: createNoteDocumentService({
-      openDocuments,
+      noteSessions,
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
       indexLifecycle: createTestIndexLifecycleService(),

@@ -10,7 +10,7 @@ import { hasAuthoredTitle, parseNote } from '../markdown/extract.ts'
 import { slugForTitle } from '../markdown/slug.ts'
 import type { NoteDocumentService } from './note-document-service.ts'
 import type { NoteMoveService } from './note-move-service.ts'
-import type { OpenDocumentsService } from './open-documents-service.ts'
+import type { NoteSessionService } from './note-session-types.ts'
 
 /**
 
@@ -98,7 +98,7 @@ export interface TemplateServiceDeps {
   readonly indexQuery: IndexQueryService
   readonly notePath: NotePathService
   readonly noteMove: NoteMoveService
-  readonly openDocuments: OpenDocumentsService
+  readonly noteSessions: NoteSessionService
   readonly progress: ProgressPort
   readonly graphSession: GraphSessionSource
 }
@@ -156,12 +156,12 @@ class TemplateServiceImpl implements TemplateService {
   }
 
   async renameTemplate(path: string, name: string): Promise<string> {
-    const { notePath, noteMove, openDocuments, graphSession } = this.#deps
+    const { notePath, noteMove, noteSessions, graphSession } = this.#deps
     const { generation } = requireGraphSession(graphSession)
     const title = name.trim()
     // Flush first so the retitle below edits settled bytes; the move flushes on
     // its own, but a same-slug rename skips the move entirely.
-    await openDocuments.sessionFor(path)?.flush()
+    await noteSessions.existingSessionFor(path)?.flush()
     const target = await notePath.templateSlugPathForTitle(path, title)
     if (target !== path) {
       await noteMove.moveNote(path, target, generation)

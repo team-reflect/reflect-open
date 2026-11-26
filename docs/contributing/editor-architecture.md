@@ -8,33 +8,47 @@ document logic in `packages/core/src/documents/`. The design docs are Plans
 
 ```text
 NotePane / DailyStream / MobileNote     components — composition only
-  ├─ useNoteDocument()                  React adapter (editor/use-note-document.ts)
-  │    ├─ createDocumentBinding()       create/adopt/teardown/hand-off policy (core)
-  │    ├─ noteSessions.create()         the document state machine, `NoteSession` (core)
-  │    │    └─ NoteFileService          read / write, injected through `deps`
-  │    └─ titleRename.createCoordinator()   the auto-rename flow (core)
+  ├─ useNoteSession()                   React adapter (editor/use-note-session.ts)
+  │    └─ noteSessions.sessionFor()     the sessions of the graph, one per path (core)
+  │         ├─ NoteSession              the document state machine, a `Store` (core)
+  │         │    └─ NoteFileService     read / write, injected through `deps`
+  │         └─ titleRename.createCoordinator()   the auto-rename flow (core)
   ├─ useWikiLinkNavigation()            [[link]] click → route / create
   ├─ useWikiLinkHoverPreview()          [[link]] hover → passive local preview
   ├─ useAssetPersistence()              paste/drop → assets/ write (AttachmentService)
   └─ <NoteEditor>                       meowdown + our extensions (editor/note-editor.tsx)
 ```
 
-The load-bearing split is **session vs. adapter**. The session
-(`packages/core/src/documents/note-session-service.ts`, built by `NoteSessionService`)
-owns every save/conflict/protection rule as a state machine with no React and
-no editor: file access, the clock and the logger come through the service's
-`deps`. `use-note-document.ts` only wires it to React state, the watcher
-stream, and the editor's imperative handle; it gets `noteSessions`,
-`openDocuments` and `titleRename` from `useCoreServices()`.
-`documents/document-binding.ts` owns the pane lifecycle around that session:
-create, adopt after a rename-following route change, teardown, and the
-microtask hand-off when a moved note is not adopted. Tests drive the session
-and binding directly over test doubles (`note-session-service.test.ts`,
-`document-binding.test.ts`, with `createTestNoteFileService()` and
-`createTestClockService()`); if you're changing *what happens*, you're almost
-certainly in one of those core modules, and your test belongs there too.
+The load-bearing split is **data vs. view**. A note's text lives in its
+session (`packages/core/src/documents/note-session.ts`), which owns every
+save/conflict/protection rule as a state machine with no React and no editor:
+file access, the clock and the logger come through `deps`. A session is a
+`Store` of its snapshot. `NoteSessionService`
+(`documents/note-session-service.ts`) holds the sessions, one per path, and
+decides how long each lives. A view never creates, loads or destroys a
+session: `use-note-session.ts` gets the session of a path and subscribes to
+it.
 
-`NoteEditor` is **uncontrolled**: `initialContent` is read once, and showing
+The subscription is the only thing a view contributes to a session's
+lifetime. A session with a subscriber is **observed**: it reconciles with the
+note file on every write to it.
+When the last subscriber leaves (the pane unmounts, a virtual row scrolls
+away, a tab switches), the session flushes and its pending title rename
+settles, and the session stays: its text, and any edit a failed write left
+unsaved, are still there for the next view, which renders them in its first
+commit. An unobserved session reads nothing and is stale: it catches up with
+the note file when it is next observed or committed to. The service keeps a
+bounded number of unobserved sessions and disposes the least recently
+observed clean ones.
+
+Tests drive the session and the service directly over test doubles
+(`note-session.test.ts`, `note-session-service.test.ts`, with
+`createTestNoteFileService()` and `createTestClockService()`); if you're
+changing *what happens*, you're almost certainly in one of those core modules,
+and your test belongs there too.
+
+`NoteEditor` is **uncontrolled**: `initialContent` is read once, from
+`session.editorSeed()` when the editor mounts, and showing
 different content goes through the imperative `NoteEditorHandle` (or a remount
 via `key`), never a prop change. Edits flow out through `onEditorChange`; the
 session pushes content back in through `applyContent` and recognizes the
@@ -50,12 +64,12 @@ keystroke → session.editorChanged() → debounce (800ms) → atomic write
 ```
 
 Saving never calls the indexer from the session: our own write flows through
-the same file-change pipeline as any external change. On desktop that signal
-comes from the watcher; on mobile, where the app sandbox has no external
-writers, `NoteFileService.write` reports the write to `FileChangeService`,
-which echoes it in-process after the write lands. On every change event the session re-reads the file and
-compares by content: a match against what it last wrote (or a still-settling
-in-flight write) is our own echo and is ignored.
+the same file-change pipeline as any external change. `NoteFileService.write`
+reports the write to `FileChangeService`, which echoes it in-process after the
+write lands; on desktop the watcher reports it again. On every change event an
+observed session re-reads the file and compares by content: a match against
+what it last wrote (or a still-settling in-flight write) is our own echo and
+is ignored.
 
 Invariants the loop maintains:
 
@@ -103,23 +117,18 @@ in the webview.
 
 ## Work that outlives a pane
 
-React unmount effects never run on the quit paths (window close, ⌘Q), and some
-editor work must survive pane teardown. The pieces to understand are all core
-services (`packages/core/src/documents/`):
+React unmount effects never run on the quit paths (window close, ⌘Q), and
+saves and renames must finish with no pane mounted. The pieces to understand
+are all core services (`packages/core/src/documents/`):
 
-- **`document-binding.ts`** — the per-pane lifecycle policy. A rename can move
-  the file and retarget the live session before React has rendered the new
-  route; the binding lets the next render adopt that same session, preserving
-  cursor, selection, undo history, conflict state, and pending writes. If no
-  adoption happens, the deferred hand-off tears the session down.
-- **`OpenDocumentsService`** (`open-documents-service.ts`,
-  `CoreServices.openDocuments`) — the registry of live sessions of this
-  webview. Quit teardown flushes every buffer and awaits settle-time work
-  before the webview dies: `PersistenceFlushService` calls
-  `openDocuments.flushAll()` as its `documents` flusher. The
-  rename and move services use `sessionFor(path)` to discover whether a note
-  is open (possibly *reopened* in a new pane) and route through its live
-  session instead of racing the disk.
+- **`NoteSessionService`** (`note-session-service.ts`,
+  `CoreServices.noteSessions`) — the sessions of this webview's graph. Quit
+  teardown flushes every buffer and awaits settle-time work before the webview
+  dies: `PersistenceFlushService` calls `noteSessions.flushAll()` as its
+  `documents` flusher. A rename moves the session with the file
+  (`moveSession`), so the pane keeps the same session, with cursor, selection,
+  undo history, conflict state, and pending writes. A graph switch or close
+  flushes and drops every session (`releaseAll`).
 - **`TitleRenameService` + `NoteMoveService`** (`title-rename-service.ts`,
   `title-rename-tracker.ts`, `note-move-service.ts`) — the auto-rename flow
   (Plans 07b/17). The tracker watches the session's `onContent` stream and
@@ -133,8 +142,9 @@ services (`packages/core/src/documents/`):
   rewrites its history.
 - **`NoteDocumentService`** (`note-document-service.ts`) — session-aware reads
   and writes for everything that is not the pane itself (frontmatter commits,
-  tasks, previews): the live session's buffer when the note is open, the disk
-  otherwise.
+  tasks, previews): the note's session when it has one, after the session has
+  caught up with the file, and the disk otherwise. It never creates a session:
+  a bulk edit (a rename's link rewrite) must not load a session per note.
 
 ## File map
 
@@ -142,10 +152,9 @@ Core, `packages/core/src/documents/`:
 
 | File | Owns |
 |---|---|
-| `note-session-service.ts` (+ `note-session-types.ts`) | `NoteSessionService`: save pipeline, conflicts, protection, frontmatter — the rules |
-| `document-binding.ts` | create/adopt/teardown/hand-off lifecycle for one pane |
-| `open-documents-service.ts` | the live-session registry; `flushAll` for quit |
-| `note-document-service.ts` | live open-session content, else generation-pinned disk read; session-aware writes |
+| `note-session.ts` (+ `note-session-types.ts`) | `NoteSession`: save pipeline, conflicts, protection, frontmatter — the rules |
+| `note-session-service.ts` | `NoteSessionService`: one session per path, observation, staleness, eviction; `flushAll` for quit |
+| `note-document-service.ts` | session content, else generation-pinned disk read; session-aware writes |
 | `note-move-service.ts` | move a note while carrying/following a live session; `onMoved` |
 | `title-rename-service.ts`, `title-rename-tracker.ts` | settled-title detection and the rename pipeline |
 | `attachment-service.ts` | the attachment catalog, asset saves, image URLs |
@@ -162,7 +171,7 @@ Desktop, `apps/web/src/editor/`:
 
 | File | Owns |
 |---|---|
-| `use-note-document.ts` | React adapter: session ↔ state/watcher/editor |
+| `use-note-session.ts` | React adapter: the session of a path and its snapshot |
 | `note-editor.tsx` | meowdown composition + our extensions; imperative handle |
 | `use-editor-autocomplete.ts` | `[[` and `#` search handlers over `AutocompleteSuggestionService` |
 | `use-wiki-link-navigation.ts`, `use-tag-navigation.ts` | chip click → resolve → navigate or create |

@@ -117,7 +117,7 @@ describe('RouteContent', () => {
     await expect.element(editor()).toHaveFocus()
 
     // Opening never litters the graph — even a forced flush writes nothing.
-    await act(() => view.core.openDocuments.flushAll())
+    await act(() => view.core.noteSessions.flushAll())
     expect(noteFile.writes()).toEqual([])
     expect(noteFile.files().get(NEW_NOTE_PATH)).toBeUndefined()
     await view.unmount()

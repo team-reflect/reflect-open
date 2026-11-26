@@ -7,14 +7,10 @@ import {
   type CaptureLinkRepairService,
 } from './capture-link-repair-service.ts'
 import { captureNoteSource } from './capture-note.ts'
-import {
-  createOpenDocumentsService,
-  type OpenDocumentsService,
-} from '../documents/open-documents-service.ts'
+import { createTestNoteSessionService, type TestNoteSessionService } from '../testing/documents.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import {
   createTestClockService,
-  createTestFileChangeService,
   createTestLoggerService,
   createTestNoteDocumentService,
   createTestNoteFileService,
@@ -97,15 +93,15 @@ describe('repairCaptureLinks', () => {
 
 describe('CaptureLinkRepairService', () => {
   let noteFile: TestNoteFileService
-  let openDocuments: OpenDocumentsService
+  let noteSessions: TestNoteSessionService
   let repair: CaptureLinkRepairService
 
   beforeEach(() => {
     noteFile = createTestNoteFileService()
-    openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
+    noteSessions = createTestNoteSessionService()
     repair = createCaptureLinkRepairService({
       noteFile,
-      noteDocuments: createTestNoteDocumentService({ noteFile, openDocuments }),
+      noteDocuments: createTestNoteDocumentService({ noteFile, noteSessions }),
       clock: createTestClockService({ now: CAPTURED_AT.getTime() + 60_000 }),
       logger: createTestLoggerService(),
     })
@@ -165,7 +161,7 @@ describe('CaptureLinkRepairService', () => {
     noteFile.set(oldDaily, daily)
     const lateNight = createCaptureLinkRepairService({
       noteFile,
-      noteDocuments: createTestNoteDocumentService({ noteFile, openDocuments }),
+      noteDocuments: createTestNoteDocumentService({ noteFile, noteSessions }),
       clock: createTestClockService({ now: new Date(2026, 3, 1, 0, 30).getTime() }),
       logger: createTestLoggerService(),
     })
@@ -201,12 +197,12 @@ describe('CaptureLinkRepairService', () => {
       path: DAILY,
       content: `- ${PLACEHOLDER_LINK}\n- unsaved typing\n`,
     })
-    openDocuments.register({ session })
+    noteSessions.register({ session })
     const write = vi.spyOn(noteFile, 'write')
 
     await repair.sweep(3)
 
-    expect(session.content()).toBe(`- ${TITLED_LINK}\n- unsaved typing\n`)
+    expect(session.liveContent()).toBe(`- ${TITLED_LINK}\n- unsaved typing\n`)
     expect(write).not.toHaveBeenCalled()
   })
 
@@ -220,11 +216,11 @@ describe('CaptureLinkRepairService', () => {
       accepts: false,
       dirty: true,
     })
-    openDocuments.register({ session })
+    noteSessions.register({ session })
 
     await repair.sweep(3)
 
-    expect(session.content()).toBe(daily)
+    expect(session.liveContent()).toBe(daily)
     expect(noteFile.files().get(DAILY)).toBe(daily)
   })
 

@@ -214,7 +214,7 @@ function createTestServiceFactories(overrides: TestCoreServiceOverrides) {
       )
     },
     attachments: ({ graphSession }) => createTestAttachmentService({ graphSession }),
-    persistenceFlush: ({ openDocuments }) => createTestPersistenceFlushService({ openDocuments }),
+    persistenceFlush: ({ noteSessions }) => createTestPersistenceFlushService({ noteSessions }),
     gitRepository: () => createTestGitRepositoryService(),
     githubAuth: (deps) => createTestGithubAuthService(deps),
     icloudNative: () => createTestICloudNativeService(),

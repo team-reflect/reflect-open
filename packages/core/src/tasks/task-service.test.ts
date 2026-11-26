@@ -1,9 +1,11 @@
 import { sha256HexSync } from '@reflect/utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  createOpenDocumentsService,
-  type OpenDocumentsService,
-} from '../documents/open-documents-service.ts'
+  createTestNoteSessionService,
+  type TestNoteSessionService,
+  createTestNoteSession,
+  type TestNoteSession,
+} from '../testing/documents.ts'
 import { createGraphSession, type GraphSession } from '../graph/graph-session.ts'
 import type { NoteWriteResult } from '../graph/note-file-service.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
@@ -24,8 +26,6 @@ import {
   seedNotes,
   type TestDatabaseService,
 } from '../testing/database.ts'
-import { createTestNoteSession, type TestNoteSession } from '../testing/documents.ts'
-import { createTestFileChangeService } from '../testing/file-change.ts'
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createTestNoteFileService, type TestNoteFileService } from '../testing/graph.ts'
 import { createTestIpcBridgeService, type TestIpcBridgeService } from '../testing/ipc.ts'
@@ -98,7 +98,7 @@ const task = ref('+ [ ] do it\n')
 
 let database: TestDatabaseService
 let noteFile: TestNoteFileService
-let openDocuments: OpenDocumentsService
+let noteSessions: TestNoteSessionService
 let progress: TestProgressPort
 let ipc: TestIpcBridgeService
 let clock: TestClockService
@@ -111,7 +111,7 @@ function createTasks(graphSession: TaskServiceDeps['graphSession']): TaskService
   return createTaskService({
     database,
     noteDocuments: createNoteDocumentService({
-      openDocuments,
+      noteSessions,
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
       indexLifecycle: createTestIndexLifecycleService(),
@@ -133,13 +133,13 @@ function emitCommitted(paths: string[] | null): void {
 }
 
 function openSession(session: TestNoteSession): void {
-  openDocuments.register({ session })
+  noteSessions.register({ session })
 }
 
 beforeEach(() => {
   database = createTestDatabaseService()
   noteFile = createTestNoteFileService()
-  openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
+  noteSessions = createTestNoteSessionService()
   progress = createTestProgressPort()
   ipc = createTestIpcBridgeService()
   clock = createTestClockService()

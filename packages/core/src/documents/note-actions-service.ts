@@ -21,7 +21,7 @@ import {
   type NoteRowOverlayPatch,
   type NoteRowService,
 } from './note-row-service.ts'
-import type { OpenDocumentsService } from './open-documents-service.ts'
+import type { NoteSessionService } from './note-session-types.ts'
 import { getNextPinOrder, isValidPinOrder } from './pin-order.ts'
 import { noop } from '@ocavue/utils'
 
@@ -172,7 +172,7 @@ export interface NoteActionsService {
 export interface NoteActionsServiceDeps {
   readonly noteDocuments: NoteDocumentService
   readonly noteFile: NoteFileService
-  readonly openDocuments: OpenDocumentsService
+  readonly noteSessions: NoteSessionService
   readonly indexQuery: IndexQueryService
   readonly noteRows: NoteRowService
   readonly progress: ProgressPort
@@ -472,15 +472,15 @@ class NoteActionsServiceImpl implements NoteActionsService {
   }
 
   async #trashOne(path: string, generation: number): Promise<void> {
-    const { noteFile, openDocuments, noteRows } = this.#deps
+    const { noteFile, noteSessions, noteRows } = this.#deps
     if (!canTrashNote(path)) {
       throw new Error('Daily notes cannot be deleted')
     }
-    const session = openDocuments.sessionFor(path)
+    const session = noteSessions.existingSessionFor(path)
     const unpersisted = await session?.prepareDelete()
     if (session !== null && unpersisted === true) {
       noteRows.setOverlay(path, generation, { trashed: true })
-      session.discard()
+      noteSessions.discardSession(path)
       return
     }
     try {
@@ -491,11 +491,8 @@ class NoteActionsServiceImpl implements NoteActionsService {
     }
     // Marked only once the file is gone: a note that fails stays listed.
     noteRows.setOverlay(path, generation, { trashed: true })
-    session?.discard()
-    const currentSession = openDocuments.sessionFor(path)
-    if (currentSession !== session) {
-      currentSession?.discard()
-    }
+    // A view may have opened the note while the delete ran.
+    noteSessions.discardSession(path)
   }
 
   async #deepLinkFor(path: string, session: GraphSession): Promise<string> {

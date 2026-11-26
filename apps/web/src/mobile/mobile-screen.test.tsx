@@ -53,7 +53,7 @@ const editorProbe = vi.hoisted(() => ({
   selectionCalls: [] as Array<'start' | 'end'>,
 }))
 vi.mock('@/editor/note-editor.tsx', async () => {
-  const { useEffect, useRef } = await import('react')
+  const { useEffect, useRef, useState } = await import('react')
   return {
     NoteEditor: ({
       initialContent,
@@ -67,10 +67,12 @@ vi.mock('@/editor/note-editor.tsx', async () => {
       ) => void | (() => void)
     }) => {
       const markdownRef = useRef(initialContent)
+      const [shown, setShown] = useState(initialContent)
       useEffect(() => {
         const cleanup = handleRef?.({
           setMarkdown: (markdown) => {
             markdownRef.current = markdown
+            setShown(markdown)
           },
           getMarkdown: () => markdownRef.current,
           insertMarkdown: noop,
@@ -99,7 +101,7 @@ vi.mock('@/editor/note-editor.tsx', async () => {
       }, [handleRef])
       return (
         <div data-testid="fake-editor">
-          {initialContent}
+          {shown}
           {onWikiLinkClick ? (
             <button
               type="button"

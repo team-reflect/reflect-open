@@ -1,21 +1,22 @@
+import type { Store } from '../store.ts'
+import type { Unlisten } from '../unlisten.ts'
 import type { FrontmatterPatch } from './note-session-frontmatter.ts'
 import type { RoundTripFidelity } from '@meowdown/markdown'
 
 export type NoteSessionStatus = 'loading' | 'ready' | 'error'
 
-/** The observable document state, emitted to `onSnapshot` whenever it changes. */
+/** The observable document state of a {@link NoteSession}. */
 export interface NoteSessionSnapshot {
   /**
    * The session's path; a rename that retargets the session reports its new
-   * one. Null before a session exists.
+   * one.
    */
-  path: string | null
+  path: string
   status: NoteSessionStatus
   /**
-   * Markdown to seed the editor with once `status` is `ready` — the body
-   * (the editor never sees frontmatter). While `protected` it is the **full**
-   * file instead: the read-only view's job is honest display of a file we
-   * refuse to touch, frontmatter included.
+   * The note's Markdown as of the last load or adopted file change: the body,
+   * or the **full** file while `protected` (the read-only view shows a file we
+   * refuse to touch, frontmatter included). It does not follow typing.
    */
   initialContent: string
   /**
@@ -41,18 +42,6 @@ export interface NoteSessionSnapshot {
   error: string | null
 }
 
-/** The snapshot before a session has loaded anything. */
-export const INITIAL_NOTE_SNAPSHOT: NoteSessionSnapshot = {
-  path: null,
-  status: 'loading',
-  initialContent: '',
-  protected: false,
-  dirty: false,
-  isPrivate: true,
-  missing: false,
-  error: null,
-}
-
 /**
  * What a session needs from the editor that shows it.
  */
@@ -75,21 +64,25 @@ export interface NoteSessionEditor {
 export type NoteContentOrigin = 'load' | 'external' | 'saved'
 
 export interface NoteSessionOptions {
-  /** Graph-relative path of the note this session owns. */
-  path: string
   /**
-   * True for a session that tracks dirtiness but never writes, as is every
-   * session created while no graph is open. Otherwise every write is pinned to
-   * the generation of the graph open at creation, read at write time so a
+   * Graph-relative path of the note this session owns. Every write is pinned
+   * to the generation of the graph open at creation, read at write time so a
    * reopen of that graph carries over.
    */
-  readOnly?: boolean | undefined
+  path: string
+  /**
+   * {@link NoteSession.id}.
+   */
+  id: number
   /**
    * Round-trip fidelity check gating editability (meowdown's `checkRoundTrip`).
    */
   classify: (markdown: string) => RoundTripFidelity
-  /** Receives every state change. Not called after `dispose()`. */
-  onSnapshot: (snapshot: NoteSessionSnapshot) => void
+  /**
+   * Called when the session gets its first subscriber, with `true`, and when
+   * it has had none for a microtask, with `false`.
+   */
+  onObservedChange?: ((observed: boolean) => void) | undefined
   /**
    * Receives the full document (frontmatter + body) whenever it transitions
    * to a known-on-disk state: the initial load, an adopted external change
@@ -101,9 +94,7 @@ export interface NoteSessionOptions {
   /**
    * Treat a missing file as an empty note on load instead of an error; the
    * file is then created by the first save — Plan 06's lazy daily-note
-   * contract: opening a day never litters the graph, writing does. Applies
-   * only to the initial load: a note deleted mid-session still reconciles to
-   * a no-op rather than silently emptying the editor.
+   * contract: opening a day never litters the graph, writing does.
    */
   createIfMissing?: boolean | undefined
   /**
@@ -117,9 +108,6 @@ export interface NoteSessionOptions {
   missingSeed?: string | undefined
   saveDebounceMs?: number | undefined
 }
-/**
- * One open note's document lifecycle. Create via {@link NoteSessionService.create}.
- */
 /**
  * Rewrites the full text of a note. `revision` is the hash of `source` as the
  * note file holds it, or `null` when `source` holds unsaved edits or the note
@@ -146,38 +134,38 @@ export interface NoteSessionCommit {
   readonly merged: boolean
 }
 
-export interface NoteSession {
-  /** The graph-relative path this session is bound to (mutable via {@link NoteSession.retarget}). */
+/**
+ * One note in memory: its text, its save pipeline, and its state as a
+ * `Store`. Get it from {@link NoteSessionService.sessionFor}. A subscriber is
+ * a view of the note: the session follows the note file while it has one.
+ */
+export interface NoteSession extends Store<NoteSessionSnapshot> {
+  /**
+   * Identifies this session among the sessions of its service. A rename keeps it.
+   */
+  readonly id: number
+  /** The graph-relative path this session is bound to. A note move changes it. */
   readonly path: string
   /**
-   * Rebind the session to a renamed path (Plan 17). The *file* moved; the
-   * document didn't: buffer, header, and dirtiness are all
-   * untouched, and every subsequent read/write uses `to`. Call after flushing,
-   * right before the file move lands, so a racing save can never resurrect
-   * the old path.
+   * The Markdown a mounting editor opens on: the current body, or `null` when
+   * the note shows no editor (not `ready`, or `protected`).
    */
-  retarget(to: string): void
-  /** Read the note and emit `ready` (or `error`). Call once after creation. */
-  load(): void
+  editorSeed(): string | null
   /** Every editor document change enters the pipeline here. */
   editorChanged(markdown: string): void
   /**
-   * Attach the editor that shows this session, or detach it with `null`. One
-   * editor at a time: a second attach replaces the first. A detach reconciles
-   * the editor's pending input into the session first, so its last keystrokes
+   * Attach the editor that shows this session; returns the detach. One editor
+   * at a time: a second attach replaces the first. The detach reconciles the
+   * editor's pending input into the session first, so its last keystrokes
    * reach disk.
    */
-  attachEditor(editor: NoteSessionEditor | null): void
-  /** The watcher reported an on-disk change to this note; reconcile. */
-  externalChanged(): void
+  attachEditor(editor: NoteSessionEditor): Unlisten
   /**
    * Persist pending edits now (e.g. on window blur). Resolves once the
    * flushed write has settled — quit-time teardown awaits this so the webview
    * can't die before the bytes land.
    */
   flush(): Promise<void>
-  /** The full current document (frontmatter + buffer), as a save would write it. */
-  content(): string
   /**
    * The live document **only when the session has loaded** (`status` is
    * `ready`), else `null`. Distinguishes a genuinely-empty loaded note (return
@@ -194,17 +182,10 @@ export interface NoteSession {
    */
   isDirty(): boolean
   /**
-   * Whether this lazy-created note still exists only in the editor session.
-   * Returns false while loading, once a file is known to exist, or while a
-   * first write is already in flight. An unpersisted session can be discarded
-   * without issuing a filesystem delete.
-   */
-  isUnpersisted(): boolean
-  /**
    * Pause new saves and wait for the initial load plus any write already in
    * flight before deletion chooses between local discard and filesystem
    * trash. Returns true when no backing file exists. The caller must finish
-   * with {@link NoteSession.discard} on success or
+   * with {@link NoteSessionService.discardSession} on success or
    * {@link NoteSession.cancelDelete} when filesystem deletion fails.
    */
   prepareDelete(): Promise<boolean>
@@ -212,17 +193,10 @@ export interface NoteSession {
   cancelDelete(): void
   /**
    * Patch frontmatter keys (e.g. `aliases`, Plan 07b) without touching the
-   * editor: the header is updated in place and saved through the normal
-   * pipeline. Returns false (and does nothing) when the session can't take
-   * the patch — disposed, protected, or not yet `ready`. All three mean the
-   * same thing to a caller: this channel is unavailable, use the fallback
-   * (the rename coordinator writes straight to disk, which a live session
-   * then reconciles like any external change).
-   */
-  updateFrontmatter(patch: FrontmatterPatch): boolean
-  /**
-   * {@link NoteSession.updateFrontmatter}, but the patch **lands on disk now**
-   * through a flush. Same gating and false-return as `updateFrontmatter`.
+   * editor, and land the patch on disk now through a flush. Returns false
+   * (and does nothing) when the session can't take the patch: disposed,
+   * protected, or not yet `ready`. The caller then writes the note file,
+   * which the session reconciles like any external change.
    */
   commitFrontmatter(patch: FrontmatterPatch): Promise<boolean>
   /**
@@ -238,24 +212,112 @@ export interface NoteSession {
    * rethrowing.
    */
   commitSourceEdit(transform: NoteSourceTransform): Promise<NoteSessionCommit | null>
-  /** Flush pending edits and detach: no further snapshots are emitted. */
-  dispose(): void
-  /**
-   * Detach **without** flushing — for deleting the note: a final flush (which
-   * `dispose` performs) would rewrite the buffer and recreate the file we are
-   * removing. After `discard`, a later `dispose` (e.g. on the pane's unmount)
-   * is a no-op. Pending saves are cancelled.
-   */
-  discard(): void
 }
 
 /**
- * Creates the document session of each open note.
+ * A {@link NoteSession} with the operations of its owner, the {@link NoteSessionService}.
+ */
+export interface ManagedNoteSession extends NoteSession {
+  /**
+   * Rebind the session to a renamed path (Plan 17). The *file* moved; the
+   * document didn't: buffer, header, and dirtiness are all
+   * untouched, and every subsequent read/write uses `to`. Call after flushing,
+   * right before the file move lands, so a racing save can never resurrect
+   * the old path.
+   */
+  retarget(to: string): void
+  /** The watcher reported an on-disk change to this note; reconcile. */
+  externalChanged(): void
+  /**
+   * Bring the session up to date with the note file. Resolves when the session
+   * holds the result. A session that has not loaded, or failed to, loads. A
+   * loaded clean session ends as a fresh load would, without passing through
+   * `loading`; a dirty one reconciles as for
+   * {@link ManagedNoteSession.externalChanged}.
+   */
+  revalidate(): Promise<void>
+  /**
+   * Whether a write is queued or in flight.
+   */
+  isSaving(): boolean
+  /**
+   * Detach **without** flushing, for a deleted note: a flush would rewrite the
+   * buffer and recreate the file. Pending saves are cancelled and no further
+   * snapshots are emitted.
+   */
+  discard(): void
+  /**
+   * Flush pending edits and detach: no further snapshots are emitted. Resolves
+   * once the flushed write has settled.
+   */
+  dispose(): Promise<void>
+}
+
+/**
+ * The note sessions of the open graph, one per note path. A session lives
+ * here, not in the view that shows it: a view that goes away leaves the
+ * session, its text, and its pending writes in place.
+ *
+ * A session with a subscriber is **observed**: it reconciles with the note
+ * file on every write to it. An unobserved session reads nothing and is
+ * stale: it catches up with the note file when it is next observed or
+ * committed to. When the last subscriber leaves, the session flushes and its
+ * pending title rename settles. The service keeps a bounded number of
+ * unobserved sessions and disposes the least recently observed clean ones.
  */
 export interface NoteSessionService {
   /**
-   * The save pipeline + external-change reconciliation for one open note
-   * (Plan 05 steps 4-5), as a pure state machine.
+   * Returns the session of `path`. Creates it on first use, with no other effect: a render may call it.
    */
-  create(options: NoteSessionOptions): NoteSession
+  sessionFor(path: string): NoteSession
+  /**
+   * Returns the session of `path` when one exists. It may be stale: use
+   * {@link NoteSessionService.currentSessionFor} to read or commit through it.
+   */
+  existingSessionFor(path: string): NoteSession | null
+  /**
+   * Returns the session of `path` when one exists, after it has caught up with the note file.
+   */
+  currentSessionFor(path: string): Promise<NoteSession | null>
+  /**
+   * Starts the load of the session of `path` before a view needs it.
+   */
+  prefetch(path: string): void
+  /**
+   * Paths of sessions that hold unsaved edits right now.
+   */
+  dirtyPaths(): string[]
+  /**
+   * The note file of `path` may have changed with no event: as for
+   * {@link NoteSessionService.invalidateAll}, for the one session.
+   */
+  invalidate(path: string): void
+  /**
+   * The note files may have changed with no per-file event: observed sessions
+   * reconcile now, the others when they are next observed. On iOS there is
+   * no file watcher, so this is the only signal a remote edit produces.
+   */
+  invalidateAll(): void
+  /**
+   * Carry the session of `from` to `to` (Plan 17): its later writes go to
+   * `to`, and its title rename tracks `to`. A session already at `to` is
+   * disposed. Returns the moved session, or `null` when `from` has none.
+   */
+  moveSession(from: string, to: string): NoteSession | null
+  /**
+   * Discard the session of `path`, if any, without a flush: its note was
+   * deleted. The service forgets it.
+   */
+  discardSession(path: string): void
+  /**
+   * Flush every buffer, fire each session's pending settle-time work, and
+   * settle once all of it has landed. Failures are surfaced per session by the
+   * save pipeline already; teardown must proceed past them, so rejections are
+   * absorbed, never re-thrown.
+   */
+  flushAll(): Promise<void>
+  /**
+   * Flush and dispose every session: the graph they belong to is going away.
+   */
+  releaseAll(): void
 }

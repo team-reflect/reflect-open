@@ -96,7 +96,7 @@ export function GraphProvider({
   children: ReactNode
   platform?: AppPlatform | undefined
 }) {
-  const { graphSession: session, openDocuments } = useCoreServices()
+  const { graphSession: session, noteSessions } = useCoreServices()
   const { graphBoot, mobileOnboarding, whatsNew } = useAppServices()
   const services = useSelector(session, selectServices)
 
@@ -117,11 +117,11 @@ export function GraphProvider({
   // pending title rename fires.
   useEffect(() => {
     const controller = new AbortController()
-    window.addEventListener('blur', () => openDocuments.settleAll(), {
+    window.addEventListener('blur', () => void noteSessions.flushAll(), {
       signal: controller.signal,
     })
     return () => controller.abort()
-  }, [openDocuments])
+  }, [noteSessions])
 
   const value = useMemo<GraphContextValue>(
     () => ({

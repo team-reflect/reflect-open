@@ -83,9 +83,10 @@ round-trip behind a 5-second quiet gate.) Drift is cosmetic: resolution never
 reads filenames.
 
 After a move, the router rewrites history entries for the old path, so
-back/forward never lands on a dead path. The pane adopts its retargeted
-session (the editor is keyed on `sessionEpoch`, not the path), so cursor,
-selection, and undo history survive (`packages/core/src/documents/document-binding.ts`).
+back/forward never lands on a dead path. The session moves with the file and
+the pane keeps it (the editor is keyed on the session's `id`, not the path),
+so cursor, selection, and undo history survive
+(`packages/core/src/documents/note-session-service.ts`).
 
 ## External renames heal by id
 

@@ -8,8 +8,11 @@ import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.
 import { createIndexQueryService, type IndexQueryService } from '../indexing/index-query-service.ts'
 import { createTestDatabaseService } from '../testing/database.ts'
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
-import { createTestNoteSession, type TestNoteSessionOptions } from '../testing/documents.ts'
-import { createTestFileChangeService } from '../testing/file-change.ts'
+import {
+  createTestNoteSession,
+  type TestNoteSessionOptions,
+  createTestNoteSessionService,
+} from '../testing/documents.ts'
 import {
   createTestGraphSessionService,
   type TestGraphSessionService,
@@ -22,9 +25,8 @@ import { createTestProgressPort } from '../testing/ports.ts'
 import { canTrashNote, createNoteActionsService } from './note-actions-service.ts'
 import { createNoteDocumentService } from './note-document-service.ts'
 import { createNoteRowService, type NoteRowService } from './note-row-service.ts'
-import { createNoteSessionService } from './note-session-service.ts'
-import type { NoteSession, NoteSessionSnapshot } from './note-session-types.ts'
-import { createOpenDocumentsService } from './open-documents-service.ts'
+import { createNoteSession } from './note-session.ts'
+import type { ManagedNoteSession, NoteSession, NoteSessionSnapshot } from './note-session-types.ts'
 
 const ULID_RE = /^[0-9a-hjkmnp-tv-z]{26}$/
 
@@ -72,21 +74,21 @@ function createNoteActions(deps: {
 }) {
   const { noteFile } = deps
   const graph = deps.graph ?? createTestGraph()
-  const openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
+  const noteSessions = createTestNoteSessionService()
   for (const session of deps.sessions) {
-    openDocuments.register({ session })
+    noteSessions.register({ session })
   }
   const indexLog: { path: string; generation: number }[] = []
   const service = createNoteActionsService({
     noteDocuments: createNoteDocumentService({
-      openDocuments,
+      noteSessions,
       noteFile,
       graphSession: graph,
       indexLifecycle: deps.indexLifecycle ?? recordingIndexLifecycle(indexLog),
       logger: createTestLoggerService(),
     }),
     noteFile,
-    openDocuments,
+    noteSessions,
     indexQuery:
       deps.indexQuery ?? createIndexQueryService({ database: createTestDatabaseService() }),
     noteRows: deps.noteRows ?? createNoteRowService({ graphSession: graph }),
@@ -95,7 +97,7 @@ function createNoteActions(deps: {
     id: createTestIdService(),
     graphSession: graph,
   })
-  return { actions: Object.assign(service, { indexed: () => [...indexLog] }), openDocuments }
+  return { actions: Object.assign(service, { indexed: () => [...indexLog] }), noteSessions }
 }
 
 function setup(options?: {
@@ -130,7 +132,7 @@ function setup(options?: {
   vi.spyOn(indexQuery, 'getNote').mockImplementation((path) => {
     return Promise.resolve(options?.rows?.[path])
   })
-  const { actions, openDocuments } = createNoteActions({
+  const { actions, noteSessions } = createNoteActions({
     noteFile: options?.wrapNoteFile?.(files) ?? files,
     sessions: session === null ? [] : [session],
     progress,
@@ -141,7 +143,7 @@ function setup(options?: {
       ? {}
       : { indexLifecycle: indexLifecycleWith(options.indexNote) }),
   })
-  return { actions, files, session, openDocuments, progress, noteRows, graph }
+  return { actions, files, session, noteSessions, progress, noteRows, graph }
 }
 
 function shelfNote(path: string, pinnedOrder: number | null): PinnedNoteRow {
@@ -578,7 +580,7 @@ describe('togglePrivate', () => {
 function lazySession(
   files: WritableNoteFileService,
   beforeWrite: () => Promise<void>,
-): { readonly session: NoteSession; readonly snapshots: NoteSessionSnapshot[] } {
+): { readonly session: ManagedNoteSession; readonly snapshots: NoteSessionSnapshot[] } {
   const snapshots: NoteSessionSnapshot[] = []
   const noteFile = overrideNoteFileService(files, {
     write: async (...args) => {
@@ -586,20 +588,24 @@ function lazySession(
       return await files.write(...args)
     },
   })
-  const session = createNoteSessionService({
-    noteFile,
-    clock: createTestClockService(),
-    logger: createTestLoggerService(),
-    graphSession: createTestGraph(),
-  }).create({
-    path: 'notes/new.md',
-    classify: () => 'exact',
-    onSnapshot: (snapshot) => {
-      snapshots.push(snapshot)
+  const session = createNoteSession(
+    {
+      noteFile,
+      clock: createTestClockService(),
+      logger: createTestLoggerService(),
+      graphSession: createTestGraph(),
     },
-    createIfMissing: true,
-    missingSeed: '#\n',
-    saveDebounceMs: 10,
+    {
+      path: 'notes/new.md',
+      id: 1,
+      classify: () => 'exact',
+      createIfMissing: true,
+      missingSeed: '#\n',
+      saveDebounceMs: 10,
+    },
+  )
+  session.subscribe(() => {
+    snapshots.push(session.get())
   })
   return { session, snapshots }
 }
@@ -655,7 +661,7 @@ describe('trash', () => {
     const { actions } = setupWith(files, session)
     const deleteFile = vi.spyOn(files, 'delete')
     const discard = vi.spyOn(session, 'discard')
-    session.load()
+    void session.revalidate()
 
     await actions.trash('notes/new.md')
 
@@ -673,7 +679,7 @@ describe('trash', () => {
     })
     const { actions } = setupWith(files, session)
     const deleteFile = vi.spyOn(files, 'delete')
-    session.load()
+    void session.revalidate()
     await vi.waitFor(() => expect(snapshots.at(-1)?.status).toBe('ready'))
     session.editorChanged('# Draft\n')
     const flush = session.flush()
@@ -692,11 +698,11 @@ describe('trash', () => {
   })
 
   it('leaves the session intact and resumes persistence when the delete fails', async () => {
-    const { actions, session, openDocuments, noteRows } = setup({
+    const { actions, session, noteSessions, noteRows } = setup({
       session: { path: 'notes/gone.md', content: '# Gone\n' },
       wrapNoteFile: failing('delete', new Error('disk full')),
     })
-    const sessionFor = vi.spyOn(openDocuments, 'sessionFor')
+    const sessionFor = vi.spyOn(noteSessions, 'existingSessionFor')
 
     const result = await actions.trash('notes/gone.md')
 
@@ -710,8 +716,8 @@ describe('trash', () => {
   })
 
   it('refuses a daily note and never touches disk or sessions', async () => {
-    const { actions, files, openDocuments } = setup({ files: { 'daily/2026-06-15.md': '# Day\n' } })
-    const sessionFor = vi.spyOn(openDocuments, 'sessionFor')
+    const { actions, files, noteSessions } = setup({ files: { 'daily/2026-06-15.md': '# Day\n' } })
+    const sessionFor = vi.spyOn(noteSessions, 'existingSessionFor')
 
     const result = await actions.trash('daily/2026-06-15.md')
 

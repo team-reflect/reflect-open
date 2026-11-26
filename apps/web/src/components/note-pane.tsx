@@ -1,24 +1,18 @@
-import { memo, useState, type ReactElement } from 'react'
-import { deferredCreationPolicy, isDaily } from '@reflect/core'
+import { memo, type ReactElement } from 'react'
+import { isDaily } from '@reflect/core'
 import { BacklinksPanel } from '@/components/backlinks-panel.tsx'
 import { NoteLoading } from '@/components/note-loading.tsx'
 import { NoteOpenError } from '@/components/note-open-error.tsx'
 import { ProtectedNoteView } from '@/components/protected-note-view.tsx'
 import { SessionEditorView } from '@/components/session-editor-view.tsx'
 import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
-import { useNoteDocument } from '@/editor/use-note-document.ts'
+import { useNoteSession } from '@/editor/use-note-session.ts'
 import { useXPostPreload } from '@/editor/use-x-post-preload.ts'
 import { cn } from '@/lib/utils.ts'
-import { useCoreServices } from '@/services/services-provider.tsx'
 
 interface NotePaneProps {
   /** Graph-relative path of the note to edit. */
   path: string
-  /**
-   * Request lazy creation. The pane permits it only for daily notes and the
-   * explicit new-note ULID route; arbitrary missing paths fail closed.
-   */
-  lazy?: boolean | undefined
   /** Focus the editor when it mounts (the navigated-to day/note). */
   autoFocus?: boolean | undefined
   /**
@@ -86,13 +80,12 @@ interface NotePaneProps {
  * so a converter gap can never silently rewrite a file. Plan 06 mounts one of
  * these per day in the daily stream.
  *
- * The pane is composition only: document semantics live in
- * `useNoteDocument`/`note-session.ts`, and the editor of one session, with
+ * The pane is composition only: document semantics live in core's
+ * `NoteSessionService`, and the editor of one session, with
  * everything addressed by its path, is `SessionEditorView`.
  */
 export function NotePaneComponent({
   path,
-  lazy = false,
   autoFocus = false,
   autoFocusSelection = 'start',
   onAutoFocused,
@@ -104,45 +97,14 @@ export function NotePaneComponent({
   registerHandle,
   onExitBoundary,
 }: NotePaneProps): ReactElement {
-  const { noteCreation } = useCoreServices()
   const dailyNote = isDaily(path)
-  const policy = deferredCreationPolicy(path)
-  const lazyCreate = lazy && policy.lazyCreatable
-  // One seed per (pane, path): a fresh seed carries a fresh `id:`, and a mere
-  // re-render must not mint a new identity (the session is keyed on the seed).
-  // Re-mint during render when the path changes — only the committed render's
-  // seed reaches the session, so the transient stale render is harmless, and
-  // this avoids writing a ref during render.
-  const needsSeed = lazyCreate && policy.seedsUntitled
-  const [seed, setSeed] = useState(() => ({ path, seed: noteCreation.untitledNoteSeed() }))
-  if (needsSeed && seed.path !== path) {
-    setSeed({ path, seed: noteCreation.untitledNoteSeed() })
-  }
-  const document = useNoteDocument(path, {
-    createIfMissing: lazyCreate,
-    // Every editable regular note maintains title-addressed links and
-    // title-mirroring backlink displays. The coordinator separately limits
-    // title-derived file moves to Reflect-managed notes.
-    trackRenames: policy.trackRenames,
-    // A missing ordinary note opens as a name-me template (old Reflect's
-    // new-note flow): the seed — `id:` frontmatter plus an empty H1 the
-    // caret lands in, ghosted "Untitled" by the title placeholder — only
-    // reaches disk if the user edits, and typing names the note. Daily
-    // notes stay unseeded — the date is their identity.
-    missingSeed: needsSeed ? seed.seed : undefined,
-  })
-  const { snapshot, session, epoch } = document
+  const [session, snapshot] = useNoteSession(path)
 
   const editorContent =
     snapshot.status === 'ready' && !snapshot.protected ? snapshot.initialContent : null
   const xPostsReady = useXPostPreload(editorContent)
 
-  if (
-    session === null ||
-    snapshot.path === null ||
-    snapshot.status === 'loading' ||
-    (editorContent !== null && !xPostsReady)
-  ) {
+  if (snapshot.status === 'loading' || (editorContent !== null && !xPostsReady)) {
     return <NoteLoading className={cn(gutterClassName, editorClassName, className)} />
   }
 
@@ -172,13 +134,12 @@ export function NotePaneComponent({
   return (
     <div className={cn('relative', className)} aria-label={`Editing ${path}`}>
       <SessionEditorView
-        // Keyed on the session, not the path: a rename retargets the live
-        // session under a new filename (Plan 17), and remounting the editor
+        // Keyed on the session, not the path: a rename moves the session
+        // to a new filename (Plan 17), and remounting the editor
         // for that would throw away the cursor mid-thought.
-        key={epoch}
+        key={session.id}
         path={snapshot.path}
         session={session}
-        initialContent={snapshot.initialContent}
         isPrivate={snapshot.isPrivate}
         saveError={snapshot.error}
         dailyNote={dailyNote}
