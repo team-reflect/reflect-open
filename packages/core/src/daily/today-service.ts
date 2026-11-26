@@ -28,17 +28,14 @@ class TodayServiceImpl implements TodayService {
 
   readonly get = (): string => {
     // While nothing is subscribed, no timer keeps the cached date fresh.
-    if (!this.#store.subscribed()) {
-      this.#syncToday()
-    }
-    return this.#store.get()
+    return this.#store.subscribed() ? this.#store.get() : this.#readToday()
   }
 
   readonly subscribe = (listener: VoidFunction): Unlisten => {
-    const unlisten = this.#store.subscribe(listener)
     if (this.#heartbeat === null) {
       this.#start()
     }
+    const unlisten = this.#store.subscribe(listener)
     return () => {
       unlisten()
       if (!this.#store.subscribed()) {

@@ -140,12 +140,14 @@ class TaskServiceImpl implements TaskService {
   readonly get = this.#state.get
 
   readonly subscribe = (listener: VoidFunction): Unlisten => {
-    const unlisten = this.#state.subscribe(listener)
-    this.#sources ??= this.#startSources()
-    this.#adoptSession()
-    if (this.#stale) {
-      void this.#refresh()
+    if (this.#sources === null) {
+      this.#sources = this.#startSources()
+      this.#adoptSession()
+      if (this.#stale) {
+        void this.#refresh()
+      }
     }
+    const unlisten = this.#state.subscribe(listener)
     return () => {
       unlisten()
       if (!this.#state.subscribed()) {
