@@ -52,7 +52,7 @@ export interface EmbeddingBackfillOptions {
   generation: number
   fileGeneration: number
   modelId: string
-  onProgress?: (done: number, total: number) => void
+  onProgress?: ((done: number, total: number) => void) | undefined
   /**
    * Abort between notes (e.g. graph switch).
    */
@@ -96,7 +96,17 @@ export interface EmbeddingIndexService {
    * signal, and those notes must re-embed for the description text to reach
    * semantic search.
    */
-  follow(options: { generation: number; fileGeneration: number; modelId: string }): Unlisten
+  follow(options: EmbeddingFollowOptions): Unlisten
+}
+
+export interface EmbeddingFollowOptions {
+  generation: number
+  fileGeneration: number
+  modelId: string
+  /**
+   * Called after each note of the first backfill.
+   */
+  onProgress?: (done: number, total: number) => void
 }
 
 export interface EmbeddingIndexServiceDeps {
@@ -193,9 +203,9 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
     return pass
   }
 
-  follow(options: { generation: number; fileGeneration: number; modelId: string }): Unlisten {
+  follow(options: EmbeddingFollowOptions): Unlisten {
     const { indexLifecycle, logger } = this.#deps
-    const { generation, fileGeneration, modelId } = options
+    const { generation, fileGeneration, modelId, onProgress } = options
     const stopped = new AbortController()
 
     this.#queue = this.#queue
@@ -208,6 +218,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
           fileGeneration,
           modelId,
           signal: stopped.signal,
+          onProgress,
         }).then(noop)
       })
       .catch((cause: unknown) => {

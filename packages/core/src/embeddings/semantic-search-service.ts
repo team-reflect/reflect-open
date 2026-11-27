@@ -4,7 +4,7 @@ import type { LoggerService } from '../ports/logger-service.ts'
 import type { StorageService } from '../ports/storage-service.ts'
 import type { GraphSessionState } from '../graph/graph-session-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
-import { deriveStore, type Store } from '../store.ts'
+import { deriveStore, WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { Settings } from '../settings/schema.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
@@ -26,6 +26,14 @@ const SIMILAR_NOTES_LIMIT = 6
  * The open graph as {@link SemanticSearchService} reads it; a `GraphSessionService` is one.
 
  */
+/**
+ * How far the first backfill of a follow got: notes visited of all notes.
+ */
+export interface EmbeddingProgress {
+  readonly done: number
+  readonly total: number
+}
+
 export type SemanticSearchGraphSource = Store<Pick<GraphSessionState, 'graph' | 'indexGeneration'>>
 
 /**
@@ -93,6 +101,11 @@ export interface SemanticSearchService {
    */
   similarNotes(path: string): Promise<RetrievalHit[]>
   /**
+   * The progress of the current follow's first backfill, `null` while no
+   * follow runs.
+   */
+  readonly progress: Store<EmbeddingProgress | null>
+  /**
    * Stop re-embedding after index rebuilds. The service is unusable afterwards.
    */
   dispose(): void
@@ -123,6 +136,8 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
   readonly #deps: SemanticSearchServiceDeps
   readonly #stopFollowingRebuilds: () => void
   readonly #mainWindow: boolean
+  readonly #progress = new WritableStore<EmbeddingProgress | null>(null)
+  readonly progress: Store<EmbeddingProgress | null> = this.#progress
 
   constructor(deps: SemanticSearchServiceDeps) {
     this.#deps = deps
@@ -193,6 +208,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
         // follow down: its queued work skips and its subscription drops.
         followed = next
         stopFollowing?.()
+        this.#progress.set(null)
         stopFollowing =
           target === null
             ? null
@@ -200,6 +216,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
                 generation: target.generation,
                 fileGeneration: target.fileGeneration,
                 modelId: target.modelId,
+                onProgress: (done, total) => this.#progress.set({ done, total }),
               })
       }
     }
@@ -224,6 +241,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
       }
       stopFollowing?.()
       stopFollowing = null
+      this.#progress.set(null)
     }
   }
 

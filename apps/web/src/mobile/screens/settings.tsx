@@ -81,6 +81,7 @@ import {
 import { CountdownText } from '@/components/countdown-text.tsx'
 import { useGitSyncActions, useGitSyncState } from '@/providers/sync-provider.tsx'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
+import { SemanticSearchGroup } from '@/mobile/semantic-search-group.tsx'
 
 const PAYWALL_PHASE_OPTIONS: readonly SettingsMenuOption<PaywallPhase | 'off'>[] = [
   { value: 'off', label: 'Off' },
@@ -421,6 +422,8 @@ export function MobileSettings(): ReactElement {
               }}
             />
           </SettingsGroup>
+
+          <SemanticSearchGroup />
 
           {isIos ? (
             <SettingsGroup

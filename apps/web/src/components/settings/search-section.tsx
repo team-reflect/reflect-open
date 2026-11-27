@@ -2,9 +2,8 @@ import { APP_COMMANDS } from '@reflect/app'
 import type { ReactElement, ReactNode } from 'react'
 import { Sparkles } from 'lucide-react'
 import { InlineAlert } from '@/components/inline-alert.tsx'
-import { useEmbedStatus } from '@/lib/use-embed-status.ts'
-import { useSemanticSearchEnabled, useSettingsService } from '@/providers/settings-provider.tsx'
-import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+import { useSemanticSearchControls } from '@/lib/use-semantic-search-controls.ts'
+import { useAppServices } from '@/services/services-provider.tsx'
 import { DescribeAssetsField } from './describe-assets-field.tsx'
 import { SettingsField } from './field.tsx'
 import { ModelDownloadProgress } from './model-download-progress.tsx'
@@ -21,10 +20,7 @@ const PALETTE_BINDING = APP_COMMANDS['palette.open'].keybinding
  * events carry byte counts).
  */
 export function SearchSection(): ReactElement {
-  const semanticSearchEnabled = useSemanticSearchEnabled()
-  const settingsService = useSettingsService()
-  const status = useEmbedStatus()
-  const { semanticSearch } = useCoreServices()
+  const { enabled, status, enable, disable, retry } = useSemanticSearchControls()
   const { keymap } = useAppServices()
 
   let control: ReactNode
@@ -32,18 +28,13 @@ export function SearchSection(): ReactElement {
     control = (
       <p className="text-xs text-text-muted">Semantic search is not available on this device.</p>
     )
-  } else if (!semanticSearchEnabled) {
+  } else if (!enabled) {
     // Disabling takes effect immediately — every semantic consumer gates on
     // the setting, so the still-loaded model just idles. No caveat needed.
     control = (
       <button
         type="button"
-        onClick={() => {
-          settingsService.update({ semanticSearchEnabled: true })
-          // EmbeddingsSync loads an untouched runtime; a `failed` one only
-          // retries on an explicit action like this.
-          void semanticSearch.retryFailedModel()
-        }}
+        onClick={enable}
         className="inline-flex items-center gap-1.5 rounded-md bg-accent px-2.5 py-1.5 text-xs font-medium text-text-on-brand shadow-sm transition-colors duration-100 hover:bg-accent-hover"
       >
         <Sparkles aria-hidden strokeWidth={1.75} className="size-3.5" />
@@ -59,7 +50,7 @@ export function SearchSection(): ReactElement {
         </span>
         <button
           type="button"
-          onClick={() => settingsService.update({ semanticSearchEnabled: false })}
+          onClick={disable}
           className="shrink-0 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-text-secondary transition-colors duration-100 hover:bg-surface-hover"
         >
           Disable
@@ -73,14 +64,14 @@ export function SearchSection(): ReactElement {
         <div className="mt-2 flex items-center gap-2">
           <button
             type="button"
-            onClick={() => void semanticSearch.ensureModel()}
+            onClick={retry}
             className="rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-text-secondary transition-colors duration-100 hover:bg-surface-hover"
           >
             Try again
           </button>
           <button
             type="button"
-            onClick={() => settingsService.update({ semanticSearchEnabled: false })}
+            onClick={disable}
             className="rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-text-secondary transition-colors duration-100 hover:bg-surface-hover"
           >
             Disable

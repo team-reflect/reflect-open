@@ -11,6 +11,7 @@ import {
   type EmbedNoteOptions,
   type EmbeddingBackfillOptions,
   type EmbeddingBackfillResult,
+  type EmbeddingFollowOptions,
   type EmbeddingIndexService,
 } from '../embeddings/embedding-index-service.ts'
 import {
@@ -25,10 +26,12 @@ import type {
 } from '../embeddings/retrieval-service.ts'
 import {
   createSemanticSearchService,
+  type EmbeddingProgress,
   type SemanticSearchGraphSource,
   type SemanticSearchService,
 } from '../embeddings/semantic-search-service.ts'
 import { AppError } from '../errors.ts'
+import type { Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
@@ -410,7 +413,7 @@ class TestEmbeddingIndexServiceImpl implements TestEmbeddingIndexService {
     return this.#backfillOverride?.(backfillOptions) ?? this.#inner.backfill(backfillOptions)
   }
 
-  follow(followOptions: { generation: number; fileGeneration: number; modelId: string }): Unlisten {
+  follow(followOptions: EmbeddingFollowOptions): Unlisten {
     this.#followLog.push({ generation: followOptions.generation, modelId: followOptions.modelId })
     return this.#inner.follow(followOptions)
   }
@@ -499,6 +502,10 @@ class TestSemanticSearchServiceImpl implements TestSemanticSearchService {
 
   similarNotes(path: string): Promise<RetrievalHit[]> {
     return this.#inner.similarNotes(path)
+  }
+
+  get progress(): Store<EmbeddingProgress | null> {
+    return this.#inner.progress
   }
 
   dispose(): void {

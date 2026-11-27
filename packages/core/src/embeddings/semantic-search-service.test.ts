@@ -3,17 +3,20 @@ import { createGraphSession, type GraphRole } from '../graph/graph-session.ts'
 import {
   TEST_EMBED_MODEL,
   createTestActivityPort,
+  createTestDatabaseService,
   createTestEmbeddingIndexService,
   createTestEmbeddingRuntimeService,
   createTestGraphSessionService,
   createTestIndexLifecycleService,
   createTestIndexStoreService,
   createTestLoggerService,
+  createTestNoteFileService,
   createTestProgressPort,
   createTestRetrievalService,
   createTestSemanticSearchService,
   createTestSettingsService,
   createTestStorageService,
+  seedNotes,
 } from '../testing/index.ts'
 import { WritableStore } from '../store.ts'
 import type { EmbeddingBackfillResult } from './embedding-index-service.ts'
@@ -36,6 +39,10 @@ async function setup(options?: {
   backfill?: () => Promise<EmbeddingBackfillResult>
   relatedNotes?: (path: string, limit?: number) => RetrievalHit[]
   unloadWhenHidden?: boolean
+  /**
+   * Notes in the index and on disk for the embedding pass.
+   */
+  notes?: { path: string; markdown: string }[]
 }) {
   const logger = createTestLoggerService()
   const progress = createTestProgressPort()
@@ -62,8 +69,15 @@ async function setup(options?: {
       },
     }),
   })
+  const notes = options?.notes ?? []
+  const database = createTestDatabaseService()
+  seedNotes(database, notes)
   const embeddingIndex = createTestEmbeddingIndexService({
     embeddingRuntime: runtime,
+    database,
+    noteFile: createTestNoteFileService({
+      files: Object.fromEntries(notes.map((note) => [note.path, note.markdown])),
+    }),
     indexLifecycle,
     logger,
     backfill: options?.backfill,
@@ -245,6 +259,22 @@ describe('start', () => {
 
     activity.emitVisible()
     await vi.waitFor(() => expect(runtime.ensureCalls()).toBe(ensures + 1))
+    stop()
+  })
+
+  it('reports the progress of the first backfill until the follow stops', async () => {
+    const { semanticSearch, settings } = await setup({
+      notes: [
+        { path: 'notes/a.md', markdown: '# A\n\nAlpha text.\n' },
+        { path: 'notes/b.md', markdown: '# B\n\nBeta text.\n' },
+      ],
+    })
+    expect(semanticSearch.progress.get()).toBeNull()
+    const stop = semanticSearch.start()
+
+    await vi.waitFor(() => expect(semanticSearch.progress.get()).toEqual({ done: 2, total: 2 }))
+    settings.update({ semanticSearchEnabled: false })
+    expect(semanticSearch.progress.get()).toBeNull()
     stop()
   })
 
