@@ -874,24 +874,12 @@ describe('TasksScreen', () => {
     await view.getByRole('button', { name: 'second' }).click({ button: 'right' })
 
     await waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
-    const titles = nativeMenu
-      .popups()[0]!
-      .filter((item) => item.type !== 'separator')
-      .map((item) => item.title)
-    expect(titles).toEqual([
-      'Complete',
-      'Schedule',
-      'Convert to bullet',
-      'Open note',
-      'Open note in new window',
-      'Delete',
-    ])
     expect(view.getByTestId('task-editor').element().textContent).toContain('first')
     expect(
       view.getByRole('button', { name: 'second' }).element().getAttribute('aria-pressed'),
     ).toBe('false')
 
-    nativeMenu.select('complete')
+    nativeMenu.select('toggle')
     await expect.element(view.getByRole('button', { name: 'Reopen: second' })).toBeInTheDocument()
     expect(writesOf('toggle')).toHaveLength(1)
     await view.unmount()
@@ -911,9 +899,65 @@ describe('TasksScreen', () => {
     await view.getByRole('button', { name: 'second' }).click({ button: 'right' })
 
     await waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
-    nativeMenu.select('complete')
+    nativeMenu.select('toggle')
     await waitFor(() => expect(view.getAllByRole('button', { name: /^Reopen:/ })).toHaveLength(2))
     expect(view.getByRole('button', { name: 'Complete: third' }).query()).not.toBeNull()
+    await view.unmount()
+  })
+
+  it('keeps the system menu for a right-click inside the inline editor', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/p.md', astPath: [2], text: 'first', noteTitle: 'Project' }),
+      task({ notePath: 'notes/p.md', astPath: [3], text: 'second', noteTitle: 'Project' }),
+    ])
+    const view = await renderScreen()
+    const nativeMenu = view.appServices.nativeMenuHost
+
+    await userEvent.click(await view.findByRole('button', { name: 'first' }))
+    await view.getByText('type-edit').click({ button: 'right' })
+    await view.getByRole('button', { name: 'second' }).click({ button: 'right' })
+
+    await waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
+    await view.unmount()
+  })
+
+  it('menu Delete clears a selection it acts on and keeps any other selection', async () => {
+    getOpenTasks.mockResolvedValue(manyTasks(3))
+    const view = await renderScreen()
+    const nativeMenu = view.appServices.nativeMenuHost
+    const pressed = (name: string) => {
+      return view.getByRole('button', { name }).element().getAttribute('aria-pressed') === 'true'
+    }
+
+    await userEvent.click(await view.findByRole('button', { name: 'task 0' }))
+    fireEvent.click(view.getByRole('button', { name: 'task 1' }), MOD_KEY)
+    await view.getByRole('button', { name: 'task 2' }).click({ button: 'right' })
+    await waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
+    nativeMenu.select('delete')
+    await waitFor(() => expect(view.queryByText('task 2')).toBeNull())
+    expect([pressed('task 0'), pressed('task 1')]).toEqual([true, true])
+
+    await view.getByRole('button', { name: 'task 0' }).click({ button: 'right' })
+    await waitFor(() => expect(nativeMenu.popups()).toHaveLength(2))
+    nativeMenu.select('delete')
+    await waitFor(() => expect(writesOf('remove')).toHaveLength(3))
+    expect(view.queryByRole('button', { name: /^Schedule/ })).toBeNull()
+    await view.unmount()
+  })
+
+  it('menu Complete on the sole selection closes its inline editor', async () => {
+    getOpenTasks.mockResolvedValue(manyTasks(2))
+    const view = await renderScreen()
+    const nativeMenu = view.appServices.nativeMenuHost
+
+    await userEvent.click(await view.findByRole('button', { name: 'task 0' }))
+    await view.findByTestId('task-editor')
+    await view.getByRole('button', { name: 'Complete: task 0' }).click({ button: 'right' })
+    await waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
+    nativeMenu.select('toggle')
+
+    await expect.element(view.getByRole('button', { name: 'Reopen: task 0' })).toBeInTheDocument()
+    expect(view.queryByTestId('task-editor')).toBeNull()
     await view.unmount()
   })
 

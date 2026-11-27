@@ -2,34 +2,39 @@ import type { NativeContextMenuItem } from '@reflect/app'
 import type { OpenTask } from '@reflect/core'
 import { getTaskDatePresets } from './task-date-presets.ts'
 
-export interface TaskMenuActions {
-  toggle: () => void
-  schedule: (isoDate: string | null) => void
-  convert: () => void
-  remove: () => void
-  openNote: (openInNewWindow: boolean) => void
-}
+export type TaskMenuId =
+  | 'toggle'
+  | `schedule:${string}`
+  | 'clear-date'
+  | 'convert'
+  | 'open-note'
+  | 'open-note-in-new-window'
+  | 'delete'
 
-export function getTaskMenuItems(
-  tasks: readonly OpenTask[],
-  today: string,
-): NativeContextMenuItem[] {
-  const sole = tasks.length === 1 ? tasks[0] : undefined
+type TaskMenuItem =
+  | (Extract<NativeContextMenuItem, { type: 'action' }> & { id: TaskMenuId })
+  | { type: 'separator' }
+  | { type: 'submenu'; title: string; items: TaskMenuItem[] }
+
+export function getTaskMenuItems(tasks: readonly OpenTask[], today: string): TaskMenuItem[] {
   const notePath = tasks[0]?.notePath
-  const items: NativeContextMenuItem[] = [
-    tasks.some((task) => !task.checked)
-      ? { type: 'action', id: 'complete', title: 'Complete', shortcut: 'Mod-Enter' }
-      : { type: 'action', id: 'reopen', title: 'Reopen', shortcut: 'Mod-Enter' },
+  const items: TaskMenuItem[] = [
+    {
+      type: 'action',
+      id: 'toggle',
+      title: tasks.some((task) => !task.checked) ? 'Complete' : 'Reopen',
+      shortcut: 'Mod-Enter',
+    },
     {
       type: 'submenu',
       title: 'Schedule',
       items: [
-        ...getTaskDatePresets(today).map((preset): NativeContextMenuItem => {
+        ...getTaskDatePresets(today).map((preset): TaskMenuItem => {
           return {
             type: 'action',
-            id: preset.id,
-            title: preset.label,
-            checked: sole?.dueDate === preset.date,
+            id: `schedule:${preset.date}`,
+            title: preset.title,
+            checked: tasks.every((task) => task.dueDate === preset.date),
           }
         }),
         { type: 'separator' },
@@ -55,33 +60,4 @@ export function getTaskMenuItems(
     { type: 'action', id: 'delete', title: 'Delete', shortcut: 'Mod-Backspace' },
   )
   return items
-}
-
-export function runTaskMenuAction(id: string, today: string, actions: TaskMenuActions): void {
-  const preset = getTaskDatePresets(today).find((candidate) => candidate.id === id)
-  if (preset !== undefined) {
-    actions.schedule(preset.date)
-    return
-  }
-  switch (id) {
-    case 'complete':
-    case 'reopen':
-      actions.toggle()
-      break
-    case 'clear-date':
-      actions.schedule(null)
-      break
-    case 'convert':
-      actions.convert()
-      break
-    case 'open-note':
-      actions.openNote(false)
-      break
-    case 'open-note-in-new-window':
-      actions.openNote(true)
-      break
-    case 'delete':
-      actions.remove()
-      break
-  }
 }

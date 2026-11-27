@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input.tsx'
 import { useNoteLinkNavigation, type ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
 import { useTaskRowHandlers } from '@/lib/tasks/use-task-row-handlers.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
-import { getTaskMenuItems, runTaskMenuAction } from '@/lib/tasks/task-menu.ts'
+import { getTaskMenuItems, type TaskMenuId } from '@/lib/tasks/task-menu.ts'
 import type { TaskListRow } from '@/lib/tasks/task-list-items.ts'
 import { useTaskKeyboard } from '@/lib/tasks/use-task-keyboard.ts'
 import { useTaskSelection } from '@/lib/tasks/use-task-selection.ts'
@@ -191,10 +191,7 @@ export function TasksScreen(): ReactElement {
   const onListContextMenu = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
       const target = event.target as Element
-      if (
-        (target instanceof HTMLElement && target.isContentEditable) ||
-        target.closest('input, textarea') !== null
-      ) {
+      if (target.closest('[data-task-editor]') !== null) {
         return
       }
       const key = target.closest<HTMLElement>('[data-task-key]')?.dataset.taskKey
@@ -214,26 +211,29 @@ export function TasksScreen(): ReactElement {
         .openContextMenu({
           items: getTaskMenuItems(tasks, today),
           onSelect: (id) => {
-            runTaskMenuAction(id, today, {
-              toggle: () => {
-                void commands.toggle(tasks)
-              },
-              schedule: (isoDate) => {
-                void commands.schedule(tasks, isoDate)
+            const menuId = id as TaskMenuId
+            if (menuId === 'toggle') {
+              void commands.toggle(tasks)
+              // A sole selection would keep its inline editor on the struck row.
+              if (tasks.length === 1) {
                 clearSelection()
-              },
-              convert: () => {
-                void commands.convert(tasks)
-                clearSelection()
-              },
-              remove: () => {
-                void commands.remove(tasks)
-                clearSelection()
-              },
-              openNote: (openInNewWindow) => {
-                navigateNoteLink({ target: routeForPath(task.notePath), openInNewWindow })
-              },
-            })
+              }
+            } else if (menuId === 'convert') {
+              void commands.convert(tasks)
+              clearSelection()
+            } else if (menuId === 'delete') {
+              void commands.remove(tasks)
+              clearSelection()
+            } else if (menuId === 'open-note' || menuId === 'open-note-in-new-window') {
+              navigateNoteLink({
+                target: routeForPath(task.notePath),
+                openInNewWindow: menuId === 'open-note-in-new-window',
+              })
+            } else {
+              const isoDate = menuId === 'clear-date' ? null : menuId.slice('schedule:'.length)
+              void commands.schedule(tasks, isoDate)
+              clearSelection()
+            }
           },
         })
         .catch((cause: unknown) => {

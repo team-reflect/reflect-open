@@ -225,8 +225,8 @@ export function MobileTaskEditSheet({
           <div className="flex flex-wrap items-center gap-1.5" aria-label="Schedule">
             {getTaskDatePresets(today).map((preset) => (
               <ScheduleChip
-                key={preset.id}
-                label={preset.label}
+                key={preset.date}
+                label={preset.title}
                 active={dueDate === preset.date}
                 onClick={() => schedule(preset.date)}
               />
