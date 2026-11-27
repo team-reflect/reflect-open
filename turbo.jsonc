@@ -41,11 +41,6 @@
     },
 
     // TypeScript checks and tests (root scripts, whole repo).
-    "//#lint": {
-      "outputLogs": "new-only",
-      "dependsOn": ["@reflect/index-wasm#build"],
-      "outputs": [".eslintcache"],
-    },
     "//#typecheck": {
       "outputLogs": "new-only",
       "outputs": ["**/*.tsbuildinfo"],
