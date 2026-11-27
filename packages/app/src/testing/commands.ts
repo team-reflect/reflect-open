@@ -38,7 +38,7 @@ export interface TestNativeMenuHost extends NativeMenuHost {
    */
   popups(): readonly (readonly NativeContextMenuItem[])[]
   /**
-   * Pick the enabled action `id` in the latest context menu, as the user would.
+   * Picks the enabled action `id` in the latest popup, and throws when there is none.
    */
   select(id: string): void
 }

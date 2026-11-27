@@ -46,9 +46,6 @@ export type TestAppServices = Omit<
   readonly opener: TestOpenerService
   readonly navigation: TestNavigationService
   readonly lifecycle: TestLifecycleService
-  /**
-   * The host behind `nativeMenu`, which records the menus it opens.
-   */
   readonly nativeMenuHost: TestNativeMenuHost
 }
 

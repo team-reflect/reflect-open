@@ -78,25 +78,18 @@ export interface NativeAppMenu {
   assignNsAppRoles(): MaybePromise<void>
 }
 
-/**
- * One item of a context menu. It is plain data, so a host can render it
- * anywhere and report the picked action by its `id`.
- */
 export type NativeContextMenuItem =
   | {
       type: 'action'
-      /**
-       * Passed to {@link NativeContextMenuOptions.onSelect} when the item is picked.
-       */
       id: string
       title: string
       disabled?: boolean | undefined
       /**
-       * Makes the item a check item, with or without its check mark.
+       * Any boolean makes a check item, so `false` shows an unchecked check item.
        */
       checked?: boolean | undefined
       /**
-       * A keybinding such as `Mod-Enter`, shown as a hint next to the title.
+       * A keybinding such as `Mod-Enter`, shown only as a hint.
        */
       shortcut?: string | undefined
     }
@@ -108,9 +101,6 @@ export interface NativeContextMenuOptions {
    * Menu items to render in order.
    */
   items: readonly NativeContextMenuItem[]
-  /**
-   * Runs with the action item id when the user picks an action.
-   */
   onSelect: (id: string) => void
 }
 

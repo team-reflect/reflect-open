@@ -29,10 +29,6 @@ async function menuEntry(item: NativeMenuItem): Promise<MenuItem | PredefinedMen
 
 type ContextMenuEntry = MenuItem | CheckMenuItem | PredefinedMenuItem | Submenu
 
-/**
- * Builds the context menu entries for `items` and adds every built entry to
- * `built`, so the caller can close them all later.
- */
 async function buildContextMenuEntries(
   items: readonly NativeContextMenuItem[],
   onSelect: (id: string) => void,
@@ -61,8 +57,7 @@ async function buildContextMenuEntry(
       items: await buildContextMenuEntries(item.items, onSelect, built),
     })
   }
-  // No Tauri item id: Tauri keys click channels by id, and a context menu id
-  // could replace the channel of an app menu item with the same id.
+  // No Tauri id: Tauri keys click channels by id, so a shared id would replace an app menu item's channel.
   const options = {
     text: item.title,
     enabled: !(item.disabled ?? false),

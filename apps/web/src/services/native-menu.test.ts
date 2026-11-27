@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NativeContextMenuItem, NativeSubmenu } from '@reflect/app'
 
 const calls = vi.hoisted((): string[] => [])
-// Every closed resource, named by its `text`, else by its kind.
 const closed = vi.hoisted((): string[] => [])
 const popup = vi.hoisted(() => vi.fn(async () => {}))
 const setAsAppMenu = vi.hoisted(() => {
@@ -17,8 +16,7 @@ const menuNew = vi.hoisted(() => {
   })
 })
 /**
- * A fake `X.new` that echoes its options and kind as the built resource's own
- * fields. Its methods live on the prototype, so `toEqual` compares only the fields.
+ * Fake methods live on the prototype, so `toEqual` compares only the echoed options and `built`.
  */
 const resourceNew = vi.hoisted(() => {
   interface ResourceOptions {
