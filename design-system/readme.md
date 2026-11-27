@@ -190,9 +190,9 @@ Tailwind utilities in the desktop app's `@theme inline` block.
 **Shadow token.** `--shadow-app-input`: V1's five-layer search-field shadow. Pair it with
 the field's `7px` radius and `--border-strong` outline.
 
-**Edge token.** `--shadow-edge`: the trailing edge of a surface that slides over the
-content behind it, such as a swiped list row. It is a `--border` hairline plus a soft
-shadow that falls to the right. Light uses the shadow ink `rgba(11,19,36,.1)`; dark uses
+**Edge token.** `--shadow-edge`: both side edges of a surface that slides over the
+content behind it, such as a swiped list row. Each side is a `--border` hairline plus a
+soft shadow that falls outward. Light uses the shadow ink `rgba(11,19,36,.1)`; dark uses
 `rgba(0,0,0,.4)`, where the hairline does most of the work.
 
 **Type tokens.** `--font-shortcut` is a `system-ui`-first stack so keyboard glyphs
