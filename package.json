@@ -20,7 +20,6 @@
     "build:windows": "pnpm --filter @reflect/tauri build:windows",
     "web-inspector": "node scripts/web-inspector.ts",
     "typecheck": "tsc -b",
-    "test": "pnpm build:index-wasm --output-logs=errors-only && vitest",
     "test:browser": "pnpm build:index-wasm --output-logs=errors-only && vitest run --project '*browser*'",
     "test:node": "pnpm build:index-wasm --output-logs=errors-only && vitest run --project '!*browser*'",
     "test:ios": "node scripts/test-ios.ts",

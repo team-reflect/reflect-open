@@ -145,7 +145,8 @@ Common commands from the repository root (the rest are in `package.json`):
 ```bash
 pnpm dev              # Vite only, http://localhost:1420
 pnpm check            # typecheck + lint
-pnpm test --run path/to/test
+pnpm test:node path/to/x.test.ts
+pnpm test:browser path/to/x.test.tsx
 
 # Rust tests that compile the desktop crate need sidecars staged first
 pnpm --filter @reflect/tauri sidecar
