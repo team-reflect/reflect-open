@@ -166,8 +166,8 @@ export interface NativeMenuService {
    */
   connect(): Unlisten
   /**
-   * Open a native context menu. Outside a native shell, this is a no-op so
-   * browser and test shells can call the same path without platform guards.
+   * Open a context menu at the pointer: a native menu in the Tauri shell, a
+   * menu drawn in the page in a plain browser.
    */
   openContextMenu(options: ContextMenuOptions): Promise<void>
 }
@@ -283,9 +283,6 @@ class NativeMenuServiceImpl implements NativeMenuService {
   }
 
   async openContextMenu(options: ContextMenuOptions): Promise<void> {
-    if (!this.#deps.platform.isNativeShell) {
-      return
-    }
     await this.#deps.host.popup(
       options.items.map((item) => resolveContextMenuItem(item, options.onSelect)),
     )

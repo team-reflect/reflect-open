@@ -14,7 +14,9 @@ import {
 import {
   type GraphBootService,
   type AppCommandId,
+  createNativeMenuService,
   deepLinkForRoute,
+  type NativeMenuHost,
   type Route,
 } from '@reflect/app'
 import {
@@ -34,6 +36,7 @@ import { SidebarProvider } from '@/providers/sidebar-provider.tsx'
 import { UpdateProvider } from '@/providers/update-provider.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createBrowserNativeMenuHost } from '@/services/browser-native-menu.ts'
 import { Sidebar } from './sidebar.tsx'
 
 const GRAPH = { root: '/notes', name: 'Notes', generation: 1 }
@@ -88,7 +91,7 @@ const SIDEBAR_COMMANDS: readonly AppCommandId[] = [
   'palette.open',
 ]
 
-async function renderSidebar(initialRoute?: Route) {
+async function renderSidebar(initialRoute?: Route, nativeMenuHost?: NativeMenuHost) {
   const readSource = (): Promise<string> => Promise.resolve('# Rust\n')
   operations = createTestOperationsService()
   const core = createTestCoreServices({
@@ -119,11 +122,21 @@ async function renderSidebar(initialRoute?: Route) {
   chooseGraph = vi.spyOn(appLayer.graphBoot, 'chooseGraph').mockResolvedValue()
   updateSettingsWith = vi.spyOn(core.settings, 'updateWith')
   opener = appLayer.opener
+  const nativeMenu = nativeMenuHost
+    ? createNativeMenuService({
+        commands: appLayer.commands,
+        window: appLayer.window,
+        platform: core.platform,
+        ipc: core.ipc,
+        logger: core.logger,
+        host: nativeMenuHost,
+      })
+    : appLayer.nativeMenu
   // The app constrains the sidebar to its rail width; without it the graph
   // menu's anchor spans the viewport and popper pushes the submenu off-screen.
   const view = await renderInApp(<Sidebar graph={GRAPH} />, {
     core,
-    appServices: appLayer,
+    appServices: { ...appLayer, nativeMenu },
     graph: GRAPH,
     graphState: {
       recents: [
@@ -318,6 +331,20 @@ describe('Sidebar', () => {
     await vi.waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
     nativeMenu.select('unpin')
     await expectLocatorToHaveCount(view.getByRole('button', { name: 'Rust' }), 0)
+    expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/rust.md', { pinned: false }, 1)
+  })
+
+  it('right-click unpins a pinned row through the menu drawn in a plain browser', async () => {
+    getPinnedNotes.mockResolvedValue([
+      { path: 'notes/rust.md', title: 'Rust', dailyDate: null, pinnedOrder: null },
+    ])
+    const { view } = await renderSidebar(undefined, createBrowserNativeMenuHost())
+
+    await view.getByRole('button', { name: 'Rust' }).click({ button: 'right' })
+    await page.getByRole('menuitem', { name: 'Unpin Note' }).click()
+
+    await expectLocatorToHaveCount(view.getByRole('button', { name: 'Rust' }), 0)
+    await expectLocatorToHaveCount(page.getByRole('menu'), 0)
     expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/rust.md', { pinned: false }, 1)
   })
 
