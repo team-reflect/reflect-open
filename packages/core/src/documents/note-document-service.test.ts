@@ -4,7 +4,6 @@ import {
   createTestNoteSession,
   type TestNoteSessionOptions,
   createTestNoteSessionService,
-  createTestLinkedDailyNoteService,
 } from '../testing/documents.ts'
 import {
   createTestNoteFileService,
@@ -12,6 +11,9 @@ import {
   type TestNoteFileServiceOptions,
 } from '../testing/graph.ts'
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
+import { createWikiResolverService } from '../indexing/wiki-resolver-service.ts'
+import { createTestDatabaseService } from '../testing/database.ts'
+import { createLinkedDailyNoteService } from './linked-daily-note-service.ts'
 import { createNoteDocumentService } from './note-document-service.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
@@ -58,7 +60,11 @@ function setup(options?: {
       },
     }),
     indexLifecycle,
-    linkedDailyNotes: createTestLinkedDailyNoteService(),
+    linkedDailyNotes: createLinkedDailyNoteService({
+      noteFile: racedNoteFile,
+      wikiResolver: createWikiResolverService({ database: createTestDatabaseService() }),
+      logger,
+    }),
     logger,
   })
   return { noteDocuments, noteFile, session, externalWrites, indexNote, logger }

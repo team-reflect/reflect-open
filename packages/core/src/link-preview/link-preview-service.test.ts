@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
-import { createNoteDocumentService } from '../documents/note-document-service.ts'
 import {
   createTestNoteSessionService,
-  createTestLinkedDailyNoteService,
+  createTestNoteDocumentService,
 } from '../testing/documents.ts'
 import { createPrivacyService } from '../privacy/privacy-service.ts'
 import {
@@ -12,7 +10,6 @@ import {
   createTestWebFetchService,
 } from '../testing/index.ts'
 import { createLinkPreviewService } from './link-preview-service.ts'
-import { createTestLoggerService } from '../testing/logger.ts'
 
 const PATH = 'notes/a.md'
 const PAGE = 'https://example.com/page'
@@ -26,13 +23,10 @@ function setup(source: string) {
     icon: { [ICON]: ICON_SRC },
   })
   const linkPreview = createLinkPreviewService({
-    noteDocuments: createNoteDocumentService({
+    noteDocuments: createTestNoteDocumentService({
       noteSessions: createTestNoteSessionService(),
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
-      indexLifecycle: createTestIndexLifecycleService(),
-      linkedDailyNotes: createTestLinkedDailyNoteService(),
-      logger: createTestLoggerService(),
     }),
     privacy: createPrivacyService({
       noteFile: createTestNoteFileService(),
