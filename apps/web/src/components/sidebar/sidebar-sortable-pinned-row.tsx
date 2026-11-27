@@ -39,14 +39,10 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
       event.stopPropagation()
       void nativeMenu
         .openContextMenu({
-          items: [
-            {
-              text: 'Unpin Note',
-              action: () => {
-                void noteActions.unpin(note.path)
-              },
-            },
-          ],
+          items: [{ type: 'action', id: 'unpin', title: 'Unpin Note' }],
+          onSelect: () => {
+            void noteActions.unpin(note.path)
+          },
         })
         .catch((cause: unknown) => {
           operations.start('Opening note menu').fail(errorMessage(cause))

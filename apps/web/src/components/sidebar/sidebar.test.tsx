@@ -14,7 +14,6 @@ import {
 import {
   type GraphBootService,
   type AppCommandId,
-  type NativeContextMenuOptions,
   deepLinkForRoute,
   type Route,
 } from '@reflect/app'
@@ -36,12 +35,6 @@ import { UpdateProvider } from '@/providers/update-provider.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { Sidebar } from './sidebar.tsx'
-
-const openNativeContextMenu = vi.fn((options: NativeContextMenuOptions) => {
-  return Promise.try(() => {
-    options.items[0]?.action()
-  })
-})
 
 const GRAPH = { root: '/notes', name: 'Notes', generation: 1 }
 
@@ -83,7 +76,6 @@ beforeEach(() => {
   commitNoteFrontmatter.mockReset().mockResolvedValue(undefined)
   openNoteWindow.mockReset().mockResolvedValue(true)
   aiProviders = [OPENAI]
-  openNativeContextMenu.mockClear()
 })
 
 const SIDEBAR_COMMANDS: readonly AppCommandId[] = [
@@ -122,7 +114,6 @@ async function renderSidebar(initialRoute?: Route) {
     appLayer.commands.handle(id, () => void ran.push(id), handlers.signal)
   }
   vi.spyOn(core.indexQuery, 'getPinnedNotes').mockImplementation(getPinnedNotes)
-  vi.spyOn(appLayer.nativeMenu, 'openContextMenu').mockImplementation(openNativeContextMenu)
   openRecent = vi.spyOn(core.graphSession, 'openRecent').mockResolvedValue(true)
   pickAndOpen = vi.spyOn(appLayer.graphBoot, 'pickAndOpen').mockResolvedValue()
   chooseGraph = vi.spyOn(appLayer.graphBoot, 'chooseGraph').mockResolvedValue()
@@ -157,7 +148,7 @@ async function renderSidebar(initialRoute?: Route) {
       </div>
     ),
   })
-  return { view, ran, core, navigation: appLayer.navigation }
+  return { view, ran, core, navigation: appLayer.navigation, nativeMenu: appLayer.nativeMenu }
 }
 
 describe('Sidebar', () => {
@@ -319,20 +310,13 @@ describe('Sidebar', () => {
     getPinnedNotes.mockResolvedValue([
       { path: 'notes/rust.md', title: 'Rust', dailyDate: null, pinnedOrder: null },
     ])
-    const { view } = await renderSidebar()
+    const { view, nativeMenu } = await renderSidebar()
     const rust = view.getByRole('button', { name: 'Rust' })
 
     await rust.click({ button: 'right' })
 
-    await vi.waitFor(() => {
-      expect(openNativeContextMenu).toHaveBeenCalledWith({
-        items: [
-          expect.objectContaining({
-            text: 'Unpin Note',
-          }),
-        ],
-      })
-    })
+    await vi.waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
+    nativeMenu.select('unpin')
     await expectLocatorToHaveCount(view.getByRole('button', { name: 'Rust' }), 0)
     expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/rust.md', { pinned: false }, 1)
   })
@@ -342,10 +326,12 @@ describe('Sidebar', () => {
     getPinnedNotes.mockResolvedValue([
       { path: 'notes/rust.md', title: 'Rust', dailyDate: null, pinnedOrder: null },
     ])
-    const { view } = await renderSidebar()
+    const { view, nativeMenu } = await renderSidebar()
     const rust = view.getByRole('button', { name: 'Rust' })
 
     await rust.click({ button: 'right' })
+    await vi.waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
+    nativeMenu.select('unpin')
 
     await vi.waitFor(() => {
       expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/rust.md', { pinned: false }, 1)

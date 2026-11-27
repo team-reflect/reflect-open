@@ -9,7 +9,7 @@ import { createTestNativeMenuService } from '../testing/commands.ts'
 import { createTestWindowService } from '../testing/window.ts'
 import type { AppCommandId } from './app-commands.ts'
 import { createCommandService } from './command-service.ts'
-import type { AppSubmenuLayout, NativeMenuItem } from './native-menu-service.ts'
+import type { AppSubmenuLayout, ContextMenuItem, NativeMenuItem } from './native-menu-service.ts'
 import { returnNull } from '@ocavue/utils'
 
 const LAYOUT: AppSubmenuLayout[] = [
@@ -246,20 +246,54 @@ describe('openContextMenu', () => {
     const { menu } = setup({ platform: { isNativeShell: false } })
     const onSelect = vi.fn()
 
-    await menu.openContextMenu({ items: [{ text: 'Unpin Note', action: onSelect }] })
+    await menu.openContextMenu({
+      items: [{ type: 'action', id: 'unpin', title: 'Unpin' }],
+      onSelect,
+    })
 
     expect(menu.host.popups()).toEqual([])
+    expect(menu.popups()).toEqual([])
     expect(onSelect).not.toHaveBeenCalled()
   })
 
-  it('opens a native menu whose items run their actions', async () => {
+  it('opens the items as native menu items whose actions report the picked id', async () => {
     const { menu } = setup()
     const onSelect = vi.fn()
+    const items: ContextMenuItem[] = [
+      { type: 'action', id: 'complete', title: 'Complete' },
+      { type: 'separator' },
+      {
+        type: 'submenu',
+        title: 'Schedule',
+        items: [
+          { type: 'action', id: 'clear', title: 'Clear date', disabled: true, checked: false },
+        ],
+      },
+    ]
 
-    await menu.openContextMenu({ items: [{ text: 'Unpin Note', action: onSelect }] })
+    await menu.openContextMenu({ items, onSelect })
 
-    expect(menu.host.popups()).toEqual([[{ text: 'Unpin Note', action: onSelect }]])
-    menu.host.popups()[0]?.[0]?.action()
-    expect(onSelect).toHaveBeenCalled()
+    const action = expect.any(Function) as (id: string) => void
+    expect(menu.host.popups()).toEqual<NativeMenuItem[][]>([
+      [
+        { kind: 'command', text: 'Complete', enabled: true, action },
+        { kind: 'predefined', item: 'Separator' },
+        {
+          kind: 'submenu',
+          text: 'Schedule',
+          items: [{ kind: 'command', text: 'Clear date', enabled: false, checked: false, action }],
+        },
+      ],
+    ])
+    expect(menu.popups()).toEqual([items])
+
+    const [complete, , schedule] = menu.host.popups()[0] ?? []
+    const clear = schedule?.kind === 'submenu' ? schedule.items[0] : undefined
+    if (complete?.kind !== 'command' || clear?.kind !== 'command') {
+      throw new Error('expected command items')
+    }
+    complete.action('')
+    clear.action('')
+    expect(onSelect.mock.calls).toEqual([['complete'], ['clear']])
   })
 })

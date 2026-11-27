@@ -1,12 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { NativeSubmenu } from '@reflect/app'
-
-interface SubmenuOptionsForTest {
-  readonly text: string
-  readonly items: readonly unknown[]
-}
+import type { NativeMenuItem, NativeSubmenu } from '@reflect/app'
 
 const calls = vi.hoisted((): string[] => [])
+const closed = vi.hoisted((): string[] => [])
 const popup = vi.hoisted(() => vi.fn(async () => {}))
 const setAsAppMenu = vi.hoisted(() => {
   return vi.fn(() => {
@@ -14,30 +10,61 @@ const setAsAppMenu = vi.hoisted(() => {
     return Promise.resolve()
   })
 })
-const submenuNew = vi.hoisted(() => {
-  return vi.fn((options: SubmenuOptionsForTest) => {
-    return Promise.resolve({
-      setAsWindowsMenuForNSApp: () => {
-        calls.push(`windows:${options.text}`)
-        return Promise.resolve()
-      },
-      setAsHelpMenuForNSApp: () => {
-        calls.push(`help:${options.text}`)
-        return Promise.resolve()
-      },
-    })
+const menuNew = vi.hoisted(() => {
+  return vi.fn((_options: unknown) => {
+    return Promise.resolve({ setAsAppMenu, popup, close: () => void closed.push('Menu') })
   })
 })
-const menuNew = vi.hoisted(() => {
-  return vi.fn((_options: unknown) => Promise.resolve({ setAsAppMenu, popup }))
+/**
+ * Fake methods live on the prototype, so `toEqual` compares only the echoed options and `built`.
+ */
+const resourceNew = vi.hoisted(() => {
+  interface ResourceOptions {
+    text?: string
+    action?: () => void
+  }
+  class FakeResource {
+    readonly #name: string
+    constructor(kind: string, options: ResourceOptions) {
+      Object.assign(this, options, { built: kind })
+      this.#name = options.text ?? kind
+    }
+    close(): Promise<void> {
+      closed.push(this.#name)
+      return Promise.resolve()
+    }
+  }
+  class FakeSubmenu extends FakeResource {
+    readonly #text: string | undefined
+    constructor(options: ResourceOptions) {
+      super('Submenu', options)
+      this.#text = options.text
+    }
+    setAsWindowsMenuForNSApp(): Promise<void> {
+      calls.push(`windows:${this.#text}`)
+      return Promise.resolve()
+    }
+    setAsHelpMenuForNSApp(): Promise<void> {
+      calls.push(`help:${this.#text}`)
+      return Promise.resolve()
+    }
+  }
+  return (kind: string) => {
+    return vi.fn((options: ResourceOptions) => {
+      return Promise.resolve(
+        kind === 'Submenu' ? new FakeSubmenu(options) : new FakeResource(kind, options),
+      )
+    })
+  }
 })
-const menuItemNew = vi.hoisted(() => {
-  return vi.fn((options: object) => Promise.resolve({ ...options, built: true }))
-})
+const menuItemNew = vi.hoisted(() => resourceNew('MenuItem'))
+const checkMenuItemNew = vi.hoisted(() => resourceNew('CheckMenuItem'))
+const submenuNew = vi.hoisted(() => resourceNew('Submenu'))
 
 vi.mock('@tauri-apps/api/menu', () => ({
   Menu: { new: menuNew },
   MenuItem: { new: menuItemNew },
+  CheckMenuItem: { new: checkMenuItemNew },
   Submenu: { new: submenuNew },
 }))
 
@@ -46,6 +73,7 @@ const { createTauriNativeMenuHost } = await import('./native-menu.ts')
 beforeEach(() => {
   vi.clearAllMocks()
   calls.length = 0
+  closed.length = 0
 })
 
 describe('createTauriNativeMenuHost', () => {
@@ -88,9 +116,9 @@ describe('createTauriNativeMenuHost', () => {
     expect(view).toEqual({
       text: 'View',
       items: [
-        { ...sidebarToggle, built: true },
+        { ...sidebarToggle, built: 'MenuItem' },
         { item: 'Separator' },
-        { ...themeToggle, built: true },
+        { ...themeToggle, built: 'MenuItem' },
         { item: 'Quit', text: 'Quit Reflect' },
       ],
     })
@@ -109,15 +137,60 @@ describe('createTauriNativeMenuHost', () => {
     expect(calls).toEqual(['setAsAppMenu', 'windows:Window', 'help:Help'])
   })
 
-  it('pops up a context menu whose items run their actions', async () => {
-    const onSelect = vi.fn()
+  it('builds nested submenus and check items for a context menu', async () => {
+    const action = vi.fn()
+    const items: NativeMenuItem[] = [
+      { kind: 'command', text: 'Complete', enabled: true, action },
+      { kind: 'predefined', item: 'Separator' },
+      {
+        kind: 'submenu',
+        text: 'Schedule',
+        items: [
+          { kind: 'command', text: 'Today', checked: true, action },
+          { kind: 'command', text: 'Clear date', enabled: false, action },
+        ],
+      },
+    ]
 
-    await createTauriNativeMenuHost().popup([{ text: 'Unpin Note', action: onSelect }])
+    await createTauriNativeMenuHost().popup(items)
 
-    expect(menuItemNew).toHaveBeenCalledWith({ text: 'Unpin Note', action: onSelect })
-    expect(menuNew).toHaveBeenCalledWith({
-      items: [{ text: 'Unpin Note', action: onSelect, built: true }],
+    expect(menuNew).toHaveBeenLastCalledWith({
+      items: [
+        { built: 'MenuItem', text: 'Complete', enabled: true, action },
+        { item: 'Separator' },
+        {
+          built: 'Submenu',
+          text: 'Schedule',
+          items: [
+            { built: 'CheckMenuItem', text: 'Today', checked: true, action },
+            { built: 'MenuItem', text: 'Clear date', enabled: false, action },
+          ],
+        },
+      ],
     })
     expect(popup).toHaveBeenCalledTimes(1)
+  })
+
+  it('closes the previous context menu when the next one opens', async () => {
+    const host = createTauriNativeMenuHost()
+    const items: NativeMenuItem[] = [{ kind: 'command', text: 'Unpin Note', action: vi.fn() }]
+
+    await host.popup(items)
+    expect(closed).toEqual([])
+
+    await host.popup(items)
+    expect(closed).toEqual(['Unpin Note', 'Menu'])
+    expect(popup).toHaveBeenCalledTimes(2)
+  })
+
+  it('closes a menu that was still building when the next one opened', async () => {
+    const host = createTauriNativeMenuHost()
+
+    await Promise.all([
+      host.popup([{ kind: 'command', text: 'First', action: vi.fn() }]),
+      host.popup([{ kind: 'command', text: 'Second', action: vi.fn() }]),
+    ])
+
+    expect(closed).toEqual(['First', 'Menu'])
   })
 })
