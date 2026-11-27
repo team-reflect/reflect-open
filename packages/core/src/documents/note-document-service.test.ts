@@ -377,6 +377,20 @@ describe('commitSourceEdit', () => {
   })
 })
 
+describe('linked daily notes', () => {
+  it('creates the daily note of a day that a source edit links to', async () => {
+    const { noteDocuments, noteFile } = setup({ files: { 'notes/a.md': '# A\n' } })
+    await noteDocuments.commitSourceEdit(
+      'notes/a.md',
+      (source) => `${source}\n- [ ] call [[2026-12-01]]\n`,
+      { generation: 7 },
+    )
+    await vi.waitFor(() => {
+      expect(noteFile.files().get('daily/2026-12-01.md')).toBe('')
+    })
+  })
+})
+
 describe('readExisting', () => {
   it('reads the live buffer of an open, ready session', async () => {
     const { noteDocuments } = setup({
