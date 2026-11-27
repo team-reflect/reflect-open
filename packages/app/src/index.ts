@@ -145,6 +145,7 @@ export {
   type ContextMenuOptions,
   type ContextMenuSeparator,
   type ContextMenuSubmenu,
+  type NativeMenuCommand,
   type NativeMenuHost,
   type NativeMenuItem,
   type NativeMenuPredefinedItem,

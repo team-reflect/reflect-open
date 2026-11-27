@@ -1,5 +1,5 @@
 import { noop } from '@ocavue/utils'
-import type { NativeMenuHost, NativeMenuItem, NativeSubmenu } from '@reflect/app'
+import type { NativeMenuCommand, NativeMenuHost, NativeMenuItem, NativeSubmenu } from '@reflect/app'
 import type { Resource } from '@tauri-apps/api/core'
 import {
   CheckMenuItem,
@@ -34,9 +34,7 @@ async function buildMenuEntry(
 }
 
 // Inline item options lose their click handler once the submenu is built.
-async function buildCommandEntry(
-  item: Extract<NativeMenuItem, { kind: 'command' }>,
-): Promise<MenuItem | CheckMenuItem> {
+async function buildCommandEntry(item: NativeMenuCommand): Promise<MenuItem | CheckMenuItem> {
   const options = {
     ...(item.id !== undefined ? { id: item.id } : {}),
     text: item.text,

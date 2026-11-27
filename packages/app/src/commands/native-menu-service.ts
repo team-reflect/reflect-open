@@ -45,24 +45,35 @@ export interface AppSubmenuLayout {
 /**
  * One item of a submenu, as a {@link NativeMenuHost} builds it.
  */
-export type NativeMenuItem =
-  | {
-      kind: 'command'
-      id?: string | undefined
-      text: string
-      accelerator?: string | undefined
-      enabled?: boolean | undefined
-      /**
-       * Any boolean makes a check item, so `false` shows an unchecked check item.
-       */
-      checked?: boolean | undefined
-      /**
-       * Invoked on activation with `id`, or with a host-generated id when `id` is unset.
-       */
-      action: (id: string) => void
-    }
-  | { kind: 'predefined'; item: NativeMenuPredefinedItem; text?: string | undefined }
-  | { kind: 'submenu'; text: string; items: readonly NativeMenuItem[] }
+export type NativeMenuItem = NativeMenuCommand | NativeMenuPredefined | NativeMenuSubmenu
+
+export interface NativeMenuCommand {
+  kind: 'command'
+  id?: string | undefined
+  text: string
+  accelerator?: string | undefined
+  enabled?: boolean | undefined
+  /**
+   * Any boolean makes a check item, so `false` shows an unchecked check item.
+   */
+  checked?: boolean | undefined
+  /**
+   * Invoked on activation with `id`, or with a host-generated id when `id` is unset.
+   */
+  action: (id: string) => void
+}
+
+interface NativeMenuPredefined {
+  kind: 'predefined'
+  item: NativeMenuPredefinedItem
+  text?: string | undefined
+}
+
+interface NativeMenuSubmenu {
+  kind: 'submenu'
+  text: string
+  items: readonly NativeMenuItem[]
+}
 
 export interface NativeSubmenu {
   text: string
