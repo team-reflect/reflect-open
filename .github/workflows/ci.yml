@@ -172,13 +172,10 @@ jobs:
       - name: Lint (oxlint)
         run: pnpm turbo run lint:oxlint --filter=//
 
-      # The ESLint cache outlives a run: a PR lints only the files whose content
-      # changed since its last run or since master. Master lints every file, so
-      # it also checks results that depend on another file's types.
       - name: Pick the ESLint cache key
         id: eslint-cache
         env:
-          HASH: ${{ hashFiles('pnpm-lock.yaml', 'eslint.config.*', '**/tsconfig*.json', '!**/node_modules/**') }}
+          HASH: ${{ hashFiles('pnpm-lock.yaml', 'eslint.config.*') }}
         run: echo "prefix=eslint-$HASH-" >> "$GITHUB_OUTPUT"
 
       - name: Restore the ESLint cache
