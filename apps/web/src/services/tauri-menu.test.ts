@@ -149,7 +149,7 @@ describe('createTauriContextMenuService', () => {
         title: 'Schedule',
         items: [
           { type: 'action', id: 'today', title: 'Today', checked: true },
-          { type: 'action', id: 'clear', title: 'Clear date', disabled: true },
+          { type: 'action', id: 'clear', title: 'Clear date', disabled: true, checked: false },
         ],
       },
     ]
@@ -166,7 +166,7 @@ describe('createTauriContextMenuService', () => {
           text: 'Schedule',
           items: [
             { built: 'CheckMenuItem', text: 'Today', enabled: true, checked: true, action },
-            { built: 'MenuItem', text: 'Clear date', enabled: false, action },
+            { built: 'CheckMenuItem', text: 'Clear date', enabled: false, checked: false, action },
           ],
         },
       ],
@@ -176,7 +176,7 @@ describe('createTauriContextMenuService', () => {
     for (const [options] of [...menuItemNew.mock.calls, ...checkMenuItemNew.mock.calls]) {
       options.action?.()
     }
-    expect(onSelect.mock.calls).toEqual([['complete'], ['clear'], ['today']])
+    expect(onSelect.mock.calls).toEqual([['complete'], ['today'], ['clear']])
   })
 
   it('closes the previous context menu when the next one opens', async () => {

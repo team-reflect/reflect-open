@@ -144,7 +144,7 @@ export {
   type AppSubmenuLayout,
   type NativeAppMenu,
   type NativeMenuItem,
-  type NativeMenuPredefinedKind,
+  type NativeMenuPredefinedItem,
   type NativeSubmenu,
 } from './commands/app-menu-service.ts'
 export {

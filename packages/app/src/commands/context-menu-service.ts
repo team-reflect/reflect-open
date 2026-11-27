@@ -19,22 +19,16 @@ export interface ContextMenuSubmenu {
 export type ContextMenuItem = ContextMenuAction | ContextMenuSeparator | ContextMenuSubmenu
 
 export interface ContextMenuOptions {
-  /**
-   * Menu items to render in order.
-   */
   items: readonly ContextMenuItem[]
   onSelect: (id: string) => void
 }
 
-/**
- * Context menus at the pointer.
- */
 export interface ContextMenuService {
   open(options: ContextMenuOptions): Promise<void>
 }
 
 /**
- * A host without context menus: opening one rejects.
+ * A `ContextMenuService` whose `open` rejects.
  */
 export function createUnsupportedContextMenuService(): ContextMenuService {
   return {

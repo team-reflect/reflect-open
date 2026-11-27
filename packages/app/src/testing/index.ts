@@ -2,12 +2,6 @@
  * Test doubles for `@reflect/app` services, and `createTestAppServices()`, the
  * app layer built over `createTestCoreServices()`.
  */
-export {
-  createTestAppMenuHost,
-  type TestAppMenuHost,
-  type TestAppMenuHostCall,
-} from './app-menu.ts'
-export { createTestContextMenuService, type TestContextMenuService } from './context-menu.ts'
 export { createTestClipboardService, type TestClipboardService } from './clipboard.ts'
 export {
   createTestOperationsService,

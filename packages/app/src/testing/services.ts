@@ -98,7 +98,7 @@ export function createTestAppServices(
   const app = createAppServices(core, {
     ...createTestAppHost({ window, dialog, operations, clipboard, lifecycle }),
     updater: createTestUpdaterAdapter(),
-    appMenu: createTestAppMenuHost(),
+    appMenuHost: createTestAppMenuHost(),
     contextMenu,
   })
   const deepLinkRouter = overrides.deepLinkRouter ?? app.deepLinkRouter

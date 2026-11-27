@@ -3,7 +3,7 @@ import type {
   AppMenuEntry,
   AppMenuService,
   AppSubmenuLayout,
-  NativeMenuPredefinedKind,
+  NativeMenuPredefinedItem,
 } from './app-menu-service.ts'
 
 /**
@@ -22,7 +22,7 @@ function command(commandId: AppCommandId, text?: string): AppMenuEntry {
   return { kind: 'command', commandId, text }
 }
 
-function predefined(item: NativeMenuPredefinedKind, text?: string): AppMenuEntry {
+function predefined(item: NativeMenuPredefinedItem, text?: string): AppMenuEntry {
   return { kind: 'predefined', item, text }
 }
 

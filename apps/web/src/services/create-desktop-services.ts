@@ -27,7 +27,7 @@ import { createNavigatorClipboardService } from '@/services/browser-clipboard.ts
 import { createBrowserDialogService } from '@/services/browser-dialog.ts'
 import { createBrowserOpenerTransport } from '@/services/browser-opener.ts'
 import { createBrowserImageCodec } from '@/services/browser-image-codec.ts'
-import { createBrowserContextMenuService } from '@/services/browser-context-menu.tsx'
+import { createBrowserContextMenuService } from '@/services/browser-context-menu-service.tsx'
 import { createDomLifecycleAdapter } from '@/services/dom-lifecycle.ts'
 import type { HostKind } from '@/services/detect-platform.ts'
 import { createTauriDeepLinkSource } from '@/services/tauri-deep-link.ts'
@@ -131,7 +131,7 @@ export function createDesktopHost(
         opener: createTauriOpenerTransport(),
         exceptionTelemetry,
         updater: createTauriUpdaterAdapter(),
-        appMenu: createTauriAppMenuHost(),
+        appMenuHost: createTauriAppMenuHost(),
         contextMenu: createTauriContextMenuService(),
       }
     case 'swift':

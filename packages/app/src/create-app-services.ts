@@ -122,9 +122,9 @@ export interface AppHost {
   /**
    * The native application menu; without one, the app has none.
    */
-  readonly appMenu?: AppMenuHost
+  readonly appMenuHost?: AppMenuHost
   /**
-   * Context menus at the pointer; without them, opening one rejects.
+   * Without one, opening a context menu rejects.
    */
   readonly contextMenu?: ContextMenuService
   /**
@@ -273,7 +273,7 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
     platform: core.platform,
     ipc: core.ipc,
     logger: core.logger,
-    host: host.appMenu,
+    host: host.appMenuHost,
   })
   const navigation = createNavigationService()
   const noteVisits = createNoteVisitService({

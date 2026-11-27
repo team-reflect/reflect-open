@@ -2,7 +2,7 @@ import { mouse } from 'vitest-browser-commands/playwright'
 import { page, userEvent } from 'vitest/browser'
 import { describe, expect, it, vi } from 'vitest'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
-import { createBrowserContextMenuService } from './browser-context-menu.tsx'
+import { createBrowserContextMenuService } from './browser-context-menu-service.tsx'
 
 describe('createBrowserContextMenuService', () => {
   it('opens the menu at the right-click point and runs the picked action', async () => {

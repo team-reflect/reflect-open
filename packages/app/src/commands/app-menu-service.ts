@@ -8,7 +8,7 @@ import type { CommandService } from './command-service.ts'
 /**
  * A menu item whose behavior the operating system implements.
  */
-export type NativeMenuPredefinedKind =
+export type NativeMenuPredefinedItem =
   | 'Separator'
   | 'Copy'
   | 'Cut'
@@ -30,7 +30,7 @@ export type NativeMenuPredefinedKind =
 
 export type AppMenuEntry =
   | { kind: 'command'; commandId: AppCommandId; text?: string | undefined }
-  | { kind: 'predefined'; item: NativeMenuPredefinedKind; text?: string | undefined }
+  | { kind: 'predefined'; item: NativeMenuPredefinedItem; text?: string | undefined }
 
 export interface AppSubmenuLayout {
   text: string
@@ -42,27 +42,24 @@ export interface AppSubmenuLayout {
   entries: AppMenuEntry[]
 }
 
-export interface NativeMenuCommandItem {
+interface NativeMenuCommand {
   kind: 'command'
   id: string
   text: string
   accelerator?: string | undefined
-  /**
-   * Invoked on activation with `id`.
-   */
   action: (id: string) => void
 }
 
-export interface NativeMenuPredefinedItem {
+interface NativeMenuPredefined {
   kind: 'predefined'
-  item: NativeMenuPredefinedKind
+  item: NativeMenuPredefinedItem
   text?: string | undefined
 }
 
 /**
  * One item of a submenu, as an {@link AppMenuHost} builds it.
  */
-export type NativeMenuItem = NativeMenuCommandItem | NativeMenuPredefinedItem
+export type NativeMenuItem = NativeMenuCommand | NativeMenuPredefined
 
 export interface NativeSubmenu {
   text: string
@@ -139,9 +136,6 @@ export interface AppMenuServiceDeps {
   readonly platform: PlatformFacts
   readonly ipc: IpcBridgeService
   readonly logger: LoggerService
-  /**
-   * Without a host, the app has no application menu.
-   */
   readonly host?: AppMenuHost | undefined
 }
 
