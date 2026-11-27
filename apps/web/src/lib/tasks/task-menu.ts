@@ -22,17 +22,17 @@ export function getTaskMenuItems(tasks: readonly OpenTask[], today: string): Tas
     {
       type: 'action',
       id: 'toggle',
-      title: tasks.some((task) => !task.checked) ? 'Complete' : 'Reopen',
+      title: tasks.some((task) => !task.checked) ? 'Mark as Completed' : 'Mark as Incomplete',
     },
     {
       type: 'submenu',
-      title: 'Schedule',
+      title: 'Due Date',
       items: [
         ...getTaskDatePresets(today).map((preset): TaskMenuItem => {
           return {
             type: 'action',
             id: `schedule:${preset.date}`,
-            title: preset.title,
+            title: preset.menuTitle,
             checked: tasks.every((task) => task.dueDate === preset.date),
           }
         }),
@@ -40,18 +40,18 @@ export function getTaskMenuItems(tasks: readonly OpenTask[], today: string): Tas
         {
           type: 'action',
           id: 'clear-date',
-          title: 'Clear date',
-          disabled: tasks.every((task) => task.dueDate === null),
+          title: 'None',
+          checked: tasks.every((task) => task.dueDate === null),
         },
       ],
     },
-    { type: 'action', id: 'convert', title: 'Convert to bullet' },
+    { type: 'action', id: 'convert', title: 'Convert to Bullet' },
   ]
   if (tasks.every((task) => task.notePath === notePath)) {
     items.push(
       { type: 'separator' },
-      { type: 'action', id: 'open-note', title: 'Open note' },
-      { type: 'action', id: 'open-note-in-new-window', title: 'Open note in new window' },
+      { type: 'action', id: 'open-note', title: 'Open Note' },
+      { type: 'action', id: 'open-note-in-new-window', title: 'Open Note in New Window' },
     )
   }
   items.push({ type: 'separator' }, { type: 'action', id: 'delete', title: 'Delete' })
