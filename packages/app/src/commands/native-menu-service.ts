@@ -130,7 +130,7 @@ export function createUnsupportedNativeMenuHost(): NativeMenuHost {
 const MENU_COMMAND_EVENT = 'reflect://menu-command'
 
 /**
- * The native macOS application menu and native context menus. Command items
+ * The native macOS application menu and context menus. Command items
  * derive from the command registry — id, label, and accelerator come from the
  * one command definition — so the menu cannot drift from the bindings that
  * fire.
@@ -166,8 +166,7 @@ export interface NativeMenuService {
    */
   connect(): Unlisten
   /**
-   * Open a context menu at the pointer: a native menu in the Tauri shell, a
-   * menu drawn in the page in a plain browser.
+   * Open a context menu at the pointer.
    */
   openContextMenu(options: ContextMenuOptions): Promise<void>
 }

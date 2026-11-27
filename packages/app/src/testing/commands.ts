@@ -154,11 +154,8 @@ class TestNativeMenuServiceImpl implements TestNativeMenuService {
   }
 
   async openContextMenu(options: ContextMenuOptions): Promise<void> {
-    const popped = this.host.popups().length
     await this.#inner.openContextMenu(options)
-    if (this.host.popups().length > popped) {
-      this.#popups.push(options)
-    }
+    this.#popups.push(options)
   }
 
   popups(): readonly (readonly ContextMenuItem[])[] {

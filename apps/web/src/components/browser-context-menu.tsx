@@ -67,7 +67,7 @@ function renderItems(items: readonly NativeMenuItem[], path: string): ReactNode[
     const key = `${path}${index}`
     switch (item.kind) {
       case 'predefined':
-        // The operating system implements every other predefined item.
+        // Context menus contain only the separator.
         return item.item === 'Separator' ? <DropdownMenuSeparator key={key} /> : null
       case 'submenu':
         return (
