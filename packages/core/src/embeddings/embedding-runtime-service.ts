@@ -69,6 +69,10 @@ export interface EmbeddingRuntimeService extends Store<EmbedStatus> {
    * `ready`.
    */
   embedQuery(text: string): Promise<number[]>
+  /**
+   * Release a `ready` model's context; the status turns `uninitialized`.
+   */
+  unload(): Promise<void>
 }
 
 const STATUS_EVENT = 'embed:status'
@@ -154,6 +158,10 @@ class EmbeddingRuntimeServiceImpl implements EmbeddingRuntimeService {
 
   embedQuery(text: string): Promise<number[]> {
     return this.#deps.ipc.call('embed_query', { text })
+  }
+
+  async unload(): Promise<void> {
+    await this.#deps.ipc.call('embed_unload', {})
   }
 
   readonly get = this.#status.get

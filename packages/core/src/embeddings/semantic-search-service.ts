@@ -1,4 +1,5 @@
 import type { GraphRole } from '../graph/graph-session.ts'
+import type { ActivityPort } from '../ports/activity-port.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { StorageService } from '../ports/storage-service.ts'
 import type { GraphSessionState } from '../graph/graph-session-service.ts'
@@ -64,6 +65,10 @@ export interface SemanticSearchService {
    * window loading the model and re-embedding on the same watcher stream
    * would duplicate every write.
    *
+   * With `unloadWhenHidden`, a hidden app counts as disabled, and it unloads
+   * a `ready` model: iOS does not let a background app use the GPU, and a
+   * background app that holds less memory is killed later.
+   *
    * Starting also carries the opt-in over from where it lived before the
    * settings document (`localStorage`), once, so those users keep semantic
    * search across the move.
@@ -102,6 +107,11 @@ export interface SemanticSearchServiceDeps {
   readonly role: GraphRole
   readonly indexLifecycle: IndexLifecycleService
   readonly graphSession: SemanticSearchGraphSource
+  readonly activity: ActivityPort
+  /**
+   * Stop embedding and unload the model while the app is hidden.
+   */
+  readonly unloadWhenHidden: boolean
   readonly logger: LoggerService
 }
 
@@ -132,7 +142,8 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
   }
 
   start(): Unlisten {
-    const { embeddingRuntime, embeddingIndex, settings, graphSession, logger } = this.#deps
+    const { embeddingRuntime, embeddingIndex, settings, graphSession, activity, logger } =
+      this.#deps
     if (this.#consumeLegacyOptIn()) {
       settings.update({ semanticSearchEnabled: true })
     }
@@ -148,14 +159,19 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
       if (stopped) {
         return
       }
-      const enabled = settings.get().semanticSearchEnabled && this.#mainWindow
+      const hidden = this.#deps.unloadWhenHidden && activity.isHidden()
+      const enabled = settings.get().semanticSearchEnabled && this.#mainWindow && !hidden
       const status = embeddingRuntime.get()
 
-      const nextLoadGate = `${enabled} ${status.status}`
+      const nextLoadGate = `${enabled} ${hidden} ${status.status}`
       if (nextLoadGate !== loadGate) {
         loadGate = nextLoadGate
         if (enabled && status.status === 'uninitialized') {
           void this.ensureModel()
+        } else if (hidden && status.status === 'ready') {
+          embeddingRuntime.unload().catch((cause: unknown) => {
+            logger.warn('failed to unload the embedding model', cause)
+          })
         }
       }
 
@@ -192,6 +208,8 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
       deriveStore(settings, selectSemanticSearchEnabled).subscribe(react),
       embeddingRuntime.subscribe(react),
       graphSession.subscribe(react),
+      activity.subscribeHidden(react),
+      activity.subscribeVisible(react),
     ]
     // A later start reads the last status the runtime observed; the first one polls.
     embeddingRuntime.status().catch((cause: unknown) => {

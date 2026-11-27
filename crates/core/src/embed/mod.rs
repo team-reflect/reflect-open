@@ -402,6 +402,23 @@ impl Core {
         Ok(status)
     }
 
+    /// Drops the context of a `Ready` model and reports `Uninitialized`. The
+    /// next `embed_ensure` loads it again from the local file. The weights
+    /// stay loaded for the process. An embed in progress keeps the context
+    /// until it ends.
+    pub fn embed_unload(&self) -> AppResult<()> {
+        let status = {
+            let mut runtime = lock_state(&self.embed)?;
+            if !matches!(*runtime, Runtime::Ready(_)) {
+                return Ok(());
+            }
+            *runtime = Runtime::Uninitialized;
+            status_of(&runtime)
+        };
+        emit_status(self.host(), &status);
+        Ok(())
+    }
+
     /// Embed a search query. Errors unless the model is `Ready`.
     pub async fn embed_query(&self, text: String) -> AppResult<Vec<f32>> {
         let model = self.ready_model()?;

@@ -57,6 +57,7 @@ macro_rules! commands {
                 link_preview_fetch_icon(url: String).await -> String,
                 embed_status() -> EmbedStatus,
                 embed_ensure().await -> EmbedStatus,
+                embed_unload() -> (),
                 embed_query(text: String).await -> Vec<f32>,
                 embed_note_chunks(path: String, chunks: Vec<ChunkToEmbed>, generation: u64).await -> u32,
                 watch_start() -> (),
