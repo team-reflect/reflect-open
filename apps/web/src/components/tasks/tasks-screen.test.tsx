@@ -939,7 +939,7 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
-  it('menu Schedule on a selected row schedules and clears the selection', async () => {
+  it('menu Due Date on a selected row schedules and clears the selection', async () => {
     getOpenTasks.mockResolvedValue(manyTasks(3))
     const view = await renderScreen()
     const contextMenu = view.appServices.contextMenu

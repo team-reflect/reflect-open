@@ -22,14 +22,16 @@ function getIds(items: readonly TaskMenuItem[]): string[] {
 }
 
 describe('getTaskMenuItems', () => {
-  it('offers Complete while any target is open, else Reopen', () => {
+  it('offers Mark as Completed while any target is open, else Mark as Incomplete', () => {
     const open = task({ astPath: [0] })
     const done = task({ astPath: [1], checked: true })
 
     expect(getAction(getTaskMenuItems([open, done], TODAY), 'toggle')).toMatchObject({
-      title: 'Complete',
+      title: 'Mark as Completed',
     })
-    expect(getAction(getTaskMenuItems([done], TODAY), 'toggle')).toMatchObject({ title: 'Reopen' })
+    expect(getAction(getTaskMenuItems([done], TODAY), 'toggle')).toMatchObject({
+      title: 'Mark as Incomplete',
+    })
   })
 
   it('checks the preset that every target is due on', () => {
@@ -52,19 +54,22 @@ describe('getTaskMenuItems', () => {
     expect(getAction(items, `schedule:${TOMORROW}`)).toMatchObject({ checked: false })
   })
 
-  it('disables Clear date when no target has a due date', () => {
+  it('checks None when no target has a due date', () => {
     const undated = task({ astPath: [0] })
     const dated = task({ astPath: [1], dueDate: TODAY })
 
-    expect(getAction(getTaskMenuItems([undated], TODAY), 'clear-date')).toMatchObject({
-      disabled: true,
+    expect(getAction(getTaskMenuItems([undated], TODAY), 'clear-date')).toEqual({
+      type: 'action',
+      id: 'clear-date',
+      title: 'None',
+      checked: true,
     })
     expect(getAction(getTaskMenuItems([undated, dated], TODAY), 'clear-date')).toMatchObject({
-      disabled: false,
+      checked: false,
     })
   })
 
-  it('offers Open note only for targets in one note', () => {
+  it('offers Open Note only for targets in one note', () => {
     const a = task({ notePath: 'notes/a.md', astPath: [0] })
     const a2 = task({ notePath: 'notes/a.md', astPath: [1] })
     const b = task({ notePath: 'notes/b.md', astPath: [0] })
