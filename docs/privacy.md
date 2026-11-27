@@ -33,9 +33,9 @@ from disk at call time. Tests cover it.
 
 ## Semantic search (off by default)
 
-- Embeddings are computed **on-device** (bundled ONNX runtime, `all-MiniLM-L6-v2`) and stored
+- Embeddings are computed **on-device** (bundled llama.cpp, EmbeddingGemma 300M) and stored
   in `.reflect/`. Note content never leaves the machine.
-- Enabling it downloads the model (~90 MB) **from Hugging Face, once**. The request carries no
+- Enabling it downloads the model (~330 MB) **from Hugging Face, once**. The request carries no
   user data.
 - Not available on Intel Macs or iOS, which have no embedding runtime.
 

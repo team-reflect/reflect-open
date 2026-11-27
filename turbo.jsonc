@@ -80,7 +80,6 @@
       "outputLogs": "new-only",
       "command": ["cargo", "clippy", "--workspace", "--all-targets", "--locked"],
       "env": ["TAURI_CONFIG"],
-      "passThroughEnv": ["ORT_CACHE_DIR"],
     },
     "reflect-workspace#lint:ios": {
       "outputLogs": "new-only",
@@ -96,7 +95,6 @@
         "aarch64-apple-ios-sim",
       ],
       "env": ["TAURI_CONFIG"],
-      "passThroughEnv": ["ORT_CACHE_DIR"],
     },
     "reflect-workspace#lint:wasm": {
       "outputLogs": "new-only",
@@ -117,7 +115,6 @@
     "reflect-workspace#test": {
       "outputLogs": "new-only",
       "env": ["TAURI_CONFIG"],
-      "passThroughEnv": ["ORT_CACHE_DIR"],
     },
   },
 }

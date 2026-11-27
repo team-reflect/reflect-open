@@ -22,9 +22,18 @@ impl Core {
     }
 
     /// Fails loudly: the frontend never embeds on an `unsupported` runtime.
-    pub async fn embed_texts(&self, _texts: Vec<String>) -> AppResult<Vec<Vec<f32>>> {
-        Err(AppError::Unknown {
-            message: "the embedding runtime is not supported on this platform".into(),
-        })
+    pub async fn embed_query(&self, _text: String) -> AppResult<Vec<f32>> {
+        Err(unsupported())
+    }
+
+    /// Fails loudly: the frontend never embeds on an `unsupported` runtime.
+    pub async fn embed_documents(&self, _texts: Vec<String>) -> AppResult<Vec<Vec<f32>>> {
+        Err(unsupported())
+    }
+}
+
+fn unsupported() -> AppError {
+    AppError::Unknown {
+        message: "the embedding runtime is not supported on this platform".into(),
     }
 }

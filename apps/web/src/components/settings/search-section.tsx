@@ -16,7 +16,7 @@ const PALETTE_BINDING = APP_COMMANDS['palette.open'].keybinding
 /**
  * The search settings: the semantic-search opt-in (Plan 09) and the index
  * rebuild action. Enabling semantic search persists `semanticSearchEnabled`;
- * EmbeddingsSync reacts by loading the model, and the first load's ~90MB
+ * EmbeddingsSync reacts by loading the model, and the first load's
  * download streams through this section as a progress bar (the `embed:status`
  * events carry byte counts).
  */
@@ -99,7 +99,7 @@ export function SearchSection(): ReactElement {
     <SettingsSection id="search">
       <SettingsField
         legend="Semantic search"
-        description={`Find notes by meaning, not just keywords — smarter ${keymap.formatLabel(PALETTE_BINDING)} results and related notes. Runs entirely on this device; enabling downloads a small model (~90 MB) once.`}
+        description={`Find notes by meaning, not just keywords — smarter ${keymap.formatLabel(PALETTE_BINDING)} results and related notes. Runs entirely on this device; enabling downloads a model (~330 MB) once.`}
       >
         <div className="mt-3">{control}</div>
       </SettingsField>

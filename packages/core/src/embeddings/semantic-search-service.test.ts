@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createGraphSession, type GraphRole } from '../graph/graph-session.ts'
 import {
+  TEST_EMBED_MODEL,
   createTestEmbeddingIndexService,
   createTestEmbeddingRuntimeService,
   createTestGraphSessionService,
@@ -19,8 +20,7 @@ import type { EmbedStatus } from './embedding-runtime-service.ts'
 import type { RetrievalHit } from './retrieval-service.ts'
 import { sleep } from '@ocavue/utils'
 
-const MODEL = 'all-MiniLM-L6-v2'
-const READY: EmbedStatus = { status: 'ready', model: MODEL }
+const READY: EmbedStatus = { status: 'ready', model: TEST_EMBED_MODEL }
 const GRAPH = { root: '/g', name: 'g', generation: 1 }
 
 /**
@@ -142,7 +142,7 @@ describe('start', () => {
     await vi.waitFor(() => expect(embeddingIndex.follows()).toHaveLength(1))
 
     expect(runtime.ensureCalls()).toBe(1)
-    expect(embeddingIndex.follows()).toEqual([{ generation: 7, modelId: MODEL }])
+    expect(embeddingIndex.follows()).toEqual([{ generation: 7, modelId: TEST_EMBED_MODEL }])
     stop()
   })
 
@@ -184,7 +184,7 @@ describe('start', () => {
 
     // The download ends: the backfill and the follow start by themselves.
     runtime.setStatus(READY)
-    expect(embeddingIndex.follows()).toEqual([{ generation: 7, modelId: MODEL }])
+    expect(embeddingIndex.follows()).toEqual([{ generation: 7, modelId: TEST_EMBED_MODEL }])
     stop()
   })
 
@@ -238,8 +238,8 @@ describe('start', () => {
     graphSession.setState({ indexGeneration: 8 })
 
     expect(embeddingIndex.follows()).toEqual([
-      { generation: 7, modelId: MODEL },
-      { generation: 8, modelId: MODEL },
+      { generation: 7, modelId: TEST_EMBED_MODEL },
+      { generation: 8, modelId: TEST_EMBED_MODEL },
     ])
     // The first follow is over: a late batch of its generation is dropped.
     indexLifecycle.emitApplied([{ kind: 'remove', path: 'notes/a.md' }], 7)
@@ -358,8 +358,8 @@ describe('after an index rebuild', () => {
 
     // index_clear wiped the embedding tables; each rebuild repopulates them once.
     expect(embeddingIndex.backfills()).toEqual([
-      { generation: 7, modelId: MODEL },
-      { generation: 7, modelId: MODEL },
+      { generation: 7, modelId: TEST_EMBED_MODEL },
+      { generation: 7, modelId: TEST_EMBED_MODEL },
     ])
   })
 

@@ -6,6 +6,7 @@ import type { EmbedStatus } from '../../embeddings/embedding-runtime-service.ts'
 import type { GraphInfo } from '../../graph/schemas.ts'
 import type { AiProviderConfig, Settings } from '../../settings/schema.ts'
 import {
+  TEST_EMBED_MODEL,
   createTestAiKeyValidationService,
   createTestChatEngineService,
   createTestChatGraphContextService,
@@ -306,7 +307,7 @@ describe('ChatSession persistence', () => {
   it('passes the semantic search setting into chat turns', async () => {
     const { session, chatEngine } = await setup({
       settings: { semanticSearchEnabled: true },
-      embedStatus: { status: 'ready', model: 'all-MiniLM-L6-v2' },
+      embedStatus: { status: 'ready', model: TEST_EMBED_MODEL },
     })
     session.attach()
     await flush()

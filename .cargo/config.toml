@@ -12,6 +12,17 @@ global-min-publish-age = "24 hours"
 # Rust toolchain: the macOS `ar` writes no symbol index for wasm objects.
 [env]
 AR_wasm32_unknown_unknown = { value = "scripts/llvm-ar", relative = true }
+# llama.cpp (ggml) compiles its CPU kernels for the Rust target's features, and
+# the x86_64 targets have no AVX2. These turn on the AVX2 kernels for ggml only;
+# `embed::cpu_supported` checks the CPU before the runtime loads. ggml reads
+# them only on x86. https://github.com/utilityai/llama-cpp-rs/blob/0.1.161/llama-cpp-sys-2/build.rs#L785-L793
+GGML_AVX2 = "ON"
+GGML_FMA = "ON"
+GGML_F16C = "ON"
+# ggml on Windows ARM64 builds with clang-cl. clang-cl turns C++ exceptions off
+# without `/EHsc`, and the cmake crate replaces CMake's default flags.
+CMAKE_TOOLCHAIN_FILE_aarch64_pc_windows_msvc = { value = "scripts/cmake/clangcl.cmake", relative = true }
+CXXFLAGS_aarch64_pc_windows_msvc = "/EHsc"
 
 # `cargo xtask <command>` runs the repository automation in `xtask/`.
 [alias]

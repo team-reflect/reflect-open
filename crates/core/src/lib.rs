@@ -17,9 +17,9 @@ mod secrets;
 pub mod settings;
 pub mod web_fetch;
 
-// The watcher and the embedding runtime are desktop capabilities, and Intel
-// macOS has no embedding runtime either: other platforms swap in stand-ins
-// with the same `Core` methods.
+// The watcher and the embedding runtime are desktop capabilities: other
+// platforms swap in stand-ins with the same `Core` methods. Intel macOS has the
+// stand-in too: the llama.cpp runtime is not tested on Intel Macs yet.
 #[cfg(not(any(
     target_os = "android",
     target_os = "ios",

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import { page, userEvent } from 'vitest/browser'
 import type { Locator } from 'vitest/browser'
 import {
+  TEST_EMBED_MODEL,
   createTestDatabaseService,
   createTestCoreServices,
   createTestEmbeddingRuntimeService,
@@ -640,11 +641,11 @@ describe('SettingsScreen', () => {
 
   it('shows the downloaded model once ready and persists a disable', async () => {
     stored = { semanticSearchEnabled: true }
-    embedRuntime.setStatus({ status: 'ready', model: 'all-MiniLM-L6-v2' })
+    embedRuntime.setStatus({ status: 'ready', model: TEST_EMBED_MODEL })
     await renderScreen()
 
     await expect
-      .element(page.getByText(/model downloaded \(all-MiniLM-L6-v2\)/i))
+      .element(page.getByText(`Model downloaded (${TEST_EMBED_MODEL})`))
       .toBeInTheDocument()
 
     await page.getByRole('button', { name: /disable/i }).click()

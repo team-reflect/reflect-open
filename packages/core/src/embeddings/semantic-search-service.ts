@@ -29,7 +29,7 @@ export type SemanticSearchGraphSource = Store<Pick<GraphSessionState, 'graph' | 
 
 /**
  * The user-facing side of the optional local semantic search (Plan 09). The
- * model is ~90MB and downloads from the network, so it is **opt-in**: the
+ * model downloads from the network, so it is **opt-in**: the
  * `semanticSearchEnabled` setting is the persisted opt-in, and a started
  * service kicks the first download; later launches auto-load from the local
  * cache because the flag is set. Acceptance: "first semantic use downloads

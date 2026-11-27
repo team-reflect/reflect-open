@@ -46,7 +46,7 @@ first-party and MIT, so there is no copyleft constraint.
 | Keychain / secrets | `keyring` | 10 / 12 |
 | Git | `git2` (libgit2) | 12 |
 | SSH transport for generic remotes | `git2` `ssh` feature (vendored libssh2 + openssl) | 16 |
-| Local embeddings | `fastembed` | 09 |
+| Local embeddings | `llama-cpp-2` (llama.cpp) | 09 |
 | Image processing (screenshot downscale) | `image` | 11 |
 | Bounded capture meta fetch | `reqwest` with rustls | 11 |
 | CLI framework | `clap` v4 | 14 |
@@ -65,8 +65,8 @@ first-party and MIT, so there is no copyleft constraint.
 - **The CLI (Plan 14) is a Rust binary** (replacing the earlier `cac` + `node:sqlite`
   choice): bundled rusqlite gives the same SQLite + FTS5 as the app via one lockfile, and
   it ships as a Tauri sidecar. `saphyr` was chosen because `serde_yaml` is unmaintained.
-- **`fastembed` (Plan 09)** uses ONNX Runtime, whose dylib must be signed for
-  notarization. `candle` (pure Rust, no dylib) was the rejected alternative.
+- **`llama-cpp-2` (Plan 09)** compiles llama.cpp from source and runs EmbeddingGemma.
+  It replaced `fastembed` (ONNX Runtime); see [TDR 0006](../decisions/0006-llama-cpp-embeddings.md).
 - **Auto-update (Plan 15):** official Tauri updater plugin, updater-signed payloads,
   `latest.json` + artifacts on **GitHub Releases** (static, not a Reflect-hosted API).
   License/dependency scanning stays **manual**.

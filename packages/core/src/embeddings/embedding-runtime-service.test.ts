@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
+import { TEST_EMBED_MODEL } from '../testing/embeddings.ts'
 import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 
 import { createEmbeddingRuntimeService, type EmbedStatus } from './embedding-runtime-service.ts'
 import { noop, sleep } from '@ocavue/utils'
 
-const READY: EmbedStatus = { status: 'ready', model: 'all-MiniLM-L6-v2' }
+const READY: EmbedStatus = { status: 'ready', model: TEST_EMBED_MODEL }
 const LOADING: EmbedStatus = { status: 'loading' }
 
 function setup() {
@@ -20,12 +21,15 @@ describe('createEmbeddingRuntimeService', () => {
     const { ipc, runtime } = setup()
     ipc.onCommand('embed_status', () => ({ status: 'uninitialized' }))
     ipc.onCommand('embed_ensure', () => READY)
-    ipc.onCommand('embed_texts', () => [[0.5, 0.5]])
+    ipc.onCommand('embed_query', () => [0.5, 0.5])
+    ipc.onCommand('embed_documents', () => [[0.5, 0.5]])
 
     await expect(runtime.status()).resolves.toEqual({ status: 'uninitialized' })
     await expect(runtime.ensure()).resolves.toEqual(READY)
-    await expect(runtime.embedTexts(['hello'])).resolves.toEqual([[0.5, 0.5]])
-    expect(ipc.calls().at(-1)).toEqual({ command: 'embed_texts', args: { texts: ['hello'] } })
+    await expect(runtime.embedQuery('hello')).resolves.toEqual([0.5, 0.5])
+    expect(ipc.calls().at(-1)).toEqual({ command: 'embed_query', args: { text: 'hello' } })
+    await expect(runtime.embedDocuments(['hello'])).resolves.toEqual([[0.5, 0.5]])
+    expect(ipc.calls().at(-1)).toEqual({ command: 'embed_documents', args: { texts: ['hello'] } })
   })
 
   it('remembers the last observed status and notifies subscribers', async () => {

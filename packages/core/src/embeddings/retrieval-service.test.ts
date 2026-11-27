@@ -1,6 +1,8 @@
 import type { ChunkHit } from '@reflect/types'
 import { describe, expect, it } from 'vitest'
 import {
+  TEST_EMBED_MODEL,
+  TEST_EMBED_DIMENSIONS,
   createTestDatabaseService,
   createTestEmbeddingIndexService,
   createTestEmbeddingRuntimeService,
@@ -20,14 +22,11 @@ import {
   type RetrievalHit,
 } from './retrieval-service.ts'
 
-const MODEL = 'all-MiniLM-L6-v2'
-const DIMENSIONS = 384
-
 /**
  * A unit vector at `degrees` in the plane of the first two axes.
  */
 function direction(degrees: number): number[] {
-  const vector = Array.from({ length: DIMENSIONS }, () => 0)
+  const vector = Array.from({ length: TEST_EMBED_DIMENSIONS }, () => 0)
   const radians = (degrees * Math.PI) / 180
   vector[0] = Math.cos(radians)
   vector[1] = Math.sin(radians)
@@ -77,7 +76,7 @@ async function setup(options?: { status?: EmbedStatus; embedded?: boolean }) {
       storeChunksIn: database,
     })
     await expect(
-      index.backfill({ generation: 1, fileGeneration: 1, modelId: MODEL }),
+      index.backfill({ generation: 1, fileGeneration: 1, modelId: TEST_EMBED_MODEL }),
     ).resolves.toBe('completed')
   }
   const runtime = createTestEmbeddingRuntimeService({

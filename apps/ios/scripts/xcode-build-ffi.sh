@@ -26,7 +26,6 @@ fi
 keep=(
   # The Xcode that runs this build.
   DEVELOPER_DIR
-  ORT_CACHE_DIR
 )
 # cargo, rustc and rustup settings, mise's `cargo` wrapper (MISE_*), mbx
 # (MBX_*), and sccache with its S3 bucket and GitHub Actions cache.

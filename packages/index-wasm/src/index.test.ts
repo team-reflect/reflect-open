@@ -55,7 +55,7 @@ it('stores a vector and finds it with a nearest-neighbour query', () => {
   index = createWasmIndexBackend()
   const generation = index.invoke('index_open', {})
   index.invoke('index_apply', { note: NOTE, generation })
-  const vector = Array.from({ length: 384 }, (_, at) => (at === 0 ? 1 : 0))
+  const vector = Array.from({ length: 256 }, (_, at) => (at === 0 ? 1 : 0))
   const chunk = {
     heading: null,
     posFrom: 0,

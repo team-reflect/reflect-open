@@ -37,9 +37,8 @@ jobs:
       fail-fast: false
       matrix:
         # Each runner's host triple is the build target, so no extra rustup
-        # target and no cross-compilation. Ubuntu 24.04 is the oldest release
-        # that can link the prebuilt ONNX Runtime, which needs glibc 2.38 and
-        # the libstdc++ of GCC 14.
+        # target and no cross-compilation. The runner's glibc is the oldest
+        # glibc that the app runs on.
         include:
           - name: x64
             runner: ubuntu-24.04

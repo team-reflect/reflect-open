@@ -42,13 +42,13 @@ const KNN_CANDIDATES = 24
  * Neighbors farther than this cosine distance are noise, not matches: KNN
  * always fills the candidate list with the nearest chunks however unrelated
  * they are (worst in small graphs), so without a cutoff a gibberish query
- * still "finds" notes. 0.7 is the old app's tuned cutoff for the same model
- * family, carried over for parity; with all-MiniLM-L6-v2 it also separates
- * query→chunk matching cleanly (real matches land under ~0.65, gibberish and
- * unrelated queries at ~0.72+). The `embedding_vectors` table's metric is
- * cosine (migration 0003), so vec0 distances threshold directly.
+ * still "finds" notes. Calibrated for EmbeddingGemma at 256 dimensions on an
+ * English and Chinese notes corpus: almost every correct note's best chunk is
+ * nearer, and almost every unrelated or gibberish query's nearest chunk is
+ * farther. The `embedding_vectors` table's metric is cosine, so vec0
+ * distances threshold directly.
  */
-const MAX_COSINE_DISTANCE = 0.7
+const MAX_COSINE_DISTANCE = 0.6
 
 /**
  * Collapse KNN chunk rows (ordered nearest-first) into one hit per note —
@@ -219,9 +219,9 @@ class RetrievalServiceImpl implements RetrievalService {
 
   async #semanticHits(query: string, limit: number): Promise<RetrievalHit[]> {
     const { database, embeddingRuntime } = this.#deps
-    const [vector] = await embeddingRuntime.embedTexts([query])
+    const vector = await embeddingRuntime.embedQuery(query)
     const rows = await database.read('embed_semantic_chunks', {
-      vector: vector ?? [],
+      vector,
       candidates: KNN_CANDIDATES,
     })
     return bestChunkPerNote(rows, limit)

@@ -215,14 +215,12 @@ Each release attaches an AppImage and a `.deb` for x64 and arm64, not code-signe
 
 ### Requirements
 
-- glibc 2.39+ (Ubuntu 24.04+, Debian 13+, Fedora 40+). The prebuilt ONNX Runtime needs glibc
-  2.38 and GCC 14's libstdc++.
-- On x64, an AVX2 CPU for semantic search.
+- glibc 2.39+ (Ubuntu 24.04+, Debian 13+, Fedora 40+), the glibc of the build runner.
+- On x64, a CPU with AVX2, FMA and F16C for semantic search. Other CPUs show it as unsupported.
 - A Secret Service keyring (GNOME Keyring or KWallet) to save secrets.
 
 ### Troubleshooting
 
-- **Crash when semantic search starts (x64)**: the CPU has no AVX2.
 - **Secrets are not saved**: no keyring is running.
 - **Blank or flickering window** (often NVIDIA): start with `WEBKIT_DISABLE_DMABUF_RENDERER=1`,
   then also `WEBKIT_DISABLE_COMPOSITING_MODE=1`.

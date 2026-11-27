@@ -46,27 +46,11 @@ runs:
       shell: bash
       run: command -v cargo
 
-    # `ort-sys` downloads prebuilt ONNX Runtime binaries into ORT_CACHE_DIR.
-    # ORT_CACHE_DIR is documented in the v2.0.0-rc.11 release notes:
-    # https://github.com/pykeio/ort/releases/tag/v2.0.0-rc.11
-    - name: Set the ONNX Runtime cache dir
-      shell: bash
-      run: echo "ORT_CACHE_DIR=$RUNNER_TEMP/ort_cache" >> "$GITHUB_ENV"
-
-    - name: Cache ONNX Runtime
-      id: ort
-      if: inputs.cache == 'true'
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: ${{ env.ORT_CACHE_DIR }}
-        key: ort-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
-
-    # The ort-sys build script downloads ONNX Runtime only when it runs, and
-    # mbx replays a cached build-script run instead of running it.
+    # mbx replays a cached build-script run, OUT_DIR included. The OUT_DIR of
+    # llama-cpp-sys-2 holds a CMake build directory with absolute paths, so a
+    # replay in another checkout fails.
     # https://github.com/jdx/mr-boxington/blob/v1.30.0/docs/limits.md#build-script-execution-follows-cargos-freshness-inputs
-    # Remove this step once https://github.com/pykeio/ort/issues/676 is fixed.
     - name: Run build scripts without the mbx cache
-      if: inputs.cache == 'true' && steps.ort.outputs.cache-hit != 'true'
       shell: bash
       run: echo "MBX_BUILD_SCRIPT_EXECUTION=0" >> "$GITHUB_ENV"
 
@@ -83,16 +67,3 @@ runs:
         restore-keys: |
           mbx-v2/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/
         save-on-workflow-dispatch: true
-
-    # The ort-sys build script declares no input for the downloaded binaries,
-    # so Cargo reuses its output from the restored target directory.
-    # Removing its build directories makes Cargo run it again.
-    # Remove this step once https://github.com/pykeio/ort/issues/676 is fixed.
-    - name: Run the ort-sys build script again
-      if: inputs.cache == 'true' && steps.ort.outputs.cache-hit != 'true'
-      shell: bash
-      run: |
-        shopt -s nullglob
-        dirs=(target/*/build/ort-sys target/*/*/build/ort-sys)
-        echo "Removing: ${dirs[*]:-nothing}"
-        rm -rf "${dirs[@]}"
