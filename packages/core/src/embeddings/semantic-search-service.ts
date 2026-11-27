@@ -148,6 +148,9 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
         if (source !== 'rebuild') {
           return
         }
+        if (deps.unloadWhenHidden && deps.activity.isHidden()) {
+          return
+        }
         const embed = await embeddingRuntime.status()
         if (embed.status === 'ready') {
           await embeddingIndex.backfill({ generation, fileGeneration, modelId: embed.model })
@@ -169,6 +172,8 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
     let loadGate: string | null = null
     let followed: string | null = null
     let stopFollowing: Unlisten | null = null
+    // Identifies the current follow, so a stopped follow's late progress is dropped.
+    let followId = 0
 
     const react = (): void => {
       if (stopped) {
@@ -209,6 +214,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
         followed = next
         stopFollowing?.()
         this.#progress.set(null)
+        const id = ++followId
         stopFollowing =
           target === null
             ? null
@@ -216,7 +222,11 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
                 generation: target.generation,
                 fileGeneration: target.fileGeneration,
                 modelId: target.modelId,
-                onProgress: (done, total) => this.#progress.set({ done, total }),
+                onProgress: (done, total) => {
+                  if (id === followId) {
+                    this.#progress.set({ done, total })
+                  }
+                },
               })
       }
     }
@@ -226,7 +236,15 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
       embeddingRuntime.subscribe(react),
       graphSession.subscribe(react),
       activity.subscribeHidden(react),
-      activity.subscribeVisible(react),
+      activity.subscribeVisible(() => {
+        react()
+        if (this.#deps.unloadWhenHidden) {
+          // Corrects a status that a missed event or a late IPC response left stale.
+          embeddingRuntime.status().catch((cause: unknown) => {
+            logger.warn('failed to poll the embedding runtime status', cause)
+          })
+        }
+      }),
     ]
     // A later start reads the last status the runtime observed; the first one polls.
     embeddingRuntime.status().catch((cause: unknown) => {
@@ -241,6 +259,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
       }
       stopFollowing?.()
       stopFollowing = null
+      followId++
       this.#progress.set(null)
     }
   }
