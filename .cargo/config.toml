@@ -14,6 +14,8 @@ global-min-publish-age = "24 hours"
 AR_wasm32_unknown_unknown = { value = "scripts/llvm-ar", relative = true }
 # llama.cpp's CMake build on Windows ARM64 uses clang-cl through this toolchain file.
 CMAKE_TOOLCHAIN_FILE_aarch64_pc_windows_msvc = { value = "scripts/cmake/clangcl.cmake", relative = true }
+# clang-cl turns C++ exceptions off unless `/EHsc` is given; the cmake crate drops CMake's default flags.
+CXXFLAGS_aarch64_pc_windows_msvc = "/EHsc"
 
 # `cargo xtask <command>` runs the repository automation in `xtask/`.
 [alias]
