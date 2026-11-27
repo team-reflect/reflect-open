@@ -28,11 +28,11 @@ keep=(
   DEVELOPER_DIR
   ORT_CACHE_DIR
 )
-# cargo, rustc and rustup settings, mise's `cargo` wrapper (MISE_*), mbx
-# (MBX_*), and sccache with its S3 bucket and GitHub Actions cache.
+# cargo, rustc and rustup settings, mise's `cargo` wrapper (MISE_*), and mbx
+# with its GitHub Actions cache (MBX_*, ACTIONS_*).
 for name in $(compgen -e); do
   case "$name" in
-    CARGO_* | RUSTC_* | RUSTUP_* | MISE_* | MBX_* | SCCACHE_* | AWS_* | ACTIONS_*)
+    CARGO_* | RUSTC_* | RUSTUP_* | MISE_* | MBX_* | ACTIONS_*)
       keep+=("$name")
       ;;
   esac

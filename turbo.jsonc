@@ -5,14 +5,13 @@
     "experimentalCargoWorkspaces": true,
     "experimentalTaskCommand": true,
   },
-  // sccache reads its config and the GitHub Actions cache token from these.
   // mise's `cargo` wrapper reads MISE_* (for example the trusted config paths
   // that mise-action sets) and the Rust toolchain from RUSTUP_* and CARGO_HOME.
-  // mbx reads its settings from MBX_*.
+  // mbx reads its settings from MBX_* and the GitHub Actions cache token from
+  // ACTIONS_*.
   "globalPassThroughEnv": [
     "CI",
     "GITHUB_ACTIONS",
-    "SCCACHE_*",
     "ACTIONS_*",
     "MISE_*",
     "MBX_*",
