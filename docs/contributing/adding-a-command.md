@@ -224,4 +224,4 @@ consumes it. See [testing.md](testing.md).
       `generation` parameter if mutating
 - [ ] TS: test double updated; new types exported from `packages/core/src/index.ts`
 - [ ] TS: behavior covered over `createTestIpcBridgeService()` where it matters
-- [ ] `pnpm typecheck && pnpm lint && pnpm test:node <touched paths>` and `pnpm test:browser <touched paths>`
+- [ ] `pnpm typecheck && pnpm lint && pnpm test <touched paths>`
