@@ -6,11 +6,11 @@ import { OutdatedWebEngineBanner } from '@/components/outdated-web-engine-banner
 import { Toaster } from '@/components/ui/toast.tsx'
 import { WindowDragRegion } from '@/components/window-drag-region.tsx'
 import { TooltipProvider } from '@/components/ui/tooltip.tsx'
+import { useSuppressDefaultContextMenu } from '@/hooks/use-suppress-default-context-menu.ts'
 import { GraphProvider } from '@/providers/graph-provider.tsx'
 import { SidebarWidthEffect } from '@/providers/sidebar-width.tsx'
 import { UpdateProvider } from '@/providers/update-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useSuppressDefaultContextMenu } from '@/hooks/use-suppress-default-context-menu.ts'
 
 /**
  * The desktop surface tree: auto-update checks, the titlebar drag region, and
@@ -18,7 +18,7 @@ import { useSuppressDefaultContextMenu } from '@/hooks/use-suppress-default-cont
  */
 export function DesktopRoot(): ReactElement {
   const { noteMove, platform, logger, deepLinkIntake } = useCoreServices()
-  useSuppressDefaultContextMenu()
+  useSuppressDefaultContextMenu(!platform.isDev)
   // Deep-link intake starts with the surface, not the workspace: a
   // `reflect://` URL that launched the app (or arrived on the graph chooser)
   // buffers in `intake.ts` until a graph opens. Browser dev has no plugin.

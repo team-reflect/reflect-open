@@ -1,33 +1,45 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import { keepsDefaultContextMenu } from './use-suppress-default-context-menu.ts'
+import type { ReactElement } from 'react'
+import { render } from 'vitest-browser-react'
+import { describe, expect, it } from 'vitest'
+import { fireEvent } from '@/test-utils/fire-event.ts'
+import { useSuppressDefaultContextMenu } from './use-suppress-default-context-menu.ts'
 
-afterEach(() => {
-  document.body.replaceChildren()
-})
-
-function mount(html: string): void {
-  document.body.innerHTML = html
+interface HostProps {
+  enabled: boolean
 }
 
-function query(selector: string): Element | null {
-  return document.querySelector(selector)
+function Host({ enabled }: HostProps): ReactElement {
+  useSuppressDefaultContextMenu(enabled)
+  return (
+    <div>
+      <button type="button">Daily</button>
+      <input aria-label="Title" />
+      <div className="reflect-editor">
+        <strong>Body</strong>
+      </div>
+      <code className="select-text">ABCD-1234</code>
+    </div>
+  )
 }
 
-describe('keepsDefaultContextMenu', () => {
-  it('keeps the menu inside inputs and text areas', () => {
-    mount('<input id="field" /><textarea id="area"></textarea>')
-    expect(keepsDefaultContextMenu(query('#field'))).toBe(true)
-    expect(keepsDefaultContextMenu(query('#area'))).toBe(true)
+describe('useSuppressDefaultContextMenu', () => {
+  it('prevents the default menu on plain chrome', async () => {
+    const view = await render(<Host enabled />)
+    expect(fireEvent.contextMenu(view.getByRole('button', { name: 'Daily' }))).toBe(false)
+    await view.unmount()
   })
 
-  it('keeps the menu on descendants of the editor', () => {
-    mount('<div class="reflect-editor"><p><strong id="word">text</strong></p></div>')
-    expect(keepsDefaultContextMenu(query('#word'))).toBe(true)
+  it('keeps the default menu inside text regions', async () => {
+    const view = await render(<Host enabled />)
+    expect(fireEvent.contextMenu(view.getByRole('textbox', { name: 'Title' }))).toBe(true)
+    expect(fireEvent.contextMenu(view.getByText('Body'))).toBe(true)
+    expect(fireEvent.contextMenu(view.getByText('ABCD-1234'))).toBe(true)
+    await view.unmount()
   })
 
-  it('suppresses the menu on plain chrome', () => {
-    mount('<nav><button id="row">Daily</button></nav>')
-    expect(keepsDefaultContextMenu(query('#row'))).toBe(false)
-    expect(keepsDefaultContextMenu(document)).toBe(false)
+  it('keeps the default menu everywhere while disabled', async () => {
+    const view = await render(<Host enabled={false} />)
+    expect(fireEvent.contextMenu(view.getByRole('button', { name: 'Daily' }))).toBe(true)
+    await view.unmount()
   })
 })
