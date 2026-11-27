@@ -38,6 +38,12 @@ export const fireEvent = {
   click(target: EventTarget, init: MouseEventInit = {}): boolean {
     return dispatch(target, new MouseEvent('click', { bubbles: true, cancelable: true, ...init }))
   },
+  contextMenu(target: EventTarget, init: MouseEventInit = {}): boolean {
+    return dispatch(
+      target,
+      new MouseEvent('contextmenu', { bubbles: true, cancelable: true, ...init }),
+    )
+  },
   focusIn(target: EventTarget): boolean {
     return dispatch(target, new FocusEvent('focusin', { bubbles: true, cancelable: true }))
   },
