@@ -28,7 +28,7 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
     {
       id: 'mobile-semantic-search',
       title: 'Semantic search on iPhone and iPad',
-      body: 'Turn on Semantic search in Settings to find notes by meaning, not only by exact words.',
+      body: 'Turn on Semantic search in Settings, and search in All Notes finds notes by meaning, not only by exact words.',
       platforms: ['ios'],
     },
   ],
