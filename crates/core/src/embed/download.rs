@@ -1,5 +1,6 @@
-//! Downloads one file pinned by size and SHA-256: resumes a partial download with an HTTP `Range`
-//! request, and checks the SHA-256 before the file gets its final name.
+//! Downloads one file pinned by size and SHA-256: resumes a partial download
+//! with an HTTP `Range` request, and checks the SHA-256 before the file gets
+//! its final name.
 
 use std::io::Read;
 use std::path::Path;
