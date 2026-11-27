@@ -16,3 +16,7 @@ ENABLE_USER_SCRIPT_SANDBOXING = NO
 
 // Info.plist also reads REFLECT_SENTRY_DSN (ReflectSentryDSN). It is set only
 // on the release command line or in the environment; empty disables native Sentry.
+
+// llama.cpp (ggml) in libreflect_ffi.a calls vDSP (CPU ops) and Metal (GPU ops).
+// A static library carries no link commands, so the app links them.
+OTHER_LDFLAGS = $(inherited) -framework Accelerate -framework Metal -framework Foundation
