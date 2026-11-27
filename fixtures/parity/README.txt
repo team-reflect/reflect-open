@@ -17,7 +17,7 @@ How it works:
   Regenerate with:
 
   ```bash
-  UPDATE_PARITY=1 pnpm --filter @reflect/core test --run parity
+  UPDATE_PARITY=1 pnpm test parity
   ```
 
 - **The Rust side only consumes** — `apps/cli/tests/parity.rs` runs the same
