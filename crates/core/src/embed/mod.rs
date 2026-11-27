@@ -40,7 +40,7 @@ struct ModelSpec {
     document_prompt: &'static str,
 }
 
-/// EmbeddingGemma 300M, Q8_0. The prompts and the 256-dim truncation follow
+/// EmbeddingGemma 300M, Q8_0. The prompts and the Matryoshka truncation follow
 /// the model card: https://huggingface.co/google/embeddinggemma-300m
 const MODEL: ModelSpec = ModelSpec {
     id: "embeddinggemma-300m-q8_0-d256",
@@ -62,20 +62,19 @@ const LEGACY_CACHE_DIRS: [&str; 2] = [
     ".locks/models--Qdrant--all-MiniLM-L6-v2-onnx",
 ];
 
-/// CPU threads per embed. A call embeds one note, so more threads mostly
-/// wait on each other.
+/// CPU threads per embed. Embedding is background work, so it leaves most
+/// cores to the app.
 const THREADS: i32 = 2;
 
 /// How many newly downloaded bytes accumulate between progress events, so the
 /// IPC channel carries few events and the progress bar still moves smoothly.
 const PROGRESS_EMIT_STEP: u64 = 1024 * 1024;
 
-/// A loaded model and its one context. Embed calls serialize on the Mutex
+/// The loaded model and its one context. Embed calls serialize on the Mutex
 /// around it.
 struct Model {
-    // Declared first so it drops first: it borrows `model`.
+    model: &'static LlamaModel,
     context: LlamaContext<'static>,
-    model: Box<LlamaModel>,
 }
 
 /// Forwards llama.cpp's warnings and errors to the app log and drops the rest.
@@ -95,35 +94,41 @@ unsafe extern "C" fn log_warnings(level: ggml_log_level, text: *const c_char, _:
     }
 }
 
-/// llama.cpp's process-wide backend, initialized once.
+/// llama.cpp's backend, with its log routed to [`log_warnings`]. llama.cpp
+/// allows one backend per process, so a failed init stays failed.
 fn backend() -> Result<&'static LlamaBackend, String> {
     static BACKEND: OnceLock<Result<LlamaBackend, String>> = OnceLock::new();
     BACKEND
         .get_or_init(|| {
-            let backend = LlamaBackend::init().map_err(|err| err.to_string())?;
             // SAFETY: the callback is a plain function that reads only its
             // arguments. llama.cpp also routes ggml's log through it.
             unsafe { llama_cpp_sys_2::llama_log_set(Some(log_warnings), std::ptr::null_mut()) };
-            Ok(backend)
+            LlamaBackend::init().map_err(|err| err.to_string())
         })
         .as_ref()
         .map_err(Clone::clone)
 }
 
+/// The model weights, loaded once and kept for the process, so the context can
+/// borrow them for `'static` and a retry after a failed context reuses them.
+fn load_weights(backend: &LlamaBackend, path: &Path) -> Result<&'static LlamaModel, String> {
+    static WEIGHTS: OnceLock<LlamaModel> = OnceLock::new();
+    if let Some(weights) = WEIGHTS.get() {
+        return Ok(weights);
+    }
+    // The default offloads every layer to the GPU backend, which only the
+    // Apple Silicon build has (Metal). Other builds run on the CPU.
+    let weights = LlamaModel::load_from_file(backend, path, &LlamaModelParams::default())
+        .map_err(|err| err.to_string())?;
+    Ok(WEIGHTS.get_or_init(|| weights))
+}
+
 impl Model {
     fn load(path: &Path) -> Result<Self, String> {
         let backend = backend()?;
-        // The default offloads every layer to the GPU backend, which only the
-        // Apple Silicon build has (Metal). Other builds run on the CPU.
-        let model = Box::new(
-            LlamaModel::load_from_file(backend, path, &LlamaModelParams::default())
-                .map_err(|err| err.to_string())?,
-        );
-        // SAFETY: the box keeps the model at one address until `Model` drops,
-        // and `context` drops before `model` (field order).
-        let model_ref: &'static LlamaModel = unsafe { &*std::ptr::from_ref(model.as_ref()) };
+        let model = load_weights(backend, path)?;
         let max_tokens = MODEL.max_tokens;
-        let context = model_ref
+        let context = model
             .new_context(
                 backend,
                 LlamaContextParams::default()
@@ -136,7 +141,7 @@ impl Model {
                     .with_n_threads_batch(THREADS),
             )
             .map_err(|err| err.to_string())?;
-        Ok(Self { context, model })
+        Ok(Self { model, context })
     }
 
     /// One unit vector of `MODEL.dims` for `prompt` followed by `text`.
@@ -167,9 +172,9 @@ impl Model {
             .get(..MODEL.dims)
             .ok_or_else(|| format!("the model returned {} dimensions", full.len()))?
             .to_vec();
-        let norm = vector.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let norm = vector.iter().map(|value| value * value).sum::<f32>().sqrt();
         if norm > 0.0 {
-            vector.iter_mut().for_each(|x| *x /= norm);
+            vector.iter_mut().for_each(|value| *value /= norm);
         }
         Ok(vector)
     }
@@ -276,7 +281,9 @@ async fn ensure_model_file(
     models_dir: &Path,
 ) -> Result<PathBuf, String> {
     let path = models_dir.join(MODEL.file);
-    if tokio::fs::try_exists(&path).await.unwrap_or(false) {
+    // A file of another size is from another revision: download it again.
+    let existing = tokio::fs::metadata(&path).await.map(|meta| meta.len());
+    if existing.is_ok_and(|len| len == MODEL.size) {
         return Ok(path);
     }
     let url = model_url();
@@ -360,14 +367,13 @@ impl Core {
         // return early on Loading).
         let loaded = match ensure_model_file(self.host(), &self.embed.0, &models_dir).await {
             Ok(path) => self
-                .runtime
                 .spawn_blocking(move || {
-                    let model = Model::load(&path)?;
+                    let model = Model::load(&path).map_err(AppError::io)?;
                     remove_legacy_caches(&models_dir);
                     Ok(model)
                 })
                 .await
-                .unwrap_or_else(|err| Err(format!("embedding load task panicked: {err}"))),
+                .map_err(|err| err.message().to_string()),
             Err(message) => Err(message),
         };
 
@@ -388,43 +394,39 @@ impl Core {
 
     /// Embed a search query. Errors unless the model is `Ready`.
     pub async fn embed_query(&self, text: String) -> AppResult<Vec<f32>> {
-        self.with_model(move |model| model.embed(MODEL.query_prompt, &text))
+        let model = self.ready_model()?;
+        self.spawn_blocking(move || embed_one(&model, MODEL.query_prompt, &text))
             .await
     }
 
     /// Embed note chunks for storage. Errors unless the model is `Ready`.
+    /// Each chunk takes the model lock on its own, so a query can run between
+    /// two chunks of a long note.
     pub async fn embed_documents(&self, texts: Vec<String>) -> AppResult<Vec<Vec<f32>>> {
-        self.with_model(move |model| {
+        let model = self.ready_model()?;
+        self.spawn_blocking(move || {
             texts
                 .iter()
-                .map(|text| model.embed(MODEL.document_prompt, text))
+                .map(|text| embed_one(&model, MODEL.document_prompt, text))
                 .collect()
         })
         .await
     }
 
-    /// Runs `work` on a blocking thread with the loaded model.
-    async fn with_model<T: Send + 'static>(
-        &self,
-        work: impl FnOnce(&mut Model) -> Result<T, String> + Send + 'static,
-    ) -> AppResult<T> {
-        let model = {
-            let runtime = lock_state(&self.embed)?;
-            match &*runtime {
-                Runtime::Ready(model) => Arc::clone(model),
-                _ => return Err(AppError::io("embedding model is not loaded")),
-            }
-        };
-        self.runtime
-            .spawn_blocking(move || {
-                let mut model = model
-                    .lock()
-                    .map_err(|_| AppError::io("embedding model lock poisoned"))?;
-                work(&mut model).map_err(|err| AppError::io(format!("embedding failed: {err}")))
-            })
-            .await
-            .map_err(|err| AppError::io(format!("embedding task panicked: {err}")))?
+    fn ready_model(&self) -> AppResult<Arc<Mutex<Model>>> {
+        match &*lock_state(&self.embed)? {
+            Runtime::Ready(model) => Ok(Arc::clone(model)),
+            _ => Err(AppError::io("embedding model is not loaded")),
+        }
     }
+}
+
+fn embed_one(model: &Mutex<Model>, prompt: &str, text: &str) -> AppResult<Vec<f32>> {
+    model
+        .lock()
+        .map_err(|_| AppError::io("embedding model lock poisoned"))?
+        .embed(prompt, text)
+        .map_err(|err| AppError::io(format!("embedding failed: {err}")))
 }
 
 #[cfg(test)]
@@ -448,7 +450,7 @@ mod tests {
             .embed(MODEL.query_prompt, "Notes about gardening")
             .unwrap();
         assert_eq!(first.len(), MODEL.dims);
-        let norm = first.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let norm = first.iter().map(|value| value * value).sum::<f32>().sqrt();
         assert!((norm - 1.0).abs() < 1e-4, "norm {norm}");
         assert_eq!(first, again);
         assert_ne!(first, query);

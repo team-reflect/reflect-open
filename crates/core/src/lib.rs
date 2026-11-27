@@ -17,11 +17,21 @@ mod secrets;
 pub mod settings;
 pub mod web_fetch;
 
-// The watcher and the embedding runtime are desktop capabilities: mobile swaps
-// in stand-ins with the same `Core` methods.
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
+// The watcher and the embedding runtime are desktop capabilities: other
+// platforms swap in stand-ins with the same `Core` methods. Intel macOS has the
+// stand-in too: its llama.cpp build includes Metal, and the CPU-only path for
+// Intel GPUs needs `op_offload`, which `llama-cpp-2` does not expose.
+#[cfg(not(any(
+    target_os = "android",
+    target_os = "ios",
+    all(target_os = "macos", target_arch = "x86_64")
+)))]
 pub mod embed;
-#[cfg(any(target_os = "android", target_os = "ios"))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "ios",
+    all(target_os = "macos", target_arch = "x86_64")
+))]
 #[path = "embed_unsupported.rs"]
 pub mod embed;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]

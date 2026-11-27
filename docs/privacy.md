@@ -37,7 +37,7 @@ from disk at call time. Tests cover it.
   in `.reflect/`. Note content never leaves the machine.
 - Enabling it downloads the model (~330 MB) **from Hugging Face, once**. The request carries no
   user data.
-- Not available on iOS yet.
+- Not available on Intel Macs or iOS, which have no embedding runtime.
 
 ## Backup & sync (off until you connect)
 

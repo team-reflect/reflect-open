@@ -25,8 +25,11 @@ vector table and re-embeds every note once.
 
 ### Runtime
 
-- `llama-cpp-2` without default features (no OpenMP, no `common` library). The
-  `metal` feature is on for Apple Silicon Macs; other desktops use the CPU.
+- `llama-cpp-2` without default features (no OpenMP, no `common` library).
+  ggml builds Metal for every Apple target. Apple Silicon Macs run on Metal;
+  Windows and Linux run on the CPU.
+- Intel Macs keep the stand-in runtime. Their build includes Metal, and the
+  CPU-only path needs `op_offload`, which `llama-cpp-2` does not expose.
 - One context, two threads, and the model's full 2048-token window. A longer
   text is truncated and keeps its closing EOS token. Chinese text takes about
   one token per two characters, so a 512-token window would cut the chunker's
@@ -81,7 +84,6 @@ vector table and re-embeds every note once.
 - CI runs build scripts without the mbx replay
   (`MBX_BUILD_SCRIPT_EXECUTION=0`), because the CMake build directory in
   OUT_DIR holds absolute paths. Each job compiles llama.cpp again.
-- Intel Macs get semantic search too, on the CPU.
 - The same runtime builds for iOS. Turning semantic search on there is a
   separate change.
 - An older app that opens a migrated index embeds every note on each backfill
