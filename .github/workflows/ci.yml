@@ -210,6 +210,9 @@ jobs:
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:chromium
 
+      - name: Build the index wasm
+        run: pnpm build:index-wasm
+
       - name: Test
         run: pnpm turbo run vitest:browser -- --shard=${{ matrix.shard }}/3
 
@@ -238,6 +241,9 @@ jobs:
 
       - name: Install Playwright
         run: pnpm --filter @reflect/web test:install:webkit
+
+      - name: Build the index wasm
+        run: pnpm build:index-wasm
 
       # WebKit keeps the memory of every finished test file, so each shard
       # runs in its own Vitest process to restart the browser.
