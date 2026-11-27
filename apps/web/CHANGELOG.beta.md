@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.21.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.21.0-beta.1...v0.21.0-beta.2) (2026-11-27)
+
+
+### Features
+
+* **desktop:** add a context menu to note rows ([#2357](https://github.com/team-reflect/reflect-open/issues/2357)) ([bc029a4](https://github.com/team-reflect/reflect-open/commit/bc029a46b3a639fba4f22edefc11b7df62d9f3ea))
+* **desktop:** add a context menu to task rows ([#2355](https://github.com/team-reflect/reflect-open/issues/2355)) ([011acb1](https://github.com/team-reflect/reflect-open/commit/011acb10158552e1c0b537797f47f3f1ee55d7b9))
+
+
+### Bug Fixes
+
+* drop the asset name probe cap ([#2369](https://github.com/team-reflect/reflect-open/issues/2369)) ([df7e195](https://github.com/team-reflect/reflect-open/commit/df7e195513b94679004bb6769fa587914a5e1400))
+* use Title Case for menu items and per-platform reveal labels ([#2371](https://github.com/team-reflect/reflect-open/issues/2371)) ([d694d1d](https://github.com/team-reflect/reflect-open/commit/d694d1da236db855198fefe1193d0cad6da3f250))
+
 ## [0.21.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.20.0...v0.21.0-beta.1) (2026-11-27)
 
 
