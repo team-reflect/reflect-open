@@ -35,7 +35,9 @@ pub(super) async fn fetch(
             .await
             .map_err(|err| format!("creating {}: {err}", dir.display()))?;
     }
-    let mut have = tokio::fs::metadata(&part).await.map_or(0, |meta| meta.len());
+    let mut have = tokio::fs::metadata(&part)
+        .await
+        .map_or(0, |meta| meta.len());
     if have > download.size {
         have = 0;
     }
@@ -57,7 +59,9 @@ pub(super) async fn fetch(
         .map_err(|err| format!("hashing task panicked: {err}"))??;
     if actual != expected {
         let _ = tokio::fs::remove_file(&part).await;
-        return Err(format!("sha256 mismatch: expected {expected}, got {actual}"));
+        return Err(format!(
+            "sha256 mismatch: expected {expected}, got {actual}"
+        ));
     }
     tokio::fs::rename(&part, dest)
         .await

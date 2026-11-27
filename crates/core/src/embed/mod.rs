@@ -417,9 +417,15 @@ mod tests {
     fn embeds_with_the_real_model() {
         let path = std::env::var("REFLECT_EMBED_MODEL").expect("REFLECT_EMBED_MODEL");
         let mut model = Model::load(Path::new(&path)).unwrap();
-        let first = model.embed(MODEL.document_prompt, "Notes about gardening").unwrap();
-        let again = model.embed(MODEL.document_prompt, "Notes about gardening").unwrap();
-        let query = model.embed(MODEL.query_prompt, "Notes about gardening").unwrap();
+        let first = model
+            .embed(MODEL.document_prompt, "Notes about gardening")
+            .unwrap();
+        let again = model
+            .embed(MODEL.document_prompt, "Notes about gardening")
+            .unwrap();
+        let query = model
+            .embed(MODEL.query_prompt, "Notes about gardening")
+            .unwrap();
         assert_eq!(first.len(), MODEL.dims);
         let norm = first.iter().map(|x| x * x).sum::<f32>().sqrt();
         assert!((norm - 1.0).abs() < 1e-4, "norm {norm}");
