@@ -3,7 +3,7 @@
 //! compose at runtime.
 
 use expect_test::{Expect, expect};
-use reflect_index_schema::LATEST_SCHEMA_VERSION;
+use reflect_index_schema::{EMBEDDING_DIMS, LATEST_SCHEMA_VERSION};
 use reflect_types::{
     ChatConversation, ChatMessageRow, EmbeddedChunk, IndexCommit, IndexTouch, IndexedAlias,
     IndexedClaim, IndexedEmail, IndexedLink, IndexedNote, IndexedTag, IndexedTask, LinkKind,
@@ -1301,13 +1301,13 @@ fn chunk(hash: &str, vector: Option<Vec<f32>>) -> EmbeddedChunk {
         pos_to: 10,
         text: format!("text {hash}"),
         content_hash: hash.to_string(),
-        model_id: "embeddinggemma-300m-q8_0-d256".to_string(),
+        model_id: "test-model".to_string(),
         vector,
     }
 }
 
-fn vec256(fill: f32) -> Vec<f32> {
-    vec![fill; 256]
+fn vector(fill: f32) -> Vec<f32> {
+    vec![fill; EMBEDDING_DIMS]
 }
 
 /// Chunks only exist for indexed notes (apply_chunks guards on the row).
@@ -1339,8 +1339,8 @@ fn apply_chunks_inserts_new_and_drops_stale_with_their_vectors() {
         &conn,
         "notes/a.md",
         &[
-            chunk("h1", Some(vec256(0.1))),
-            chunk("h2", Some(vec256(0.2))),
+            chunk("h1", Some(vector(0.1))),
+            chunk("h2", Some(vector(0.2))),
         ],
     )
     .unwrap();
@@ -1350,7 +1350,7 @@ fn apply_chunks_inserts_new_and_drops_stale_with_their_vectors() {
     apply_chunks(
         &conn,
         "notes/a.md",
-        &[chunk("h2", None), chunk("h3", Some(vec256(0.3)))],
+        &[chunk("h2", None), chunk("h3", Some(vector(0.3)))],
     )
     .unwrap();
     assert_eq!(
@@ -1367,7 +1367,7 @@ fn apply_chunks_inserts_new_and_drops_stale_with_their_vectors() {
 fn unchanged_chunks_keep_vectors_but_refresh_positions() {
     let conn = migrated();
     index_note(&conn, "notes/a.md");
-    apply_chunks(&conn, "notes/a.md", &[chunk("h1", Some(vec256(0.5)))]).unwrap();
+    apply_chunks(&conn, "notes/a.md", &[chunk("h1", Some(vector(0.5)))]).unwrap();
     let mut moved = chunk("h1", None);
     moved.pos_from = 100;
     moved.pos_to = 140;
@@ -1396,8 +1396,8 @@ fn remove_chunks_drops_rows_and_vectors_for_one_note_only() {
     let conn = migrated();
     index_note(&conn, "notes/a.md");
     index_note(&conn, "notes/b.md");
-    apply_chunks(&conn, "notes/a.md", &[chunk("a1", Some(vec256(0.1)))]).unwrap();
-    apply_chunks(&conn, "notes/b.md", &[chunk("b1", Some(vec256(0.2)))]).unwrap();
+    apply_chunks(&conn, "notes/a.md", &[chunk("a1", Some(vector(0.1)))]).unwrap();
+    apply_chunks(&conn, "notes/b.md", &[chunk("b1", Some(vector(0.2)))]).unwrap();
     remove_chunks(&conn, "notes/a.md").unwrap();
     assert_eq!(
         chunk_rows(&conn),
@@ -1410,7 +1410,7 @@ fn remove_chunks_drops_rows_and_vectors_for_one_note_only() {
 fn clear_index_wipes_embeddings_too() {
     let conn = migrated();
     index_note(&conn, "notes/a.md");
-    apply_chunks(&conn, "notes/a.md", &[chunk("a1", Some(vec256(0.1)))]).unwrap();
+    apply_chunks(&conn, "notes/a.md", &[chunk("a1", Some(vector(0.1)))]).unwrap();
     clear_index(&conn).unwrap();
     assert_eq!(chunk_rows(&conn), vec![]);
     assert_eq!(vector_count(&conn), 0);
@@ -1421,14 +1421,14 @@ fn knn_query_returns_nearest_chunk_first() {
     let conn = migrated();
     index_note(&conn, "notes/near.md");
     index_note(&conn, "notes/far.md");
-    let mut near = vec256(0.0);
+    let mut near = vector(0.0);
     near[0] = 1.0;
-    let mut far = vec256(0.0);
+    let mut far = vector(0.0);
     far[1] = 1.0;
     apply_chunks(&conn, "notes/near.md", &[chunk("n", Some(near))]).unwrap();
     apply_chunks(&conn, "notes/far.md", &[chunk("f", Some(far))]).unwrap();
 
-    let mut probe = vec![0.0f32; 256];
+    let mut probe = vec![0.0f32; EMBEDDING_DIMS];
     probe[0] = 0.9;
     let probe_json = format!(
         "[{}]",
@@ -1456,7 +1456,7 @@ fn knn_query_returns_nearest_chunk_first() {
 fn reindexing_a_note_keeps_its_chunks_but_true_deletion_drops_them() {
     let mut conn = migrated();
     apply_note(&conn, &note("notes/a.md", "Alpha", vec![])).unwrap();
-    apply_chunks(&conn, "notes/a.md", &[chunk("a1", Some(vec256(0.1)))]).unwrap();
+    apply_chunks(&conn, "notes/a.md", &[chunk("a1", Some(vector(0.1)))]).unwrap();
 
     // Upsert path: apply_note re-creates the note row — chunks must survive
     // (the hash-skip depends on it).
@@ -1480,11 +1480,11 @@ fn embedding_vectors_use_cosine_distance() {
     // the metric (retrieve.ts thresholds raw distances as cosine).
     let conn = migrated();
     index_note(&conn, "notes/a.md");
-    let mut stored = vec256(0.0);
+    let mut stored = vector(0.0);
     stored[0] = 1.0;
     apply_chunks(&conn, "notes/a.md", &[chunk("a1", Some(stored))]).unwrap();
 
-    let mut probe = vec![0.0f32; 256];
+    let mut probe = vec![0.0f32; EMBEDDING_DIMS];
     probe[0] = 0.5;
     let probe_json = format!(
         "[{}]",
@@ -1569,7 +1569,7 @@ fn gemma_migration_drops_the_384_dimension_vectors() {
     migrate(&mut conn).expect("migrate to latest");
     assert_eq!(vector_count(&conn), 0);
     assert!(chunk_rows(&conn).is_empty());
-    apply_chunks(&conn, "notes/a.md", &[chunk("a2", Some(vec256(0.25)))]).unwrap();
+    apply_chunks(&conn, "notes/a.md", &[chunk("a2", Some(vector(0.25)))]).unwrap();
     assert_eq!(vector_count(&conn), 1);
     assert!(apply_chunks(&conn, "notes/a.md", &[chunk("a3", Some(vec![0.25; 384]))]).is_err());
 }
@@ -1580,7 +1580,7 @@ fn stored_vectors_round_trip_through_vec_to_json() {
     // pin the function name + shape against the real extension.
     let conn = migrated();
     index_note(&conn, "notes/a.md");
-    apply_chunks(&conn, "notes/a.md", &[chunk("a1", Some(vec256(0.25)))]).unwrap();
+    apply_chunks(&conn, "notes/a.md", &[chunk("a1", Some(vector(0.25)))]).unwrap();
     let rows = run_query(
         &conn,
         "SELECT vec_to_json(v.embedding) AS vec
@@ -1611,7 +1611,7 @@ fn apply_chunks_for_an_unindexed_path_is_a_cleaning_no_op() {
     // The embed pipeline can race index_remove: a late embed_apply for a
     // deleted note must not reinsert vectors for a dead path.
     let conn = migrated();
-    let result = apply_chunks(&conn, "notes/gone.md", &[chunk("g1", Some(vec256(0.1)))]);
+    let result = apply_chunks(&conn, "notes/gone.md", &[chunk("g1", Some(vector(0.1)))]);
     assert!(result.is_ok());
     assert_eq!(chunk_rows(&conn), vec![]);
     assert_eq!(vector_count(&conn), 0);
@@ -1640,7 +1640,7 @@ fn move_note_migrates_every_row_and_preserves_derived_state() {
         &note("notes/src.md", "Src", vec![wiki("Kept Title")]),
     )
     .unwrap();
-    apply_chunks(&conn, "notes/old.md", &[chunk("m1", Some(vec256(0.5)))]).unwrap();
+    apply_chunks(&conn, "notes/old.md", &[chunk("m1", Some(vector(0.5)))]).unwrap();
     let vectors_before = vector_count(&conn);
 
     move_in_txn(&mut conn, "notes/old.md", "notes/kept-title.md").unwrap();
@@ -1751,7 +1751,7 @@ fn watcher_echo_after_a_move_is_benign_and_vectors_survive() {
     let mut moved = note("notes/old.md", "Kept Title", vec![]);
     moved.is_pinned = true;
     apply_note(&conn, &moved).unwrap();
-    apply_chunks(&conn, "notes/old.md", &[chunk("e1", Some(vec256(0.25)))]).unwrap();
+    apply_chunks(&conn, "notes/old.md", &[chunk("e1", Some(vector(0.25)))]).unwrap();
     move_in_txn(&mut conn, "notes/old.md", "notes/kept-title.md").unwrap();
 
     // Echo: remove(old) — no rows — then upsert(new) — identical projection.
@@ -3133,24 +3133,24 @@ fn vector_reads_find_the_nearest_chunks_and_keep_private_notes_out_of_related() 
     let mut secret = note("notes/secret.md", "Secret", vec![]);
     secret.is_private = true;
     apply_note(&conn, &secret).unwrap();
-    let mut far = vec256(0.0);
+    let mut far = vector(0.0);
     far[0] = 1.0;
     // The note has two chunks that point in different directions; each one
     // seeds its own neighbour list.
-    let mut second = vec256(0.0);
+    let mut second = vector(0.0);
     second[1] = 1.0;
     let mut second_chunk = chunk("s2", Some(second.clone()));
     second_chunk.pos_from = 20;
     apply_chunks(
         &conn,
         "notes/self.md",
-        &[chunk("s1", Some(vec256(0.5))), second_chunk],
+        &[chunk("s1", Some(vector(0.5))), second_chunk],
     )
     .unwrap();
     index_note(&conn, "notes/other.md");
     second[2] = 0.1;
     apply_chunks(&conn, "notes/other.md", &[chunk("o1", Some(second))]).unwrap();
-    let mut near = vec256(0.5);
+    let mut near = vector(0.5);
     near[0] = 0.1;
     apply_chunks(&conn, "notes/near.md", &[chunk("n1", Some(near))]).unwrap();
     apply_chunks(&conn, "notes/secret.md", &[chunk("x1", Some(far.clone()))]).unwrap();

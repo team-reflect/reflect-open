@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  TEST_EMBED_MODEL,
+  TEST_EMBED_DIMENSIONS,
   createTestDatabaseService,
   createTestEmbeddingIndexService,
   createTestEmbeddingRuntimeService,
@@ -30,7 +32,7 @@ function seedStoredRows(
       text: '',
       contentHash: row.content_hash,
       modelId: row.model_id,
-      vector: Array.from({ length: 256 }, () => 0),
+      vector: Array.from({ length: TEST_EMBED_DIMENSIONS }, () => 0),
     })),
     generation: database.generation(),
   })
@@ -81,8 +83,6 @@ function setup(options: {
   }
 }
 
-const MODEL = 'embeddinggemma-300m-q8_0-d256'
-
 describe('embedNote', () => {
   it('never embeds a template — boilerplate must not reach retrieval', async () => {
     const { index, embedded, applied, removed } = setup({
@@ -94,7 +94,7 @@ describe('embedNote', () => {
       path: 'templates/journal.md',
       generation: 1,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
     })
     expect(count).toBe(0)
     expect(embedded()).toHaveLength(0)
@@ -115,7 +115,7 @@ describe('embedNote', () => {
       path: 'notes/a.md',
       generation: 1,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
     })
     expect(count).toBe(0)
     expect(embedded()).toHaveLength(0)
@@ -132,7 +132,7 @@ describe('embedNote', () => {
       path: 'notes/a.md',
       generation: 1,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
     })
     expect(count).toBe(2)
     expect(embedded()).toHaveLength(1) // one batched embed_documents call
@@ -147,19 +147,19 @@ describe('embedNote', () => {
       path: 'notes/a.md',
       generation: 1,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
     })
     const hash = first.applied()[0]!.chunks[0]!.contentHash
 
     const second = setup({
       content,
-      storedRows: [{ content_hash: hash, model_id: MODEL }],
+      storedRows: [{ content_hash: hash, model_id: TEST_EMBED_MODEL }],
     })
     const count = await second.index.embedNote({
       path: 'notes/a.md',
       generation: 1,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
     })
     expect(count).toBe(0)
     expect(second.embedded()).toHaveLength(0) // nothing re-embedded()
@@ -173,7 +173,7 @@ describe('embedNote', () => {
       path: 'notes/a.md',
       generation: 1,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
     })
     const hash = first.applied()[0]!.chunks[0]!.contentHash
 
@@ -185,7 +185,7 @@ describe('embedNote', () => {
       path: 'notes/a.md',
       generation: 1,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
     })
     expect(count).toBe(1) // same hash, different model → new vector
     expect(second.embedded()).toHaveLength(1)
@@ -201,7 +201,7 @@ describe('embedNote', () => {
       path: 'notes/a.md',
       generation: 1,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
     })
     const hashes = first.applied()[0]!.chunks.map((chunk) => chunk.contentHash)
     expect(hashes[0]).toBe(hashes[1]) // genuinely duplicated chunks
@@ -210,13 +210,13 @@ describe('embedNote', () => {
     // other must re-embed (vector present), or apply_chunks errors loudly.
     const second = setup({
       content: dup,
-      storedRows: [{ content_hash: hashes[0]!, model_id: MODEL }],
+      storedRows: [{ content_hash: hashes[0]!, model_id: TEST_EMBED_MODEL }],
     })
     const count = await second.index.embedNote({
       path: 'notes/a.md',
       generation: 1,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
     })
     expect(count).toBe(1)
     const sent = second.applied()[0]!.chunks
@@ -230,7 +230,7 @@ describe('embedNote', () => {
       path: 'notes/a.md',
       generation: 1,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
     })
     expect(count).toBe(0)
     expect(applied()).toHaveLength(0)
@@ -251,7 +251,7 @@ describe('embedNote', () => {
       path: 'notes/a.md',
       generation: 1,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
     })
     expect(count).toBeGreaterThanOrEqual(2) // note chunk(s) + the asset chunk
 
@@ -271,14 +271,14 @@ describe('embedNote', () => {
     // chunks, and sidecars are untracked so nothing would restore them.
     const { index, embedded, applied, removed } = setup({
       content: IMAGE_NOTE,
-      storedRows: [{ content_hash: 'previously-stored', model_id: MODEL }],
+      storedRows: [{ content_hash: 'previously-stored', model_id: TEST_EMBED_MODEL }],
       evictedSidecars: ['assets/pic.png.reflect.md'],
     })
     const count = await index.embedNote({
       path: 'notes/a.md',
       generation: 1,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
     })
     expect(count).toBe(0)
     expect(embedded()).toHaveLength(0)
@@ -288,7 +288,12 @@ describe('embedNote', () => {
 
   it('a note without a description for its asset embeds only its own text', async () => {
     const { index, applied } = setup({ content: IMAGE_NOTE, storedRows: [] })
-    await index.embedNote({ path: 'notes/a.md', generation: 1, fileGeneration: 1, modelId: MODEL })
+    await index.embedNote({
+      path: 'notes/a.md',
+      generation: 1,
+      fileGeneration: 1,
+      modelId: TEST_EMBED_MODEL,
+    })
     expect(applied()[0]!.chunks.every((chunk) => chunk.posFrom < IMAGE_NOTE.length)).toBe(true)
   })
 
@@ -299,11 +304,11 @@ describe('embedNote', () => {
       path: 'notes/a.md',
       generation: 1,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
     })
     const storedRows = first.applied()[0]!.chunks.map((chunk) => ({
       content_hash: chunk.contentHash,
-      model_id: MODEL,
+      model_id: TEST_EMBED_MODEL,
     }))
 
     const second = setup({ content: IMAGE_NOTE, storedRows, descriptions })
@@ -311,7 +316,7 @@ describe('embedNote', () => {
       path: 'notes/a.md',
       generation: 1,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
     })
     expect(count).toBe(0)
     expect(second.embedded()).toHaveLength(0)
@@ -327,11 +332,11 @@ describe('embedNote', () => {
       path: 'notes/a.md',
       generation: 1,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
     })
     const storedRows = first.applied()[0]!.chunks.map((chunk) => ({
       content_hash: chunk.contentHash,
-      model_id: MODEL,
+      model_id: TEST_EMBED_MODEL,
     }))
 
     const second = setup({
@@ -345,7 +350,7 @@ describe('embedNote', () => {
       path: 'notes/a.md',
       generation: 1,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
     })
     expect(count).toBe(1)
     expect(second.embedded()).toEqual([['Now a snowy mountain pass.']])
@@ -375,7 +380,7 @@ function setupGraph(options?: { unreadable?: string[] }) {
       if (unreadable.some((marker) => text.includes(marker))) {
         throw new Error(`cannot embed ${text.trim()}`)
       }
-      return Array.from({ length: 256 }, (_, i) => (i === 0 ? 1 : 0))
+      return Array.from({ length: TEST_EMBED_DIMENSIONS }, (_, i) => (i === 0 ? 1 : 0))
     },
   })
   const noteFile = createTestNoteFileService({
@@ -408,8 +413,18 @@ async function queueDrained(): Promise<void> {
 describe('removeNote', () => {
   it('drops the chunks and vectors of a note', async () => {
     const { index, storedPaths } = setupGraph()
-    await index.embedNote({ path: 'notes/a.md', generation: 1, fileGeneration: 1, modelId: MODEL })
-    await index.embedNote({ path: 'notes/b.md', generation: 1, fileGeneration: 1, modelId: MODEL })
+    await index.embedNote({
+      path: 'notes/a.md',
+      generation: 1,
+      fileGeneration: 1,
+      modelId: TEST_EMBED_MODEL,
+    })
+    await index.embedNote({
+      path: 'notes/b.md',
+      generation: 1,
+      fileGeneration: 1,
+      modelId: TEST_EMBED_MODEL,
+    })
 
     await index.removeNote('notes/a.md', 1)
 
@@ -426,7 +441,7 @@ describe('backfill', () => {
     const result = await index.backfill({
       generation: 3,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
       onProgress: (done, total) => {
         progress.push([done, total])
       },
@@ -446,11 +461,11 @@ describe('backfill', () => {
 
   it('embeds nothing on a second pass (the hash-skip)', async () => {
     const { index, runtime } = setupGraph()
-    await index.backfill({ generation: 3, fileGeneration: 1, modelId: MODEL })
+    await index.backfill({ generation: 3, fileGeneration: 1, modelId: TEST_EMBED_MODEL })
     const embedded = runtime.embedCalls().length
 
     await expect(
-      index.backfill({ generation: 3, fileGeneration: 1, modelId: MODEL }),
+      index.backfill({ generation: 3, fileGeneration: 1, modelId: TEST_EMBED_MODEL }),
     ).resolves.toBe('completed')
 
     expect(runtime.embedCalls()).toHaveLength(embedded)
@@ -459,15 +474,15 @@ describe('backfill', () => {
   it('logs one summary line per pass', async () => {
     const { index, logger } = setupGraph()
 
-    await index.backfill({ generation: 3, fileGeneration: 1, modelId: MODEL })
-    await index.backfill({ generation: 3, fileGeneration: 1, modelId: MODEL })
+    await index.backfill({ generation: 3, fileGeneration: 1, modelId: TEST_EMBED_MODEL })
+    await index.backfill({ generation: 3, fileGeneration: 1, modelId: TEST_EMBED_MODEL })
 
     expect(logger.getInfos()).toEqual([
       {
         message: 'embedding backfill finished',
         cause: {
           outcome: 'completed',
-          modelId: MODEL,
+          modelId: TEST_EMBED_MODEL,
           generation: 3,
           notes: 2,
           done: 2,
@@ -481,7 +496,7 @@ describe('backfill', () => {
         message: 'embedding backfill finished',
         cause: {
           outcome: 'completed',
-          modelId: MODEL,
+          modelId: TEST_EMBED_MODEL,
           generation: 3,
           notes: 2,
           done: 2,
@@ -501,7 +516,7 @@ describe('backfill', () => {
     const result = await index.backfill({
       generation: 3,
       fileGeneration: 1,
-      modelId: MODEL,
+      modelId: TEST_EMBED_MODEL,
       onProgress: () => {
         controller.abort()
       },
@@ -519,7 +534,7 @@ describe('backfill', () => {
     const { index, logger } = setupGraph({ unreadable: ['Alpha'] })
 
     await expect(
-      index.backfill({ generation: 3, fileGeneration: 1, modelId: MODEL }),
+      index.backfill({ generation: 3, fileGeneration: 1, modelId: TEST_EMBED_MODEL }),
     ).resolves.toBe('completed')
 
     expect(index.applied().map((apply) => apply.path)).toEqual(['notes/b.md'])
@@ -535,7 +550,7 @@ describe('backfill', () => {
     database.close()
 
     await expect(
-      index.backfill({ generation: 3, fileGeneration: 1, modelId: MODEL }),
+      index.backfill({ generation: 3, fileGeneration: 1, modelId: TEST_EMBED_MODEL }),
     ).resolves.toBe('failed')
     expect(logger.getInfos().map((entry) => entry.cause)).toMatchObject([
       { outcome: 'failed', notes: 0, done: 0 },
@@ -546,7 +561,7 @@ describe('backfill', () => {
 describe('follow', () => {
   it('backfills, then embeds the notes of each applied batch', async () => {
     const { index, indexLifecycle, noteFile } = setupGraph()
-    const stop = index.follow({ generation: 7, fileGeneration: 1, modelId: MODEL })
+    const stop = index.follow({ generation: 7, fileGeneration: 1, modelId: TEST_EMBED_MODEL })
     await queueDrained()
     expect(index.applied().map((apply) => apply.path)).toEqual(['notes/a.md', 'notes/b.md'])
 
@@ -562,7 +577,7 @@ describe('follow', () => {
 
   it('drops the vectors of a removed note', async () => {
     const { index, indexLifecycle, storedPaths } = setupGraph()
-    const stop = index.follow({ generation: 7, fileGeneration: 1, modelId: MODEL })
+    const stop = index.follow({ generation: 7, fileGeneration: 1, modelId: TEST_EMBED_MODEL })
     await queueDrained()
 
     indexLifecycle.emitApplied([{ kind: 'remove', path: 'notes/a.md' }], 7)
@@ -575,7 +590,7 @@ describe('follow', () => {
 
   it('ignores a sync pass', async () => {
     const { index, indexLifecycle } = setupGraph()
-    const stop = index.follow({ generation: 7, fileGeneration: 1, modelId: MODEL })
+    const stop = index.follow({ generation: 7, fileGeneration: 1, modelId: TEST_EMBED_MODEL })
     await queueDrained()
     const before = index.applied().length
 
@@ -589,7 +604,7 @@ describe('follow', () => {
 
   it('ignores a delayed emit from a superseded index session', async () => {
     const { index, indexLifecycle } = setupGraph()
-    const stop = index.follow({ generation: 7, fileGeneration: 1, modelId: MODEL })
+    const stop = index.follow({ generation: 7, fileGeneration: 1, modelId: TEST_EMBED_MODEL })
     await queueDrained()
     const applied = index.applied().length
 
@@ -604,7 +619,7 @@ describe('follow', () => {
 
   it('never embeds asset-file changes riding the same batches', async () => {
     const { index, indexLifecycle } = setupGraph()
-    const stop = index.follow({ generation: 7, fileGeneration: 1, modelId: MODEL })
+    const stop = index.follow({ generation: 7, fileGeneration: 1, modelId: TEST_EMBED_MODEL })
     await queueDrained()
     const applied = index.applied().length
 
@@ -624,7 +639,7 @@ describe('follow', () => {
 
   it('skips the work still queued when it stops, and hears no later batch', async () => {
     const { index, indexLifecycle } = setupGraph()
-    const stop = index.follow({ generation: 7, fileGeneration: 1, modelId: MODEL })
+    const stop = index.follow({ generation: 7, fileGeneration: 1, modelId: TEST_EMBED_MODEL })
     // Queued behind the backfill, which has not started yet.
     indexLifecycle.emitApplied([{ kind: 'remove', path: 'notes/a.md' }], 7)
     stop()
@@ -637,7 +652,7 @@ describe('follow', () => {
 
   it('logs one failing note and goes on with the queue', async () => {
     const { index, indexLifecycle, logger, noteFile, unwritable } = setupGraph()
-    const stop = index.follow({ generation: 7, fileGeneration: 1, modelId: MODEL })
+    const stop = index.follow({ generation: 7, fileGeneration: 1, modelId: TEST_EMBED_MODEL })
     await queueDrained()
     const applied = index.applied().length
 

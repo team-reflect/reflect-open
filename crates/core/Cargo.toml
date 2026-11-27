@@ -22,6 +22,7 @@ keyring-core = { workspace = true }
 reflect-git = { workspace = true }
 reflect-graph-io = { workspace = true }
 reflect-index = { workspace = true, features = ["native"] }
+reflect-index-schema = { workspace = true }
 reflect-types = { workspace = true }
 reflect-utils = { workspace = true }
 reqwest = { workspace = true }

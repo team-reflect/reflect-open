@@ -44,8 +44,7 @@ import { createTestStorageService } from './storage.ts'
 
 export interface TestEmbeddingRuntimeServiceOptions {
   /**
-   * The runtime status. Defaults to `ready` with model
-   * `embeddinggemma-300m-q8_0-d256`.
+   * The runtime status. Defaults to `ready` with model `TEST_EMBED_MODEL`.
    */
   status?: EmbedStatus | undefined
   /**
@@ -70,10 +69,18 @@ export interface TestEmbeddingRuntimeService extends EmbeddingRuntimeService {
   ensureCalls(): number
 }
 
-const DIMENSIONS = 256
+/**
+ * The model id of the test embedding runtime.
+ */
+export const TEST_EMBED_MODEL = 'test-model'
+
+/**
+ * The vector width of the index (`EMBEDDING_DIMS` in `reflect-index-schema`).
+ */
+export const TEST_EMBED_DIMENSIONS = 256
 
 function unitVector(): number[] {
-  const vector = Array.from({ length: DIMENSIONS }, () => 0)
+  const vector = Array.from({ length: TEST_EMBED_DIMENSIONS }, () => 0)
   vector[0] = 1
   return vector
 }
@@ -87,7 +94,7 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
   #ensures = 0
 
   constructor(options?: TestEmbeddingRuntimeServiceOptions) {
-    this.#status = options?.status ?? { status: 'ready', model: 'embeddinggemma-300m-q8_0-d256' }
+    this.#status = options?.status ?? { status: 'ready', model: TEST_EMBED_MODEL }
     this.#vectors = options?.vectors ?? unitVector
     this.#ipc = createTestIpcBridgeService({
       commands: {

@@ -58,6 +58,8 @@ export {
   type TestNote,
 } from './database.ts'
 export {
+  TEST_EMBED_DIMENSIONS,
+  TEST_EMBED_MODEL,
   createTestEmbeddingIndexService,
   createTestEmbeddingRuntimeService,
   createTestRetrievalService,

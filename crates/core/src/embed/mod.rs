@@ -51,7 +51,7 @@ const MODEL: ModelSpec = ModelSpec {
     file: "embeddinggemma-300M-Q8_0.gguf",
     size: 333_590_944,
     sha256: "b5ce9d77a3fc4b3b39ccb5643c36777911cc4eb46a66962eadfa3f5f60490d63",
-    dims: 256,
+    dims: reflect_index_schema::EMBEDDING_DIMS,
     max_tokens: 2048,
     query_prompt: "task: search result | query: ",
     document_prompt: "title: none | text: ",

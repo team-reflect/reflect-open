@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  TEST_EMBED_MODEL,
   createTestDatabaseService,
   createTestCoreServices,
   createTestSettingsService,
@@ -30,9 +31,7 @@ describe('EmbeddingsSync', () => {
     await renderInApp(<EmbeddingsSync />, { core, servicesOnly: true })
 
     await vi.waitFor(() => {
-      expect(core.embeddingIndex.follows()).toEqual([
-        { generation: 7, modelId: 'embeddinggemma-300m-q8_0-d256' },
-      ])
+      expect(core.embeddingIndex.follows()).toEqual([{ generation: 7, modelId: TEST_EMBED_MODEL }])
     })
   })
 

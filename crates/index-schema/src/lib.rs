@@ -22,6 +22,10 @@ pub const REFLECT_DIR: &str = ".reflect";
 /// The index database's filename inside [`REFLECT_DIR`].
 pub const INDEX_FILE: &str = "index.sqlite";
 
+/// The vector width of `embedding_vectors`. A new width needs a migration
+/// that recreates the table, like 0025.
+pub const EMBEDDING_DIMS: usize = 256;
+
 /// `user_version` after every migration has run. Read-only consumers compare
 /// this against `PRAGMA user_version` to detect an index written by a newer
 /// (or older) app than they were built for.

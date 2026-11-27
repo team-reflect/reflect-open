@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
+import { TEST_EMBED_MODEL } from '../testing/embeddings.ts'
 import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 
 import { createEmbeddingRuntimeService, type EmbedStatus } from './embedding-runtime-service.ts'
 import { noop, sleep } from '@ocavue/utils'
 
-const READY: EmbedStatus = { status: 'ready', model: 'embeddinggemma-300m-q8_0-d256' }
+const READY: EmbedStatus = { status: 'ready', model: TEST_EMBED_MODEL }
 const LOADING: EmbedStatus = { status: 'loading' }
 
 function setup() {

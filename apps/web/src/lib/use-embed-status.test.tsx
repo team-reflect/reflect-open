@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest'
 import {
+  TEST_EMBED_MODEL,
   createTestDatabaseService,
   createTestCoreServices,
   createTestEmbeddingRuntimeService,
@@ -38,8 +39,8 @@ it('tracks status changes while mounted', async () => {
   const view = await renderHookInApp(() => useEmbedStatus(), { core })
   await vi.waitFor(() => expect(view.result.current).toEqual({ status: 'loading' }))
 
-  runtime.setStatus({ status: 'ready', model: 'embeddinggemma-300m-q8_0-d256' })
+  runtime.setStatus({ status: 'ready', model: TEST_EMBED_MODEL })
   await vi.waitFor(() => {
-    expect(view.result.current).toEqual({ status: 'ready', model: 'embeddinggemma-300m-q8_0-d256' })
+    expect(view.result.current).toEqual({ status: 'ready', model: TEST_EMBED_MODEL })
   })
 })
