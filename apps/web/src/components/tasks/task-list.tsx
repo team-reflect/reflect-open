@@ -59,9 +59,6 @@ interface TaskListProps {
    * Called when the list scrolls.
    */
   onScroll?: (() => void) | undefined
-  /**
-   * Called on a right-click anywhere in the list.
-   */
   onContextMenu?: MouseEventHandler<HTMLDivElement> | undefined
   groups: readonly TaskGroup[]
   /**

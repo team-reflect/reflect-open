@@ -2,9 +2,6 @@ import type { NativeContextMenuItem } from '@reflect/app'
 import type { OpenTask } from '@reflect/core'
 import { getTaskDatePresets } from './task-date-presets.ts'
 
-/**
- * What the task menu actions do to the tasks the menu was opened for.
- */
 export interface TaskMenuActions {
   toggle: () => void
   schedule: (isoDate: string | null) => void
@@ -13,10 +10,6 @@ export interface TaskMenuActions {
   openNote: (openInNewWindow: boolean) => void
 }
 
-/**
- * The context menu items for `tasks`, the targets of a right-click on the
- * Tasks screen.
- */
 export function getTaskMenuItems(
   tasks: readonly OpenTask[],
   today: string,
@@ -64,9 +57,6 @@ export function getTaskMenuItems(
   return items
 }
 
-/**
- * Runs the action of the item `id` from {@link getTaskMenuItems}.
- */
 export function runTaskMenuAction(id: string, today: string, actions: TaskMenuActions): void {
   const preset = getTaskDatePresets(today).find((candidate) => candidate.id === id)
   if (preset !== undefined) {

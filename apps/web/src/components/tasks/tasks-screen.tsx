@@ -187,9 +187,7 @@ export function TasksScreen(): ReactElement {
     },
     [navigateNoteLink],
   )
-  // A right-click on a selected row acts on the whole selection, and on any
-  // other row on that row alone, without selecting it. Editable text keeps
-  // the system menu.
+  // A selected row targets the whole selection, any other row only itself without selecting it.
   const onListContextMenu = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
       const target = event.target as Element
