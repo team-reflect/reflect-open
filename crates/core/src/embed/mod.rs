@@ -452,7 +452,9 @@ mod tests {
         assert!((norm - 1.0).abs() < 1e-4, "norm {norm}");
         assert_eq!(first, again);
         assert_ne!(first, query);
-        let long = model.embed(MODEL.document_prompt, &"word ".repeat(5000)).unwrap();
+        let long = model
+            .embed(MODEL.document_prompt, &"word ".repeat(5000))
+            .unwrap();
         assert_eq!(long.len(), MODEL.dims);
     }
 }
