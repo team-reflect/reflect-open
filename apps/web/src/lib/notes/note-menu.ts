@@ -1,4 +1,4 @@
-import type { ContextMenuItem } from '@reflect/app'
+import type { ContextMenuAction, ContextMenuSeparator } from '@reflect/app'
 import { canTrashNote } from '@reflect/core'
 
 export type NoteMenuId =
@@ -19,9 +19,9 @@ export interface NoteMenuTarget {
   readonly isPinned: boolean
 }
 
-type NoteMenuAction = Extract<ContextMenuItem, { type: 'action' }> & { id: NoteMenuId }
+type NoteMenuAction = ContextMenuAction & { id: NoteMenuId }
 
-type NoteMenuItem = NoteMenuAction | { type: 'separator' }
+type NoteMenuItem = NoteMenuAction | ContextMenuSeparator
 
 interface NoteMenuOptions {
   surface: NoteMenuSurface
