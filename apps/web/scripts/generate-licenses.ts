@@ -105,25 +105,10 @@ async function collectCargo(): Promise<Entry[]> {
   })
 }
 
-/** The bundled Inter font, which comes from neither npm nor crates.io. */
-function collectInter(): Entry {
-  return {
-    name: 'Inter',
-    ecosystem: 'other',
-    license: 'OFL-1.1',
-    url: 'https://github.com/rsms/inter',
-    texts: [
-      readFileSync(
-        join(ROOT_DIR, 'design-system', 'assets', 'fonts', 'LICENSE.txt'),
-        'utf8',
-      ).trim(),
-    ],
-  }
-}
-
 /**
- * Code and a model that come from neither npm nor crates.io, each with a
- * license file in `scripts/licenses/`:
+ * Code, a font and a model that come from neither npm nor crates.io, each with
+ * its license text in a file:
+ * - Inter: the bundled font.
  * - llama.cpp: `llama-cpp-sys-2` compiles it in, and cargo-about reports only
  *   the crate's own license.
  * - EmbeddingGemma: the app downloads it at runtime. The Gemma Terms of Use
@@ -131,24 +116,31 @@ function collectInter(): Entry {
  *   reach every user.
  */
 function collectLicenseFiles(): Entry[] {
+  const licensesDir = join(import.meta.dirname, 'licenses')
   const files = [
+    {
+      name: 'Inter',
+      license: 'OFL-1.1',
+      url: 'https://github.com/rsms/inter',
+      path: join(ROOT_DIR, 'design-system', 'assets', 'fonts', 'LICENSE.txt'),
+    },
     {
       name: 'llama.cpp',
       license: 'MIT',
       url: 'https://github.com/ggml-org/llama.cpp',
-      file: 'llama.cpp.txt',
+      path: join(licensesDir, 'llama.cpp.txt'),
     },
     {
       name: 'EmbeddingGemma',
       license: 'Gemma Terms of Use',
       url: 'https://ai.google.dev/gemma/terms',
-      file: 'embeddinggemma.txt',
+      path: join(licensesDir, 'embeddinggemma.txt'),
     },
   ]
-  return files.map(({ file, ...entry }) => ({
+  return files.map(({ path, ...entry }) => ({
     ...entry,
     ecosystem: 'other' as const,
-    texts: [readFileSync(join(import.meta.dirname, 'licenses', file), 'utf8').trim()],
+    texts: [readFileSync(path, 'utf8').trim()],
   }))
 }
 
@@ -217,12 +209,7 @@ function countCommonPrefix(a: string, b: string): number {
 }
 
 async function main(): Promise<void> {
-  const collected = [
-    ...(await collectNpm()),
-    ...(await collectCargo()),
-    collectInter(),
-    ...collectLicenseFiles(),
-  ]
+  const collected = [...(await collectNpm()), ...(await collectCargo()), ...collectLicenseFiles()]
   const entries = mergeEntries(collected).toSorted(compareEntries)
 
   // Each distinct text is stored once under its key, and entries refer to
