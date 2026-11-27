@@ -438,8 +438,10 @@ fn embed_one(model: &Mutex<Model>, prompt: &str, text: &str) -> AppResult<Vec<f3
 mod tests {
     use super::*;
 
-    /// Needs the model file: `REFLECT_EMBED_MODEL=/path/to/model.gguf cargo test
-    /// -p reflect-core -- --ignored embeds_with_the_real_model`.
+    /// Needs the model file: `REFLECT_EMBED_MODEL=/path/to/model.gguf
+    /// GGML_METAL_NO_RESIDENCY=1 cargo test -p reflect-core -- --ignored
+    /// embeds_with_the_real_model`. On macOS the variable keeps ggml from
+    /// aborting at exit, as in the app's `main`.
     #[test]
     #[ignore = "needs the model file"]
     fn embeds_with_the_real_model() {
