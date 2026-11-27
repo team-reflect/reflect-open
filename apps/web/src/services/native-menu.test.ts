@@ -140,7 +140,7 @@ describe('createTauriNativeMenuHost', () => {
   it('builds nested submenus and check items for a context menu', async () => {
     const action = vi.fn()
     const items: NativeMenuItem[] = [
-      { kind: 'command', text: 'Complete', accelerator: 'CmdOrCtrl+Enter', enabled: true, action },
+      { kind: 'command', text: 'Complete', enabled: true, action },
       { kind: 'predefined', item: 'Separator' },
       {
         kind: 'submenu',
@@ -156,13 +156,7 @@ describe('createTauriNativeMenuHost', () => {
 
     expect(menuNew).toHaveBeenLastCalledWith({
       items: [
-        {
-          built: 'MenuItem',
-          text: 'Complete',
-          accelerator: 'CmdOrCtrl+Enter',
-          enabled: true,
-          action,
-        },
+        { built: 'MenuItem', text: 'Complete', enabled: true, action },
         { item: 'Separator' },
         {
           built: 'Submenu',

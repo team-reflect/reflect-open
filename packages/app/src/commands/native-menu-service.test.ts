@@ -260,7 +260,7 @@ describe('openContextMenu', () => {
     const { menu } = setup()
     const onSelect = vi.fn()
     const items: ContextMenuItem[] = [
-      { type: 'action', id: 'complete', title: 'Complete', shortcut: 'Mod-Enter' },
+      { type: 'action', id: 'complete', title: 'Complete' },
       { type: 'separator' },
       {
         type: 'submenu',
@@ -276,13 +276,7 @@ describe('openContextMenu', () => {
     const action = expect.any(Function) as (id: string) => void
     expect(menu.host.popups()).toEqual<NativeMenuItem[][]>([
       [
-        {
-          kind: 'command',
-          text: 'Complete',
-          accelerator: 'CmdOrCtrl+Enter',
-          enabled: true,
-          action,
-        },
+        { kind: 'command', text: 'Complete', enabled: true, action },
         { kind: 'predefined', item: 'Separator' },
         {
           kind: 'submenu',

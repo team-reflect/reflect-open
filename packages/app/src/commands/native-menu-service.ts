@@ -91,10 +91,6 @@ export type ContextMenuItem =
       title: string
       disabled?: boolean | undefined
       checked?: boolean | undefined
-      /**
-       * A keybinding such as `Mod-Enter`, shown only as a hint.
-       */
-      shortcut?: string | undefined
     }
   | { type: 'separator' }
   | { type: 'submenu'; title: string; items: readonly ContextMenuItem[] }
@@ -203,7 +199,6 @@ function resolveContextMenuItem(
   return {
     kind: 'command',
     text: item.title,
-    accelerator: item.shortcut === undefined ? undefined : bindingToAccelerator(item.shortcut),
     enabled: !(item.disabled ?? false),
     checked: item.checked,
     action: () => onSelect(item.id),
