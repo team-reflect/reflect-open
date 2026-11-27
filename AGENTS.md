@@ -77,7 +77,7 @@ near-duplicate. Skip internal changes, refactors, and small fixes.
 ### Running tests
 
 There are too many tests to run them all. Run only the ones for the logic you wrote:
-`pnpm test --run path/to/test`.
+`pnpm test path/to/test`.
 
 Web JS tests are split into Vitest projects (details in
 `docs/contributing/testing.md`):

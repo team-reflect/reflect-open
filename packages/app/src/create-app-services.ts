@@ -14,11 +14,14 @@ import {
 import { createCommandService, type CommandService } from './commands/command-service.ts'
 import { createKeymapService, type KeymapService } from './commands/keymap-service.ts'
 import {
-  createNativeMenuService,
-  createUnsupportedNativeMenuHost,
-  type NativeMenuHost,
-  type NativeMenuService,
-} from './commands/native-menu-service.ts'
+  createAppMenuService,
+  type AppMenuHost,
+  type AppMenuService,
+} from './commands/app-menu-service.ts'
+import {
+  createUnsupportedContextMenuService,
+  type ContextMenuService,
+} from './commands/context-menu-service.ts'
 import {
   createPaletteSearchService,
   type PaletteSearchService,
@@ -117,9 +120,13 @@ export interface AppHost {
    */
   readonly updater?: UpdaterAdapter
   /**
-   * The native menus; without a host, every menu operation rejects.
+   * The native application menu; without one, the app has none.
    */
-  readonly nativeMenu?: NativeMenuHost
+  readonly appMenuHost?: AppMenuHost
+  /**
+   * Without one, opening a context menu rejects.
+   */
+  readonly contextMenu?: ContextMenuService
   /**
    * The shell that draws the mobile chrome natively; without one, the web
    * draws it.
@@ -169,9 +176,13 @@ export interface AppServices {
    */
   readonly commands: CommandService
   /**
-   * The native macOS application menu and native context menus.
+   * The native macOS application menu.
    */
-  readonly nativeMenu: NativeMenuService
+  readonly appMenu: AppMenuService
+  /**
+   * Context menus at the pointer.
+   */
+  readonly contextMenu: ContextMenuService
   /**
    * The command palette's data layer.
    */
@@ -256,13 +267,13 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
     logger: core.logger,
   })
   const keymap = createKeymapService({ platform: core.platform })
-  const nativeMenu = createNativeMenuService({
+  const appMenu = createAppMenuService({
     commands,
     window: host.window,
     platform: core.platform,
     ipc: core.ipc,
     logger: core.logger,
-    host: host.nativeMenu ?? createUnsupportedNativeMenuHost(),
+    host: host.appMenuHost,
   })
   const navigation = createNavigationService()
   const noteVisits = createNoteVisitService({
@@ -326,7 +337,8 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
     opener,
     commands,
     keymap,
-    nativeMenu,
+    appMenu,
+    contextMenu: host.contextMenu ?? createUnsupportedContextMenuService(),
     paletteSearch,
     exceptionTelemetry: host.exceptionTelemetry ?? createDisabledExceptionTelemetry(),
     theme: createThemeService({

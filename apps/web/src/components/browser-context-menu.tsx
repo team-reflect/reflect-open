@@ -1,4 +1,4 @@
-import type { NativeMenuItem } from '@reflect/app'
+import type { ContextMenuItem } from '@reflect/app'
 import { useState, type ReactElement, type ReactNode } from 'react'
 import {
   DropdownMenu,
@@ -17,11 +17,16 @@ interface Point {
 }
 
 interface BrowserContextMenuProps {
-  items: readonly NativeMenuItem[]
+  items: readonly ContextMenuItem[]
+  onSelect: (id: string) => void
   point: Point
 }
 
-export function BrowserContextMenu({ items, point }: BrowserContextMenuProps): ReactElement {
+export function BrowserContextMenu({
+  items,
+  onSelect,
+  point,
+}: BrowserContextMenuProps): ReactElement {
   const [open, setOpen] = useState(true)
   const anchor = { getBoundingClientRect: () => DOMRect.fromRect(point) }
   return (
@@ -33,32 +38,37 @@ export function BrowserContextMenu({ items, point }: BrowserContextMenuProps): R
         className="w-auto"
         onContextMenu={(event) => event.preventDefault()}
       >
-        {renderItems(items, '')}
+        {renderItems(items, onSelect, '')}
       </DropdownMenuContent>
     </DropdownMenu>
   )
 }
 
-function renderItems(items: readonly NativeMenuItem[], path: string): ReactNode[] {
+function renderItems(
+  items: readonly ContextMenuItem[],
+  onSelect: (id: string) => void,
+  path: string,
+): ReactNode[] {
   return items.map((item, index) => {
     const key = `${path}${index}`
-    switch (item.kind) {
-      case 'predefined':
-        // Context menus contain only the separator.
-        return item.item === 'Separator' ? <DropdownMenuSeparator key={key} /> : null
+    switch (item.type) {
+      case 'separator':
+        return <DropdownMenuSeparator key={key} />
       case 'submenu':
         return (
           <DropdownMenuSub key={key}>
-            <DropdownMenuSubTrigger>{item.text}</DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>{renderItems(item.items, `${key}.`)}</DropdownMenuSubContent>
+            <DropdownMenuSubTrigger>{item.title}</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              {renderItems(item.items, onSelect, `${key}.`)}
+            </DropdownMenuSubContent>
           </DropdownMenuSub>
         )
-      case 'command': {
-        const disabled = item.enabled === false
-        const select = (): void => item.action(item.id ?? key)
+      case 'action': {
+        const disabled = item.disabled ?? false
+        const select = (): void => onSelect(item.id)
         return item.checked === undefined ? (
           <DropdownMenuItem key={key} disabled={disabled} onClick={select}>
-            {item.text}
+            {item.title}
           </DropdownMenuItem>
         ) : (
           <DropdownMenuCheckboxItem
@@ -68,7 +78,7 @@ function renderItems(items: readonly NativeMenuItem[], path: string): ReactNode[
             closeOnClick
             onClick={select}
           >
-            {item.text}
+            {item.title}
           </DropdownMenuCheckboxItem>
         )
       }
