@@ -868,7 +868,7 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/p.md', astPath: [3], text: 'second', noteTitle: 'Project' }),
     ])
     const view = await renderScreen()
-    const nativeMenu = view.appServices.nativeMenuHost
+    const nativeMenu = view.appServices.nativeMenu
 
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await view.getByRole('button', { name: 'second' }).click({ button: 'right' })
@@ -892,7 +892,7 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/b.md', astPath: [3], text: 'third', noteTitle: 'B' }),
     ])
     const view = await renderScreen()
-    const nativeMenu = view.appServices.nativeMenuHost
+    const nativeMenu = view.appServices.nativeMenu
 
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     fireEvent.click(view.getByRole('button', { name: 'second' }), MOD_KEY)
@@ -911,7 +911,7 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/p.md', astPath: [3], text: 'second', noteTitle: 'Project' }),
     ])
     const view = await renderScreen()
-    const nativeMenu = view.appServices.nativeMenuHost
+    const nativeMenu = view.appServices.nativeMenu
 
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await view.getByText('type-edit').click({ button: 'right' })
@@ -924,7 +924,7 @@ describe('TasksScreen', () => {
   it('menu Delete clears a selection it acts on and keeps any other selection', async () => {
     getOpenTasks.mockResolvedValue(manyTasks(3))
     const view = await renderScreen()
-    const nativeMenu = view.appServices.nativeMenuHost
+    const nativeMenu = view.appServices.nativeMenu
     const pressed = (name: string) => {
       return view.getByRole('button', { name }).element().getAttribute('aria-pressed') === 'true'
     }
@@ -948,7 +948,7 @@ describe('TasksScreen', () => {
   it('menu Complete on the sole selection closes its inline editor', async () => {
     getOpenTasks.mockResolvedValue(manyTasks(2))
     const view = await renderScreen()
-    const nativeMenu = view.appServices.nativeMenuHost
+    const nativeMenu = view.appServices.nativeMenu
 
     await userEvent.click(await view.findByRole('button', { name: 'task 0' }))
     await view.findByTestId('task-editor')

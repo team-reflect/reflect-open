@@ -1,4 +1,4 @@
-import type { NativeContextMenuItem } from '@reflect/app'
+import type { ContextMenuItem } from '@reflect/app'
 import type { OpenTask } from '@reflect/core'
 import { getTaskDatePresets } from './task-date-presets.ts'
 
@@ -12,7 +12,7 @@ export type TaskMenuId =
   | 'delete'
 
 type TaskMenuItem =
-  | (Extract<NativeContextMenuItem, { type: 'action' }> & { id: TaskMenuId })
+  | (Extract<ContextMenuItem, { type: 'action' }> & { id: TaskMenuId })
   | { type: 'separator' }
   | { type: 'submenu'; title: string; items: TaskMenuItem[] }
 
