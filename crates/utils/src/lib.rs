@@ -5,5 +5,5 @@
 mod hash;
 mod note_text;
 
-pub use hash::{hex, sha256_hex};
+pub use hash::sha256_hex;
 pub use note_text::{normalize_line_endings, note_hash};

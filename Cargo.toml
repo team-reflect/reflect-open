@@ -71,6 +71,9 @@ ignore = "0.4.34"
 image = { version = "0.25.10", default-features = false }
 infer = "0.22.0"
 js-sys = "0.3.103"
+# hf-hub 1.0 always pulls in the Xet storage client, which builds aws-lc-sys
+# (CMake, and NASM on Windows). The model repo needs only plain HTTP.
+hf-hub = { version = "0.5.0", default-features = false, features = ["tokio", "rustls-tls"] }
 jiff = { version = "1.0.0", default-features = false, features = ["std"] }
 keyring-core = "1.0.1"
 # The default features add OpenMP and llama.cpp's `common` library, which the
