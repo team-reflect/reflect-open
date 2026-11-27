@@ -19,14 +19,13 @@ import {
   createTestPlatformService,
 } from '../testing/index.ts'
 import { createAttachmentService } from './attachment-service.ts'
-import { createNoteDocumentService, type NoteDocumentService } from './note-document-service.ts'
+import type { NoteDocumentService } from './note-document-service.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createNotePreviewService, type NotePreviewServiceDeps } from './note-preview-service.ts'
 import {
   createTestNoteSessionService,
-  createTestLinkedDailyNoteService,
+  createTestNoteDocumentService,
 } from '../testing/documents.ts'
-import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 
 /**
  * A test graph session with a graph of generation 7 open.
@@ -54,13 +53,10 @@ function resolverWith(
  * Real note documents whose `readExisting` runs `read`.
  */
 function documentsWith(read: () => Promise<string>): NoteDocumentService {
-  const noteDocuments = createNoteDocumentService({
+  const noteDocuments = createTestNoteDocumentService({
     noteSessions: createTestNoteSessionService(),
     noteFile: createTestNoteFileService(),
     graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
-    indexLifecycle: createTestIndexLifecycleService(),
-    linkedDailyNotes: createTestLinkedDailyNoteService(),
-    logger: createTestLoggerService(),
   })
   vi.spyOn(noteDocuments, 'readExisting').mockImplementation(read)
   return noteDocuments
@@ -77,13 +73,10 @@ function notePreviewOver(
     noteLinkResolver: options?.noteLinkResolver ?? createTestNoteLinkResolverService({ noteFile }),
     noteDocuments:
       options?.noteDocuments ??
-      createNoteDocumentService({
+      createTestNoteDocumentService({
         noteSessions: createTestNoteSessionService(),
         noteFile,
         graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
-        indexLifecycle: createTestIndexLifecycleService(),
-        linkedDailyNotes: createTestLinkedDailyNoteService(),
-        logger: createTestLoggerService(),
       }),
     attachments: options?.attachments ?? createTestAttachmentService(),
     graphSession: options?.graphSession ?? openGraph(),
@@ -138,13 +131,10 @@ describe('previewWikiTarget', () => {
     })
     const notePreview = notePreviewOver({
       noteFile,
-      noteDocuments: createNoteDocumentService({
+      noteDocuments: createTestNoteDocumentService({
         noteSessions,
         noteFile,
         graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
-        indexLifecycle: createTestIndexLifecycleService(),
-        linkedDailyNotes: createTestLinkedDailyNoteService(),
-        logger: createTestLoggerService(),
       }),
     })
 

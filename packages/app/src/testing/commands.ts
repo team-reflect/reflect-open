@@ -12,6 +12,7 @@ import {
   createNativeMenuService,
   type AppSubmenuLayout,
   type NativeAppMenu,
+  type ContextMenuAction,
   type ContextMenuItem,
   type ContextMenuOptions,
   type NativeMenuHost,
@@ -40,10 +41,7 @@ export interface TestNativeMenuHost extends NativeMenuHost {
   popups(): readonly (readonly NativeMenuItem[])[]
 }
 
-function findAction(
-  items: readonly ContextMenuItem[],
-  id: string,
-): Extract<ContextMenuItem, { type: 'action' }> | undefined {
+function findAction(items: readonly ContextMenuItem[], id: string): ContextMenuAction | undefined {
   for (const item of items) {
     if (item.type === 'action' && item.id === id) {
       return item

@@ -170,7 +170,10 @@ import {
   createNotePreviewService,
   type NotePreviewService,
 } from './documents/note-preview-service.ts'
-import { createLinkedDailyNoteService } from './documents/linked-daily-note-service.ts'
+import {
+  createLinkedDailyNoteService,
+  type LinkedDailyNoteService,
+} from './documents/linked-daily-note-service.ts'
 import { createNoteSessionService } from './documents/note-session-service.ts'
 import type { NoteSessionService } from './documents/note-session-types.ts'
 import {
@@ -704,6 +707,10 @@ export type ServiceFactories = typeof coreServiceFactories
  * The services that {@link createCoreServices} builds but keeps out of {@link CoreServices}.
  */
 export interface CoreInternalServices {
+  /**
+   * Creates the empty daily note of a day that notes link to.
+   */
+  readonly linkedDailyNotes: LinkedDailyNoteService
   /**
    * Outbound HTTP, in the shape of the global `fetch`.
    */
@@ -1383,6 +1390,7 @@ export function composeCoreServices(
     mobile,
   }
   const internal: CoreInternalServices = {
+    linkedDailyNotes,
     http: adapters.http,
     secretStore,
     database,

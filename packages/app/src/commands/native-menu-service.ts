@@ -84,16 +84,25 @@ export interface NativeAppMenu {
   assignNsAppRoles(): MaybePromise<void>
 }
 
-export type ContextMenuItem =
-  | {
-      type: 'action'
-      id: string
-      title: string
-      disabled?: boolean | undefined
-      checked?: boolean | undefined
-    }
-  | { type: 'separator' }
-  | { type: 'submenu'; title: string; items: readonly ContextMenuItem[] }
+export interface ContextMenuAction {
+  type: 'action'
+  id: string
+  title: string
+  disabled?: boolean | undefined
+  checked?: boolean | undefined
+}
+
+export interface ContextMenuSeparator {
+  type: 'separator'
+}
+
+export interface ContextMenuSubmenu {
+  type: 'submenu'
+  title: string
+  items: readonly ContextMenuItem[]
+}
+
+export type ContextMenuItem = ContextMenuAction | ContextMenuSeparator | ContextMenuSubmenu
 
 export interface ContextMenuOptions {
   /**
