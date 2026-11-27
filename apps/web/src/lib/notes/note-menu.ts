@@ -42,17 +42,19 @@ export function getNoteMenuItems(
   const groups = [
     [
       allNotes && single && action('open', 'Open'),
-      single && action('open-in-new-window', 'Open in new window'),
+      single && action('open-in-new-window', 'Open in New Window'),
     ],
     [
-      notes.some((note) => !note.isPinned) ? action('pin', 'Pin') : action('unpin', 'Unpin'),
+      notes.some((note) => !note.isPinned)
+        ? action('pin', single ? 'Pin Note' : 'Pin Notes')
+        : action('unpin', single ? 'Unpin Note' : 'Unpin Notes'),
       single &&
         isPrivate !== undefined &&
-        action('toggle-private', isPrivate ? 'Unlock note' : 'Lock note'),
+        action('toggle-private', isPrivate ? 'Unlock Note' : 'Lock Note'),
     ],
     [
-      single && action('copy-deep-link', 'Copy deep link'),
-      single && action('copy-path', 'Copy note path'),
+      single && action('copy-deep-link', 'Copy Link'),
+      single && action('copy-path', 'Copy File Path'),
       single && action('reveal', 'Reveal in Finder'),
     ],
     [allNotes && notes.some((note) => canTrashNote(note.path)) && action('trash', 'Move to Trash')],

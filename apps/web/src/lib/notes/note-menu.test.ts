@@ -17,6 +17,21 @@ describe('getNoteMenuItems', () => {
     expect(getIds(getNoteMenuItems([PINNED], { surface: 'allNotes' }))).toContain('unpin')
   })
 
+  it('labels Pin and Unpin by the number of targets', () => {
+    const titleOf = (notes: readonly NoteMenuTarget[]) => {
+      return getNoteMenuItems(notes, { surface: 'allNotes' }).find(
+        (item) => item.type === 'action' && (item.id === 'pin' || item.id === 'unpin'),
+      )
+    }
+
+    expect(titleOf([UNPINNED])).toMatchObject({ title: 'Pin Note' })
+    expect(titleOf([PINNED, UNPINNED])).toMatchObject({ title: 'Pin Notes' })
+    expect(titleOf([PINNED])).toMatchObject({ title: 'Unpin Note' })
+    expect(titleOf([PINNED, { ...PINNED, path: 'notes/other.md' }])).toMatchObject({
+      title: 'Unpin Notes',
+    })
+  })
+
   it('labels the private toggle from the private state of a single target', () => {
     const titleFor = (isPrivate: boolean) => {
       return getNoteMenuItems([PINNED], { surface: 'sidebar', isPrivate }).find(
@@ -24,8 +39,8 @@ describe('getNoteMenuItems', () => {
       )
     }
 
-    expect(titleFor(false)).toMatchObject({ title: 'Lock note' })
-    expect(titleFor(true)).toMatchObject({ title: 'Unlock note' })
+    expect(titleFor(false)).toMatchObject({ title: 'Lock Note' })
+    expect(titleFor(true)).toMatchObject({ title: 'Unlock Note' })
   })
 
   it('hides the single-target items for several targets', () => {
