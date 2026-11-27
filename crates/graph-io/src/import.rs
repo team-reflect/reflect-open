@@ -236,12 +236,14 @@ pub fn finalize_import(
     let mut planned: Vec<(import_assets::FetchedAsset, import_assets::PlannedAssetName)> =
         Vec::new();
     // Downloads must not take asset names the zip itself will write.
-    let mut taken = entries
-        .iter()
-        .filter_map(|entry| entry.relative.strip_prefix("assets/"))
-        .filter(|name| !name.is_empty() && !name.contains('/'))
-        .map(str::to_string)
-        .collect::<HashSet<_>>();
+    let mut taken = import_assets::TakenAssetNames::new(
+        entries
+            .iter()
+            .filter_map(|entry| entry.relative.strip_prefix("assets/"))
+            .filter(|name| !name.is_empty() && !name.contains('/'))
+            .map(str::to_string)
+            .collect(),
+    );
     let mut downloaded_assets = 0;
     let mut failed_asset_downloads = 0;
     for url in &urls {
@@ -256,9 +258,8 @@ pub fn finalize_import(
                     &assets_dir,
                     &fetched.desired_name,
                     fetched.file.as_ref(),
-                    &taken,
+                    &mut taken,
                 )?;
-                taken.insert(plan.name.clone());
                 url_replacements.insert(url.clone(), format!("assets/{}", plan.name));
                 planned.push((fetched, plan));
             }
