@@ -123,8 +123,6 @@ fn sha256_file(path: &Path) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::LazyLock;
-
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
 
@@ -132,13 +130,13 @@ mod tests {
 
     const BODY: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
 
-    static BODY_SHA256: LazyLock<String> = LazyLock::new(|| reflect_utils::sha256_hex(BODY));
+    const BODY_SHA256: &str = "74e7e5bb9d22d6db26bf76946d40fff3ea9f0346b884fd0694920fccfad15e33";
 
     fn download(url: &str) -> Download<'_> {
         Download {
             url,
             size: BODY.len() as u64,
-            sha256: &BODY_SHA256,
+            sha256: BODY_SHA256,
         }
     }
 
@@ -195,7 +193,7 @@ mod tests {
         std::fs::write(dest.with_added_extension("part"), &BODY[..10]).unwrap();
         fetch(&download(&url), &dest, |_| {}).await.unwrap();
         assert_eq!(std::fs::read(&dest).unwrap(), BODY);
-        assert!(server.await.unwrap().contains("range: bytes=10-"));
+        assert!(server.await.unwrap().contains("\r\nrange: bytes=10-\r\n"));
     }
 
     #[tokio::test]
