@@ -7,7 +7,8 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import { SiDiscord, SiGithub } from '@icons-pack/react-simple-icons'
+import SiDiscord from '@icons-pack/react-simple-icons/icons/SiDiscord'
+import SiGithub from '@icons-pack/react-simple-icons/icons/SiGithub'
 import { Mail, Star } from 'lucide-react'
 import type { FeedbackChannel, WhatsNewItem } from '@reflect/app'
 import { marketingVersion } from '@reflect/core'

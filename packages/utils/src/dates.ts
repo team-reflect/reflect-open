@@ -1,20 +1,17 @@
-import {
-  addDays,
-  addMonths,
-  differenceInCalendarDays,
-  format,
-  formatDistanceToNow,
-  getDay,
-  isValid,
-  parse,
-  parseISO,
-  startOfWeek,
-  startOfDay,
-  type Day,
-} from 'date-fns'
+import { addDays } from 'date-fns/addDays'
+import { addMonths } from 'date-fns/addMonths'
+import { differenceInCalendarDays } from 'date-fns/differenceInCalendarDays'
+import { format } from 'date-fns/format'
+import { formatDistanceToNow } from 'date-fns/formatDistanceToNow'
+import { getDay } from 'date-fns/getDay'
+import { isValid } from 'date-fns/isValid'
+import { parse } from 'date-fns/parse'
+import { parseISO } from 'date-fns/parseISO'
+import { startOfWeek } from 'date-fns/startOfWeek'
 import { UTCDate, utc } from '@date-fns/utc'
 
-export { startOfDay, addDays }
+export { addDays }
+export { startOfDay } from 'date-fns/startOfDay'
 
 /**
  * Calendar math on ISO `YYYY-MM-DD` dates and `YYYY-MM` year-months. Daily
@@ -84,7 +81,7 @@ export function getWeekday(date: string): Weekday {
 }
 
 /** A day of the week: 0 = Sunday … 6 = Saturday. */
-export type Weekday = Day
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
 /** The first day of `date`'s week, for a week that starts on `weekStartsOn`. */
 export function getWeekStart(date: string, weekStartsOn: Weekday): string {
