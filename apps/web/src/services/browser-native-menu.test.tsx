@@ -89,6 +89,37 @@ describe('createBrowserNativeMenuHost', () => {
     for (const row of rows) row.remove()
   })
 
+  it('keeps the browser menu closed on a right-click inside the menu or a submenu', async () => {
+    const host = createBrowserNativeMenuHost()
+    await mouse.click(40, 40, { button: 'right' })
+    await host.popup([
+      {
+        kind: 'submenu',
+        text: 'Schedule',
+        items: [{ kind: 'command', id: 'today', text: 'Today', action: vi.fn() }],
+      },
+    ])
+    await page.getByRole('menuitem', { name: 'Schedule' }).click()
+    const item = page.getByRole('menuitem', { name: 'Today' })
+    await expect.element(item).toBeVisible()
+    let defaultPrevented: boolean | undefined
+    document.addEventListener(
+      'contextmenu',
+      (event) => (defaultPrevented = event.defaultPrevented),
+      {
+        once: true,
+      },
+    )
+
+    await item.click({ button: 'right' })
+
+    expect(defaultPrevented).toBe(true)
+    await userEvent.keyboard('{Escape}')
+    await expectLocatorToHaveCount(page.getByRole('menu'), 1)
+    await userEvent.keyboard('{Escape}')
+    await expectLocatorToHaveCount(page.getByRole('menu'), 0)
+  })
+
   it('closes on Escape without running an action', async () => {
     const host = createBrowserNativeMenuHost()
     const action = vi.fn()

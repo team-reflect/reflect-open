@@ -26,7 +26,13 @@ export function BrowserContextMenu({ items, point }: BrowserContextMenuProps): R
   const anchor = { getBoundingClientRect: () => DOMRect.fromRect(point) }
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuContent anchor={anchor} sideOffset={0} className="w-auto">
+      {/* React bubbles the event from submenus too, through their portals. */}
+      <DropdownMenuContent
+        anchor={anchor}
+        sideOffset={0}
+        className="w-auto"
+        onContextMenu={(event) => event.preventDefault()}
+      >
         {renderItems(items, '')}
       </DropdownMenuContent>
     </DropdownMenu>
