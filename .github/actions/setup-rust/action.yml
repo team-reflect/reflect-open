@@ -71,7 +71,7 @@ runs:
         cache-links: ${{ inputs.cache-links }}
         github-cache-mode: objects
         cache-key: |
-          mbx-v2/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/${{ hashFiles('Cargo.lock') }}
+          mbx-v3/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/${{ hashFiles('Cargo.lock') }}
         restore-keys: |
-          mbx-v2/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/
+          mbx-v3/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/
         save-on-workflow-dispatch: true
