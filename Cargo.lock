@@ -4498,6 +4498,7 @@ dependencies = [
  "jiff 1.0.2",
  "keyring-core",
  "llama-cpp-2",
+ "llama-cpp-sys-2",
  "log",
  "notify-debouncer-full",
  "objc2",

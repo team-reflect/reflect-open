@@ -43,6 +43,8 @@ pub(super) async fn fetch(
     }
     if have < download.size {
         have = fetch_range(download, &part, have, &mut progress).await?;
+    } else {
+        progress(have);
     }
     if have != download.size {
         return Err(format!(
@@ -50,7 +52,6 @@ pub(super) async fn fetch(
             download.size
         ));
     }
-    progress(have);
 
     let expected = download.sha256.to_owned();
     let hashed = part.clone();
@@ -134,11 +135,7 @@ fn sha256_file(path: &Path) -> Result<String, String> {
         }
         hasher.update(&buffer[..read]);
     }
-    Ok(hasher
-        .finalize()
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect())
+    Ok(reflect_utils::hex(&hasher.finalize()))
 }
 
 #[cfg(test)]
@@ -152,12 +149,7 @@ mod tests {
 
     const BODY: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
 
-    static BODY_SHA256: LazyLock<String> = LazyLock::new(|| {
-        Sha256::digest(BODY)
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect()
-    });
+    static BODY_SHA256: LazyLock<String> = LazyLock::new(|| reflect_utils::sha256_hex(BODY));
 
     fn download(url: &str) -> Download<'_> {
         Download {

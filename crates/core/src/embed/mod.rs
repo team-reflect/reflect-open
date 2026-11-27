@@ -6,6 +6,7 @@
 
 mod download;
 
+use std::ffi::{CStr, c_char, c_void};
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -16,6 +17,7 @@ use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::model::params::LlamaModelParams;
+use llama_cpp_sys_2::{GGML_LOG_LEVEL_ERROR, GGML_LOG_LEVEL_WARN, ggml_log_level};
 use reflect_types::{AppError, AppResult, EmbedProgress, EmbedStatus};
 
 use crate::{Core, Host};
@@ -32,8 +34,8 @@ struct ModelSpec {
     sha256: &'static str,
     /// Leading dimensions kept (Matryoshka truncation), then re-normalized.
     dims: usize,
-    /// Longer inputs are truncated.
-    max_tokens: usize,
+    /// The context window. Longer inputs are truncated.
+    max_tokens: u32,
     query_prompt: &'static str,
     document_prompt: &'static str,
 }
@@ -48,7 +50,7 @@ const MODEL: ModelSpec = ModelSpec {
     size: 333_590_944,
     sha256: "b5ce9d77a3fc4b3b39ccb5643c36777911cc4eb46a66962eadfa3f5f60490d63",
     dims: 256,
-    max_tokens: 512,
+    max_tokens: 2048,
     query_prompt: "task: search result | query: ",
     document_prompt: "title: none | text: ",
 };
@@ -60,17 +62,12 @@ const LEGACY_CACHE_DIRS: [&str; 2] = [
     ".locks/models--Qdrant--all-MiniLM-L6-v2-onnx",
 ];
 
-/// CPU threads per embed. A call embeds one note (two or three chunks), so
-/// more threads mostly wait on each other.
+/// CPU threads per embed. A call embeds one note, so more threads mostly
+/// wait on each other.
 const THREADS: i32 = 2;
 
-/// Layers offloaded to the GPU: all of them on Apple Silicon (Metal), none
-/// elsewhere.
-const GPU_LAYERS: u32 = if cfg!(target_os = "macos") { 99 } else { 0 };
-
-/// How many newly downloaded bytes accumulate between progress events: about
-/// three hundred events for the model, few for the IPC channel yet smooth
-/// enough for a progress bar.
+/// How many newly downloaded bytes accumulate between progress events, so the
+/// IPC channel carries few events and the progress bar still moves smoothly.
 const PROGRESS_EMIT_STEP: u64 = 1024 * 1024;
 
 /// A loaded model and its one context. Embed calls serialize on the Mutex
@@ -81,18 +78,32 @@ struct Model {
     model: Box<LlamaModel>,
 }
 
-// SAFETY: llama.cpp allows a context to move between threads; it is only used
-// behind the runtime's Mutex, so one thread at a time.
-unsafe impl Send for Model {}
+/// Forwards llama.cpp's warnings and errors to the app log and drops the rest.
+/// A failed load or context creation returns no reason, so the log is the
+/// only place that has it.
+unsafe extern "C" fn log_warnings(level: ggml_log_level, text: *const c_char, _: *mut c_void) {
+    if level != GGML_LOG_LEVEL_WARN && level != GGML_LOG_LEVEL_ERROR {
+        return;
+    }
+    // SAFETY: llama.cpp passes a NUL-terminated string that lives for the call.
+    let text = unsafe { CStr::from_ptr(text) }.to_string_lossy();
+    let text = text.trim_end();
+    if level == GGML_LOG_LEVEL_ERROR {
+        tracing::error!(target: "llama.cpp", "{text}");
+    } else {
+        tracing::warn!(target: "llama.cpp", "{text}");
+    }
+}
 
 /// llama.cpp's process-wide backend, initialized once.
 fn backend() -> Result<&'static LlamaBackend, String> {
     static BACKEND: OnceLock<Result<LlamaBackend, String>> = OnceLock::new();
     BACKEND
         .get_or_init(|| {
-            let mut backend = LlamaBackend::init().map_err(|err| err.to_string())?;
-            // Load and embed failures come back as errors; the log is noise.
-            backend.void_logs();
+            let backend = LlamaBackend::init().map_err(|err| err.to_string())?;
+            // SAFETY: the callback is a plain function that reads only its
+            // arguments. llama.cpp also routes ggml's log through it.
+            unsafe { llama_cpp_sys_2::llama_log_set(Some(log_warnings), std::ptr::null_mut()) };
             Ok(backend)
         })
         .as_ref()
@@ -102,14 +113,16 @@ fn backend() -> Result<&'static LlamaBackend, String> {
 impl Model {
     fn load(path: &Path) -> Result<Self, String> {
         let backend = backend()?;
-        let params = LlamaModelParams::default().with_n_gpu_layers(GPU_LAYERS);
+        // The default offloads every layer to the GPU backend, which only the
+        // Apple Silicon build has (Metal). Other builds run on the CPU.
         let model = Box::new(
-            LlamaModel::load_from_file(backend, path, &params).map_err(|err| err.to_string())?,
+            LlamaModel::load_from_file(backend, path, &LlamaModelParams::default())
+                .map_err(|err| err.to_string())?,
         );
         // SAFETY: the box keeps the model at one address until `Model` drops,
         // and `context` drops before `model` (field order).
         let model_ref: &'static LlamaModel = unsafe { &*std::ptr::from_ref(model.as_ref()) };
-        let max_tokens = MODEL.max_tokens as u32;
+        let max_tokens = MODEL.max_tokens;
         let context = model_ref
             .new_context(
                 backend,
@@ -129,15 +142,22 @@ impl Model {
     /// One unit vector of `MODEL.dims` for `prompt` followed by `text`.
     fn embed(&mut self, prompt: &str, text: &str) -> Result<Vec<f32>, String> {
         let input = format!("{prompt}{text}");
-        let mut tokens = self.model.vocab().tokenize(input.as_bytes(), true, false);
-        tokens.truncate(MODEL.max_tokens);
-        self.context.clear_kv_cache();
-        let mut batch = LlamaBatch::new(tokens.len().max(1), 1);
+        let vocab = self.model.vocab();
+        let mut tokens = vocab.tokenize(input.as_bytes(), true, false);
+        // ggml aborts the process when a batch is larger than `n_ubatch`, so
+        // the input must fit the window. The cut keeps the closing EOS token.
+        let max = MODEL.max_tokens as usize;
+        if tokens.len() > max {
+            let eos = vocab.should_add_eos().then(|| vocab.eos());
+            tokens.truncate(max - usize::from(eos.is_some()));
+            tokens.extend(eos);
+        }
+        let mut batch = LlamaBatch::new(tokens.len(), 1);
         batch
             .add_sequence(&tokens, 0, false)
             .map_err(|err| err.to_string())?;
         self.context
-            .decode(&mut batch)
+            .encode(&mut batch)
             .map_err(|err| err.to_string())?;
         let full = self
             .context
@@ -168,7 +188,7 @@ enum Runtime {
 
 /// Process-wide embedding runtime state.
 #[derive(Default)]
-pub struct EmbedState(Arc<Mutex<Runtime>>);
+pub struct EmbedState(Mutex<Runtime>);
 
 /// ggml's x86_64 kernels are built for AVX2, FMA and F16C (`.cargo/config.toml`).
 /// Without them the first embed dies with SIGILL, which no error path can
@@ -255,7 +275,7 @@ async fn ensure_model_file(
     state: &Mutex<Runtime>,
     models_dir: &Path,
 ) -> Result<PathBuf, String> {
-    let path = models_dir.join(format!("{}.gguf", MODEL.id));
+    let path = models_dir.join(MODEL.file);
     if tokio::fs::try_exists(&path).await.unwrap_or(false) {
         return Ok(path);
     }
@@ -269,10 +289,12 @@ async fn ensure_model_file(
         },
         &path,
         |downloaded| {
+            // `abs_diff`: the count drops to zero when the server ignores the
+            // resume range and the download starts over.
             let due = emitted.is_none_or(|last| {
                 downloaded.abs_diff(last) >= PROGRESS_EMIT_STEP || downloaded == MODEL.size
             });
-            if due && emitted != Some(downloaded) {
+            if due {
                 emitted = Some(downloaded);
                 report_progress(host, state, downloaded);
             }
@@ -292,6 +314,8 @@ fn remove_legacy_caches(models_dir: &Path) {
             Err(err) => tracing::warn!(?err, path = %path.display(), "legacy model cache"),
         }
     }
+    // Removes the lock directory only when nothing else is in it.
+    let _ = std::fs::remove_dir(models_dir.join(".locks"));
 }
 
 impl Core {
@@ -364,22 +388,26 @@ impl Core {
 
     /// Embed a search query. Errors unless the model is `Ready`.
     pub async fn embed_query(&self, text: String) -> AppResult<Vec<f32>> {
-        let mut vectors = self.embed_with(MODEL.query_prompt, vec![text]).await?;
-        vectors
-            .pop()
-            .ok_or_else(|| AppError::io("embedding returned no vector"))
+        self.with_model(move |model| model.embed(MODEL.query_prompt, &text))
+            .await
     }
 
     /// Embed note chunks for storage. Errors unless the model is `Ready`.
     pub async fn embed_documents(&self, texts: Vec<String>) -> AppResult<Vec<Vec<f32>>> {
-        self.embed_with(MODEL.document_prompt, texts).await
+        self.with_model(move |model| {
+            texts
+                .iter()
+                .map(|text| model.embed(MODEL.document_prompt, text))
+                .collect()
+        })
+        .await
     }
 
-    async fn embed_with(
+    /// Runs `work` on a blocking thread with the loaded model.
+    async fn with_model<T: Send + 'static>(
         &self,
-        prompt: &'static str,
-        texts: Vec<String>,
-    ) -> AppResult<Vec<Vec<f32>>> {
+        work: impl FnOnce(&mut Model) -> Result<T, String> + Send + 'static,
+    ) -> AppResult<T> {
         let model = {
             let runtime = lock_state(&self.embed)?;
             match &*runtime {
@@ -392,14 +420,7 @@ impl Core {
                 let mut model = model
                     .lock()
                     .map_err(|_| AppError::io("embedding model lock poisoned"))?;
-                texts
-                    .iter()
-                    .map(|text| {
-                        model
-                            .embed(prompt, text)
-                            .map_err(|err| AppError::io(format!("embedding failed: {err}")))
-                    })
-                    .collect()
+                work(&mut model).map_err(|err| AppError::io(format!("embedding failed: {err}")))
             })
             .await
             .map_err(|err| AppError::io(format!("embedding task panicked: {err}")))?
@@ -431,5 +452,7 @@ mod tests {
         assert!((norm - 1.0).abs() < 1e-4, "norm {norm}");
         assert_eq!(first, again);
         assert_ne!(first, query);
+        let long = model.embed(MODEL.document_prompt, &"word ".repeat(5000)).unwrap();
+        assert_eq!(long.len(), MODEL.dims);
     }
 }

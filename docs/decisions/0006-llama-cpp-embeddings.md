@@ -27,8 +27,11 @@ vector table and re-embeds every note once.
 
 - `llama-cpp-2` without default features (no OpenMP, no `common` library). The
   `metal` feature is on for Apple Silicon Macs; other desktops use the CPU.
-- One context, two threads, a 512-token window. A text longer than the window
-  is truncated.
+- One context, two threads, and the model's full 2048-token window. A longer
+  text is truncated and keeps its closing EOS token. Chinese text takes about
+  one token per two characters, so a 512-token window would cut the chunker's
+  larger chunks.
+- llama.cpp warnings and errors go to the app log. Other levels are dropped.
 - `llama-cpp-sys-2` turns on ggml CPU features only from the Rust target
   features, which leaves x86_64 on SSE. `.cargo/config.toml` sets
   `GGML_AVX2`, `GGML_FMA`, `GGML_F16C` and `GGML_AVX`, which affect only ggml.
@@ -78,5 +81,8 @@ vector table and re-embeds every note once.
 - CI runs build scripts without the mbx replay
   (`MBX_BUILD_SCRIPT_EXECUTION=0`), because the CMake build directory in
   OUT_DIR holds absolute paths. Each job compiles llama.cpp again.
+- Intel Macs get semantic search too, on the CPU.
 - The same runtime builds for iOS. Turning semantic search on there is a
   separate change.
+- An older app that opens a migrated index embeds every note on each backfill
+  and fails each write. It keeps working, but spends CPU until it is updated.

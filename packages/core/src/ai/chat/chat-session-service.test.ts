@@ -306,7 +306,7 @@ describe('ChatSession persistence', () => {
   it('passes the semantic search setting into chat turns', async () => {
     const { session, chatEngine } = await setup({
       settings: { semanticSearchEnabled: true },
-      embedStatus: { status: 'ready', model: 'all-MiniLM-L6-v2' },
+      embedStatus: { status: 'ready', model: 'embeddinggemma-300m-q8_0-d256' },
     })
     session.attach()
     await flush()

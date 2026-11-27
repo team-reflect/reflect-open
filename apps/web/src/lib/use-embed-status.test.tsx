@@ -38,8 +38,8 @@ it('tracks status changes while mounted', async () => {
   const view = await renderHookInApp(() => useEmbedStatus(), { core })
   await vi.waitFor(() => expect(view.result.current).toEqual({ status: 'loading' }))
 
-  runtime.setStatus({ status: 'ready', model: 'all-MiniLM-L6-v2' })
+  runtime.setStatus({ status: 'ready', model: 'embeddinggemma-300m-q8_0-d256' })
   await vi.waitFor(() => {
-    expect(view.result.current).toEqual({ status: 'ready', model: 'all-MiniLM-L6-v2' })
+    expect(view.result.current).toEqual({ status: 'ready', model: 'embeddinggemma-300m-q8_0-d256' })
   })
 })

@@ -20,7 +20,7 @@ import {
   type RetrievalHit,
 } from './retrieval-service.ts'
 
-const MODEL = 'all-MiniLM-L6-v2'
+const MODEL = 'embeddinggemma-300m-q8_0-d256'
 const DIMENSIONS = 256
 
 /**

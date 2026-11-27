@@ -122,34 +122,34 @@ function collectInter(): Entry {
 }
 
 /**
- * llama.cpp, which `llama-cpp-sys-2` compiles in. cargo-about reports only the
- * crate's own license.
+ * Code and a model that come from neither npm nor crates.io, each with a
+ * license file in `scripts/licenses/`:
+ * - llama.cpp: `llama-cpp-sys-2` compiles it in, and cargo-about reports only
+ *   the crate's own license.
+ * - EmbeddingGemma: the app downloads it at runtime. The Gemma Terms of Use
+ *   (Section 3.1) ask for its notice, the terms, and the use restrictions to
+ *   reach every user.
  */
-function collectLlamaCpp(): Entry {
-  return {
-    name: 'llama.cpp',
-    ecosystem: 'other',
-    license: 'MIT',
-    url: 'https://github.com/ggml-org/llama.cpp',
-    texts: [readFileSync(join(import.meta.dirname, 'licenses', 'llama.cpp.txt'), 'utf8').trim()],
-  }
-}
-
-/**
- * EmbeddingGemma, the semantic-search model the app downloads at runtime. The
- * Gemma Terms of Use (Section 3.1) ask for its notice, the terms, and the use
- * restrictions to reach every user.
- */
-function collectEmbeddingGemma(): Entry {
-  return {
-    name: 'EmbeddingGemma',
-    ecosystem: 'other',
-    license: 'Gemma Terms of Use',
-    url: 'https://ai.google.dev/gemma/terms',
-    texts: [
-      readFileSync(join(import.meta.dirname, 'licenses', 'embeddinggemma.txt'), 'utf8').trim(),
-    ],
-  }
+function collectLicenseFiles(): Entry[] {
+  const files = [
+    {
+      name: 'llama.cpp',
+      license: 'MIT',
+      url: 'https://github.com/ggml-org/llama.cpp',
+      file: 'llama.cpp.txt',
+    },
+    {
+      name: 'EmbeddingGemma',
+      license: 'Gemma Terms of Use',
+      url: 'https://ai.google.dev/gemma/terms',
+      file: 'embeddinggemma.txt',
+    },
+  ]
+  return files.map(({ file, ...entry }) => ({
+    ...entry,
+    ecosystem: 'other' as const,
+    texts: [readFileSync(join(import.meta.dirname, 'licenses', file), 'utf8').trim()],
+  }))
 }
 
 /**
@@ -221,8 +221,7 @@ async function main(): Promise<void> {
     ...(await collectNpm()),
     ...(await collectCargo()),
     collectInter(),
-    collectLlamaCpp(),
-    collectEmbeddingGemma(),
+    ...collectLicenseFiles(),
   ]
   const entries = mergeEntries(collected).toSorted(compareEntries)
 

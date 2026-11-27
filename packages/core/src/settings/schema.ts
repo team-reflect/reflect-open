@@ -206,7 +206,7 @@ export type AllNotesFilterTags = z.infer<typeof allNotesFilterTagsSchema>
 
 /**
  * Whether semantic search is on. Off by default — turning it on downloads the
- * ~90MB embedding model, and that first network fetch is the user's call
+ * embedding model, and that first network fetch is the user's call
  * (Plan 09). Later launches load the cached model because this flag is set.
  */
 export const semanticSearchEnabledSchema = z.boolean().catch(false)

@@ -81,7 +81,7 @@ function setup(options: {
   }
 }
 
-const MODEL = 'all-MiniLM-L6-v2'
+const MODEL = 'embeddinggemma-300m-q8_0-d256'
 
 describe('embedNote', () => {
   it('never embeds a template — boilerplate must not reach retrieval', async () => {

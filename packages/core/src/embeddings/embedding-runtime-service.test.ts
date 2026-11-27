@@ -5,7 +5,7 @@ import { createTestLoggerService } from '../testing/logger.ts'
 import { createEmbeddingRuntimeService, type EmbedStatus } from './embedding-runtime-service.ts'
 import { noop, sleep } from '@ocavue/utils'
 
-const READY: EmbedStatus = { status: 'ready', model: 'all-MiniLM-L6-v2' }
+const READY: EmbedStatus = { status: 'ready', model: 'embeddinggemma-300m-q8_0-d256' }
 const LOADING: EmbedStatus = { status: 'loading' }
 
 function setup() {

@@ -16,7 +16,7 @@ const PALETTE_BINDING = APP_COMMANDS['palette.open'].keybinding
 /**
  * The search settings: the semantic-search opt-in (Plan 09) and the index
  * rebuild action. Enabling semantic search persists `semanticSearchEnabled`;
- * EmbeddingsSync reacts by loading the model, and the first load's ~330MB
+ * EmbeddingsSync reacts by loading the model, and the first load's
  * download streams through this section as a progress bar (the `embed:status`
  * events carry byte counts).
  */

@@ -2298,9 +2298,9 @@
     },
     {
       "name": "EmbeddingGemma",
-      "ecosystem": "other",
       "license": "Gemma Terms of Use",
       "url": "https://ai.google.dev/gemma/terms",
+      "ecosystem": "other",
       "texts": [
         "_NTc"
       ]
@@ -3643,9 +3643,9 @@
     },
     {
       "name": "llama.cpp",
-      "ecosystem": "other",
       "license": "MIT",
       "url": "https://github.com/ggml-org/llama.cpp",
+      "ecosystem": "other",
       "texts": [
         "NGh5"
       ]

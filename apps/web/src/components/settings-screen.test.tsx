@@ -640,11 +640,11 @@ describe('SettingsScreen', () => {
 
   it('shows the downloaded model once ready and persists a disable', async () => {
     stored = { semanticSearchEnabled: true }
-    embedRuntime.setStatus({ status: 'ready', model: 'all-MiniLM-L6-v2' })
+    embedRuntime.setStatus({ status: 'ready', model: 'embeddinggemma-300m-q8_0-d256' })
     await renderScreen()
 
     await expect
-      .element(page.getByText(/model downloaded \(all-MiniLM-L6-v2\)/i))
+      .element(page.getByText(/model downloaded \(embeddinggemma-300m-q8_0-d256\)/i))
       .toBeInTheDocument()
 
     await page.getByRole('button', { name: /disable/i }).click()

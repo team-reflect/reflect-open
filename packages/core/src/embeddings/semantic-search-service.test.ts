@@ -19,7 +19,7 @@ import type { EmbedStatus } from './embedding-runtime-service.ts'
 import type { RetrievalHit } from './retrieval-service.ts'
 import { sleep } from '@ocavue/utils'
 
-const MODEL = 'all-MiniLM-L6-v2'
+const MODEL = 'embeddinggemma-300m-q8_0-d256'
 const READY: EmbedStatus = { status: 'ready', model: MODEL }
 const GRAPH = { root: '/g', name: 'g', generation: 1 }
 

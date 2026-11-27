@@ -104,7 +104,7 @@ async function renderPalette(query: string, handlers?: Partial<Record<AppCommand
     retrieval: createTestRetrievalService({ retrieve }),
     embeddingRuntime: createTestEmbeddingRuntimeService({
       status: embedReady
-        ? { status: 'ready', model: 'all-MiniLM-L6-v2' }
+        ? { status: 'ready', model: 'embeddinggemma-300m-q8_0-d256' }
         : { status: 'uninitialized' },
     }),
     noteFile: createTestNoteFileService({ files }),

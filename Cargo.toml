@@ -76,6 +76,7 @@ keyring-core = "1.0.1"
 # The default features add OpenMP and llama.cpp's `common` library, which the
 # embedding runtime does not use.
 llama-cpp-2 = { version = "0.1.161", default-features = false }
+llama-cpp-sys-2 = { version = "0.1.161", default-features = false }
 log = "0.4.35"
 notify-debouncer-full = "0.8.0"
 objc2 = "0.6.5"

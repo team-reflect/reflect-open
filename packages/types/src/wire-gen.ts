@@ -1544,7 +1544,7 @@ export type EmbedStatus =
   /**  No model loaded yet; `embed_ensure` will download/load it. */
   | { status: 'uninitialized' }
   /**
-   *  Download/load in progress (first run downloads ~330 MB). The runtime
+   *  Download/load in progress (the first run downloads the model). The runtime
    *  keeps the latest byte counts, so polls and `embed:status` events
    *  report the same progress.
    */

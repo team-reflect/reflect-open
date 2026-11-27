@@ -71,11 +71,10 @@ dbus-secret-service-keyring-store = { workspace = true, features = ["crypto-rust
 trash = { workspace = true }
 notify-debouncer-full = { workspace = true }
 walkdir = { workspace = true }
-
-# The embedding runtime (llama.cpp). Intel macOS and mobile use the stand-in in
+# The embedding runtime (llama.cpp). Mobile uses the stand-in in
 # `embed_unsupported.rs`.
-[target.'cfg(all(not(any(target_os = "android", target_os = "ios")), not(all(target_os = "macos", target_arch = "x86_64"))))'.dependencies]
 llama-cpp-2 = { workspace = true }
+llama-cpp-sys-2 = { workspace = true }
 sha2 = { workspace = true }
 
 [target.'cfg(all(target_os = "macos", target_arch = "aarch64"))'.dependencies]
