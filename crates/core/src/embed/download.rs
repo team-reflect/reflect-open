@@ -1,4 +1,4 @@
-//! Downloads the model file: resumes a partial download with an HTTP `Range`
+//! Downloads one file pinned by size and SHA-256: resumes a partial download with an HTTP `Range`
 //! request, and checks the SHA-256 before the file gets its final name.
 
 use std::io::Read;
@@ -29,7 +29,7 @@ pub(super) async fn fetch(
             .await
             .map_err(|err| format!("creating {}: {err}", dir.display()))?;
     }
-    // A partial file larger than the model is damaged: start over.
+    // A partial file larger than the file is damaged: start over.
     let mut have = tokio::fs::metadata(&part)
         .await
         .ok()
@@ -38,7 +38,7 @@ pub(super) async fn fetch(
         .unwrap_or(0);
     progress(have);
     if have < download.size {
-        // No total timeout: a slow connection may take many minutes for the model.
+        // No total timeout: a slow connection may take many minutes for a large file.
         let client = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(30))
             .read_timeout(Duration::from_secs(60))
