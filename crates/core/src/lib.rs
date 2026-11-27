@@ -19,8 +19,7 @@ pub mod web_fetch;
 
 // The watcher and the embedding runtime are desktop capabilities: other
 // platforms swap in stand-ins with the same `Core` methods. Intel macOS has the
-// stand-in too: its llama.cpp build includes Metal, and the CPU-only path for
-// Intel GPUs needs `op_offload`, which `llama-cpp-2` does not expose.
+// stand-in too: the llama.cpp runtime is not tested on Intel Macs yet.
 #[cfg(not(any(
     target_os = "android",
     target_os = "ios",

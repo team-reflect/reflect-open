@@ -73,8 +73,8 @@ notify-debouncer-full = { workspace = true }
 walkdir = { workspace = true }
 
 # The embedding runtime (llama.cpp). Intel macOS and mobile use the stand-in in
-# `embed_unsupported.rs` (see `src/lib.rs`). ggml builds Metal for every Apple
-# target, without a feature flag.
+# `embed_unsupported.rs`. ggml builds Metal for every Apple target, without a
+# feature flag.
 [target.'cfg(all(not(any(target_os = "android", target_os = "ios")), not(all(target_os = "macos", target_arch = "x86_64"))))'.dependencies]
 llama-cpp-2 = { workspace = true }
 llama-cpp-sys-2 = { workspace = true }

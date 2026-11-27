@@ -28,8 +28,9 @@ vector table and re-embeds every note once.
 - `llama-cpp-2` without default features (no OpenMP, no `common` library).
   ggml builds Metal for every Apple target. Apple Silicon Macs run on Metal;
   Windows and Linux run on the CPU.
-- Intel Macs keep the stand-in runtime. Their build includes Metal, and the
-  CPU-only path needs `op_offload`, which `llama-cpp-2` does not expose.
+- Intel Macs keep the stand-in runtime until the llama.cpp runtime is tested
+  on them. Their build includes Metal too, so a CPU-only run would need
+  `with_n_gpu_layers(0)` and `with_op_offload(false)`.
 - One context, two threads, and the model's full 2048-token window. A longer
   text is truncated and keeps its closing EOS token. Chinese text takes about
   one token per two characters, so a 512-token window would cut the chunker's

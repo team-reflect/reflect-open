@@ -94,8 +94,9 @@ unsafe extern "C" fn log_warnings(level: ggml_log_level, text: *const c_char, _:
     }
 }
 
-/// llama.cpp's backend, with its log routed to [`log_warnings`]. llama.cpp
-/// allows one backend per process, so a failed init stays failed.
+/// llama.cpp's backend, with its log routed to [`log_warnings`].
+/// `LlamaBackend::init` succeeds only on its first call, so the first result
+/// is kept.
 fn backend() -> Result<&'static LlamaBackend, String> {
     static BACKEND: OnceLock<Result<LlamaBackend, String>> = OnceLock::new();
     BACKEND
@@ -280,8 +281,9 @@ async fn ensure_model_file(
     state: &Mutex<Runtime>,
     models_dir: &Path,
 ) -> Result<PathBuf, String> {
-    let path = models_dir.join(MODEL.file);
-    // A file of another size is from another revision: download it again.
+    // The revision in the name keeps a new model spec from reusing an old file.
+    let path = models_dir.join(format!("{}-{}", &MODEL.revision[..12], MODEL.file));
+    // A file of another size is damaged: download it again.
     let existing = tokio::fs::metadata(&path).await.map(|meta| meta.len());
     if existing.is_ok_and(|len| len == MODEL.size) {
         return Ok(path);
