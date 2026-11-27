@@ -27,7 +27,7 @@ import { createNavigatorClipboardService } from '@/services/browser-clipboard.ts
 import { createBrowserDialogService } from '@/services/browser-dialog.ts'
 import { createBrowserOpenerTransport } from '@/services/browser-opener.ts'
 import { createBrowserImageCodec } from '@/services/browser-image-codec.ts'
-import { createBrowserNativeMenuHost } from '@/services/browser-native-menu.ts'
+import { createBrowserNativeMenuHost } from '@/services/browser-native-menu.tsx'
 import { createDomLifecycleAdapter } from '@/services/dom-lifecycle.ts'
 import type { HostKind } from '@/services/detect-platform.ts'
 import { createTauriDeepLinkSource } from '@/services/tauri-deep-link.ts'

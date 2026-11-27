@@ -1,6 +1,5 @@
 import type { NativeMenuItem } from '@reflect/app'
 import { useState, type ReactElement, type ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -23,26 +22,14 @@ interface BrowserContextMenuProps {
   onClosed: () => void
 }
 
-let root: Root | null = null
-let opened = 0
-
 /**
- * Show `items` as a menu at `point`, replacing the menu that is open.
+ * A context menu of `items` at `point`, open until a pick or a dismissal.
  */
-export function showBrowserContextMenu(items: readonly NativeMenuItem[], point: Point): void {
-  root ??= createRoot(document.body.appendChild(document.createElement('div')))
-  opened += 1
-  root.render(
-    <BrowserContextMenu
-      key={opened}
-      items={items}
-      point={point}
-      onClosed={() => root?.render(null)}
-    />,
-  )
-}
-
-function BrowserContextMenu({ items, point, onClosed }: BrowserContextMenuProps): ReactElement {
+export function BrowserContextMenu({
+  items,
+  point,
+  onClosed,
+}: BrowserContextMenuProps): ReactElement {
   const [open, setOpen] = useState(true)
   const anchor = { getBoundingClientRect: () => DOMRect.fromRect(point) }
   return (

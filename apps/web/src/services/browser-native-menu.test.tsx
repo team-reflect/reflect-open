@@ -1,7 +1,7 @@
 import { page, userEvent } from 'vitest/browser'
 import { describe, expect, it, vi } from 'vitest'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
-import { createBrowserNativeMenuHost } from './browser-native-menu.ts'
+import { createBrowserNativeMenuHost } from './browser-native-menu.tsx'
 
 async function rightClickAt(x: number, y: number): Promise<void> {
   const target = document.body.appendChild(document.createElement('div'))
