@@ -15,7 +15,7 @@ import { buildFtsMatch } from './search-query.ts'
  * real core pipeline and fails when the committed file drifts; the CLI's
  * `tests/parity.rs` asserts its mirror produces the same values. A behavior
  * change here therefore can't ship without regenerating the expectations
- * (`UPDATE_PARITY=1 pnpm --filter @reflect/core test --run parity`) — and the
+ * (`UPDATE_PARITY=1 pnpm test parity`) — and the
  * regenerated file forces the Rust mirror to follow in the same PR.
  */
 

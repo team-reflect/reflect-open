@@ -54,13 +54,14 @@
       "outputLogs": "new-only",
       "command": ["vitest", "run"],
       "dependsOn": ["@reflect/index-wasm#build"],
-      "env": ["REFLECT_TEST_BROWSER"],
-      "passThroughEnv": ["DEBUG", "VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB", "__XPC_JSC_useJIT"],
+      "env": ["DEBUG", "REFLECT_TEST_BROWSER", "UPDATE_CHROME_FIXTURES", "UPDATE_PARITY"],
+      "passThroughEnv": ["VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB", "__XPC_JSC_useJIT"],
     },
     "//#vitest:node": {
       "outputLogs": "new-only",
       "command": ["vitest", "run", "--project", "!*browser*"],
       "dependsOn": ["@reflect/index-wasm#build"],
+      "env": ["UPDATE_CHROME_FIXTURES", "UPDATE_PARITY"],
     },
     "//#vitest:browser": {
       "outputLogs": "new-only",
@@ -75,8 +76,8 @@
         "!crates/**",
         "!scripts/**",
       ],
-      "env": ["REFLECT_TEST_BROWSER"],
-      "passThroughEnv": ["DEBUG", "VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB", "__XPC_JSC_useJIT"],
+      "env": ["DEBUG", "REFLECT_TEST_BROWSER"],
+      "passThroughEnv": ["VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB", "__XPC_JSC_useJIT"],
     },
 
     // Rust checks and tests (the whole Cargo workspace).
