@@ -78,7 +78,7 @@ async function main(): Promise<void> {
     ])
   })
 
-  const simulator = await step('Create the simulator', async () => {
+  let simulator = await step('Create the simulator', async () => {
     const udid = SNAPSHOT_DIR
       ? await restoreSimulator(SNAPSHOT_DIR)
       : await createSimulator(`reflect-test-${Date.now()}`)
@@ -86,25 +86,29 @@ async function main(): Promise<void> {
     return udid
   })
 
-  const xcodebuildArgs = [
+  const xcodebuildArgs = (udid: string) => [
     ...projectArgs,
     '-configuration',
     'Debug-Dev',
     '-destination',
-    `platform=iOS Simulator,id=${simulator}`,
+    `platform=iOS Simulator,id=${udid}`,
   ]
 
   try {
     // The build comes before the boot: a booted simulator takes CPU time
     // from the compiler.
     await step('Build the app and the tests', async () => {
-      await run('xcodebuild', ['build-for-testing', '-showBuildTimingSummary', ...xcodebuildArgs])
+      await run('xcodebuild', [
+        'build-for-testing',
+        '-showBuildTimingSummary',
+        ...xcodebuildArgs(simulator),
+      ])
     })
 
     // simslim keeps its settings on the host, not in the device folder, so a
     // restored simulator needs it too.
-    await step('Slim and boot the simulator', async () => {
-      await slimSimulator(simulator)
+    simulator = await step('Slim and boot the simulator', async () => {
+      return await slimSimulator(simulator)
     })
 
     await step('Launch Safari', async () => {
@@ -119,7 +123,7 @@ async function main(): Promise<void> {
       await step('Run the tests', async () => {
         await run('xcodebuild', [
           'test-without-building',
-          ...xcodebuildArgs,
+          ...xcodebuildArgs(simulator),
           '-resultBundlePath',
           RESULT_BUNDLE,
         ])

@@ -28,10 +28,11 @@ export async function createSimulator(name: string): Promise<string> {
 
 /**
  * Turns off the background services that the tests do not need, then boots the
- * simulator once.
+ * simulator once. Returns the simulator that it booted, which is a new one when
+ * the runtime of `udid` is gone.
  */
-export async function slimSimulator(udid: string): Promise<void> {
-  await ensureSimulator(udid)
+export async function slimSimulator(udid: string): Promise<string> {
+  udid = await availableSimulator(udid)
   // The app listens to StoreKit transactions.
   await exec('simslim', ['on', udid, '--keep', 'com.apple.storekitd'], {
     throwOnError: true,
@@ -41,6 +42,7 @@ export async function slimSimulator(udid: string): Promise<void> {
     },
   })
   await run('xcrun', ['simctl', 'bootstatus', udid, '-b'])
+  return udid
 }
 
 /** Moves the simulator that `prepare` saved in `dir` back into the device set. */
@@ -51,8 +53,7 @@ export async function restoreSimulator(dir: string): Promise<string> {
   }
   renameSync(join(dir, udid), join(DEVICES_DIR, udid))
   await restartCoreSimulator()
-  await ensureSimulator(udid)
-  return udid
+  return await availableSimulator(udid)
 }
 
 /** Makes CoreSimulator read the device folders again. */
@@ -100,16 +101,22 @@ async function waitForSimulator(udid: string): Promise<boolean> {
   return false
 }
 
-/** Waits until the simulator is available, restarting CoreSimulator once. */
-async function ensureSimulator(udid: string): Promise<void> {
+/**
+ * Waits until the simulator is available, restarting CoreSimulator once.
+ * Returns a new simulator when it stays unavailable: macOS can remove the
+ * runtime of a simulator in the middle of a CI job.
+ */
+async function availableSimulator(udid: string): Promise<string> {
   if (await waitForSimulator(udid)) {
-    return
+    return udid
   }
   console.log('[ios-simulator] restarting CoreSimulator')
   await restartCoreSimulator()
-  if (!(await waitForSimulator(udid))) {
-    throw new Error(`Simulator ${udid} is not available`)
+  if (await waitForSimulator(udid)) {
+    return udid
   }
+  console.log('[ios-simulator] creating a new simulator')
+  return await createSimulator(`reflect-test-${Date.now()}`)
 }
 
 // The log daemon and the push daemon use about 0.4 of a core in every booted
@@ -173,8 +180,7 @@ async function waitForIdle(): Promise<void> {
 }
 
 async function prepare(dir: string): Promise<void> {
-  const udid = await createSimulator('reflect-test')
-  await slimSimulator(udid)
+  const udid = await slimSimulator(await createSimulator('reflect-test'))
   await waitForIdle()
   await run('xcrun', ['simctl', 'shutdown', udid])
   mkdirSync(dir, { recursive: true })
