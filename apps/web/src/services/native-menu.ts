@@ -1,68 +1,48 @@
-import {
-  bindingToAccelerator,
-  type NativeContextMenuItem,
-  type NativeMenuHost,
-  type NativeMenuItem,
-  type NativeSubmenu,
-} from '@reflect/app'
+import { noop } from '@ocavue/utils'
+import type { NativeMenuHost, NativeMenuItem, NativeSubmenu } from '@reflect/app'
 import type { Resource } from '@tauri-apps/api/core'
 import {
   CheckMenuItem,
   Menu,
   MenuItem,
-  PredefinedMenuItem,
   Submenu,
   type PredefinedMenuItemOptions,
 } from '@tauri-apps/api/menu'
 
+type MenuEntry = MenuItem | CheckMenuItem | Submenu | PredefinedMenuItemOptions
+
+async function buildMenuEntries(
+  items: readonly NativeMenuItem[],
+  onBuilt: (resource: Resource) => void,
+): Promise<MenuEntry[]> {
+  return await Promise.all(items.map((item) => buildMenuEntry(item, onBuilt)))
+}
+
 // Inline item options lose their click handler once the submenu is built.
-async function menuEntry(item: NativeMenuItem): Promise<MenuItem | PredefinedMenuItemOptions> {
-  return item.kind === 'command'
-    ? await MenuItem.new({
-        id: item.id,
-        text: item.text,
-        ...(item.accelerator !== undefined ? { accelerator: item.accelerator } : {}),
-        action: item.action,
-      })
-    : { item: item.item, ...(item.text !== undefined ? { text: item.text } : {}) }
+async function buildMenuEntry(
+  item: NativeMenuItem,
+  onBuilt: (resource: Resource) => void,
+): Promise<MenuEntry> {
+  if (item.kind === 'predefined') {
+    return { item: item.item, ...(item.text !== undefined ? { text: item.text } : {}) }
+  }
+  const entry =
+    item.kind === 'submenu'
+      ? await Submenu.new({ text: item.text, items: await buildMenuEntries(item.items, onBuilt) })
+      : await buildCommandEntry(item)
+  onBuilt(entry)
+  return entry
 }
 
-type ContextMenuEntry = MenuItem | CheckMenuItem | PredefinedMenuItem | Submenu
-
-async function buildContextMenuEntries(
-  items: readonly NativeContextMenuItem[],
-  onSelect: (id: string) => void,
-  built: Resource[],
-): Promise<ContextMenuEntry[]> {
-  return await Promise.all(
-    items.map(async (item) => {
-      const entry = await buildContextMenuEntry(item, onSelect, built)
-      built.push(entry)
-      return entry
-    }),
-  )
-}
-
-async function buildContextMenuEntry(
-  item: NativeContextMenuItem,
-  onSelect: (id: string) => void,
-  built: Resource[],
-): Promise<ContextMenuEntry> {
-  if (item.type === 'separator') {
-    return await PredefinedMenuItem.new({ item: 'Separator' })
-  }
-  if (item.type === 'submenu') {
-    return await Submenu.new({
-      text: item.title,
-      items: await buildContextMenuEntries(item.items, onSelect, built),
-    })
-  }
-  // No Tauri id: Tauri keys click channels by id, so a shared id would replace an app menu item's channel.
+async function buildCommandEntry(
+  item: Extract<NativeMenuItem, { kind: 'command' }>,
+): Promise<MenuItem | CheckMenuItem> {
   const options = {
-    text: item.title,
-    enabled: !(item.disabled ?? false),
-    ...(item.shortcut !== undefined ? { accelerator: bindingToAccelerator(item.shortcut) } : {}),
-    action: () => onSelect(item.id),
+    ...(item.id !== undefined ? { id: item.id } : {}),
+    text: item.text,
+    ...(item.accelerator !== undefined ? { accelerator: item.accelerator } : {}),
+    ...(item.enabled !== undefined ? { enabled: item.enabled } : {}),
+    action: item.action,
   }
   return item.checked === undefined
     ? await MenuItem.new(options)
@@ -114,19 +94,21 @@ export function createTauriNativeMenuHost(): NativeMenuHost {
         layouts.map(async (layout) => {
           return await Submenu.new({
             text: layout.text,
-            items: await Promise.all(layout.items.map(menuEntry)),
+            items: await buildMenuEntries(layout.items, noop),
           })
         }),
       )
       const menu = await Menu.new({ items: submenus })
       return new TauriNativeAppMenu(menu, layouts, submenus)
     },
-    async popup({ items, onSelect }) {
+    async popup(items) {
       const stale = contextMenuResources
       const built: Resource[] = []
       contextMenuResources = built
       await Promise.allSettled(stale.map((resource) => resource.close()))
-      const menu = await Menu.new({ items: await buildContextMenuEntries(items, onSelect, built) })
+      const menu = await Menu.new({
+        items: await buildMenuEntries(items, (resource) => void built.push(resource)),
+      })
       built.push(menu)
       await menu.popup()
     },

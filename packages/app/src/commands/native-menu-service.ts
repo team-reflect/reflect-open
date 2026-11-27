@@ -48,15 +48,21 @@ export interface AppSubmenuLayout {
 export type NativeMenuItem =
   | {
       kind: 'command'
-      id: string
+      id?: string | undefined
       text: string
       accelerator?: string | undefined
+      enabled?: boolean | undefined
+      /**
+       * Any boolean makes a check item, so `false` shows an unchecked check item.
+       */
+      checked?: boolean | undefined
       /**
        * Invoked with the item id when the item is activated.
        */
       action: (id: string) => void
     }
   | { kind: 'predefined'; item: NativeMenuPredefinedItem; text?: string | undefined }
+  | { kind: 'submenu'; text: string; items: readonly NativeMenuItem[] }
 
 export interface NativeSubmenu {
   text: string
@@ -78,15 +84,12 @@ export interface NativeAppMenu {
   assignNsAppRoles(): MaybePromise<void>
 }
 
-export type NativeContextMenuItem =
+export type ContextMenuItem =
   | {
       type: 'action'
       id: string
       title: string
       disabled?: boolean | undefined
-      /**
-       * Any boolean makes a check item, so `false` shows an unchecked check item.
-       */
       checked?: boolean | undefined
       /**
        * A keybinding such as `Mod-Enter`, shown only as a hint.
@@ -94,13 +97,13 @@ export type NativeContextMenuItem =
       shortcut?: string | undefined
     }
   | { type: 'separator' }
-  | { type: 'submenu'; title: string; items: readonly NativeContextMenuItem[] }
+  | { type: 'submenu'; title: string; items: readonly ContextMenuItem[] }
 
-export interface NativeContextMenuOptions {
+export interface ContextMenuOptions {
   /**
    * Menu items to render in order.
    */
-  items: readonly NativeContextMenuItem[]
+  items: readonly ContextMenuItem[]
   onSelect: (id: string) => void
 }
 
@@ -112,7 +115,7 @@ export interface NativeMenuHost {
   /**
    * Open a context menu at the pointer.
    */
-  popup(options: NativeContextMenuOptions): MaybePromise<void>
+  popup(items: readonly NativeMenuItem[]): MaybePromise<void>
 }
 
 /**
@@ -170,7 +173,7 @@ export interface NativeMenuService {
    * Open a native context menu. Outside a native shell, this is a no-op so
    * browser and test shells can call the same path without platform guards.
    */
-  openContextMenu(options: NativeContextMenuOptions): Promise<void>
+  openContextMenu(options: ContextMenuOptions): Promise<void>
 }
 
 export interface NativeMenuServiceDeps {
@@ -180,6 +183,31 @@ export interface NativeMenuServiceDeps {
   readonly ipc: IpcBridgeService
   readonly logger: LoggerService
   readonly host: NativeMenuHost
+}
+
+function resolveContextMenuItem(
+  item: ContextMenuItem,
+  onSelect: (id: string) => void,
+): NativeMenuItem {
+  if (item.type === 'separator') {
+    return { kind: 'predefined', item: 'Separator' }
+  }
+  if (item.type === 'submenu') {
+    return {
+      kind: 'submenu',
+      text: item.title,
+      items: item.items.map((child) => resolveContextMenuItem(child, onSelect)),
+    }
+  }
+  // No id: Tauri keys click channels by id, so a shared id would replace an app menu item's channel.
+  return {
+    kind: 'command',
+    text: item.title,
+    accelerator: item.shortcut === undefined ? undefined : bindingToAccelerator(item.shortcut),
+    enabled: !(item.disabled ?? false),
+    checked: item.checked,
+    action: () => onSelect(item.id),
+  }
 }
 
 class NativeMenuServiceImpl implements NativeMenuService {
@@ -259,11 +287,13 @@ class NativeMenuServiceImpl implements NativeMenuService {
     })
   }
 
-  async openContextMenu(options: NativeContextMenuOptions): Promise<void> {
+  async openContextMenu(options: ContextMenuOptions): Promise<void> {
     if (!this.#deps.platform.isNativeShell) {
       return
     }
-    await this.#deps.host.popup(options)
+    await this.#deps.host.popup(
+      options.items.map((item) => resolveContextMenuItem(item, options.onSelect)),
+    )
   }
 
   async #dispatchToFocusedWindow(commandId: AppCommandId): Promise<void> {

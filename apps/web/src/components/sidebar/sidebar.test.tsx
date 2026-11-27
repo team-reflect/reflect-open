@@ -148,7 +148,7 @@ async function renderSidebar(initialRoute?: Route) {
       </div>
     ),
   })
-  return { view, ran, core, navigation: appLayer.navigation, nativeMenu: appLayer.nativeMenuHost }
+  return { view, ran, core, navigation: appLayer.navigation, nativeMenu: appLayer.nativeMenu }
 }
 
 describe('Sidebar', () => {

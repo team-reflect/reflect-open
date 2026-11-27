@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { NativeContextMenuItem, NativeSubmenu } from '@reflect/app'
+import type { NativeMenuItem, NativeSubmenu } from '@reflect/app'
 
 const calls = vi.hoisted((): string[] => [])
 const closed = vi.hoisted((): string[] => [])
@@ -59,14 +59,12 @@ const resourceNew = vi.hoisted(() => {
 })
 const menuItemNew = vi.hoisted(() => resourceNew('MenuItem'))
 const checkMenuItemNew = vi.hoisted(() => resourceNew('CheckMenuItem'))
-const predefinedMenuItemNew = vi.hoisted(() => resourceNew('PredefinedMenuItem'))
 const submenuNew = vi.hoisted(() => resourceNew('Submenu'))
 
 vi.mock('@tauri-apps/api/menu', () => ({
   Menu: { new: menuNew },
   MenuItem: { new: menuItemNew },
   CheckMenuItem: { new: checkMenuItemNew },
-  PredefinedMenuItem: { new: predefinedMenuItemNew },
   Submenu: { new: submenuNew },
 }))
 
@@ -139,53 +137,54 @@ describe('createTauriNativeMenuHost', () => {
     expect(calls).toEqual(['setAsAppMenu', 'windows:Window', 'help:Help'])
   })
 
-  it('builds each context menu item with the Tauri class for its type', async () => {
-    const onSelect = vi.fn()
-    const items: NativeContextMenuItem[] = [
-      { type: 'action', id: 'complete', title: 'Complete', shortcut: 'Mod-Enter' },
-      { type: 'separator' },
+  it('builds nested submenus and check items for a context menu', async () => {
+    const action = vi.fn()
+    const items: NativeMenuItem[] = [
+      { kind: 'command', text: 'Complete', accelerator: 'CmdOrCtrl+Enter', enabled: true, action },
+      { kind: 'predefined', item: 'Separator' },
       {
-        type: 'submenu',
-        title: 'Schedule',
+        kind: 'submenu',
+        text: 'Schedule',
         items: [
-          { type: 'action', id: 'today', title: 'Today', checked: true },
-          { type: 'action', id: 'clear', title: 'Clear date', disabled: true },
+          { kind: 'command', text: 'Today', checked: true, action },
+          { kind: 'command', text: 'Clear date', enabled: false, action },
         ],
       },
     ]
 
-    await createTauriNativeMenuHost().popup({ items, onSelect })
+    await createTauriNativeMenuHost().popup(items)
 
-    const [menuOptions] = menuNew.mock.calls.at(-1) ?? []
-    expect(menuOptions).toMatchObject({
+    expect(menuNew).toHaveBeenLastCalledWith({
       items: [
-        { built: 'MenuItem', text: 'Complete', enabled: true, accelerator: 'CmdOrCtrl+Enter' },
-        { built: 'PredefinedMenuItem', item: 'Separator' },
+        {
+          built: 'MenuItem',
+          text: 'Complete',
+          accelerator: 'CmdOrCtrl+Enter',
+          enabled: true,
+          action,
+        },
+        { item: 'Separator' },
         {
           built: 'Submenu',
           text: 'Schedule',
           items: [
-            { built: 'CheckMenuItem', text: 'Today', enabled: true, checked: true },
-            { built: 'MenuItem', text: 'Clear date', enabled: false },
+            { built: 'CheckMenuItem', text: 'Today', checked: true, action },
+            { built: 'MenuItem', text: 'Clear date', enabled: false, action },
           ],
         },
       ],
     })
-    expect(menuItemNew.mock.calls[0]?.[0]).not.toHaveProperty('id')
     expect(popup).toHaveBeenCalledTimes(1)
-
-    checkMenuItemNew.mock.calls[0]?.[0].action?.()
-    expect(onSelect).toHaveBeenCalledExactlyOnceWith('today')
   })
 
   it('closes the previous context menu when the next one opens', async () => {
     const host = createTauriNativeMenuHost()
-    const items: NativeContextMenuItem[] = [{ type: 'action', id: 'unpin', title: 'Unpin Note' }]
+    const items: NativeMenuItem[] = [{ kind: 'command', text: 'Unpin Note', action: vi.fn() }]
 
-    await host.popup({ items, onSelect: vi.fn() })
+    await host.popup(items)
     expect(closed).toEqual([])
 
-    await host.popup({ items, onSelect: vi.fn() })
+    await host.popup(items)
     expect(closed).toEqual(['Unpin Note', 'Menu'])
     expect(popup).toHaveBeenCalledTimes(2)
   })
