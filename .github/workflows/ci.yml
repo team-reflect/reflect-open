@@ -173,7 +173,7 @@ jobs:
         run: pnpm run build
 
       - name: Test
-        run: pnpm turbo run test:node
+        run: pnpm test:node
 
   test-chromium:
     needs: [classify]
@@ -213,9 +213,8 @@ jobs:
       - name: Build the index wasm
         run: pnpm build:index-wasm
 
-      # `--only` passes `--shard` to the test task alone, not to the wasm build.
       - name: Test
-        run: pnpm turbo run test:browser --only -- --shard=${{ matrix.shard }}/3
+        run: pnpm test:browser --shard=${{ matrix.shard }}/3
 
   test-webkit:
     needs: [classify, test-chromium]
@@ -247,16 +246,15 @@ jobs:
         run: pnpm build:index-wasm
 
       # WebKit keeps the memory of every finished test file, so each shard
-      # runs in its own Vitest process to restart the browser. `--only` passes
-      # `--shard` to the test task alone, not to the wasm build.
+      # runs in its own Vitest process to restart the browser.
       - name: Test browser (shard 1/3)
-        run: pnpm turbo run test:browser --only -- --shard=1/3
+        run: pnpm test:browser --shard=1/3
 
       - name: Test browser (shard 2/3)
-        run: pnpm turbo run test:browser --only -- --shard=2/3
+        run: pnpm test:browser --shard=2/3
 
       - name: Test browser (shard 3/3)
-        run: pnpm turbo run test:browser --only -- --shard=3/3
+        run: pnpm test:browser --shard=3/3
 
   test-swift:
     needs: classify
@@ -275,7 +273,7 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - name: Test apple/
-        run: pnpm turbo run test:swift --filter=@reflect/apple
+        run: pnpm test:swift
 
       - name: Build apple/ for the iOS Simulator
         run: pnpm turbo run build:ios-simulator --filter=@reflect/apple

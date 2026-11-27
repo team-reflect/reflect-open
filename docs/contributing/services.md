@@ -350,4 +350,4 @@ what it is (`noteSessions.sessionFor(path)`), and let the view subscribe.
 - [ ] A test double only for a fake or a recording wrapper (§6)
 - [ ] Read with `useCoreServices()` / `useAppServices()` or module parameters
 - [ ] A platform API through `CoreAdapters`, `AppHost`, or a port (§9)
-- [ ] `pnpm typecheck && pnpm lint && pnpm test --run <touched paths>`
+- [ ] `pnpm typecheck && pnpm lint && pnpm test <touched paths>`

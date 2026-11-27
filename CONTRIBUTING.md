@@ -16,7 +16,7 @@ pnpm dev          # frontend only, no native shell
 
 ```bash
 pnpm typecheck
-pnpm test --run <paths you touched>
+pnpm test <paths you touched>
 pnpm lint
 cargo test        # from apps/tauri, if you touched Rust
 ```
