@@ -22,9 +22,6 @@ interface BrowserContextMenuProps {
   onClosed: () => void
 }
 
-/**
- * A context menu of `items` at `point`, open until a pick or a dismissal.
- */
 export function BrowserContextMenu({
   items,
   point,

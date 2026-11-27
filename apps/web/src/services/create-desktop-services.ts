@@ -100,10 +100,7 @@ export function createDesktopAdapters(
 }
 
 /**
- * The desktop app's host for the app layer: the window service, the lifecycle
- * service and the operations list over the page, the Tauri dialogs, updater
- * and native menus inside the Tauri shell, context menus drawn in the page in
- * a plain browser, and Sentry exception telemetry everywhere.
+ * The desktop app's host for the app layer.
  */
 export function createDesktopHost(
   facts: PlatformFacts,

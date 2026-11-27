@@ -2,7 +2,7 @@ import { createUnsupportedNativeMenuHost, type NativeMenuHost } from '@reflect/a
 import { createRoot, type Root } from 'react-dom/client'
 
 /**
- * Context menus drawn in the page, for a plain browser. The menu code loads on the first popup.
+ * Context menus drawn in the page. The menu code loads on the first popup.
  */
 export function createBrowserNativeMenuHost(): NativeMenuHost {
   let pointer = { x: 0, y: 0 }
