@@ -50,12 +50,21 @@
       "outputLogs": "new-only",
       "outputs": ["**/*.tsbuildinfo"],
     },
-    "//#test:node": {
+    "//#vitest": {
       "outputLogs": "new-only",
+      "command": ["vitest", "run"],
+      "dependsOn": ["@reflect/index-wasm#build"],
+      "env": ["REFLECT_TEST_BROWSER"],
+      "passThroughEnv": ["DEBUG", "VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB", "__XPC_JSC_useJIT"],
+    },
+    "//#vitest:node": {
+      "outputLogs": "new-only",
+      "command": ["vitest", "run", "--project", "!*browser*"],
       "dependsOn": ["@reflect/index-wasm#build"],
     },
-    "//#test:browser": {
+    "//#vitest:browser": {
       "outputLogs": "new-only",
+      "command": ["vitest", "run", "--project", "*browser*"],
       "dependsOn": ["@reflect/index-wasm#build"],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -67,7 +76,7 @@
         "!scripts/**",
       ],
       "env": ["REFLECT_TEST_BROWSER"],
-      "passThroughEnv": ["VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB", "__XPC_JSC_useJIT"],
+      "passThroughEnv": ["DEBUG", "VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB", "__XPC_JSC_useJIT"],
     },
 
     // Rust checks and tests (the whole Cargo workspace).

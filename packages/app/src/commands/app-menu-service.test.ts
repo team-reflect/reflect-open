@@ -5,11 +5,15 @@ import {
   createTestPlatformService,
   type TestPlatformOptions,
 } from '@reflect/core/testing'
-import { createTestNativeMenuService } from '../testing/commands.ts'
+import { createTestAppMenuHost } from '../testing/app-menu.ts'
 import { createTestWindowService } from '../testing/window.ts'
 import type { AppCommandId } from './app-commands.ts'
 import { createCommandService } from './command-service.ts'
-import type { AppSubmenuLayout, ContextMenuItem, NativeMenuItem } from './native-menu-service.ts'
+import {
+  createAppMenuService,
+  type AppSubmenuLayout,
+  type NativeMenuItem,
+} from './app-menu-service.ts'
 import { returnNull } from '@ocavue/utils'
 
 const LAYOUT: AppSubmenuLayout[] = [
@@ -49,23 +53,25 @@ function setup(options?: {
     commands: options?.failPaste ? {} : { menu_install_paste_and_match_style: returnNull },
     logger,
   })
-  const menu = createTestNativeMenuService({
+  const host = createTestAppMenuHost()
+  const menu = createAppMenuService({
     commands,
     window: windows,
     platform: createTestPlatformService(options?.platform),
     ipc,
     logger,
+    host,
   })
-  return { menu, commands, windows, ipc, logger, ran }
+  return { menu, host, commands, windows, ipc, logger, ran }
 }
 
 describe('install', () => {
   it('builds each submenu from the layout and the command registry', async () => {
-    const { menu, ran } = setup({ platform: { isNativeShell: false } })
+    const { menu, host, ran } = setup({ platform: { isNativeShell: false } })
 
     await menu.install(LAYOUT)
 
-    const [view, windowMenu] = menu.host.appMenu() ?? []
+    const [view, windowMenu] = host.appMenu() ?? []
     expect(view?.items).toEqual<NativeMenuItem[]>([
       {
         kind: 'command',
@@ -91,10 +97,10 @@ describe('install', () => {
   })
 
   it('adds Paste and Match Style after the menu is installed and its roles are assigned', async () => {
-    const { menu, ipc } = setup()
+    const { menu, host, ipc } = setup()
     let hostCallsAtPaste: readonly string[] = []
     ipc.onCommand('menu_install_paste_and_match_style', () => {
-      hostCallsAtPaste = [...menu.host.calls]
+      hostCallsAtPaste = [...host.calls]
       return null
     })
 
@@ -116,21 +122,21 @@ describe('install', () => {
   })
 
   it('leaves the main window’s app-wide menu intact when a note window boots', async () => {
-    const { menu, ipc } = setup({ label: 'note-1' })
+    const { menu, host, ipc } = setup({ label: 'note-1' })
 
     await menu.install(LAYOUT)
 
-    expect(menu.host.calls).toEqual([])
+    expect(host.calls).toEqual([])
     expect(ipc.calls()).toEqual([])
     expect(menu.isInstalled()).toBe(false)
   })
 
   it('installs nothing off the macOS desktop', async () => {
-    const { menu } = setup({ platform: { isMacosDesktop: false } })
+    const { menu, host } = setup({ platform: { isMacosDesktop: false } })
 
     await menu.install(LAYOUT)
 
-    expect(menu.host.calls).toEqual([])
+    expect(host.calls).toEqual([])
     expect(menu.isInstalled()).toBe(false)
   })
 
@@ -238,62 +244,5 @@ describe('menu command dispatch', () => {
 
     expect(ran).toEqual([])
     expect(windows.emitted()).toEqual([])
-  })
-})
-
-describe('openContextMenu', () => {
-  it('does nothing outside a native shell', async () => {
-    const { menu } = setup({ platform: { isNativeShell: false } })
-    const onSelect = vi.fn()
-
-    await menu.openContextMenu({
-      items: [{ type: 'action', id: 'unpin', title: 'Unpin' }],
-      onSelect,
-    })
-
-    expect(menu.host.popups()).toEqual([])
-    expect(menu.popups()).toEqual([])
-    expect(onSelect).not.toHaveBeenCalled()
-  })
-
-  it('opens the items as native menu items whose actions report the picked id', async () => {
-    const { menu } = setup()
-    const onSelect = vi.fn()
-    const items: ContextMenuItem[] = [
-      { type: 'action', id: 'complete', title: 'Complete' },
-      { type: 'separator' },
-      {
-        type: 'submenu',
-        title: 'Schedule',
-        items: [
-          { type: 'action', id: 'clear', title: 'Clear date', disabled: true, checked: false },
-        ],
-      },
-    ]
-
-    await menu.openContextMenu({ items, onSelect })
-
-    const action = expect.any(Function) as (id: string) => void
-    expect(menu.host.popups()).toEqual<NativeMenuItem[][]>([
-      [
-        { kind: 'command', text: 'Complete', enabled: true, action },
-        { kind: 'predefined', item: 'Separator' },
-        {
-          kind: 'submenu',
-          text: 'Schedule',
-          items: [{ kind: 'command', text: 'Clear date', enabled: false, checked: false, action }],
-        },
-      ],
-    ])
-    expect(menu.popups()).toEqual([items])
-
-    const [complete, , schedule] = menu.host.popups()[0] ?? []
-    const clear = schedule?.kind === 'submenu' ? schedule.items[0] : undefined
-    if (complete?.kind !== 'command' || clear?.kind !== 'command') {
-      throw new Error('expected command items')
-    }
-    complete.action('')
-    clear.action('')
-    expect(onSelect.mock.calls).toEqual([['complete'], ['clear']])
   })
 })

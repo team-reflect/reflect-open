@@ -104,7 +104,7 @@ describe('note window history', () => {
   it('runs the history menu commands routed to the note window', async () => {
     const { result, appServices } = await renderNoteWindowWithHistory()
     const menuEvent = 'reflect://menu-command'
-    onTestFinished(appServices.nativeMenu.connect())
+    onTestFinished(appServices.appMenu.connect())
 
     await act(() => appServices.window.emitWindowEvent(menuEvent, 'history.back'))
     expect(result.current.state.route).toEqual(NOTE_A)
