@@ -1,5 +1,5 @@
 import type { MaybePromise } from '@reflect/utils'
-import { errorMessage, type LoggerService } from '@reflect/core'
+import { errorMessage, type LoggerService, type PlatformFacts } from '@reflect/core'
 
 /**
  * A macOS System Settings privacy pane.
@@ -34,6 +34,23 @@ export interface OpenerService {
 export interface OpenerTransport {
   openUrl(url: string): MaybePromise<void>
   revealItemInDir(path: string): MaybePromise<void>
+}
+
+/**
+ * The menu label for {@link OpenerService.revealInFileManager}, in the
+ * platform's own words: `Reveal in Finder`, or `Reveal Graph in Finder` with
+ * `subject` set to `Graph`.
+ */
+export function formatRevealLabel(platform: PlatformFacts, subject?: string): string {
+  const target = subject === undefined ? '' : ` ${subject}`
+  switch (platform.buildPlatform) {
+    case 'windows':
+      return `Show${target} in File Explorer`
+    case 'linux':
+      return `Show${target} in File Manager`
+    default:
+      return `Reveal${target} in Finder`
+  }
 }
 
 const SYSTEM_SETTINGS_URLS: Record<SystemSettingsPane, string> = {
