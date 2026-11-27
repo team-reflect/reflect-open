@@ -19,19 +19,23 @@ export interface NoteMenuTarget {
   readonly isPinned: boolean
 }
 
-export interface NoteMenuOptions {
+type NoteMenuAction = Extract<ContextMenuItem, { type: 'action' }> & { id: NoteMenuId }
+
+type NoteMenuItem = NoteMenuAction | { type: 'separator' }
+
+interface NoteMenuOptions {
   surface: NoteMenuSurface
   isPrivate?: boolean | undefined
 }
 
-function action(id: NoteMenuId, title: string, shortcut?: string): ContextMenuItem {
+function action(id: NoteMenuId, title: string, shortcut?: string): NoteMenuAction {
   return { type: 'action', id, title, shortcut }
 }
 
 export function getNoteMenuItems(
   notes: readonly NoteMenuTarget[],
   options: NoteMenuOptions,
-): ContextMenuItem[] {
+): NoteMenuItem[] {
   const allNotes = options.surface === 'allNotes'
   const single = notes.length === 1
   const { isPrivate } = options
@@ -59,7 +63,7 @@ export function getNoteMenuItems(
     ],
   ]
   return groups
-    .map((group) => group.filter((item): item is ContextMenuItem => item !== false))
+    .map((group) => group.filter((item): item is NoteMenuAction => item !== false))
     .filter((group) => group.length > 0)
     .flatMap((group, index) => (index === 0 ? group : [{ type: 'separator' } as const, ...group]))
 }

@@ -3,15 +3,18 @@ import { copyNoteDeepLink, copyNotePath, routeForPath } from '@reflect/app'
 import { errorMessage } from '@reflect/core'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
-import { getNoteMenuItems, type NoteMenuId, type NoteMenuTarget } from './note-menu.ts'
+import {
+  getNoteMenuItems,
+  type NoteMenuId,
+  type NoteMenuSurface,
+  type NoteMenuTarget,
+} from './note-menu.ts'
 
-export type NoteMenuRequest =
-  | {
-      surface: 'allNotes'
-      notes: readonly NoteMenuTarget[]
-      onTrash: (paths: readonly string[]) => void
-    }
-  | { surface: 'sidebar'; notes: readonly NoteMenuTarget[]; onTrash?: undefined }
+export interface NoteMenuRequest {
+  surface: NoteMenuSurface
+  notes: readonly NoteMenuTarget[]
+  onTrash?: ((paths: readonly string[]) => void) | undefined
+}
 
 export function useOpenNoteMenu(): (request: NoteMenuRequest) => void {
   const services = useCoreServices()
@@ -75,11 +78,16 @@ export function useOpenNoteMenu(): (request: NoteMenuRequest) => void {
         if (notes.length !== 1) {
           return undefined
         }
-        return (
-          noteRows.get().get(path)?.isPrivate ??
-          (await indexQuery.getNote(path))?.isPrivate ??
-          false
-        )
+        const overlaid = noteRows.get().get(path)?.isPrivate
+        if (overlaid !== undefined) {
+          return overlaid
+        }
+        // The other items need no index, so a failed read only hides the Lock item.
+        try {
+          return (await indexQuery.getNote(path))?.isPrivate ?? false
+        } catch {
+          return undefined
+        }
       }
       void readIsPrivate()
         .then((isPrivate) => {

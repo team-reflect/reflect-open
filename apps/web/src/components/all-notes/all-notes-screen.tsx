@@ -100,16 +100,16 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   // selectable for keyboard navigation, but are never valid trash targets.
   const [pendingTrash, setPendingTrash] = useState<{
     paths: readonly string[]
-    fromSelection: boolean
+    inSelection: boolean
   } | null>(null)
   const trashableSelectedPaths = useMemo(
     () => [...selection.selected].filter((path) => canTrashNote(path)),
     [selection.selected],
   )
-  const requestTrash = useCallback((paths: readonly string[], fromSelection: boolean) => {
+  const requestTrash = useCallback((paths: readonly string[], inSelection: boolean) => {
     const trashable = paths.filter((path) => canTrashNote(path))
     if (trashable.length > 0) {
-      setPendingTrash({ paths: trashable, fromSelection })
+      setPendingTrash({ paths: trashable, inSelection })
     }
   }, [])
   const openTrashConfirm = useCallback(() => {
@@ -122,7 +122,7 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   }, [])
   const { clear: clearSelection, getSelected } = selection
   const onTrashed = useCallback(() => {
-    if (pendingTrash?.fromSelection ?? false) {
+    if (pendingTrash?.inSelection ?? false) {
       clearSelection()
     }
   }, [pendingTrash, clearSelection])
@@ -140,11 +140,11 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
       }
       event.preventDefault()
       const selected = getSelected()
-      const fromSelection = selected.has(note.path)
+      const inSelection = selected.has(note.path)
       openNoteMenu({
         surface: 'allNotes',
-        notes: fromSelection ? rows.filter((row) => selected.has(row.path)) : [note],
-        onTrash: (paths) => requestTrash(paths, fromSelection),
+        notes: inSelection ? rows.filter((row) => selected.has(row.path)) : [note],
+        onTrash: (paths) => requestTrash(paths, inSelection),
       })
     },
     [notes, getSelected, openNoteMenu, requestTrash],

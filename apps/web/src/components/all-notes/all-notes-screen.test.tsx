@@ -556,6 +556,43 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     await view.unmount()
   })
 
+  it('right-click on an unselected row trashes only that row and keeps the selection', async () => {
+    const view = await renderScreen()
+    const nativeMenu = view.appServices.nativeMenu
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
+
+    await view.getByText('Shop your health goals.').click()
+    await view.getByText('Dandelion chocolate.').click({ button: 'right' })
+
+    await vi.waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
+    nativeMenu.select('trash')
+    await expect.element(page.getByText('Trash 1 note?')).toBeInTheDocument()
+    await page.getByRole('button', { name: 'Trash', exact: true }).click()
+
+    await expectLocatorToHaveCount(view.getByText('Tokyo Gâteau'), 0)
+    expect(view.core.noteFile.trashed()).toEqual(['notes/tokyo.md'])
+    await expect.element(view.getByRole('button', { name: /Trash \(1\)/ })).toBeInTheDocument()
+    await view.unmount()
+  })
+
+  it('opens the menu without the private toggle when the index read fails', async () => {
+    const view = await renderScreen()
+    const nativeMenu = view.appServices.nativeMenu
+    vi.spyOn(view.core.indexQuery, 'getNote').mockRejectedValue(new Error('index closed'))
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
+
+    await view.getByText('Dandelion chocolate.').click({ button: 'right' })
+
+    await vi.waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
+    const ids = nativeMenu
+      .popups()[0]!
+      .filter((item) => item.type === 'action')
+      .map((item) => item.id)
+    expect(ids).toContain('pin')
+    expect(ids).not.toContain('toggle-private')
+    await view.unmount()
+  })
+
   it('does not offer bulk trash for a tagged daily note', async () => {
     const view = await renderScreen()
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
