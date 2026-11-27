@@ -84,18 +84,25 @@ export interface NativeAppMenu {
   assignNsAppRoles(): MaybePromise<void>
 }
 
-// FIXME: create separate types for "action" "separator" "submenu" and union them into ContextMenuItem. by doing this, you do not need to write Extract<ContextMenuItem, { type: 'action' }> anymore. Remove all Extract<ContextMenuItem, ...> from the codebase.
-// FIXME: merge origin/master into this branch (merge, no rebase).
-export type ContextMenuItem =
-  | {
-      type: 'action'
-      id: string
-      title: string
-      disabled?: boolean | undefined
-      checked?: boolean | undefined
-    }
-  | { type: 'separator' }
-  | { type: 'submenu'; title: string; items: readonly ContextMenuItem[] }
+export interface ContextMenuAction {
+  type: 'action'
+  id: string
+  title: string
+  disabled?: boolean | undefined
+  checked?: boolean | undefined
+}
+
+export interface ContextMenuSeparator {
+  type: 'separator'
+}
+
+export interface ContextMenuSubmenu {
+  type: 'submenu'
+  title: string
+  items: readonly ContextMenuItem[]
+}
+
+export type ContextMenuItem = ContextMenuAction | ContextMenuSeparator | ContextMenuSubmenu
 
 export interface ContextMenuOptions {
   /**

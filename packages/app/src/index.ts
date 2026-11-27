@@ -140,8 +140,11 @@ export { type KeymapService } from './commands/keymap-service.ts'
 export {
   type AppMenuEntry,
   type AppSubmenuLayout,
+  type ContextMenuAction,
   type ContextMenuItem,
   type ContextMenuOptions,
+  type ContextMenuSeparator,
+  type ContextMenuSubmenu,
   type NativeMenuHost,
   type NativeMenuItem,
   type NativeMenuPredefinedItem,
