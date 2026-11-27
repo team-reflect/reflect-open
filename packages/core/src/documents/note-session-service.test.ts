@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestClockService, type TestClockService } from '../testing/clock.ts'
+import { createTestLinkedDailyNoteService } from '../testing/documents.ts'
 import { createTestFileChangeService, type TestFileChangeService } from '../testing/file-change.ts'
 import {
   createTestNoteCreationService,
@@ -29,6 +30,7 @@ function setup(files: Record<string, string>): void {
     graphSession: createTestGraphSessionService({ graph: { generation: 1 } }),
     fileChanges,
     noteCreation: createTestNoteCreationService(),
+    linkedDailyNotes: createTestLinkedDailyNoteService(),
     createCoordinator: (path): SessionCoordinator => {
       const coordinator = { path, log: [] as string[] }
       coordinators.push(coordinator)

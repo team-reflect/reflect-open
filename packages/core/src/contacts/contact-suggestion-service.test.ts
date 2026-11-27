@@ -12,7 +12,11 @@ import {
 } from '../testing/index.ts'
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createNoteDocumentService } from '../documents/note-document-service.ts'
-import { createTestNoteSessionService, type TestNoteSessionService } from '../testing/documents.ts'
+import {
+  createTestNoteSessionService,
+  type TestNoteSessionService,
+  createTestLinkedDailyNoteService,
+} from '../testing/documents.ts'
 import type { ContactMatch, ContactsAuthorization } from './commands.ts'
 import {
   canPromptForContacts,
@@ -65,6 +69,7 @@ function contactSuggestionsOver(deps?: {
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
       indexLifecycle: createTestIndexLifecycleService(),
+      linkedDailyNotes: createTestLinkedDailyNoteService(),
       logger: createTestLoggerService(),
     }),
     settings: deps?.settings ?? createTestSettingsService(),

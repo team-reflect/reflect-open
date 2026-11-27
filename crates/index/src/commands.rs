@@ -372,7 +372,7 @@ impl<'a> IndexCommands<'a> {
         self.read(|conn| read::daily::dates_in_range(conn, &start, &end))
     }
 
-    /// The non-private daily notes in `start..=end`, newest first.
+    /// The non-private daily notes with content in `start..=end`, newest first.
     fn index_daily_notes(
         &self,
         start: String,

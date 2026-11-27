@@ -24,8 +24,8 @@ pub(crate) fn dates_in_range(conn: &Connection, start: &str, end: &str) -> AppRe
     )
 }
 
-/// The non-private daily notes in `start..=end`, newest first, at most
-/// `limit`.
+/// The non-private daily notes with content in `start..=end`, newest first,
+/// at most `limit`.
 pub(crate) fn notes_in_range(
     conn: &Connection,
     start: &str,
@@ -48,6 +48,7 @@ pub(crate) fn notes_in_range(
             .and_where(Expr::col(Notes::DailyDate).gte(start))
             .and_where(Expr::col(Notes::DailyDate).lte(end))
             .and_where(Expr::col(Notes::IsPrivate).eq(lit(0)))
+            .and_where(Expr::col(Notes::HasContent).eq(lit(1)))
             .order_by(Notes::DailyDate, Order::Desc)
             .limit(u64::from(limit)),
         |row| {

@@ -1,8 +1,10 @@
 import type { MaybePromise } from '@reflect/utils'
 import { checkRoundTrip } from '@meowdown/markdown'
 import { deferredCreationPolicy, type NoteCreationService } from '../graph/note-creation-service.ts'
+import { isDaily } from '../graph/paths.ts'
 import type { FileChange, FileChangeService } from '../indexing/file-change-service.ts'
 import type { Unlisten } from '../unlisten.ts'
+import type { LinkedDailyNoteService } from './linked-daily-note-service.ts'
 import { createNoteSession, type NoteSessionDeps } from './note-session.ts'
 import type {
   ManagedNoteSession,
@@ -42,6 +44,7 @@ export interface SessionCoordinator {
 export interface NoteSessionServiceDeps extends NoteSessionDeps {
   readonly fileChanges: FileChangeService
   readonly noteCreation: NoteCreationService
+  readonly linkedDailyNotes: LinkedDailyNoteService
   /**
    * Creates the coordinator of a note that tracks renames.
    */
@@ -175,9 +178,10 @@ class NoteSessionServiceImpl implements NoteSessionService {
       classify: checkRoundTrip,
       createIfMissing: policy.lazyCreatable,
       missingSeed: policy.seedsUntitled ? noteCreation.untitledNoteSeed() : undefined,
-      onContent: coordinator
-        ? (content, origin) => coordinator.content(content, origin)
-        : undefined,
+      onContent: (content, origin) => {
+        coordinator?.content(content, origin)
+        this.#ensureLinkedDailyNotes(session, content, origin)
+      },
       onObservedChange: (observed) => {
         this.#observedChanged(entry, observed)
       },
@@ -196,6 +200,23 @@ class NoteSessionServiceImpl implements NoteSessionService {
       this.#onFileChanges(changes)
     })
     return entry
+  }
+
+  /**
+   * Create the daily notes that a saved note links to, and the daily note of
+   * a loaded day that has no file and that notes link to.
+   */
+  #ensureLinkedDailyNotes(session: NoteSession, content: string, origin: NoteContentOrigin): void {
+    const generation = this.#deps.graphSession.get().session?.generation
+    if (generation === undefined) {
+      return
+    }
+    const { linkedDailyNotes } = this.#deps
+    if (origin === 'saved') {
+      void linkedDailyNotes.ensureDailyNotesLinkedFrom(session.path, content, generation)
+    } else if (origin === 'load' && isDaily(session.path) && session.get().missing) {
+      void linkedDailyNotes.ensureDailyNoteAt(session.path, generation)
+    }
   }
 
   #observedChanged(entry: SessionEntry, observed: boolean): void {

@@ -22,7 +22,10 @@ import { createAttachmentService } from './attachment-service.ts'
 import { createNoteDocumentService, type NoteDocumentService } from './note-document-service.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createNotePreviewService, type NotePreviewServiceDeps } from './note-preview-service.ts'
-import { createTestNoteSessionService } from '../testing/documents.ts'
+import {
+  createTestNoteSessionService,
+  createTestLinkedDailyNoteService,
+} from '../testing/documents.ts'
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 
 /**
@@ -56,6 +59,7 @@ function documentsWith(read: () => Promise<string>): NoteDocumentService {
     noteFile: createTestNoteFileService(),
     graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
     indexLifecycle: createTestIndexLifecycleService(),
+    linkedDailyNotes: createTestLinkedDailyNoteService(),
     logger: createTestLoggerService(),
   })
   vi.spyOn(noteDocuments, 'readExisting').mockImplementation(read)
@@ -78,6 +82,7 @@ function notePreviewOver(
         noteFile,
         graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
         indexLifecycle: createTestIndexLifecycleService(),
+        linkedDailyNotes: createTestLinkedDailyNoteService(),
         logger: createTestLoggerService(),
       }),
     attachments: options?.attachments ?? createTestAttachmentService(),
@@ -138,6 +143,7 @@ describe('previewWikiTarget', () => {
         noteFile,
         graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
         indexLifecycle: createTestIndexLifecycleService(),
+        linkedDailyNotes: createTestLinkedDailyNoteService(),
         logger: createTestLoggerService(),
       }),
     })

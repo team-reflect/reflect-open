@@ -5,6 +5,7 @@ import {
   type TestNoteSessionService,
   createTestNoteSession,
   type TestNoteSession,
+  createTestLinkedDailyNoteService,
 } from '../testing/documents.ts'
 import { createGraphSession, type GraphSession } from '../graph/graph-session.ts'
 import type { NoteWriteResult } from '../graph/note-file-service.ts'
@@ -115,6 +116,7 @@ function createTasks(graphSession: TaskServiceDeps['graphSession']): TaskService
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
       indexLifecycle: createTestIndexLifecycleService(),
+      linkedDailyNotes: createTestLinkedDailyNoteService(),
       logger: createTestLoggerService(),
     }),
     progress,
