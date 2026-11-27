@@ -10,7 +10,7 @@ import {
 import { createTestWindowService, type TestWindowService } from './window.ts'
 import { createAppServices, type AppHost, type AppServices } from '../create-app-services.ts'
 import { createTestClipboardService, type TestClipboardService } from './clipboard.ts'
-import { createTestNativeMenuHost } from './commands.ts'
+import { createTestNativeMenuHost, type TestNativeMenuHost } from './commands.ts'
 import { createTestOpenerService, type TestOpenerService } from './opener.ts'
 import { createLinkNavigationService } from '../navigation/link-navigation-service.ts'
 import { createNoteVisitService } from '../navigation/note-visit-service.ts'
@@ -46,6 +46,10 @@ export type TestAppServices = Omit<
   readonly opener: TestOpenerService
   readonly navigation: TestNavigationService
   readonly lifecycle: TestLifecycleService
+  /**
+   * The host behind `nativeMenu`, which records the menus it opens.
+   */
+  readonly nativeMenuHost: TestNativeMenuHost
 }
 
 /**
@@ -91,10 +95,11 @@ export function createTestAppServices(
   // Over the core's test activity port, so one emit reaches both layers.
   const activity = (core as { activity?: TestActivityPort }).activity
   const lifecycle = overrides.lifecycle ?? createTestLifecycleService({ activity })
+  const nativeMenuHost = createTestNativeMenuHost()
   const app = createAppServices(core, {
     ...createTestAppHost({ window, dialog, operations, clipboard, lifecycle }),
     updater: createTestUpdaterAdapter(),
-    nativeMenu: createTestNativeMenuHost(),
+    nativeMenu: nativeMenuHost,
   })
   const deepLinkRouter = overrides.deepLinkRouter ?? app.deepLinkRouter
   const mobileOnboarding =
@@ -153,5 +158,6 @@ export function createTestAppServices(
     noteVisits,
     deepLinkRouter,
     linkNavigation,
+    nativeMenuHost,
   } as TestAppServices
 }

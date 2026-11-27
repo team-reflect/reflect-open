@@ -110,9 +110,7 @@ class TauriNativeAppMenu implements NativeAppMenu {
  * Native menus through Tauri's menu API. Use this adapter only in the native shell.
  */
 export function createTauriNativeMenuHost(): NativeMenuHost {
-  // The Rust-side resources of the latest context menu. `popup()` resolves
-  // when the menu shows, not when it closes, so they are closed at the start
-  // of the next popup: closing them earlier would drop the user's pick.
+  // The pick arrives after `popup()` resolves, so the previous menu is closed when the next one opens.
   let contextMenuResources: Resource[] = []
 
   return {

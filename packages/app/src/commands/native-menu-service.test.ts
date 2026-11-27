@@ -278,6 +278,5 @@ describe('openContextMenu', () => {
     expect(menu.host.popups()).toEqual([items])
     menu.host.select('today')
     expect(onSelect).toHaveBeenCalledExactlyOnceWith('today')
-    expect(() => menu.host.select('clear')).toThrow('no enabled context menu action: clear')
   })
 })

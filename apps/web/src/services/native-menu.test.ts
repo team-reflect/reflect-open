@@ -1,12 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NativeContextMenuItem, NativeSubmenu } from '@reflect/app'
 
-interface SubmenuOptionsForTest {
-  readonly text: string
-  readonly items: readonly unknown[]
-}
-
 const calls = vi.hoisted((): string[] => [])
+// The `text` of every closed resource, or `menu` for a menu.
+const closed = vi.hoisted((): string[] => [])
 const popup = vi.hoisted(() => vi.fn(async () => {}))
 const setAsAppMenu = vi.hoisted(() => {
   return vi.fn(() => {
@@ -14,22 +11,6 @@ const setAsAppMenu = vi.hoisted(() => {
     return Promise.resolve()
   })
 })
-const submenuNew = vi.hoisted(() => {
-  return vi.fn((options: SubmenuOptionsForTest) => {
-    return Promise.resolve({
-      setAsWindowsMenuForNSApp: () => {
-        calls.push(`windows:${options.text}`)
-        return Promise.resolve()
-      },
-      setAsHelpMenuForNSApp: () => {
-        calls.push(`help:${options.text}`)
-        return Promise.resolve()
-      },
-    })
-  })
-})
-// The `text` of every closed resource, or `menu` for a menu.
-const closed = vi.hoisted((): string[] => [])
 const menuNew = vi.hoisted(() => {
   return vi.fn((_options: unknown) => {
     return Promise.resolve({ setAsAppMenu, popup, close: () => void closed.push('menu') })
@@ -45,6 +26,14 @@ const resourceNew = vi.hoisted(() => {
         ...options,
         built: kind,
         close: () => void closed.push(options.text ?? kind),
+        setAsWindowsMenuForNSApp: () => {
+          calls.push(`windows:${options.text}`)
+          return Promise.resolve()
+        },
+        setAsHelpMenuForNSApp: () => {
+          calls.push(`help:${options.text}`)
+          return Promise.resolve()
+        },
       })
     })
   }
@@ -52,18 +41,14 @@ const resourceNew = vi.hoisted(() => {
 const menuItemNew = vi.hoisted(() => resourceNew('MenuItem'))
 const checkMenuItemNew = vi.hoisted(() => resourceNew('CheckMenuItem'))
 const predefinedMenuItemNew = vi.hoisted(() => resourceNew('PredefinedMenuItem'))
-const contextSubmenuNew = vi.hoisted(() => resourceNew('Submenu'))
+const submenuNew = vi.hoisted(() => resourceNew('Submenu'))
 
 vi.mock('@tauri-apps/api/menu', () => ({
   Menu: { new: menuNew },
   MenuItem: { new: menuItemNew },
   CheckMenuItem: { new: checkMenuItemNew },
   PredefinedMenuItem: { new: predefinedMenuItemNew },
-  Submenu: {
-    new: (options: SubmenuOptionsForTest) => {
-      return options.text === 'Schedule' ? contextSubmenuNew(options) : submenuNew(options)
-    },
-  },
+  Submenu: { new: submenuNew },
 }))
 
 const { createTauriNativeMenuHost } = await import('./native-menu.ts')
@@ -111,12 +96,12 @@ describe('createTauriNativeMenuHost', () => {
     const view = submenuNew.mock.calls
       .map(([options]) => options)
       .find((options) => options.text === 'View')
-    expect(view).toEqual({
+    expect(view).toMatchObject({
       text: 'View',
       items: [
-        { ...sidebarToggle, built: 'MenuItem', close: expect.any(Function) as () => void },
+        { ...sidebarToggle, built: 'MenuItem' },
         { item: 'Separator' },
-        { ...themeToggle, built: 'MenuItem', close: expect.any(Function) as () => void },
+        { ...themeToggle, built: 'MenuItem' },
         { item: 'Quit', text: 'Quit Reflect' },
       ],
     })
