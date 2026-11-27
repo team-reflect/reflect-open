@@ -17,11 +17,14 @@ export function createBrowserContextMenuService(): ContextMenuService {
   return {
     async open({ items, onSelect }) {
       const at = pointer
+      const entries = await items
       const { BrowserContextMenu } = await import('@/components/browser-context-menu.tsx')
       root ??= createRoot(document.body.appendChild(document.createElement('div')))
       opened += 1
       // A new key replaces the open menu, even one that is still closing.
-      root.render(<BrowserContextMenu key={opened} items={items} onSelect={onSelect} point={at} />)
+      root.render(
+        <BrowserContextMenu key={opened} items={entries} onSelect={onSelect} point={at} />,
+      )
     },
   }
 }

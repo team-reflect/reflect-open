@@ -328,6 +328,14 @@ export type ChromeIntent =
   | { type: 'search'; entryId: number; text: string }
   /**  The user picked `month` (`YYYY-MM`) in the title's month picker. */
   | { type: 'pickMonth'; entryId: number; month: string }
+  /**
+   *  A pointer's secondary click at `x`, `y` (CSS px in the viewport) asks
+   *  for the context menu there. The page answers with a `contextMenu`
+   *  message.
+   */
+  | { type: 'contextMenu'; request: number; x: number; y: number }
+  /**  The user chose the item `id` of the context menu of `request`. */
+  | { type: 'contextMenuSelect'; request: number; id: string }
 
 /**
  *  Whether the page shows its shell, or a full-screen page with no bars
@@ -402,6 +410,11 @@ export type ChromeMessage =
    *  text.
    */
   | { type: 'focusSearch'; entryId: number }
+  /**
+   *  The answer to the `contextMenu` intent with the same `request`: the
+   *  items of the menu, or none for no menu.
+   */
+  | { type: 'contextMenu'; request: number; items: MenuItem[] }
 
 /**  A tab of the shell. */
 export type ChromeTab = 'daily' | 'all' | 'tasks'

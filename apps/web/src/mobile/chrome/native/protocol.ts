@@ -52,6 +52,14 @@ const tabSchema = z.enum({ daily: 'daily', all: 'all', tasks: 'tasks' } satisfie
 const fileSchema = z.object({ name: z.string(), type: z.string(), data: z.string() })
 
 // The shell is trusted; the schema keeps a malformed event from running.
+/**
+ * The schemas of the shell's context menu intents.
+ */
+export const CONTEXT_MENU_INTENT_SCHEMAS = [
+  z.object({ type: z.literal('contextMenu'), request: z.number(), x: z.number(), y: z.number() }),
+  z.object({ type: z.literal('contextMenuSelect'), request: z.number(), id: z.string() }),
+] as const
+
 const intentSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('back'), entryId: z.number() }),
   z.object({
@@ -80,6 +88,7 @@ const intentSchema = z.discriminatedUnion('type', [
       z.object({ kind: z.literal('menu'), id: z.string() }),
     ]),
   }),
+  ...CONTEXT_MENU_INTENT_SCHEMAS,
 ]) satisfies z.ZodType<ChromeIntent>
 
 /**

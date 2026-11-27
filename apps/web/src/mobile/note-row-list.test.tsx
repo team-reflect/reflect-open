@@ -237,6 +237,18 @@ describe('NoteRowList', () => {
     expect(view.getByRole('button', { name: 'Delete Alpha' }).query()).toBeNull()
   })
 
+  it('a right-click opens the row menu, and its Delete asks before the trash', async () => {
+    const view = await mount(<NoteRowList rows={[row()]} onOpen={onOpen} />)
+    const contextMenu = view.appServices.contextMenu
+
+    await view.getByRole('button', { name: /Alpha.*First line/ }).click({ button: 'right' })
+
+    await vi.waitFor(() => expect(contextMenu.popups()).toHaveLength(1))
+    await act(() => contextMenu.select('delete'))
+    await expect.element(view.getByText('Delete this note?')).toBeInTheDocument()
+    expect(onOpen).not.toHaveBeenCalled()
+  })
+
   it('closes an open row when the list scrolls', async () => {
     const rows = Array.from({ length: 20 }, (_, index) => {
       return row({

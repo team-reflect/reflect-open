@@ -18,5 +18,7 @@
   { "type": "sidebar", "command": { "kind": "share", "path": "reflect-v2.md" } },
   { "type": "sidebar", "command": { "kind": "menu", "id": "graphs" } },
   { "type": "search", "entryId": 3, "text": "meet" },
-  { "type": "pickMonth", "entryId": 3, "month": "2026-08" }
+  { "type": "pickMonth", "entryId": 3, "month": "2026-08" },
+  { "type": "contextMenu", "request": 2, "x": 120.5, "y": 48 },
+  { "type": "contextMenuSelect", "request": 2, "id": "0" }
 ]

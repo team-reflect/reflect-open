@@ -35,11 +35,10 @@ function findAction(items: readonly ContextMenuItem[], id: string): ContextMenuA
 }
 
 class TestContextMenuServiceImpl implements TestContextMenuService {
-  readonly #popups: ContextMenuOptions[] = []
+  readonly #popups: { items: readonly ContextMenuItem[]; onSelect: (id: string) => void }[] = []
 
-  open(options: ContextMenuOptions): Promise<void> {
-    this.#popups.push(options)
-    return Promise.resolve()
+  async open({ items, onSelect }: ContextMenuOptions): Promise<void> {
+    this.#popups.push({ items: await items, onSelect })
   }
 
   popups(): readonly (readonly ContextMenuItem[])[] {

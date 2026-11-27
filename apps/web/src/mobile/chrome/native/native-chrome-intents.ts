@@ -146,6 +146,10 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
       }
       return
     }
+    case 'contextMenu':
+    case 'contextMenuSelect':
+      // The Swift menu host runs them.
+      return
     case 'plus': {
       const plus = context.screen?.plus
       if (intent.entryId === context.entryId && plus !== undefined) {

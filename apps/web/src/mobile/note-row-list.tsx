@@ -1,15 +1,35 @@
-import { WritableStore } from '@reflect/core'
-import { useCallback, useRef, useState, type ReactElement } from 'react'
+import { WritableStore, type IndexQueryService, type NoteRowService } from '@reflect/core'
+import { useCallback, useRef, useState, type MouseEvent, type ReactElement } from 'react'
 import { Virtualizer } from 'virtua'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { ConfirmDrawer } from '@/mobile/confirm-drawer.tsx'
 import { NOTE_DELETE_CONFIRM } from '@/mobile/note-actions-menu.tsx'
+import { getNoteRowMenuItems } from '@/mobile/note-row-menu.ts'
 import {
   NOTE_ROW_HEIGHT,
   SwipeableNoteRow,
   type NoteRowModel,
 } from '@/mobile/swipeable-note-row.tsx'
-import { useCoreServices } from '@/services/services-provider.tsx'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+
+/**
+ * Whether `path` is private, or `undefined` when the index cannot say.
+ */
+async function readIsPrivate(
+  noteRows: NoteRowService,
+  indexQuery: IndexQueryService,
+  path: string,
+): Promise<boolean | undefined> {
+  const overlaid = noteRows.get().get(path)?.isPrivate
+  if (overlaid !== undefined) {
+    return overlaid
+  }
+  try {
+    return (await indexQuery.getNote(path))?.isPrivate ?? false
+  } catch {
+    return undefined
+  }
+}
 
 interface NoteRowListProps {
   rows: NoteRowModel[]
@@ -24,7 +44,8 @@ interface NoteRowListProps {
  * return.
  */
 export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
-  const { noteActions } = useCoreServices()
+  const { noteActions, noteRows, indexQuery } = useCoreServices()
+  const { contextMenu } = useAppServices()
   const [revealedRow] = useState(() => new WritableStore<string | null>(null))
   const [deletePath, setDeletePath] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -44,6 +65,40 @@ export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
     [revealedRow],
   )
 
+  const openMenu = useCallback(
+    (row: NoteRowModel): void => {
+      const items = readIsPrivate(noteRows, indexQuery, row.path).then((isPrivate) => {
+        return getNoteRowMenuItems(row, isPrivate)
+      })
+      void contextMenu.open({
+        items,
+        onSelect: (id) => {
+          if (id === 'pin') {
+            togglePin(row)
+          } else if (id === 'privacy') {
+            void noteActions.togglePrivate(row.path)
+          } else if (id === 'delete') {
+            requestDelete(row)
+          }
+        },
+      })
+    },
+    [contextMenu, noteActions, noteRows, indexQuery, togglePin, requestDelete],
+  )
+  // One listener for the list: virtua renders every mounted row again on each scroll step.
+  const onContextMenu = useCallback(
+    (event: MouseEvent<HTMLDivElement>): void => {
+      const target = event.target instanceof Element ? event.target : null
+      const path = target?.closest<HTMLElement>('[data-note-path]')?.dataset.notePath
+      const row = rows.find((candidate) => candidate.path === path)
+      if (row !== undefined) {
+        event.preventDefault()
+        openMenu(row)
+      }
+    },
+    [rows, openMenu],
+  )
+
   return (
     <>
       <div
@@ -53,6 +108,7 @@ export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
         // inside this scroller, below the iOS scroll indicator.
         className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-safe"
         ref={scrollRef}
+        onContextMenu={onContextMenu}
         onScroll={(event) => {
           revealedRow.set(null)
           onScroll(event)

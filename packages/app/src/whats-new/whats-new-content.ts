@@ -73,6 +73,12 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       body: 'Agents can now run `reflect tasks` to list your open tasks. Set it up in Settings → Agents.',
       platforms: ['darwin', 'windows', 'linux'],
     },
+    {
+      id: 'note-row-menu-ipad',
+      title: 'Right-click notes in the list',
+      body: 'On iPad, right-click a note in the All list to pin, lock, or delete it.',
+      platforms: ['ios'],
+    },
   ],
   '0.19.0': [
     {

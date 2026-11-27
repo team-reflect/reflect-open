@@ -31,7 +31,7 @@ describe('createTauriContextMenuService', () => {
       },
     ]
 
-    await createTauriContextMenuService().open({ items, onSelect })
+    await createTauriContextMenuService().open({ items: Promise.resolve(items), onSelect })
 
     const action = expect.any(Function) as () => void
     expect(menuNew).toHaveBeenLastCalledWith({

@@ -43,7 +43,7 @@ describe('parseNativeIntent', () => {
       '../../../../../../apple/Tests/ChromeKitTests/Fixtures/intents.json',
     )
     const intents = JSON.parse(readFileSync(path, 'utf8')) as unknown[]
-    expect(intents).toHaveLength(20)
+    expect(intents).toHaveLength(22)
     for (const intent of intents) {
       expect(parseNativeIntent(intent)).toEqual(intent)
     }

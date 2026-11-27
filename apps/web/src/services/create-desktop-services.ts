@@ -41,6 +41,7 @@ import { createTauriUpdaterAdapter } from '@/services/tauri-updater.ts'
 import { createTauriWindowHost } from '@/services/tauri-window.ts'
 import { createSwiftDeepLinkSource } from '@/services/swift-deep-link.ts'
 import { createSwiftHttpService } from '@/services/swift-http.ts'
+import { createSwiftContextMenuService } from '@/services/swift-context-menu-service.ts'
 import { createSwiftNativeChromeHost } from '@/services/swift-native-chrome.ts'
 import { createSwiftOpenerTransport } from '@/services/swift-opener.ts'
 
@@ -135,14 +136,17 @@ export function createDesktopHost(
         appMenuHost: createTauriAppMenuHost(),
         contextMenu: createTauriContextMenuService(),
       }
-    case 'swift':
+    case 'swift': {
+      const nativeChrome = createSwiftNativeChromeHost(window)
       return {
         ...common,
         dialog: createBrowserDialogService(),
         opener: createSwiftOpenerTransport(ipc),
         exceptionTelemetry,
-        nativeChrome: createSwiftNativeChromeHost(window),
+        nativeChrome,
+        contextMenu: createSwiftContextMenuService(nativeChrome, document),
       }
+    }
     case 'browser':
       return {
         ...common,

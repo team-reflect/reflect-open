@@ -71,7 +71,11 @@ export const SwipeableNoteRow = memo(function SwipeableNoteRow({
   }
 
   return (
-    <div className="border-b border-border" style={{ height: NOTE_ROW_HEIGHT }}>
+    <div
+      className="border-b border-border"
+      style={{ height: NOTE_ROW_HEIGHT }}
+      data-note-path={row.path}
+    >
       <SwipeRow
         revealed={revealed}
         onReveal={reveal}
