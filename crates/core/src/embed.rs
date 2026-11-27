@@ -1,36 +1,42 @@
-//! The local embedding runtime (Plan 09): fastembed (ONNX) in-process, off the
-//! UI thread. The model (all-MiniLM-L6-v2, 384-dim) is downloaded on demand
+//! The local embedding runtime (Plan 09): llama.cpp in-process, off the
+//! UI thread. The model (EmbeddingGemma 300M, Q8_0 GGUF) is downloaded on demand
 //! into app data — never bundled — and every failure degrades to a reported
 //! "unavailable" state (the same recoverable contract as sqlite-vec): semantic
 //! search is strictly additive, so nothing here may ever take the app down.
 
+use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
-use fastembed::{EmbeddingModel, TextEmbedding, TextInitOptions};
 use hf_hub::Cache;
 use hf_hub::api::Progress;
 use hf_hub::api::sync::ApiBuilder;
+use llama_cpp_2::context::LlamaContext;
+use llama_cpp_2::context::params::{LlamaContextParams, LlamaPoolingType};
+use llama_cpp_2::llama_backend::LlamaBackend;
+use llama_cpp_2::llama_batch::LlamaBatch;
+use llama_cpp_2::model::LlamaModel;
+use llama_cpp_2::model::params::LlamaModelParams;
 use reflect_types::{AppError, AppResult, EmbedProgress, EmbedStatus};
 
 use crate::{Core, Host};
 
 /// Identifier recorded per vector; changing the model bumps this and triggers
 /// an embedding rebuild (`index_meta.embeddingModel` comparison in TS).
-pub const MODEL_ID: &str = "all-MiniLM-L6-v2";
+pub const MODEL_ID: &str = "embeddinggemma-300m-q8_0-spike";
 
 /// The hf-hub repo and files fastembed resolves for `AllMiniLML6V2`. Mirrored
 /// here so the pre-download (the progress-reporting path) fills the exact
 /// cache `try_new` reads. If fastembed ever changes its file set, the only
 /// cost is that it downloads the difference itself — without progress.
-const MODEL_REPO: &str = "Qdrant/all-MiniLM-L6-v2-onnx";
-const MODEL_FILES: [&str; 5] = [
-    "model.onnx",
-    "tokenizer.json",
-    "config.json",
-    "special_tokens_map.json",
-    "tokenizer_config.json",
-];
+const MODEL_REPO: &str = "ggml-org/embeddinggemma-300M-GGUF";
+const MODEL_FILE: &str = "embeddinggemma-300M-Q8_0.gguf";
+const MODEL_FILES: [&str; 1] = [MODEL_FILE];
+/// Spike only: the index schema still holds 384-dim vectors, so keep the
+/// first 384 Matryoshka dimensions.
+const DIMS: usize = 384;
+const MAX_TOKENS: usize = 512;
+const DOCUMENT_PROMPT: &str = "title: none | text: ";
 /// ONNX Runtime intra-op threads. The default is one per logical CPU, and the
 /// workers spin-wait between ops. A call embeds one note (two or three
 /// chunks), so a large pool mostly spins.
@@ -39,6 +45,89 @@ const INTRA_OP_THREADS: usize = 2;
 /// default of 256 needs about 17 GB for a 300 KB note), and the freed memory
 /// stays in the process. One text keeps the peak near the model's own size.
 const EMBED_BATCH_SIZE: usize = 1;
+
+/// One loaded model and its context. llama.cpp contexts are not `Sync`, so
+/// the model sits behind a Mutex and embed calls serialize.
+struct TextEmbedding {
+    model: &'static LlamaModel,
+    context: LlamaContext<'static>,
+}
+
+// SAFETY: the context is only used behind the runtime's Mutex.
+unsafe impl Send for TextEmbedding {}
+
+fn backend() -> Result<&'static LlamaBackend, String> {
+    static BACKEND: OnceLock<Result<LlamaBackend, String>> = OnceLock::new();
+    BACKEND
+        .get_or_init(|| {
+            let mut backend = LlamaBackend::init().map_err(|err| err.to_string())?;
+            backend.void_logs();
+            Ok(backend)
+        })
+        .as_ref()
+        .map_err(Clone::clone)
+}
+
+impl TextEmbedding {
+    fn load(path: &Path) -> Result<Self, String> {
+        let backend = backend()?;
+        let gpu_layers = if cfg!(target_vendor = "apple") && cfg!(target_arch = "aarch64") {
+            99
+        } else {
+            0
+        };
+        let params = LlamaModelParams::default().with_n_gpu_layers(gpu_layers);
+        let model =
+            LlamaModel::load_from_file(backend, path, &params).map_err(|err| err.to_string())?;
+        // Spike: leaked; the real runtime frees it on unload.
+        let model: &'static LlamaModel = Box::leak(Box::new(model));
+        let threads = INTRA_OP_THREADS as i32;
+        let context = model
+            .new_context(
+                backend,
+                LlamaContextParams::default()
+                    .with_embeddings(true)
+                    .with_pooling_type(LlamaPoolingType::Mean)
+                    .with_n_ctx(NonZeroU32::new(MAX_TOKENS as u32))
+                    .with_n_batch(MAX_TOKENS as u32)
+                    .with_n_ubatch(MAX_TOKENS as u32)
+                    .with_n_threads(threads)
+                    .with_n_threads_batch(threads),
+            )
+            .map_err(|err| err.to_string())?;
+        Ok(Self { model, context })
+    }
+
+    fn embed_one(&mut self, text: &str) -> Result<Vec<f32>, String> {
+        let input = format!("{DOCUMENT_PROMPT}{text}");
+        let mut tokens = self.model.vocab().tokenize(input.as_bytes(), true, false);
+        tokens.truncate(MAX_TOKENS);
+        self.context.clear_kv_cache();
+        let mut batch = LlamaBatch::new(MAX_TOKENS, 1);
+        batch
+            .add_sequence(&tokens, 0, false)
+            .map_err(|err| err.to_string())?;
+        self.context
+            .decode(&mut batch)
+            .map_err(|err| err.to_string())?;
+        let full = self
+            .context
+            .embeddings_seq_ith(0)
+            .map_err(|err| err.to_string())?;
+        let mut vector = full[..DIMS.min(full.len())].to_vec();
+        let norm = vector.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-12);
+        vector.iter_mut().for_each(|x| *x /= norm);
+        Ok(vector)
+    }
+
+    fn embed(
+        &mut self,
+        texts: Vec<String>,
+        _batch: Option<usize>,
+    ) -> Result<Vec<Vec<f32>>, String> {
+        texts.iter().map(|text| self.embed_one(text)).collect()
+    }
+}
 
 #[derive(Default)]
 enum Runtime {
@@ -281,12 +370,11 @@ impl Core {
             .runtime
             .spawn_blocking(move || {
                 download_model_files(host, state, &cache_dir)?;
-                TextEmbedding::try_new(
-                    TextInitOptions::new(EmbeddingModel::AllMiniLML6V2)
-                        .with_cache_dir(cache_dir)
-                        .with_intra_threads(INTRA_OP_THREADS),
-                )
-                .map_err(|err| err.to_string())
+                let path = Cache::new(cache_dir)
+                    .model(MODEL_REPO.to_string())
+                    .get(MODEL_FILE)
+                    .ok_or_else(|| "model file missing after download".to_string())?;
+                TextEmbedding::load(&path)
             })
             .await
         {

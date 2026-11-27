@@ -32,6 +32,7 @@ tempfile = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "sync", "fs", "io-util"] }
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+llama-cpp-2 = { workspace = true, features = ["metal"] }
 objc2 = { workspace = true }
 # iCloud (`icloud/`), Contacts (`contacts.rs`), LinkPresentation
 # (`link_preview.rs`) and the App Group container (`capture.rs`). dispatch2's
@@ -72,12 +73,9 @@ trash = { workspace = true }
 notify-debouncer-full = { workspace = true }
 walkdir = { workspace = true }
 
-# The embedding runtime. Intel macOS has none: ONNX Runtime 1.24+ ships no
-# macOS x86_64 binaries.
-[target.'cfg(all(not(any(target_os = "android", target_os = "ios")), not(all(target_os = "macos", target_arch = "x86_64"))))'.dependencies]
-fastembed = { workspace = true }
-# Direct dependency on fastembed's own downloader, used to pre-fetch the
-# embedding model with byte-level progress (fastembed downloads silently).
+# The embedding runtime (spike: llama.cpp). Every platform but Android.
+[target.'cfg(not(target_os = "android"))'.dependencies]
+llama-cpp-2 = { workspace = true }
 hf-hub = { workspace = true, features = ["ureq", "native-tls"] }
 
 [dev-dependencies]

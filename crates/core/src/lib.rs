@@ -20,17 +20,9 @@ pub mod web_fetch;
 // The watcher and the embedding runtime are desktop capabilities, and Intel
 // macOS has no embedding runtime either: other platforms swap in stand-ins
 // with the same `Core` methods.
-#[cfg(not(any(
-    target_os = "android",
-    target_os = "ios",
-    all(target_os = "macos", target_arch = "x86_64")
-)))]
+#[cfg(not(target_os = "android"))]
 pub mod embed;
-#[cfg(any(
-    target_os = "android",
-    target_os = "ios",
-    all(target_os = "macos", target_arch = "x86_64")
-))]
+#[cfg(target_os = "android")]
 #[path = "embed_unsupported.rs"]
 pub mod embed;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
