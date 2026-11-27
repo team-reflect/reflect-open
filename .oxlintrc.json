@@ -12,10 +12,6 @@
       {
         "paths": [
           {
-            "name": "date-fns",
-            "message": "Import each function from its subpath, e.g. `date-fns/addDays`. The root entry loads the types of every function."
-          },
-          {
             "name": "@icons-pack/react-simple-icons",
             "message": "Import each icon from its subpath, e.g. `@icons-pack/react-simple-icons/icons/SiGithub`. The root entry loads every icon."
           }
