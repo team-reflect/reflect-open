@@ -19,7 +19,7 @@ reflect://tasks                     the tasks view
 survives renames. Then come an ISO date, a graph-relative path, a title, and an alias.
 Ambiguity resolves to the first path alphabetically. Links resolve **in the open graph** only.
 
-**Copy deep link** (⌘K palette, `⌥⌘L`) copies the id form. On first copy it writes an `id:` into
+**Copy Deep Link** (⌘K palette, `⌥⌘L`) copies the id form. On first copy it writes an `id:` into
 the frontmatter of notes that predate ids, so the link outlives any rename. Daily notes use the
 date form. A hand-written `reflect://note/Project%20X` also works, by title.
 

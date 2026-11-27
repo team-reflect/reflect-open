@@ -89,7 +89,7 @@ What `SettingsService` gives you (do not re-implement it):
 
 ## 3. Add the control
 
-`settings-screen.tsx` (⌘, or the palette's "Open settings") renders one
+`settings-screen.tsx` (⌘, or the palette's "Open Settings") renders one
 section component per group. A new group
 needs an entry in `SETTINGS_SECTIONS` (`settings/sections.ts`), which drives the
 navigator and section DOM ids, and its component rendered from
