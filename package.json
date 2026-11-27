@@ -19,6 +19,7 @@
     "build:macos": "pnpm --filter @reflect/tauri build:macos",
     "build:windows": "pnpm --filter @reflect/tauri build:windows",
     "web-inspector": "node scripts/web-inspector.ts",
+    "free-ci-mac-runners": "node scripts/free-ci-mac-runners.ts",
     "typecheck": "tsc -b",
     "test": "turbo run vitest --",
     "test:browser": "turbo run vitest:browser --",
