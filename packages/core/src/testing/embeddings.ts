@@ -97,8 +97,9 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
           return this.#status
         },
         embed_query: (args) => this.#embed([String(args['text'])])[0],
-        embed_documents: (args) =>
-          this.#embed(Array.isArray(args['texts']) ? args['texts'].map(String) : []),
+        embed_documents: (args) => {
+          return this.#embed(Array.isArray(args['texts']) ? args['texts'].map(String) : [])
+        },
       },
     })
     this.#inner = createEmbeddingRuntimeService({
