@@ -3,9 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRef, useLayoutEffect, useState, type ReactElement, type RefObject } from 'react'
 import { aiKeySecretName, type AiProviderConfig, type ChatStreamEvent } from '@reflect/core'
 import {
+  TEST_EMBED_MODEL,
   createTestDatabaseService,
   createTestCoreServices,
   createTestChatEngineService,
+  createTestEmbeddingRuntimeService,
+  createTestPlatformService,
   createTestSecretStoreService,
   type TestChatEngineService,
 } from '@reflect/core/testing'
@@ -13,7 +16,7 @@ import type { Route, Section } from '@reflect/app'
 import { createTestNavigationService } from '@reflect/app/testing'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
-import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { MobileChat } from './chat.tsx'
 
 /**
@@ -28,6 +31,7 @@ import { MobileChat } from './chat.tsx'
 const settingsState = {
   models: [] as AiProviderConfig[],
   defaultId: null as string | null,
+  semanticSearchEnabled: false,
 }
 
 const GRAPH = { root: '/graphs/test', name: 'test-graph', generation: 1 }
@@ -39,6 +43,7 @@ let chatEngine: TestChatEngineService
 beforeEach(() => {
   settingsState.models = []
   settingsState.defaultId = null
+  settingsState.semanticSearchEnabled = false
   chatEngine = createTestChatEngineService()
 })
 
@@ -105,6 +110,10 @@ async function renderHarness(route: Route = { kind: 'today' }, chatSection: Sect
     database: createTestDatabaseService(),
     secretStore: createTestSecretStoreService({ [aiKeySecretName(MODEL.id)]: 'sk-test' }),
     chatEngine,
+    embeddingRuntime: createTestEmbeddingRuntimeService({
+      status: { status: 'ready', model: TEST_EMBED_MODEL },
+    }),
+    platform: createTestPlatformService(MOBILE_PLATFORM),
   })
   // The index is not open, so the history drawer reads nothing.
   return await renderInApp(<Harness />, {
@@ -112,7 +121,11 @@ async function renderHarness(route: Route = { kind: 'today' }, chatSection: Sect
     appServices: { navigation },
     graph: { ...GRAPH, indexGeneration: null },
     route,
-    settings: { aiProviders: settingsState.models, defaultAiProviderId: settingsState.defaultId },
+    settings: {
+      aiProviders: settingsState.models,
+      defaultAiProviderId: settingsState.defaultId,
+      semanticSearchEnabled: settingsState.semanticSearchEnabled,
+    },
   })
 }
 
@@ -157,6 +170,24 @@ describe('MobileChat', () => {
     await expect.element(page.getByText('what did I write?')).toBeVisible()
     // A send that goes through clears the provider-held draft.
     await expect.element(composer).toHaveValue('')
+  })
+
+  it('lets `search_notes` run hybrid once semantic search is on and the model is ready', async () => {
+    configureModel()
+    settingsState.semanticSearchEnabled = true
+    scriptTurn([
+      { type: 'text-delta', text: 'Grounded answer.' },
+      { type: 'complete', messages: [{ role: 'assistant', content: 'Grounded answer.' }] },
+    ])
+    await renderHarness()
+
+    fireEvent.change(page.getByLabelText('Chat message'), {
+      target: { value: 'what did I write?' },
+    })
+    await page.getByRole('button', { name: 'Send' }).click()
+
+    await expect.element(page.getByText('Grounded answer.')).toBeVisible()
+    expect(chatEngine.calls()[0]?.semanticSearchEnabled).toBe(true)
   })
 
   it('names the open conversation in its entry, and New chat renames it', async () => {
