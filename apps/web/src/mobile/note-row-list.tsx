@@ -41,7 +41,7 @@ interface NoteRowListProps {
  * content line, relative timestamp, a pin marker on pinned notes) shared by
  * the plain list, the filtered feed, and search results — V1's one row shape.
  * Its scroll position is kept per history entry and restored on an All tab
- * return. A pointer's secondary click on a row opens the row's context menu.
+ * return.
  */
 export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
   const { noteActions, noteRows, indexQuery } = useCoreServices()

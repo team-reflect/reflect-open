@@ -6,16 +6,8 @@ import {
 } from '@reflect/app'
 import type { ChromeIntent, ChromeMessage, MenuItem } from '@reflect/types'
 import { z } from 'zod'
+import { CONTEXT_MENU_INTENT_SCHEMAS } from '@/mobile/chrome/native/protocol.ts'
 
-/**
- * The schemas of the shell's context menu intents, which this host runs.
- */
-export const CONTEXT_MENU_INTENT_SCHEMAS = [
-  z.object({ type: z.literal('contextMenu'), request: z.number(), x: z.number(), y: z.number() }),
-  z.object({ type: z.literal('contextMenuSelect'), request: z.number(), id: z.string() }),
-] as const
-
-// The shell is trusted; the schema keeps a malformed event from running.
 const intentSchema = z.discriminatedUnion(
   'type',
   CONTEXT_MENU_INTENT_SCHEMAS,

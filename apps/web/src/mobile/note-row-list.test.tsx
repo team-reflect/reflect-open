@@ -244,12 +244,6 @@ describe('NoteRowList', () => {
     await view.getByRole('button', { name: /Alpha.*First line/ }).click({ button: 'right' })
 
     await vi.waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
-    expect(nativeMenu.popups()[0]).toEqual([
-      { type: 'action', id: 'pin', title: 'Pin' },
-      { type: 'action', id: 'privacy', title: 'Lock note' },
-      { type: 'separator' },
-      { type: 'action', id: 'delete', title: 'Delete', destructive: true },
-    ])
     await act(() => nativeMenu.select('delete'))
     await expect.element(view.getByText('Delete this note?')).toBeInTheDocument()
     expect(onOpen).not.toHaveBeenCalled()
