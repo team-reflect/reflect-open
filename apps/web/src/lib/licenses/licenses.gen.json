@@ -3337,9 +3337,9 @@
     },
     {
       "name": "Inter",
-      "ecosystem": "other",
       "license": "OFL-1.1",
       "url": "https://github.com/rsms/inter",
+      "ecosystem": "other",
       "texts": [
         "eIKZ"
       ]
