@@ -50,12 +50,14 @@
       "outputLogs": "new-only",
       "outputs": ["**/*.tsbuildinfo"],
     },
-    "//#test:node": {
+    "//#vitest:node": {
       "outputLogs": "new-only",
+      "command": ["vitest", "run", "--project", "!*browser*"],
       "dependsOn": ["@reflect/index-wasm#build"],
     },
-    "//#test:browser": {
+    "//#vitest:browser": {
       "outputLogs": "new-only",
+      "command": ["vitest", "run", "--project", "*browser*"],
       "dependsOn": ["@reflect/index-wasm#build"],
       "inputs": [
         "$TURBO_DEFAULT$",

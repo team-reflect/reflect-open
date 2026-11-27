@@ -173,7 +173,7 @@ jobs:
         run: pnpm run build
 
       - name: Test
-        run: pnpm turbo run test:node
+        run: pnpm turbo run vitest:node
 
   test-chromium:
     needs: [classify]
@@ -215,7 +215,7 @@ jobs:
 
       # `--only` passes `--shard` to the test task alone, not to the wasm build.
       - name: Test
-        run: pnpm turbo run test:browser --only -- --shard=${{ matrix.shard }}/3
+        run: pnpm turbo run vitest:browser --only -- --shard=${{ matrix.shard }}/3
 
   test-webkit:
     needs: [classify, test-chromium]
@@ -250,13 +250,13 @@ jobs:
       # runs in its own Vitest process to restart the browser. `--only` passes
       # `--shard` to the test task alone, not to the wasm build.
       - name: Test browser (shard 1/3)
-        run: pnpm turbo run test:browser --only -- --shard=1/3
+        run: pnpm turbo run vitest:browser --only -- --shard=1/3
 
       - name: Test browser (shard 2/3)
-        run: pnpm turbo run test:browser --only -- --shard=2/3
+        run: pnpm turbo run vitest:browser --only -- --shard=2/3
 
       - name: Test browser (shard 3/3)
-        run: pnpm turbo run test:browser --only -- --shard=3/3
+        run: pnpm turbo run vitest:browser --only -- --shard=3/3
 
   test-swift:
     needs: classify
