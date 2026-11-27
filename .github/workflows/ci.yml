@@ -166,6 +166,12 @@ jobs:
       - name: Typecheck
         run: pnpm turbo run typecheck --filter=//
 
+      - name: Lint (oxfmt)
+        run: pnpm turbo run lint:oxfmt --filter=//
+
+      - name: Lint (oxlint)
+        run: pnpm turbo run lint:oxlint --filter=//
+
       # The ESLint cache outlives a run: a PR lints only the files whose content
       # changed since its last run or since master. Master lints every file, so
       # it also checks results that depend on another file's types.
@@ -182,12 +188,6 @@ jobs:
           path: .eslintcache
           key: ${{ steps.eslint-cache.outputs.prefix }}${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: ${{ steps.eslint-cache.outputs.prefix }}
-
-      - name: Lint (oxfmt)
-        run: pnpm turbo run lint:oxfmt --filter=//
-
-      - name: Lint (oxlint)
-        run: pnpm turbo run lint:oxlint --filter=//
 
       - name: Lint (ESLint)
         run: pnpm turbo run lint:eslint --filter=//
