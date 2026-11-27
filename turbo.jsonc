@@ -55,6 +55,10 @@
       "command": ["vitest", "run"],
       "dependsOn": ["@reflect/index-wasm#build"],
       "env": ["DEBUG", "REFLECT_TEST_BROWSER", "UPDATE_CHROME_FIXTURES", "UPDATE_PARITY"],
+      "outputs": [
+        "$TURBO_ROOT$/apple/Tests/ChromeKitTests/Fixtures/*.json",
+        "$TURBO_ROOT$/fixtures/parity/expected.json",
+      ],
       "passThroughEnv": ["VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB", "__XPC_JSC_useJIT"],
     },
     "//#vitest:node": {
@@ -62,6 +66,10 @@
       "command": ["vitest", "run", "--project", "!*browser*"],
       "dependsOn": ["@reflect/index-wasm#build"],
       "env": ["UPDATE_CHROME_FIXTURES", "UPDATE_PARITY"],
+      "outputs": [
+        "$TURBO_ROOT$/apple/Tests/ChromeKitTests/Fixtures/*.json",
+        "$TURBO_ROOT$/fixtures/parity/expected.json",
+      ],
     },
     "//#vitest:browser": {
       "outputLogs": "new-only",
