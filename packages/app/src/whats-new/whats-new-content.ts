@@ -24,6 +24,14 @@ const MENUS_BODY =
  * marketing version's list, and each update shows only the items not seen yet.
  */
 export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
+  '0.21.0': [
+    {
+      id: 'mobile-semantic-search',
+      title: 'Semantic search on iPhone and iPad',
+      body: 'Turn on Semantic search in Settings to find notes by meaning, not only by exact words.',
+      platforms: ['ios'],
+    },
+  ],
   '0.20.0': [
     {
       id: 'recently-opened-notes-macos',
