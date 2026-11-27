@@ -17,6 +17,7 @@ final class ChromeCoordinator {
   /// The container of the pages: the root's only child.
   var container: UIViewController { tabs }
   private let menus = MenuPresenter()
+  private let pointerMenus: PointerMenuPresenter
   private let bar: NavigationBarPresenter
   private let monthPicker = MonthPickerPresenter()
   private let formatting: FormattingAccessory
@@ -31,6 +32,7 @@ final class ChromeCoordinator {
     tabs = ChromeTabController(webView: host.webView)
     bar = NavigationBarPresenter(navigation: tabs.navigation, menus: menus)
     formatting = FormattingAccessory(webView: host.webView)
+    pointerMenus = PointerMenuPresenter(webView: host.webView)
 
     let bridge = host.chrome
     menus.send = { [weak self] intent in self?.send(intent) }
@@ -44,12 +46,15 @@ final class ChromeCoordinator {
     tabs.onSidebarVisible = { [bridge] visible in bridge.sidebarVisible = visible }
     tabs.onWindowControlsWidth = { [bridge] width in bridge.windowControlsWidth = width }
     menus.presenter = { [weak self] in self?.container }
+    pointerMenus.send = { [bridge] intent in bridge.send(intent) }
+    pointerMenus.canAsk = { [bridge] in bridge.isReady }
     formatting.send = { [weak self] intent in self?.send(intent) }
     formatting.presenter = { [weak self] in self?.container }
     bridge.onState = { [weak self] state in self?.apply(state) }
     bridge.onReset = { [weak self] in self?.reset() }
     bridge.onBackSwipe = { [weak self] started in self?.backSwipe(started: started) }
     bridge.onFocusSearch = { [weak self] entryId in self?.bar.focusSearch(entryId: entryId) }
+    bridge.onContextMenu = { [weak self] menu in self?.pointerMenus.answer(menu) }
     bridge.onError = { message in Self.logger.error("\(message, privacy: .public)") }
   }
 
@@ -113,6 +118,7 @@ final class ChromeCoordinator {
   /// theme stays until the first state, so a pinned style does not flip.
   private func reset() {
     menus.closeAll()
+    pointerMenus.reset()
     monthPicker.close()
     shownTab = nil
     swipeEntryId = nil

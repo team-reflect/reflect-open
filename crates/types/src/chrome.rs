@@ -64,6 +64,12 @@ pub enum ChromeMessage {
     /// Focuses the search field of the screen of `entry_id` and selects its
     /// text.
     FocusSearch { entry_id: isize },
+    /// The answer to the `contextMenu` intent with the same `request`: the
+    /// items of the menu, or none for no menu.
+    ContextMenu {
+        request: isize,
+        items: Vec<MenuItem>,
+    },
 }
 
 /// The middle of the top bar.
@@ -305,6 +311,19 @@ pub enum ChromeIntent {
     PickMonth {
         entry_id: isize,
         month: String,
+    },
+    /// A pointer's secondary click at `x`, `y` (CSS px in the viewport) asks
+    /// for the context menu there. The page answers with a `contextMenu`
+    /// message.
+    ContextMenu {
+        request: isize,
+        x: f64,
+        y: f64,
+    },
+    /// The user chose the item `id` of the context menu of `request`.
+    ContextMenuSelect {
+        request: isize,
+        id: String,
     },
 }
 

@@ -57,6 +57,10 @@ export type NativeMenuItem =
        */
       checked?: boolean | undefined
       /**
+       * Hosts that support it show the item as destructive; others ignore it.
+       */
+      destructive?: boolean | undefined
+      /**
        * Invoked on activation with `id`, or with a host-generated id when `id` is unset.
        */
       action: (id: string) => void
@@ -91,6 +95,7 @@ export type ContextMenuItem =
       title: string
       disabled?: boolean | undefined
       checked?: boolean | undefined
+      destructive?: boolean | undefined
     }
   | { type: 'separator' }
   | { type: 'submenu'; title: string; items: readonly ContextMenuItem[] }
@@ -200,6 +205,7 @@ function resolveContextMenuItem(
     text: item.title,
     enabled: !(item.disabled ?? false),
     checked: item.checked,
+    destructive: item.destructive,
     action: () => onSelect(item.id),
   }
 }

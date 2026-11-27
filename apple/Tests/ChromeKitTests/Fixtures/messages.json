@@ -13,5 +13,16 @@
   {
     "type": "focusSearch",
     "entryId": 3
+  },
+  {
+    "type": "contextMenu",
+    "request": 2,
+    "items": [
+      {
+        "type": "action",
+        "id": "0",
+        "title": "Pin"
+      }
+    ]
   }
 ]

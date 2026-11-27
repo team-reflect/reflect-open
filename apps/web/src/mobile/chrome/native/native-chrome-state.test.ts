@@ -210,6 +210,7 @@ describe('page messages', () => {
       { type: 'backSwipe', phase: 'cancel' },
       { type: 'chromeReady' },
       { type: 'focusSearch', entryId: 3 },
+      { type: 'contextMenu', request: 2, items: [{ type: 'action', id: '0', title: 'Pin' }] },
     ]
     checkJSONFixture('messages', messages)
   })

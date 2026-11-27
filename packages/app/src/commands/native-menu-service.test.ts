@@ -255,6 +255,7 @@ describe('openContextMenu', () => {
           { type: 'action', id: 'clear', title: 'Clear date', disabled: true, checked: false },
         ],
       },
+      { type: 'action', id: 'delete', title: 'Delete', destructive: true },
     ]
 
     await menu.openContextMenu({ items, onSelect })
@@ -269,6 +270,7 @@ describe('openContextMenu', () => {
           text: 'Schedule',
           items: [{ kind: 'command', text: 'Clear date', enabled: false, checked: false, action }],
         },
+        { kind: 'command', text: 'Delete', enabled: true, destructive: true, action },
       ],
     ])
     expect(menu.popups()).toEqual([items])

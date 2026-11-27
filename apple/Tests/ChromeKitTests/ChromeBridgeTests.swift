@@ -32,6 +32,15 @@ final class ChromeBridgeTests: XCTestCase {
       [
         .backSwipe(.init(phase: .start)), .backSwipe(.init(phase: .cancel)), .chromeReady,
         .focusSearch(.init(entryId: 3)),
+        .contextMenu(
+          .init(
+            request: 2,
+            items: [
+              .action(
+                .init(
+                  id: "0", title: "Pin", icon: nil, destructive: nil, disabled: nil, checked: nil,
+                  confirm: nil))
+            ])),
       ])
   }
 
@@ -58,6 +67,8 @@ final class ChromeBridgeTests: XCTestCase {
       .sidebar(.init(command: .menu(.init(id: "graphs")))),
       .search(.init(entryId: 3, text: "meet")),
       .pickMonth(.init(entryId: 3, month: "2026-08")),
+      .contextMenu(.init(request: 2, x: 120.5, y: 48)),
+      .contextMenuSelect(.init(request: 2, id: "0")),
     ]
     let encoded = try JSONSerialization.jsonObject(with: try JSONEncoder().encode(intents))
     let expected = try JSONSerialization.jsonObject(with: try fixture("intents"))
@@ -87,6 +98,14 @@ final class ChromeBridgeTests: XCTestCase {
     bridge.onFocusSearch = { focused.append($0) }
     bridge.receive(try message(["type": "focusSearch", "entryId": 7]))
     XCTAssertEqual(focused, [7])
+  }
+
+  func testCallsContextMenuWithTheAnswer() throws {
+    let bridge = ChromeBridge()
+    var answers: [Int] = []
+    bridge.onContextMenu = { answers.append($0.request) }
+    bridge.receive(try message(["type": "contextMenu", "request": 5, "items": []]))
+    XCTAssertEqual(answers, [5])
   }
 
   func testFixturesCarryThePlusOfTheScreen() throws {

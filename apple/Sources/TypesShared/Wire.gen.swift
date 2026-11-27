@@ -1030,6 +1030,8 @@ public enum ChromeIntent: Sendable, Equatable {
     case sidebar(ChromeIntentSidebarData)
     case search(ChromeIntentSearchData)
     case pickMonth(ChromeIntentPickmonthData)
+    case contextMenu(ChromeIntentContextmenuData)
+    case contextMenuSelect(ChromeIntentContextmenuselectData)
 }
 public struct ChromeIntentBackData: Codable, Sendable, Equatable {
     public let entryId: Int
@@ -1137,6 +1139,28 @@ public struct ChromeIntentPickmonthData: Codable, Sendable, Equatable {
     }
 }
 
+public struct ChromeIntentContextmenuData: Codable, Sendable, Equatable {
+    public let request: Int
+    public let x: Double
+    public let y: Double
+
+    public init(request: Int, x: Double, y: Double) {
+        self.request = request
+        self.x = x
+        self.y = y
+    }
+}
+
+public struct ChromeIntentContextmenuselectData: Codable, Sendable, Equatable {
+    public let request: Int
+    public let id: String
+
+    public init(request: Int, id: String) {
+        self.request = request
+        self.id = id
+    }
+}
+
 // MARK: - ChromeIntent Codable Implementation
 extension ChromeIntent: Codable {
     private struct CodingKeys: CodingKey {
@@ -1192,6 +1216,15 @@ extension ChromeIntent: Codable {
             let entryIdValue = try container.decode(Int.self, forKey: CodingKeys("entryId"))
             let monthValue = try container.decode(String.self, forKey: CodingKeys("month"))
             self = .pickMonth(ChromeIntentPickmonthData(entryId: entryIdValue, month: monthValue))
+        case "contextMenu":
+            let requestValue = try container.decode(Int.self, forKey: CodingKeys("request"))
+            let xValue = try container.decode(Double.self, forKey: CodingKeys("x"))
+            let yValue = try container.decode(Double.self, forKey: CodingKeys("y"))
+            self = .contextMenu(ChromeIntentContextmenuData(request: requestValue, x: xValue, y: yValue))
+        case "contextMenuSelect":
+            let requestValue = try container.decode(Int.self, forKey: CodingKeys("request"))
+            let idValue = try container.decode(String.self, forKey: CodingKeys("id"))
+            self = .contextMenuSelect(ChromeIntentContextmenuselectData(request: requestValue, id: idValue))
         default:
             throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown variant \(tag)"))
         }
@@ -1241,6 +1274,15 @@ extension ChromeIntent: Codable {
             try container.encode("pickMonth", forKey: CodingKeys("type"))
             try container.encode(data.entryId, forKey: CodingKeys("entryId"))
             try container.encode(data.month, forKey: CodingKeys("month"))
+        case .contextMenu(let data):
+            try container.encode("contextMenu", forKey: CodingKeys("type"))
+            try container.encode(data.request, forKey: CodingKeys("request"))
+            try container.encode(data.x, forKey: CodingKeys("x"))
+            try container.encode(data.y, forKey: CodingKeys("y"))
+        case .contextMenuSelect(let data):
+            try container.encode("contextMenuSelect", forKey: CodingKeys("type"))
+            try container.encode(data.request, forKey: CodingKeys("request"))
+            try container.encode(data.id, forKey: CodingKeys("id"))
         }
     }
 }
@@ -1259,6 +1301,7 @@ public enum ChromeMessage: Sendable, Equatable {
     case backSwipe(ChromeMessageBackswipeData)
     case chromeReady
     case focusSearch(ChromeMessageFocussearchData)
+    case contextMenu(ChromeMessageContextmenuData)
 }
 public struct ChromeMessageStateData: Codable, Sendable, Equatable {
     public let generation: Int
@@ -1320,6 +1363,16 @@ public struct ChromeMessageFocussearchData: Codable, Sendable, Equatable {
     }
 }
 
+public struct ChromeMessageContextmenuData: Codable, Sendable, Equatable {
+    public let request: Int
+    public let items: [MenuItem]
+
+    public init(request: Int, items: [MenuItem]) {
+        self.request = request
+        self.items = items
+    }
+}
+
 // MARK: - ChromeMessage Codable Implementation
 extension ChromeMessage: Codable {
     private struct CodingKeys: CodingKey {
@@ -1363,6 +1416,10 @@ extension ChromeMessage: Codable {
         case "focusSearch":
             let entryIdValue = try container.decode(Int.self, forKey: CodingKeys("entryId"))
             self = .focusSearch(ChromeMessageFocussearchData(entryId: entryIdValue))
+        case "contextMenu":
+            let requestValue = try container.decode(Int.self, forKey: CodingKeys("request"))
+            let itemsValue = try container.decode([MenuItem].self, forKey: CodingKeys("items"))
+            self = .contextMenu(ChromeMessageContextmenuData(request: requestValue, items: itemsValue))
         default:
             throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown variant \(tag)"))
         }
@@ -1400,6 +1457,10 @@ extension ChromeMessage: Codable {
         case .focusSearch(let data):
             try container.encode("focusSearch", forKey: CodingKeys("type"))
             try container.encode(data.entryId, forKey: CodingKeys("entryId"))
+        case .contextMenu(let data):
+            try container.encode("contextMenu", forKey: CodingKeys("type"))
+            try container.encode(data.request, forKey: CodingKeys("request"))
+            try container.encode(data.items, forKey: CodingKeys("items"))
         }
     }
 }

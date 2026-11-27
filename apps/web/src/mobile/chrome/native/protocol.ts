@@ -1,5 +1,6 @@
 import type { ChromeIntent, ChromeMessage, ChromeTab, FormattingCommand } from '@reflect/types'
 import { z } from 'zod'
+import { CONTEXT_MENU_INTENT_SCHEMAS } from '@/services/swift-native-menu.ts'
 
 /**
  * The entry id of a surface outside the router (onboarding, loading), so it
@@ -80,6 +81,7 @@ const intentSchema = z.discriminatedUnion('type', [
       z.object({ kind: z.literal('menu'), id: z.string() }),
     ]),
   }),
+  ...CONTEXT_MENU_INTENT_SCHEMAS,
 ]) satisfies z.ZodType<ChromeIntent>
 
 /**

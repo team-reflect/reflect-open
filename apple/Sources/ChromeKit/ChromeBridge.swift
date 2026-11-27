@@ -20,6 +20,8 @@ public final class ChromeBridge {
   public var onBackSwipe: (Bool) -> Void = { _ in }
   /// Called when the page asks to focus the search field of an entry.
   public var onFocusSearch: (Int) -> Void = { _ in }
+  /// Called with the page's answer to a `contextMenu` intent.
+  public var onContextMenu: (ChromeMessageContextmenuData) -> Void = { _ in }
   /// Called when a new document starts: the shell drops what it shows for the old one.
   public var onReset: () -> Void = {}
   /// Called with a message the bridge could not decode.
@@ -77,6 +79,8 @@ public final class ChromeBridge {
       }
     case .focusSearch(let focus):
       onFocusSearch(focus.entryId)
+    case .contextMenu(let menu):
+      onContextMenu(menu)
     }
   }
 
