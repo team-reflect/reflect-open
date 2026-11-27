@@ -229,9 +229,11 @@ export function TasksScreen(): ReactElement {
                 target: routeForPath(task.notePath),
                 openInNewWindow: menuId === 'open-note-in-new-window',
               })
-            } else {
-              const isoDate = menuId === 'clear-date' ? null : menuId.slice('schedule:'.length)
-              void commands.schedule(tasks, isoDate)
+            } else if (menuId === 'clear-date') {
+              void commands.schedule(tasks, null)
+              clearSelection()
+            } else if (menuId.startsWith('schedule:')) {
+              void commands.schedule(tasks, menuId.slice('schedule:'.length))
               clearSelection()
             }
           },

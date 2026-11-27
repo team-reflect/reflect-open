@@ -921,7 +921,7 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
-  it('menu Delete clears a selection it acts on and keeps any other selection', async () => {
+  it('menu Delete on an unselected row keeps the other selection', async () => {
     getOpenTasks.mockResolvedValue(manyTasks(3))
     const view = await renderScreen()
     const nativeMenu = view.appServices.nativeMenu
@@ -936,12 +936,27 @@ describe('TasksScreen', () => {
     nativeMenu.select('delete')
     await waitFor(() => expect(view.queryByText('task 2')).toBeNull())
     expect([pressed('task 0'), pressed('task 1')]).toEqual([true, true])
+    await view.unmount()
+  })
 
-    await view.getByRole('button', { name: 'task 0' }).click({ button: 'right' })
-    await waitFor(() => expect(nativeMenu.popups()).toHaveLength(2))
-    nativeMenu.select('delete')
-    await waitFor(() => expect(writesOf('remove')).toHaveLength(3))
-    expect(view.queryByRole('button', { name: /^Schedule/ })).toBeNull()
+  it('menu Schedule on a selected row schedules and clears the selection', async () => {
+    getOpenTasks.mockResolvedValue(manyTasks(3))
+    const view = await renderScreen()
+    const nativeMenu = view.appServices.nativeMenu
+
+    await userEvent.click(await view.findByRole('button', { name: 'task 0' }))
+    fireEvent.click(view.getByRole('button', { name: 'task 1' }), MOD_KEY)
+    const selectedRows = () => document.querySelectorAll('[aria-pressed="true"]')
+    await waitFor(() => expect(selectedRows()).toHaveLength(2))
+    await view.getByRole('button', { name: 'task 1' }).click({ button: 'right' })
+    await waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
+    nativeMenu.select('schedule:2026-06-15')
+
+    await waitFor(() => expect(writesOf('setMarkdown')).toHaveLength(2))
+    expect(writeTask).toHaveBeenCalledWith(expect.objectContaining({ astPath: [1] }), [
+      { kind: 'setMarkdown', markdown: 'task 1 [[2026-06-15]]' },
+    ])
+    expect(selectedRows()).toHaveLength(0)
     await view.unmount()
   })
 
