@@ -3,6 +3,9 @@ export interface ContextMenuAction {
   id: string
   title: string
   disabled?: boolean | undefined
+  /**
+   * Any boolean makes a check item, so `false` shows an unchecked check item.
+   */
   checked?: boolean | undefined
 }
 
