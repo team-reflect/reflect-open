@@ -39,8 +39,7 @@ jobs:
           - name: windows-arm64
             os: windows-11-arm
             command: pnpm build:windows
-          # Ubuntu 24.04 is the oldest release that can link the prebuilt ONNX
-          # Runtime, which needs glibc 2.38 and the libstdc++ of GCC 14.
+          # The runner's glibc is the oldest glibc that the app runs on.
           - name: linux-x64
             os: ubuntu-24.04
             command: pnpm build:linux
