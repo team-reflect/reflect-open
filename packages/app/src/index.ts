@@ -138,7 +138,6 @@ export { type CommandHandler, type CommandService } from './commands/command-ser
 export { formatBinding } from './commands/keybindings.ts'
 export { type KeymapService } from './commands/keymap-service.ts'
 export {
-  createNativeMenuService,
   createUnsupportedNativeMenuHost,
   type AppMenuEntry,
   type AppSubmenuLayout,
