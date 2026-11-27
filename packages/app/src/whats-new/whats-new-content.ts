@@ -73,12 +73,6 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       body: 'Agents can now run `reflect tasks` to list your open tasks. Set it up in Settings → Agents.',
       platforms: ['darwin', 'windows', 'linux'],
     },
-    {
-      id: 'future-day-backlinks',
-      title: 'Backlinks for future days',
-      body: 'A link to a day that has no note yet, such as a task scheduled for next week, now shows in that day’s backlinks.',
-      platforms: ALL_PLATFORMS,
-    },
   ],
   '0.19.0': [
     {
