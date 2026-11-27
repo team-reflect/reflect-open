@@ -31,7 +31,7 @@ pub enum EmbedStatus {
         #[cfg_attr(feature = "codegen", specta(type = EmbedProgress))]
         progress: Option<EmbedProgress>,
     },
-    /// `embed_query` and `embed_documents` are ready; `model` is recorded per
+    /// `embed_query` and `embed_note_chunks` are ready; `model` is recorded per
     /// vector (rebuild key).
     Ready { model: String },
     /// Load failed; semantic search is unavailable (lexical still works).

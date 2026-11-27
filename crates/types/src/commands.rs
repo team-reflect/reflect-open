@@ -58,7 +58,7 @@ macro_rules! commands {
                 embed_status() -> EmbedStatus,
                 embed_ensure().await -> EmbedStatus,
                 embed_query(text: String).await -> Vec<f32>,
-                embed_documents(texts: Vec<String>).await -> Vec<Vec<f32>>,
+                embed_note_chunks(path: String, chunks: Vec<ChunkToEmbed>, generation: u64).await -> u32,
                 watch_start() -> (),
                 watch_stop() -> (),
                 index_open() -> u64,

@@ -437,6 +437,21 @@ export type ChunkHit = {
 }
 
 /**
+ *  One chunk of a note for `embed_note_chunks`, built in TS (`@reflect/core`
+ *  chunker). `reuse` marks a chunk whose hash already has a row under the
+ *  runtime's model: it keeps its vector and refreshes its metadata. The
+ *  runtime embeds every other chunk.
+ */
+export type ChunkToEmbed = {
+  heading: string | null
+  posFrom: number
+  posTo: number
+  text: string
+  contentHash: string
+  reuse: boolean
+}
+
+/**
  *  Every command with its arguments and result. A Swift shell command
  *  field is named after its identifier; the codegen renames it after
  *  the command (`SHELL_COMMANDS`).
@@ -673,11 +688,13 @@ export type Commands = {
     }
     result: number[]
   }
-  embed_documents: {
+  embed_note_chunks: {
     args: {
-      texts: string[]
+      path: string
+      chunks: ChunkToEmbed[]
+      generation: number
     }
-    result: number[][]
+    result: number
   }
   watch_start: {
     args: Record<string, never>
@@ -1550,7 +1567,7 @@ export type EmbedStatus =
    */
   | { status: 'loading'; progress?: EmbedProgress | undefined }
   /**
-   *  `embed_query` and `embed_documents` are ready; `model` is recorded per
+   *  `embed_query` and `embed_note_chunks` are ready; `model` is recorded per
    *  vector (rebuild key).
    */
   | { status: 'ready'; model: string }

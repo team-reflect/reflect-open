@@ -1,4 +1,4 @@
-import type { EmbeddedChunk } from '@reflect/types'
+import type { ChunkToEmbed } from '@reflect/types'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { LocalNoteRead, NoteFileService } from '../graph/note-file-service.ts'
@@ -10,14 +10,14 @@ import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 import type { Unlisten } from '../unlisten.ts'
 import { parseNote } from '../markdown/index.ts'
 import { chunkAssetDescriptions, chunkNote } from './chunk.ts'
-import type { EmbeddingRuntimeService } from './embedding-runtime-service.ts'
 import { noop } from '@ocavue/utils'
 
 /**
  * The incremental embedding pass (Plan 09): chunk a note, diff chunk hashes
  * against the stored rows, embed only what changed, and apply as one
- * generation-pinned write. TS owns this orchestration (Rust supplies
- * `embed_documents` + the table writes), mirroring the indexing pipeline.
+ * generation-pinned write. TS owns this orchestration (Rust embeds the changed
+ * chunks and writes them in `embed_note_chunks`), mirroring the indexing
+ * pipeline.
  *
  * A note's chunk set also carries its referenced assets' description bodies
  * (Plan 20 → semantic leg), mirroring the FTS fold — so a meaning-level query
@@ -36,7 +36,8 @@ export interface EmbedNoteOptions {
    */
   fileGeneration: number
   /**
-   * The model recorded per vector (from the runtime's `ready` status).
+   * The model of the runtime's `ready` status. Stored rows of another model
+   * are embedded again.
    */
   modelId: string
   /**
@@ -92,7 +93,7 @@ export interface EmbeddingIndexService {
    * still queued when the follow stops is skipped.
    *
    * The trigger is the post-apply signal, not the raw watcher stream.
-   * Ordering: `embed_apply` drops chunks for paths without a `notes` row, so
+   * Ordering: `embed_note_chunks` drops chunks for paths without a `notes` row, so
    * embedding a brand-new note off the raw file event could race its index
    * apply and lose the chunks until the next backfill; post-apply, the row is
    * always there. Coverage: asset description writes re-index their
@@ -105,7 +106,6 @@ export interface EmbeddingIndexService {
 
 export interface EmbeddingIndexServiceDeps {
   readonly ipc: IpcBridgeService
-  readonly embeddingRuntime: EmbeddingRuntimeService
   readonly noteFile: NoteFileService
   readonly database: DatabaseService
   readonly indexLifecycle: IndexLifecycleService
@@ -135,7 +135,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
   }
 
   async embedNote(options: EmbedNoteOptions): Promise<number> {
-    const { embeddingRuntime, noteFile, database } = this.#deps
+    const { noteFile, database } = this.#deps
     const { path, generation, fileGeneration, modelId } = options
     if (isTemplatePath(path)) {
       return 0 // templates are boilerplate — never embedded, never retrieved
@@ -165,7 +165,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
       fileGeneration,
     )
     if (gathered.evicted.length > 0) {
-      // A referenced sidecar is iCloud-evicted. `embed_apply` replaces the
+      // A referenced sidecar is iCloud-evicted. `embed_note_chunks` replaces the
       // note's *entire* chunk set, so applying without that sidecar's body
       // would silently drop its previously embedded chunks — and sidecars are
       // untracked by the watcher, so nothing would ever restore them. Skip the
@@ -194,35 +194,22 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
       available.set(key, (available.get(key) ?? 0) + 1)
     }
 
-    const skip = chunks.map((chunk) => {
+    const payload: ChunkToEmbed[] = chunks.map((chunk) => {
       const key = `${modelId} ${chunk.contentHash}`
       const remaining = available.get(key) ?? 0
       if (remaining > 0) {
         available.set(key, remaining - 1)
-        return true
       }
-      return false
+      return {
+        heading: chunk.heading,
+        posFrom: chunk.posFrom,
+        posTo: chunk.posTo,
+        text: chunk.text,
+        contentHash: chunk.contentHash,
+        reuse: remaining > 0,
+      }
     })
-    const toEmbed = chunks.filter((_, i) => skip[i] !== true)
-    const vectors =
-      toEmbed.length > 0
-        ? await embeddingRuntime.embedDocuments(toEmbed.map((chunk) => chunk.text))
-        : []
-    let vectorAt = 0
-
-    const payload: EmbeddedChunk[] = chunks.map((chunk, i) => ({
-      heading: chunk.heading,
-      posFrom: chunk.posFrom,
-      posTo: chunk.posTo,
-      text: chunk.text,
-      contentHash: chunk.contentHash,
-      modelId,
-      // A non-skipped chunk always has a freshly-embedded vector: `vectors` is
-      // exactly as long as the non-skipped chunks, consumed in order here.
-      vector: skip[i] === true ? null : vectors[vectorAt++]!,
-    }))
-    await this.#applyChunks(path, payload, generation)
-    return toEmbed.length
+    return await this.#deps.ipc.call('embed_note_chunks', { path, chunks: payload, generation })
   }
 
   async removeNote(path: string, generation: number): Promise<void> {
@@ -287,13 +274,6 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
       stopped.abort()
       unlisten()
     }
-  }
-
-  /**
-   * Replace a note's chunk set (hash-diff applied in Rust; generation-pinned).
-   */
-  async #applyChunks(path: string, chunks: EmbeddedChunk[], generation: number): Promise<void> {
-    await this.#deps.ipc.call('embed_apply', { path, chunks, generation })
   }
 
   /**

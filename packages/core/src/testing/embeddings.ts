@@ -1,4 +1,4 @@
-import type { EmbeddedChunk } from '@reflect/types'
+import type { ChunkToEmbed, EmbeddedChunk } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
@@ -59,7 +59,12 @@ export interface TestEmbeddingRuntimeService extends EmbeddingRuntimeService {
    */
   setStatus(status: EmbedStatus): void
   /**
-   * The texts of every `embedQuery` (one text) and `embedDocuments` call, in
+   * Gives each chunk that is not reused a vector and the model id, like the
+   * native `embed_note_chunks`. Throws unless the status is `ready`.
+   */
+  embedChunks(chunks: readonly ChunkToEmbed[]): EmbeddedChunk[]
+  /**
+   * The texts of every `embedQuery` (one text) and `embedChunks` call, in
    * order.
    */
   embedCalls(): readonly (readonly string[])[]
@@ -104,9 +109,6 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
           return this.#status
         },
         embed_query: (args) => this.#embed([String(args['text'])])[0],
-        embed_documents: (args) => {
-          return this.#embed(Array.isArray(args['texts']) ? args['texts'].map(String) : [])
-        },
       },
     })
     this.#inner = createEmbeddingRuntimeService({
@@ -135,8 +137,15 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
     return this.#inner.embedQuery(text)
   }
 
-  embedDocuments(texts: readonly string[]): Promise<number[][]> {
-    return this.#inner.embedDocuments(texts)
+  embedChunks(chunks: readonly ChunkToEmbed[]): EmbeddedChunk[] {
+    const vectors = this.#embed(chunks.filter((chunk) => !chunk.reuse).map((chunk) => chunk.text))
+    const modelId = this.#status.status === 'ready' ? this.#status.model : ''
+    let vectorAt = 0
+    return chunks.map(({ reuse, ...chunk }) => ({
+      ...chunk,
+      modelId,
+      vector: reuse ? null : vectors[vectorAt++]!,
+    }))
   }
 
   readonly get = (): EmbedStatus => this.#inner.get()
@@ -160,7 +169,9 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
     if (this.#status.status !== 'ready') {
       throw new AppError('unknown', `embedding model is ${this.#status.status}`)
     }
-    this.#embedded.push(texts)
+    if (texts.length > 0) {
+      this.#embedded.push(texts)
+    }
     return texts.map((text) => this.#vectors(text))
   }
 }
@@ -168,8 +179,8 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
 /**
  * The real {@link EmbeddingRuntimeService} over a scripted runtime. `ensure`
  * answers the current status without loading anything: drive loads with
- * `setStatus`. `embedQuery` and `embedDocuments` reject unless the status is
- * `ready`, like the native runtime.
+ * `setStatus`. `embedQuery` rejects and `embedChunks` throws unless the status
+ * is `ready`, like the native runtime.
  */
 export function createTestEmbeddingRuntimeService(
   options?: TestEmbeddingRuntimeServiceOptions,
@@ -241,12 +252,12 @@ export function createTestRetrievalService(
 
 /**
 
- * One recorded `embed_apply`: the complete new chunk set of a note.
+ * One recorded `embed_note_chunks`: the complete new chunk set of a note.
 
  */
 export interface TestEmbeddingApply {
   readonly path: string
-  readonly chunks: readonly EmbeddedChunk[]
+  readonly chunks: readonly ChunkToEmbed[]
   readonly generation: number
 }
 
@@ -266,7 +277,10 @@ export interface TestEmbeddingRemove {
 
  */
 export interface TestEmbeddingIndexServiceOptions {
-  embeddingRuntime?: EmbeddingRuntimeService
+  /**
+   * Embeds the chunks of `embed_note_chunks`.
+   */
+  embeddingRuntime?: TestEmbeddingRuntimeService
   noteFile?: NoteFileService
   /**
    * Read lazily, so the default costs nothing until a note is embedded.
@@ -295,7 +309,7 @@ export interface TestEmbeddingIndexServiceOptions {
 
 export interface TestEmbeddingIndexService extends EmbeddingIndexService {
   /**
-   * Every chunk set that `embed_apply` wrote, in order.
+   * Every chunk set that `embed_note_chunks` wrote, in order.
    */
   applied(): readonly TestEmbeddingApply[]
   /**
@@ -324,22 +338,20 @@ class TestEmbeddingIndexServiceImpl implements TestEmbeddingIndexService {
   constructor(options?: TestEmbeddingIndexServiceOptions) {
     const store = options?.storeChunksIn ?? null
     const database = options?.database ?? store ?? createTestDatabaseService()
+    const embeddingRuntime = options?.embeddingRuntime ?? createTestEmbeddingRuntimeService()
     this.#backfillOverride = options?.backfill
     const ipc = createTestIpcBridgeService({
       commands: {
-        embed_apply: (args) => {
+        embed_note_chunks: (args) => {
           const apply = args as unknown as TestEmbeddingApply
+          const chunks = embeddingRuntime.embedChunks(apply.chunks)
           const failure = options?.failApply?.(apply)
           if (failure !== undefined) {
             throw failure
           }
           this.#applyLog.push(apply)
-          store?.invoke('embed_apply', {
-            path: apply.path,
-            chunks: apply.chunks,
-            generation: store.generation(),
-          })
-          return null
+          store?.invoke('embed_apply', { path: apply.path, chunks, generation: store.generation() })
+          return chunks.filter((chunk) => chunk.vector !== null).length
         },
         embed_remove: (args) => {
           const remove = args as unknown as TestEmbeddingRemove
@@ -351,7 +363,6 @@ class TestEmbeddingIndexServiceImpl implements TestEmbeddingIndexService {
     })
     this.#inner = createEmbeddingIndexService({
       ipc,
-      embeddingRuntime: options?.embeddingRuntime ?? createTestEmbeddingRuntimeService(),
       noteFile: options?.noteFile ?? createTestNoteFileService(),
       database,
       indexLifecycle: options?.indexLifecycle ?? createTestIndexLifecycleService({ database }),
@@ -489,8 +500,7 @@ export function createTestSemanticSearchService(
     createSemanticSearchService({
       embeddingRuntime,
       embeddingIndex:
-        options?.embeddingIndex ??
-        createTestEmbeddingIndexService({ embeddingRuntime, indexLifecycle, logger }),
+        options?.embeddingIndex ?? createTestEmbeddingIndexService({ indexLifecycle, logger }),
       retrieval: options?.retrieval ?? createTestRetrievalService(),
       settings: options?.settings ?? createTestSettingsService(),
       storage: options?.storage ?? createTestStorageService(),

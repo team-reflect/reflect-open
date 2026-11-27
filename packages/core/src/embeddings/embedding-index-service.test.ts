@@ -135,8 +135,8 @@ describe('embedNote', () => {
       modelId: TEST_EMBED_MODEL,
     })
     expect(count).toBe(2)
-    expect(embedded()).toHaveLength(1) // one batched embed_documents call
-    expect(applied()[0]!.chunks.every((chunk) => chunk.vector !== null)).toBe(true)
+    expect(embedded()).toHaveLength(1) // one batched embed_note_chunks call
+    expect(applied()[0]!.chunks.every((chunk) => !chunk.reuse)).toBe(true)
   })
 
   it('the hash-skip embeds nothing when stored hashes match', async () => {
@@ -163,7 +163,7 @@ describe('embedNote', () => {
     })
     expect(count).toBe(0)
     expect(second.embedded()).toHaveLength(0) // nothing re-embedded()
-    expect(second.applied()[0]!.chunks[0]!.vector).toBeNull() // metadata-only row
+    expect(second.applied()[0]!.chunks[0]!.reuse).toBe(true) // metadata-only row
   })
 
   it('a model change re-embeds chunks whose hashes are unchanged', async () => {
@@ -207,7 +207,7 @@ describe('embedNote', () => {
     expect(hashes[0]).toBe(hashes[1]) // genuinely duplicated chunks
 
     // Only ONE stored row for that hash: exactly one chunk may skip; the
-    // other must re-embed (vector present), or apply_chunks errors loudly.
+    // other must re-embed (not reused), or apply_chunks errors loudly.
     const second = setup({
       content: dup,
       storedRows: [{ content_hash: hashes[0]!, model_id: TEST_EMBED_MODEL }],
@@ -220,8 +220,8 @@ describe('embedNote', () => {
     })
     expect(count).toBe(1)
     const sent = second.applied()[0]!.chunks
-    expect(sent.filter((chunk) => chunk.vector === null)).toHaveLength(1)
-    expect(sent.filter((chunk) => chunk.vector !== null)).toHaveLength(1)
+    expect(sent.filter((chunk) => chunk.reuse)).toHaveLength(1)
+    expect(sent.filter((chunk) => !chunk.reuse)).toHaveLength(1)
   })
 
   it('an emptied note drops its chunks via embed_remove', async () => {
