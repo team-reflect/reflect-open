@@ -54,6 +54,14 @@ runs:
       shell: bash
       run: echo "MBX_BUILD_SCRIPT_EXECUTION=0" >> "$GITHUB_ENV"
 
+    # mbx moves OUT_DIR to a directory that the clippy and test target
+    # directories share. The CMake cache of llama-cpp-sys-2 records one target
+    # directory, so the second build fails. This keeps Cargo's own OUT_DIR.
+    # https://github.com/jdx/mr-boxington/blob/v1.30.0/docs/limits.md#out-dir-sharing
+    - name: Keep OUT_DIR in each target directory
+      shell: bash
+      run: echo "MBX_SHARE_OUT_DIR=0" >> "$GITHUB_ENV"
+
     # Uses the mbx that mise installed. A push to master or a workflow_dispatch
     # saves the cache. https://mr-boxington.jdx.dev/github-action
     - name: Set up mbx
