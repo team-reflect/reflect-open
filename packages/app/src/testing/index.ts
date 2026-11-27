@@ -3,7 +3,6 @@
  * app layer built over `createTestCoreServices()`.
  */
 export {
-  createTestNativeMenuHost,
   createTestNativeMenuService,
   type TestNativeMenuHost,
   type TestNativeMenuHostCall,

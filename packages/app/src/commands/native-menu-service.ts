@@ -57,7 +57,7 @@ export type NativeMenuItem =
        */
       checked?: boolean | undefined
       /**
-       * Invoked with the item id when the item is activated.
+       * Invoked on activation with `id`, or with a host-generated id when `id` is unset.
        */
       action: (id: string) => void
     }

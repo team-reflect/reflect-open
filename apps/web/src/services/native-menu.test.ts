@@ -188,4 +188,15 @@ describe('createTauriNativeMenuHost', () => {
     expect(closed).toEqual(['Unpin Note', 'Menu'])
     expect(popup).toHaveBeenCalledTimes(2)
   })
+
+  it('closes a menu that was still building when the next one opened', async () => {
+    const host = createTauriNativeMenuHost()
+
+    await Promise.all([
+      host.popup([{ kind: 'command', text: 'First', action: vi.fn() }]),
+      host.popup([{ kind: 'command', text: 'Second', action: vi.fn() }]),
+    ])
+
+    expect(closed).toEqual(['First', 'Menu'])
+  })
 })

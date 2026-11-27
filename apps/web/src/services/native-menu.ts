@@ -18,7 +18,6 @@ async function buildMenuEntries(
   return await Promise.all(items.map((item) => buildMenuEntry(item, onBuilt)))
 }
 
-// Inline item options lose their click handler once the submenu is built.
 async function buildMenuEntry(
   item: NativeMenuItem,
   onBuilt: (resource: Resource) => void,
@@ -34,6 +33,7 @@ async function buildMenuEntry(
   return entry
 }
 
+// Inline item options lose their click handler once the submenu is built.
 async function buildCommandEntry(
   item: Extract<NativeMenuItem, { kind: 'command' }>,
 ): Promise<MenuItem | CheckMenuItem> {
@@ -87,6 +87,18 @@ class TauriNativeAppMenu implements NativeAppMenu {
 export function createTauriNativeMenuHost(): NativeMenuHost {
   // The pick arrives after `popup()` resolves, so the previous menu is closed when the next one opens.
   let contextMenuResources: Resource[] = []
+  let latestPopup: Promise<void> = Promise.resolve()
+
+  async function popupNow(items: readonly NativeMenuItem[]): Promise<void> {
+    await Promise.allSettled(contextMenuResources.map((resource) => resource.close()))
+    const built: Resource[] = []
+    contextMenuResources = built
+    const menu = await Menu.new({
+      items: await buildMenuEntries(items, (resource) => void built.push(resource)),
+    })
+    built.push(menu)
+    await menu.popup()
+  }
 
   return {
     async buildAppMenu(layouts) {
@@ -102,15 +114,9 @@ export function createTauriNativeMenuHost(): NativeMenuHost {
       return new TauriNativeAppMenu(menu, layouts, submenus)
     },
     async popup(items) {
-      const stale = contextMenuResources
-      const built: Resource[] = []
-      contextMenuResources = built
-      await Promise.allSettled(stale.map((resource) => resource.close()))
-      const menu = await Menu.new({
-        items: await buildMenuEntries(items, (resource) => void built.push(resource)),
-      })
-      built.push(menu)
-      await menu.popup()
+      const open = (): Promise<void> => popupNow(items)
+      latestPopup = latestPopup.then(open, open)
+      await latestPopup
     },
   }
 }

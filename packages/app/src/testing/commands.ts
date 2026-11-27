@@ -197,5 +197,15 @@ export function createTestNativeMenuService(
     logger,
     host,
   })
+  return wrapTestNativeMenuService(host, service)
+}
+
+/**
+ * A {@link TestNativeMenuService} over `service`, which must build its menus on `host`.
+ */
+export function wrapTestNativeMenuService(
+  host: TestNativeMenuHost,
+  service: NativeMenuService,
+): TestNativeMenuService {
   return new TestNativeMenuServiceImpl(host, service)
 }
