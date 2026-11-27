@@ -10,8 +10,8 @@ import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete.ts'
 import { useTagNavigation } from '@/editor/use-tag-navigation.ts'
 import { useMarkdownLinkClick } from '@/editor/use-markdown-link-click.ts'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation.ts'
-import { addDaysToIsoDate } from '@reflect/utils'
 import { getTaskDueDate, type OpenTask, withDraftDueDate, formatDayLabel } from '@reflect/core'
+import { getTaskDatePresets } from '@/lib/tasks/task-date-presets.ts'
 import { useTaskDraft } from '@/lib/tasks/use-task-draft.ts'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
@@ -223,21 +223,14 @@ export function MobileTaskEditSheet({
             </NoteEditor>
           </div>
           <div className="flex flex-wrap items-center gap-1.5" aria-label="Schedule">
-            <ScheduleChip
-              label="Today"
-              active={dueDate === today}
-              onClick={() => schedule(today)}
-            />
-            <ScheduleChip
-              label="Tomorrow"
-              active={dueDate === addDaysToIsoDate(today, 1)}
-              onClick={() => schedule(addDaysToIsoDate(today, 1))}
-            />
-            <ScheduleChip
-              label="Next week"
-              active={dueDate === addDaysToIsoDate(today, 7)}
-              onClick={() => schedule(addDaysToIsoDate(today, 7))}
-            />
+            {getTaskDatePresets(today).map((preset) => (
+              <ScheduleChip
+                key={preset.id}
+                label={preset.label}
+                active={dueDate === preset.date}
+                onClick={() => schedule(preset.date)}
+              />
+            ))}
             <PickDateChip
               label={dueDate !== null ? formatDayLabel(dueDate, dateFormat) : 'Pick date'}
               value={dueDate ?? today}

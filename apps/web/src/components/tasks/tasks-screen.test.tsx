@@ -862,6 +862,61 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
+  it('right-click on an unselected row opens its menu and keeps the selection', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/p.md', astPath: [2], text: 'first', noteTitle: 'Project' }),
+      task({ notePath: 'notes/p.md', astPath: [3], text: 'second', noteTitle: 'Project' }),
+    ])
+    const view = await renderScreen()
+    const nativeMenu = view.appServices.nativeMenuHost
+
+    await userEvent.click(await view.findByRole('button', { name: 'first' }))
+    await view.getByRole('button', { name: 'second' }).click({ button: 'right' })
+
+    await waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
+    const titles = nativeMenu
+      .popups()[0]!
+      .filter((item) => item.type !== 'separator')
+      .map((item) => item.title)
+    expect(titles).toEqual([
+      'Complete',
+      'Schedule',
+      'Convert to bullet',
+      'Open note',
+      'Open note in new window',
+      'Delete',
+    ])
+    expect(view.getByTestId('task-editor').element().textContent).toContain('first')
+    expect(
+      view.getByRole('button', { name: 'second' }).element().getAttribute('aria-pressed'),
+    ).toBe('false')
+
+    nativeMenu.select('complete')
+    await expect.element(view.getByRole('button', { name: 'Reopen: second' })).toBeInTheDocument()
+    expect(writesOf('toggle')).toHaveLength(1)
+    await view.unmount()
+  })
+
+  it('right-click on a selected row applies the menu action to the whole selection', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/a.md', astPath: [2], text: 'first', noteTitle: 'A' }),
+      task({ notePath: 'notes/b.md', astPath: [2], text: 'second', noteTitle: 'B' }),
+      task({ notePath: 'notes/b.md', astPath: [3], text: 'third', noteTitle: 'B' }),
+    ])
+    const view = await renderScreen()
+    const nativeMenu = view.appServices.nativeMenuHost
+
+    await userEvent.click(await view.findByRole('button', { name: 'first' }))
+    fireEvent.click(view.getByRole('button', { name: 'second' }), MOD_KEY)
+    await view.getByRole('button', { name: 'second' }).click({ button: 'right' })
+
+    await waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
+    nativeMenu.select('complete')
+    await waitFor(() => expect(view.getAllByRole('button', { name: /^Reopen:/ })).toHaveLength(2))
+    expect(view.getByRole('button', { name: 'Complete: third' }).query()).not.toBeNull()
+    await view.unmount()
+  })
+
   it('a note group’s "+ Add" button opens the editor of a new row and writes nothing', async () => {
     getOpenTasks.mockResolvedValue([
       task({
