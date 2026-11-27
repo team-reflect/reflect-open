@@ -85,6 +85,7 @@ export interface NativeAppMenu {
 }
 
 // FIXME: create separate types for "action" "separator" "submenu" and union them into ContextMenuItem. by doing this, you do not need to write Extract<ContextMenuItem, { type: 'action' }> anymore. Remove all Extract<ContextMenuItem, ...> from the codebase.
+// FIXME: merge origin/master into this branch (merge, no rebase).
 export type ContextMenuItem =
   | {
       type: 'action'
