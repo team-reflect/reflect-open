@@ -229,30 +229,10 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
     await this.#deps.ipc.call('embed_remove', { path, generation })
   }
 
-  async backfill(options: EmbeddingBackfillOptions): Promise<EmbeddingBackfillResult> {
-    const { clock, logger } = this.#deps
-    const started = clock.monotonicNow()
-    const counts: BackfillCounts = {
-      notes: 0,
-      done: 0,
-      notesEmbedded: 0,
-      chunksEmbedded: 0,
-      failed: 0,
-    }
-    let outcome: EmbeddingBackfillResult
-    try {
-      outcome = await this.#backfillNotes(options, counts)
-    } catch {
-      outcome = 'failed'
-    }
-    logger.info('embedding backfill finished', {
-      outcome,
-      modelId: options.modelId,
-      generation: options.generation,
-      ...counts,
-      elapsedMs: clock.monotonicNow() - started,
-    })
-    return outcome
+  backfill(options: EmbeddingBackfillOptions): Promise<EmbeddingBackfillResult> {
+    const pass = this.#queue.then(() => this.#runBackfill(options))
+    this.#queue = pass.then(noop)
+    return pass
   }
 
   follow(options: { generation: number; fileGeneration: number; modelId: string }): Unlisten {
@@ -265,7 +245,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
         if (stopped.signal.aborted) {
           return
         }
-        return this.backfill({
+        return this.#runBackfill({
           generation,
           fileGeneration,
           modelId,
@@ -316,11 +296,40 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
     await this.#deps.ipc.call('embed_apply', { path, chunks, generation })
   }
 
+  /**
+   * One backfill pass. Callers run it on `#queue`.
+   */
+  async #runBackfill(options: EmbeddingBackfillOptions): Promise<EmbeddingBackfillResult> {
+    const { clock, logger } = this.#deps
+    const started = clock.monotonicNow()
+    const counts: BackfillCounts = {
+      notes: 0,
+      done: 0,
+      notesEmbedded: 0,
+      chunksEmbedded: 0,
+      failed: 0,
+    }
+    let outcome: EmbeddingBackfillResult
+    try {
+      outcome = await this.#backfillNotes(options, counts)
+    } catch {
+      outcome = 'failed'
+    }
+    logger.info('embedding backfill finished', {
+      outcome,
+      modelId: options.modelId,
+      generation: options.generation,
+      ...counts,
+      elapsedMs: clock.monotonicNow() - started,
+    })
+    return outcome
+  }
+
   async #backfillNotes(
     options: EmbeddingBackfillOptions,
     counts: BackfillCounts,
   ): Promise<'completed' | 'aborted'> {
-    const { database, logger } = this.#deps
+    const { clock, database, logger } = this.#deps
     const { generation, fileGeneration, modelId, onProgress, signal } = options
     const paths = await database.read('index_embeddable_paths', {})
     counts.notes = paths.length
@@ -329,10 +338,17 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
         return 'aborted'
       }
       try {
+        const started = clock.monotonicNow()
         const chunks = await this.embedNote({ path, generation, fileGeneration, modelId })
         if (chunks > 0) {
           counts.notesEmbedded += 1
           counts.chunksEmbedded += chunks
+          // The backfill is background work: rest as long as the note took,
+          // so the embedding runtime is busy at most half the time.
+          const elapsed = clock.monotonicNow() - started
+          if (elapsed > 0) {
+            await clock.sleep(elapsed)
+          }
         }
       } catch (cause) {
         counts.failed += 1
