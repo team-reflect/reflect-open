@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NativeContextMenuItem, NativeSubmenu } from '@reflect/app'
 
 const calls = vi.hoisted((): string[] => [])
-// The `text` of every closed resource, or `menu` for a menu.
+// Every closed resource, named by its `text`, else by its kind.
 const closed = vi.hoisted((): string[] => [])
 const popup = vi.hoisted(() => vi.fn(async () => {}))
 const setAsAppMenu = vi.hoisted(() => {
@@ -13,28 +13,49 @@ const setAsAppMenu = vi.hoisted(() => {
 })
 const menuNew = vi.hoisted(() => {
   return vi.fn((_options: unknown) => {
-    return Promise.resolve({ setAsAppMenu, popup, close: () => void closed.push('menu') })
+    return Promise.resolve({ setAsAppMenu, popup, close: () => void closed.push('Menu') })
   })
 })
 /**
- * A fake `X.new` that echoes its options as the built resource.
+ * A fake `X.new` that echoes its options and kind as the built resource's own
+ * fields. Its methods live on the prototype, so `toEqual` compares only the fields.
  */
 const resourceNew = vi.hoisted(() => {
+  interface ResourceOptions {
+    text?: string
+    action?: () => void
+  }
+  class FakeResource {
+    readonly #name: string
+    constructor(kind: string, options: ResourceOptions) {
+      Object.assign(this, options, { built: kind })
+      this.#name = options.text ?? kind
+    }
+    close(): Promise<void> {
+      closed.push(this.#name)
+      return Promise.resolve()
+    }
+  }
+  class FakeSubmenu extends FakeResource {
+    readonly #text: string | undefined
+    constructor(options: ResourceOptions) {
+      super('Submenu', options)
+      this.#text = options.text
+    }
+    setAsWindowsMenuForNSApp(): Promise<void> {
+      calls.push(`windows:${this.#text}`)
+      return Promise.resolve()
+    }
+    setAsHelpMenuForNSApp(): Promise<void> {
+      calls.push(`help:${this.#text}`)
+      return Promise.resolve()
+    }
+  }
   return (kind: string) => {
-    return vi.fn((options: { text?: string; action?: () => void }) => {
-      return Promise.resolve({
-        ...options,
-        built: kind,
-        close: () => void closed.push(options.text ?? kind),
-        setAsWindowsMenuForNSApp: () => {
-          calls.push(`windows:${options.text}`)
-          return Promise.resolve()
-        },
-        setAsHelpMenuForNSApp: () => {
-          calls.push(`help:${options.text}`)
-          return Promise.resolve()
-        },
-      })
+    return vi.fn((options: ResourceOptions) => {
+      return Promise.resolve(
+        kind === 'Submenu' ? new FakeSubmenu(options) : new FakeResource(kind, options),
+      )
     })
   }
 })
@@ -96,7 +117,7 @@ describe('createTauriNativeMenuHost', () => {
     const view = submenuNew.mock.calls
       .map(([options]) => options)
       .find((options) => options.text === 'View')
-    expect(view).toMatchObject({
+    expect(view).toEqual({
       text: 'View',
       items: [
         { ...sidebarToggle, built: 'MenuItem' },
@@ -167,7 +188,7 @@ describe('createTauriNativeMenuHost', () => {
     expect(closed).toEqual([])
 
     await host.popup({ items, onSelect: vi.fn() })
-    expect(closed).toEqual(['Unpin Note', 'menu'])
+    expect(closed).toEqual(['Unpin Note', 'Menu'])
     expect(popup).toHaveBeenCalledTimes(2)
   })
 })

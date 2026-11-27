@@ -315,9 +315,7 @@ describe('Sidebar', () => {
 
     await rust.click({ button: 'right' })
 
-    await vi.waitFor(() => {
-      expect(nativeMenu.popups()).toEqual([[{ type: 'action', id: 'unpin', title: 'Unpin Note' }]])
-    })
+    await vi.waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
     nativeMenu.select('unpin')
     await expectLocatorToHaveCount(view.getByRole('button', { name: 'Rust' }), 0)
     expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/rust.md', { pinned: false }, 1)

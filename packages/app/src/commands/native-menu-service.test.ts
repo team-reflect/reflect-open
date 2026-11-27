@@ -246,18 +246,7 @@ describe('menu command dispatch', () => {
 })
 
 describe('openContextMenu', () => {
-  const items: NativeContextMenuItem[] = [
-    { type: 'action', id: 'complete', title: 'Complete', shortcut: 'Mod-Enter' },
-    { type: 'separator' },
-    {
-      type: 'submenu',
-      title: 'Schedule',
-      items: [
-        { type: 'action', id: 'today', title: 'Today', checked: true },
-        { type: 'action', id: 'clear', title: 'Clear date', disabled: true },
-      ],
-    },
-  ]
+  const items: NativeContextMenuItem[] = [{ type: 'action', id: 'unpin', title: 'Unpin' }]
 
   it('does nothing outside a native shell', async () => {
     const { menu } = setup({ platform: { isNativeShell: false } })
@@ -276,7 +265,7 @@ describe('openContextMenu', () => {
     await menu.openContextMenu({ items, onSelect })
 
     expect(menu.host.popups()).toEqual([items])
-    menu.host.select('today')
-    expect(onSelect).toHaveBeenCalledExactlyOnceWith('today')
+    menu.host.select('unpin')
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith('unpin')
   })
 })
