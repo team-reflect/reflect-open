@@ -23,7 +23,6 @@ export function getTaskMenuItems(tasks: readonly OpenTask[], today: string): Tas
       type: 'action',
       id: 'toggle',
       title: tasks.some((task) => !task.checked) ? 'Complete' : 'Reopen',
-      shortcut: 'Mod-Enter',
     },
     {
       type: 'submenu',
@@ -46,7 +45,7 @@ export function getTaskMenuItems(tasks: readonly OpenTask[], today: string): Tas
         },
       ],
     },
-    { type: 'action', id: 'convert', title: 'Convert to bullet', shortcut: 'Mod-Shift-k' },
+    { type: 'action', id: 'convert', title: 'Convert to bullet' },
   ]
   if (tasks.every((task) => task.notePath === notePath)) {
     items.push(
@@ -55,9 +54,6 @@ export function getTaskMenuItems(tasks: readonly OpenTask[], today: string): Tas
       { type: 'action', id: 'open-note-in-new-window', title: 'Open note in new window' },
     )
   }
-  items.push(
-    { type: 'separator' },
-    { type: 'action', id: 'delete', title: 'Delete', shortcut: 'Mod-Backspace' },
-  )
+  items.push({ type: 'separator' }, { type: 'action', id: 'delete', title: 'Delete' })
   return items
 }
