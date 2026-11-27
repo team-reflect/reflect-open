@@ -239,12 +239,12 @@ describe('NoteRowList', () => {
 
   it('a right-click opens the row menu, and its Delete asks before the trash', async () => {
     const view = await mount(<NoteRowList rows={[row()]} onOpen={onOpen} />)
-    const nativeMenu = view.appServices.nativeMenu
+    const contextMenu = view.appServices.contextMenu
 
     await view.getByRole('button', { name: /Alpha.*First line/ }).click({ button: 'right' })
 
-    await vi.waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
-    await act(() => nativeMenu.select('delete'))
+    await vi.waitFor(() => expect(contextMenu.popups()).toHaveLength(1))
+    await act(() => contextMenu.select('delete'))
     await expect.element(view.getByText('Delete this note?')).toBeInTheDocument()
     expect(onOpen).not.toHaveBeenCalled()
   })

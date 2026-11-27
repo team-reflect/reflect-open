@@ -45,7 +45,7 @@ interface NoteRowListProps {
  */
 export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
   const { noteActions, noteRows, indexQuery } = useCoreServices()
-  const { nativeMenu } = useAppServices()
+  const { contextMenu } = useAppServices()
   const [revealedRow] = useState(() => new WritableStore<string | null>(null))
   const [deletePath, setDeletePath] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -66,9 +66,12 @@ export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
   )
 
   const openMenu = useCallback(
-    async (row: NoteRowModel): Promise<void> => {
-      await nativeMenu.openContextMenu({
-        items: getNoteRowMenuItems(row, await readIsPrivate(noteRows, indexQuery, row.path)),
+    (row: NoteRowModel): void => {
+      const items = readIsPrivate(noteRows, indexQuery, row.path).then((isPrivate) => {
+        return getNoteRowMenuItems(row, isPrivate)
+      })
+      void contextMenu.open({
+        items,
         onSelect: (id) => {
           if (id === 'pin') {
             togglePin(row)
@@ -80,7 +83,7 @@ export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
         },
       })
     },
-    [nativeMenu, noteActions, noteRows, indexQuery, togglePin, requestDelete],
+    [contextMenu, noteActions, noteRows, indexQuery, togglePin, requestDelete],
   )
   // One listener for the list: virtua renders every mounted row again on each scroll step.
   const onContextMenu = useCallback(
@@ -90,7 +93,7 @@ export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
       const row = rows.find((candidate) => candidate.path === path)
       if (row !== undefined) {
         event.preventDefault()
-        void openMenu(row)
+        openMenu(row)
       }
     },
     [rows, openMenu],
