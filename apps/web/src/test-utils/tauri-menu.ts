@@ -1,3 +1,7 @@
+/**
+ * A stand-in for `@tauri-apps/api/menu`. Mock it with
+ * `vi.mock('@tauri-apps/api/menu', () => import('@/test-utils/tauri-menu.ts'))`.
+ */
 import { vi } from 'vitest'
 
 /**
@@ -66,10 +70,6 @@ export const menuItemNew = fakeResourceNew('MenuItem')
 export const checkMenuItemNew = fakeResourceNew('CheckMenuItem')
 export const submenuNew = fakeResourceNew('Submenu')
 
-/**
- * A stand-in for `@tauri-apps/api/menu`. Mock it with
- * `vi.mock('@tauri-apps/api/menu', () => import('@/test-utils/tauri-menu.ts'))`.
- */
 export const Menu = { new: menuNew }
 export const MenuItem = { new: menuItemNew }
 export const CheckMenuItem = { new: checkMenuItemNew }

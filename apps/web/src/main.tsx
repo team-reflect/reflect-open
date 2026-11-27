@@ -23,7 +23,7 @@ warmPlatformRoot()
 appServices.appMenu.connect()
 registerAppKeymaps(appServices.keymap)
 installAppMenu(appServices.appMenu).catch((cause: unknown) => {
-  coreServices.logger.error('failed to install the native menu', cause)
+  coreServices.logger.error('failed to install the application menu', cause)
 })
 
 startPerfHud()

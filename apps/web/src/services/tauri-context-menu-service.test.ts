@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ContextMenuItem } from '@reflect/app'
 import {
   checkMenuItemNew,
-  closedMenus as closed,
+  closedMenus,
   menuItemNew,
   menuNew,
   popup,
@@ -64,10 +64,10 @@ describe('createTauriContextMenuService', () => {
     }
 
     await service.open(options)
-    expect(closed).toEqual([])
+    expect(closedMenus).toEqual([])
 
     await service.open(options)
-    expect(closed).toEqual(['Unpin Note', 'Menu'])
+    expect(closedMenus).toEqual(['Unpin Note', 'Menu'])
     expect(popup).toHaveBeenCalledTimes(2)
   })
 
@@ -82,6 +82,6 @@ describe('createTauriContextMenuService', () => {
       }),
     ])
 
-    expect(closed).toEqual(['First', 'Menu'])
+    expect(closedMenus).toEqual(['First', 'Menu'])
   })
 })

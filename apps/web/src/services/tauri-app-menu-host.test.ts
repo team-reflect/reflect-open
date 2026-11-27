@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NativeSubmenu } from '@reflect/app'
 import {
-  menuCalls as calls,
+  menuCalls,
   menuItemNew,
   menuNew,
   resetFakeTauriMenu,
@@ -67,12 +67,12 @@ describe('createTauriAppMenuHost', () => {
 
   it('installs the menu and assigns the NSApp roles only when asked', async () => {
     const menu = await createTauriAppMenuHost().buildAppMenu(layout)
-    expect(calls).toEqual([])
+    expect(menuCalls).toEqual([])
 
     await menu.setAsAppMenu()
-    expect(calls).toEqual(['setAsAppMenu'])
+    expect(menuCalls).toEqual(['setAsAppMenu'])
 
     await menu.assignNsAppRoles()
-    expect(calls).toEqual(['setAsAppMenu', 'windows:Window', 'help:Help'])
+    expect(menuCalls).toEqual(['setAsAppMenu', 'windows:Window', 'help:Help'])
   })
 })

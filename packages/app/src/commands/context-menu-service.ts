@@ -30,9 +30,6 @@ export interface ContextMenuService {
   open(options: ContextMenuOptions): Promise<void>
 }
 
-/**
- * A `ContextMenuService` whose `open` rejects.
- */
 export function createUnsupportedContextMenuService(): ContextMenuService {
   return {
     open: async () => {

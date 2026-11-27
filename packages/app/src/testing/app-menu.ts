@@ -1,6 +1,6 @@
 import type { AppMenuHost, NativeAppMenu, NativeSubmenu } from '../commands/app-menu-service.ts'
 
-export type TestAppMenuHostCall = 'buildAppMenu' | 'setAsAppMenu' | 'assignNsAppRoles'
+type TestAppMenuHostCall = 'buildAppMenu' | 'setAsAppMenu' | 'assignNsAppRoles'
 
 /**
  * An {@link AppMenuHost} that records what it is asked to build.
