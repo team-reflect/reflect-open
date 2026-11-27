@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createNoteDocumentService } from '../documents/note-document-service.ts'
-import { createTestNoteSessionService, createTestLinkedDayService } from '../testing/documents.ts'
+import {
+  createTestNoteSessionService,
+  createTestLinkedDailyNoteService,
+} from '../testing/documents.ts'
 import { createPrivacyService } from '../privacy/privacy-service.ts'
 import {
   createTestGraphSessionService,
@@ -28,7 +31,7 @@ function setup(source: string) {
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
       indexLifecycle: createTestIndexLifecycleService(),
-      linkedDays: createTestLinkedDayService(),
+      linkedDailyNotes: createTestLinkedDailyNoteService(),
       logger: createTestLoggerService(),
     }),
     privacy: createPrivacyService({

@@ -170,7 +170,7 @@ import {
   createNotePreviewService,
   type NotePreviewService,
 } from './documents/note-preview-service.ts'
-import { createLinkedDayService } from './documents/linked-day-service.ts'
+import { createLinkedDailyNoteService } from './documents/linked-daily-note-service.ts'
 import { createNoteSessionService } from './documents/note-session-service.ts'
 import type { NoteSessionService } from './documents/note-session-types.ts'
 import {
@@ -632,7 +632,7 @@ export const coreServiceFactories = {
   aiProviderConfig: createAiProviderConfigService,
   noteLinkResolver: createNoteLinkResolverService,
   noteCreation: createNoteCreationService,
-  linkedDays: createLinkedDayService,
+  linkedDailyNotes: createLinkedDailyNoteService,
   privacy: createPrivacyService,
   calendar: createCalendarService,
   contacts: createContactsService,
@@ -954,7 +954,7 @@ export function composeCoreServices(
   })
   const noteLinkResolver = create.noteLinkResolver({ wikiResolver, noteFile })
   const noteCreation = create.noteCreation({ noteFile, noteLinkResolver, id })
-  const linkedDays = create.linkedDays({ noteFile, wikiResolver, logger })
+  const linkedDailyNotes = create.linkedDailyNotes({ noteFile, wikiResolver, logger })
   const noteSessions = create.noteSessions({
     noteFile,
     clock,
@@ -962,7 +962,7 @@ export function composeCoreServices(
     graphSession: lateGraphSession,
     fileChanges,
     noteCreation,
-    linkedDays,
+    linkedDailyNotes,
     // Read at call time: the title rename service is built later.
     createCoordinator: (path) => titleRename.createCoordinator({ path }),
   })
@@ -1012,7 +1012,7 @@ export function composeCoreServices(
     noteFile,
     graphSession: lateGraphSession,
     indexLifecycle,
-    linkedDays,
+    linkedDailyNotes,
     logger,
   })
   const noteRows = create.noteRows({

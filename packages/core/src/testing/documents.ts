@@ -25,7 +25,7 @@ import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { createTestLoggerService } from './logger.ts'
 import { createTestIndexStoreService } from './index-store.ts'
 import { createTestIpcBridgeService } from './ipc.ts'
-import type { LinkedDayService } from '../documents/linked-day-service.ts'
+import type { LinkedDailyNoteService } from '../documents/linked-daily-note-service.ts'
 import {
   createNoteDocumentService,
   type NoteDocumentService,
@@ -386,12 +386,12 @@ export function createTestNoteMoveService(
 }
 
 /**
- * A {@link LinkedDayService} that creates no note.
+ * A {@link LinkedDailyNoteService} that creates no note.
  */
-export function createTestLinkedDayService(): LinkedDayService {
+export function createTestLinkedDailyNoteService(): LinkedDailyNoteService {
   return {
-    ensureLinkedDays: async () => {},
-    ensureLinkedDay: async () => {},
+    ensureDailyNotesLinkedFrom: async () => {},
+    ensureDailyNoteAt: async () => {},
   }
 }
 
@@ -407,7 +407,7 @@ export function createTestNoteDocumentService(
     noteFile: deps?.noteFile ?? createTestNoteFileService(),
     graphSession: deps?.graphSession ?? { get: () => ({ session: null }) },
     indexLifecycle: deps?.indexLifecycle ?? createTestIndexLifecycleService(),
-    linkedDays: deps?.linkedDays ?? createTestLinkedDayService(),
+    linkedDailyNotes: deps?.linkedDailyNotes ?? createTestLinkedDailyNoteService(),
     logger: deps?.logger ?? createTestLoggerService(),
   })
 }

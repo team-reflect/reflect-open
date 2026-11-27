@@ -15,7 +15,7 @@ import { createNoteDocumentService } from '../documents/note-document-service.ts
 import {
   createTestNoteSessionService,
   type TestNoteSessionService,
-  createTestLinkedDayService,
+  createTestLinkedDailyNoteService,
 } from '../testing/documents.ts'
 import type { ContactMatch, ContactsAuthorization } from './commands.ts'
 import {
@@ -69,7 +69,7 @@ function contactSuggestionsOver(deps?: {
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
       indexLifecycle: createTestIndexLifecycleService(),
-      linkedDays: createTestLinkedDayService(),
+      linkedDailyNotes: createTestLinkedDailyNoteService(),
       logger: createTestLoggerService(),
     }),
     settings: deps?.settings ?? createTestSettingsService(),

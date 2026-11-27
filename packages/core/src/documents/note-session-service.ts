@@ -4,7 +4,7 @@ import { deferredCreationPolicy, type NoteCreationService } from '../graph/note-
 import { isDaily } from '../graph/paths.ts'
 import type { FileChange, FileChangeService } from '../indexing/file-change-service.ts'
 import type { Unlisten } from '../unlisten.ts'
-import type { LinkedDayService } from './linked-day-service.ts'
+import type { LinkedDailyNoteService } from './linked-daily-note-service.ts'
 import { createNoteSession, type NoteSessionDeps } from './note-session.ts'
 import type {
   ManagedNoteSession,
@@ -44,7 +44,7 @@ export interface SessionCoordinator {
 export interface NoteSessionServiceDeps extends NoteSessionDeps {
   readonly fileChanges: FileChangeService
   readonly noteCreation: NoteCreationService
-  readonly linkedDays: LinkedDayService
+  readonly linkedDailyNotes: LinkedDailyNoteService
   /**
    * Creates the coordinator of a note that tracks renames.
    */
@@ -180,7 +180,7 @@ class NoteSessionServiceImpl implements NoteSessionService {
       missingSeed: policy.seedsUntitled ? noteCreation.untitledNoteSeed() : undefined,
       onContent: (content, origin) => {
         coordinator?.content(content, origin)
-        this.#ensureLinkedDays(session, content, origin)
+        this.#ensureLinkedDailyNotes(session, content, origin)
       },
       onObservedChange: (observed) => {
         this.#observedChanged(entry, observed)
@@ -206,16 +206,16 @@ class NoteSessionServiceImpl implements NoteSessionService {
    * Create the daily notes that a saved note links to, and the daily note of
    * a loaded day that has no file and that notes link to.
    */
-  #ensureLinkedDays(session: NoteSession, content: string, origin: NoteContentOrigin): void {
+  #ensureLinkedDailyNotes(session: NoteSession, content: string, origin: NoteContentOrigin): void {
     const generation = this.#deps.graphSession.get().session?.generation
     if (generation === undefined) {
       return
     }
-    const { linkedDays } = this.#deps
+    const { linkedDailyNotes } = this.#deps
     if (origin === 'saved') {
-      void linkedDays.ensureLinkedDays(session.path, content, generation)
+      void linkedDailyNotes.ensureDailyNotesLinkedFrom(session.path, content, generation)
     } else if (origin === 'load' && isDaily(session.path) && session.get().missing) {
-      void linkedDays.ensureLinkedDay(session.path, generation)
+      void linkedDailyNotes.ensureDailyNoteAt(session.path, generation)
     }
   }
 

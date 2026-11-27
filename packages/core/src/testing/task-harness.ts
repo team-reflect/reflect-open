@@ -4,7 +4,7 @@ import {
   createNoteDocumentService,
   type NoteDocumentService,
 } from '../documents/note-document-service.ts'
-import { createTestNoteSessionService, createTestLinkedDayService } from './documents.ts'
+import { createTestNoteSessionService, createTestLinkedDailyNoteService } from './documents.ts'
 import { createGraphSession, type GraphSession } from '../graph/graph-session.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import type { FileChange } from '../indexing/file-change-service.ts'
@@ -207,7 +207,7 @@ export class TaskHarness {
       noteFile: steppedFiles,
       graphSession,
       indexLifecycle: this.index,
-      linkedDays: createTestLinkedDayService(),
+      linkedDailyNotes: createTestLinkedDailyNoteService(),
       logger,
     })
     this.progress = createTestProgressPort()

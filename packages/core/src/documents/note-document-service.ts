@@ -5,7 +5,7 @@ import type { NoteRead, WritableNoteFileService } from '../graph/note-file-servi
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter.ts'
-import type { LinkedDayService } from './linked-day-service.ts'
+import type { LinkedDailyNoteService } from './linked-daily-note-service.ts'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter.ts'
 import type {
   NoteSessionCommit,
@@ -142,7 +142,7 @@ export interface NoteDocumentServiceDeps {
   readonly noteFile: WritableNoteFileService
   readonly graphSession: GraphSessionSource
   readonly indexLifecycle: IndexLifecycleService
-  readonly linkedDays: LinkedDayService
+  readonly linkedDailyNotes: LinkedDailyNoteService
   readonly logger: LoggerService
 }
 
@@ -289,7 +289,7 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
     generation: number,
     createIfMissing: boolean,
   ): Promise<NoteCommitResult> {
-    const { noteFile, linkedDays } = this.#deps
+    const { noteFile, linkedDailyNotes } = this.#deps
     let source = await this.#readForEdit(path, createIfMissing, generation)
     for (let attempt = 0; attempt < COMMIT_ATTEMPT_LIMIT; attempt += 1) {
       const content = transform(source?.content ?? null, source?.hash ?? null)
@@ -310,7 +310,7 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
           { content, hash: written.hash },
           written.modifiedMs,
         )
-        void linkedDays.ensureLinkedDays(path, content, generation)
+        void linkedDailyNotes.ensureDailyNotesLinkedFrom(path, content, generation)
         return { content, revision: written.hash, merged: false, indexSeq }
       }
       source = { content: written.merged, hash: written.hash }

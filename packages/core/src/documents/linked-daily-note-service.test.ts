@@ -9,7 +9,7 @@ import { createTestNoteCreationService, createTestNoteFileService } from '../tes
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
-import { createLinkedDayService } from './linked-day-service.ts'
+import { createLinkedDailyNoteService } from './linked-daily-note-service.ts'
 import { createNoteDocumentService } from './note-document-service.ts'
 import { createNoteSessionService } from './note-session-service.ts'
 
@@ -34,7 +34,7 @@ function setup({ indexed = [], files = {} }: Graph = {}) {
   const logger = createTestLoggerService()
   const clock = createTestClockService()
   const graphSession = createTestGraphSessionService({ graph: { generation: GENERATION } })
-  const linkedDays = createLinkedDayService({
+  const linkedDailyNotes = createLinkedDailyNoteService({
     noteFile,
     wikiResolver: createWikiResolverService({ database }),
     logger,
@@ -46,7 +46,7 @@ function setup({ indexed = [], files = {} }: Graph = {}) {
     graphSession,
     fileChanges: createTestFileChangeService(),
     noteCreation: createTestNoteCreationService(),
-    linkedDays,
+    linkedDailyNotes,
     createCoordinator: () => ({
       content: noop,
       settle: noop,
@@ -60,7 +60,7 @@ function setup({ indexed = [], files = {} }: Graph = {}) {
     noteFile,
     graphSession,
     indexLifecycle: createTestIndexLifecycleService(),
-    linkedDays,
+    linkedDailyNotes,
     logger,
   })
   const dailyFiles = (): Record<string, string> => {
@@ -68,13 +68,13 @@ function setup({ indexed = [], files = {} }: Graph = {}) {
       [...noteFile.files()].filter(([path]) => path.startsWith('daily/')).toSorted(),
     )
   }
-  return { linkedDays, noteSessions, noteDocuments, noteFile, clock, logger, dailyFiles }
+  return { linkedDailyNotes, noteSessions, noteDocuments, noteFile, clock, logger, dailyFiles }
 }
 
-describe('ensureLinkedDays', () => {
+describe('ensureDailyNotesLinkedFrom', () => {
   it('creates an empty daily note for each linked day that has none', async () => {
-    const { linkedDays, dailyFiles } = setup()
-    await linkedDays.ensureLinkedDays(
+    const { linkedDailyNotes, dailyFiles } = setup()
+    await linkedDailyNotes.ensureDailyNotesLinkedFrom(
       'notes/a.md',
       '# A\n\n- [ ] call [[2026-12-01]]\n- [[2026-12-02|Wed]] and [[2026-12-03#Plan]]\n- again [[2026-12-01]]\n',
       GENERATION,
@@ -87,57 +87,61 @@ describe('ensureLinkedDays', () => {
   })
 
   it('creates no note for a day that another note claims', async () => {
-    const { linkedDays, dailyFiles } = setup({
+    const { linkedDailyNotes, dailyFiles } = setup({
       indexed: [{ path: 'notes/launch.md', markdown: '# 2026-12-01\n' }],
     })
-    await linkedDays.ensureLinkedDays('notes/a.md', '[[2026-12-01]]\n', GENERATION)
+    await linkedDailyNotes.ensureDailyNotesLinkedFrom('notes/a.md', '[[2026-12-01]]\n', GENERATION)
     expect(dailyFiles()).toEqual({})
   })
 
   it('keeps a daily note that is on disk and not in the index', async () => {
-    const { linkedDays, dailyFiles, logger } = setup({ files: { [DAY]: 'kept\n' } })
-    await linkedDays.ensureLinkedDays('notes/a.md', '[[2026-12-01]]\n', GENERATION)
+    const { linkedDailyNotes, dailyFiles, logger } = setup({ files: { [DAY]: 'kept\n' } })
+    await linkedDailyNotes.ensureDailyNotesLinkedFrom('notes/a.md', '[[2026-12-01]]\n', GENERATION)
     expect(dailyFiles()).toEqual({ [DAY]: 'kept\n' })
     expect(logger.getErrors()).toEqual([])
   })
 
   it('creates no note for a link that names no day of another note', async () => {
-    const { linkedDays, dailyFiles } = setup()
+    const { linkedDailyNotes, dailyFiles } = setup()
     const source = '[[2026-02-31]] [[Project]]\n\n```\n[[2026-12-02]]\n```\n'
-    await linkedDays.ensureLinkedDays('notes/a.md', source, GENERATION)
-    await linkedDays.ensureLinkedDays(DAY, '[[2026-12-01]]\n', GENERATION)
-    await linkedDays.ensureLinkedDays('templates/week.md', '[[2026-12-01]]\n', GENERATION)
+    await linkedDailyNotes.ensureDailyNotesLinkedFrom('notes/a.md', source, GENERATION)
+    await linkedDailyNotes.ensureDailyNotesLinkedFrom(DAY, '[[2026-12-01]]\n', GENERATION)
+    await linkedDailyNotes.ensureDailyNotesLinkedFrom(
+      'templates/week.md',
+      '[[2026-12-01]]\n',
+      GENERATION,
+    )
     expect(dailyFiles()).toEqual({})
   })
 
   it('logs a failure and resolves', async () => {
-    const { linkedDays, noteFile, logger } = setup()
+    const { linkedDailyNotes, noteFile, logger } = setup()
     vi.spyOn(noteFile, 'create').mockRejectedValue(new Error('disk full'))
     await expect(
-      linkedDays.ensureLinkedDays('notes/a.md', '[[2026-12-01]]\n', GENERATION),
+      linkedDailyNotes.ensureDailyNotesLinkedFrom('notes/a.md', '[[2026-12-01]]\n', GENERATION),
     ).resolves.toBeUndefined()
     expect(logger.getErrors()).toHaveLength(1)
   })
 })
 
-describe('ensureLinkedDay', () => {
+describe('ensureDailyNoteAt', () => {
   const linker: TestNote = { path: 'notes/a.md', markdown: '# A\n\n[[2026-12-01]]\n' }
 
   it('creates the daily note of a day that a note links to', async () => {
-    const { linkedDays, dailyFiles } = setup({ indexed: [linker] })
-    await linkedDays.ensureLinkedDay(DAY, GENERATION)
+    const { linkedDailyNotes, dailyFiles } = setup({ indexed: [linker] })
+    await linkedDailyNotes.ensureDailyNoteAt(DAY, GENERATION)
     expect(dailyFiles()).toEqual({ [DAY]: '' })
   })
 
   it('creates no note for a day without links, or a day that another note claims', async () => {
     const unlinked = setup()
-    await unlinked.linkedDays.ensureLinkedDay(DAY, GENERATION)
+    await unlinked.linkedDailyNotes.ensureDailyNoteAt(DAY, GENERATION)
     expect(unlinked.dailyFiles()).toEqual({})
 
     const claimed = setup({
       indexed: [linker, { path: 'notes/launch.md', markdown: '# 2026-12-01\n' }],
     })
-    await claimed.linkedDays.ensureLinkedDay(DAY, GENERATION)
+    await claimed.linkedDailyNotes.ensureDailyNoteAt(DAY, GENERATION)
     expect(claimed.dailyFiles()).toEqual({})
   })
 })

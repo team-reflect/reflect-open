@@ -12,33 +12,37 @@ const DATE_LINK_HINT = /\[\[\s*\d{4}/
  * Creates the empty daily note of a day that notes link to while no note
  * claims that day, so the day's backlinks resolve.
  */
-export interface LinkedDayService {
+export interface LinkedDailyNoteService {
   /**
    * Create the missing daily notes that `source`, the text of the note at
    * `path`, links to. Never rejects.
    */
-  ensureLinkedDays(path: string, source: string, generation: number): Promise<void>
+  ensureDailyNotesLinkedFrom(path: string, source: string, generation: number): Promise<void>
   /**
    * Create the daily note at `path` when it has no file and a note links to
    * its day. Never rejects.
    */
-  ensureLinkedDay(path: string, generation: number): Promise<void>
+  ensureDailyNoteAt(path: string, generation: number): Promise<void>
 }
 
-export interface LinkedDayServiceDeps {
+export interface LinkedDailyNoteServiceDeps {
   readonly noteFile: WritableNoteFileService
   readonly wikiResolver: WikiResolverService
   readonly logger: LoggerService
 }
 
-class LinkedDayServiceImpl implements LinkedDayService {
-  readonly #deps: LinkedDayServiceDeps
+class LinkedDailyNoteServiceImpl implements LinkedDailyNoteService {
+  readonly #deps: LinkedDailyNoteServiceDeps
 
-  constructor(deps: LinkedDayServiceDeps) {
+  constructor(deps: LinkedDailyNoteServiceDeps) {
     this.#deps = deps
   }
 
-  async ensureLinkedDays(path: string, source: string, generation: number): Promise<void> {
+  async ensureDailyNotesLinkedFrom(
+    path: string,
+    source: string,
+    generation: number,
+  ): Promise<void> {
     if (isTemplatePath(path) || !DATE_LINK_HINT.test(source)) {
       return
     }
@@ -51,7 +55,7 @@ class LinkedDayServiceImpl implements LinkedDayService {
     }
   }
 
-  async ensureLinkedDay(path: string, generation: number): Promise<void> {
+  async ensureDailyNoteAt(path: string, generation: number): Promise<void> {
     const date = dateFromDailyPath(path)
     if (date === null) {
       return
@@ -95,6 +99,8 @@ function collectLinkedDates(path: string, source: string): string[] {
   return [...dates]
 }
 
-export function createLinkedDayService(deps: LinkedDayServiceDeps): LinkedDayService {
-  return new LinkedDayServiceImpl(deps)
+export function createLinkedDailyNoteService(
+  deps: LinkedDailyNoteServiceDeps,
+): LinkedDailyNoteService {
+  return new LinkedDailyNoteServiceImpl(deps)
 }

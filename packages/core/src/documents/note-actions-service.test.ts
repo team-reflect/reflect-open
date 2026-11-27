@@ -12,7 +12,7 @@ import {
   createTestNoteSession,
   type TestNoteSessionOptions,
   createTestNoteSessionService,
-  createTestLinkedDayService,
+  createTestLinkedDailyNoteService,
 } from '../testing/documents.ts'
 import {
   createTestGraphSessionService,
@@ -86,7 +86,7 @@ function createNoteActions(deps: {
       noteFile,
       graphSession: graph,
       indexLifecycle: deps.indexLifecycle ?? recordingIndexLifecycle(indexLog),
-      linkedDays: createTestLinkedDayService(),
+      linkedDailyNotes: createTestLinkedDailyNoteService(),
       logger: createTestLoggerService(),
     }),
     noteFile,
