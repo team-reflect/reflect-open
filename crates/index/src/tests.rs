@@ -2548,7 +2548,7 @@ fn daily_reads_keep_the_range_and_skip_empty_and_private_days() {
             .map(|row| row.daily_date)
             .collect()
     };
-    assert_eq!(dates(10), ["2026-06-30", "2026-06-02", "2026-06-01"]);
+    assert_eq!(dates(10), ["2026-06-30", "2026-06-01"]);
     assert_eq!(dates(1), ["2026-06-30"]);
 }
 

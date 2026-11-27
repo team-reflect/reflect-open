@@ -4,7 +4,7 @@ import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createNoteDocumentService } from '../documents/note-document-service.ts'
 import { createNoteRowService } from '../documents/note-row-service.ts'
 import type { NoteSession } from '../documents/note-session-types.ts'
-import { createTestNoteSessionService } from '../testing/documents.ts'
+import { createTestNoteSessionService, createTestLinkedDayService } from '../testing/documents.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { gistBodyHash } from '../markdown/gist.ts'
 import { createPrivacyService } from '../privacy/privacy-service.ts'
@@ -96,6 +96,7 @@ function setup(options?: SetupOptions) {
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
       indexLifecycle: createTestIndexLifecycleService(),
+      linkedDays: createTestLinkedDayService(),
       logger: createTestLoggerService(),
     }),
     noteRows,

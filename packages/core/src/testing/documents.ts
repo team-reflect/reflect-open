@@ -25,6 +25,7 @@ import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { createTestLoggerService } from './logger.ts'
 import { createTestIndexStoreService } from './index-store.ts'
 import { createTestIpcBridgeService } from './ipc.ts'
+import type { LinkedDayService } from '../documents/linked-day-service.ts'
 import {
   createNoteDocumentService,
   type NoteDocumentService,
@@ -385,6 +386,16 @@ export function createTestNoteMoveService(
 }
 
 /**
+ * A {@link LinkedDayService} that creates no note.
+ */
+export function createTestLinkedDayService(): LinkedDayService {
+  return {
+    ensureLinkedDays: async () => {},
+    ensureLinkedDay: async () => {},
+  }
+}
+
+/**
  * The real {@link NoteDocumentService} over test doubles. Without a
  * `graphSession` no graph is open, so commits write no index rows.
  */
@@ -396,6 +407,7 @@ export function createTestNoteDocumentService(
     noteFile: deps?.noteFile ?? createTestNoteFileService(),
     graphSession: deps?.graphSession ?? { get: () => ({ session: null }) },
     indexLifecycle: deps?.indexLifecycle ?? createTestIndexLifecycleService(),
+    linkedDays: deps?.linkedDays ?? createTestLinkedDayService(),
     logger: deps?.logger ?? createTestLoggerService(),
   })
 }

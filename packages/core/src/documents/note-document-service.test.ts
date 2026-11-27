@@ -4,6 +4,7 @@ import {
   createTestNoteSession,
   type TestNoteSessionOptions,
   createTestNoteSessionService,
+  createTestLinkedDayService,
 } from '../testing/documents.ts'
 import {
   createTestNoteFileService,
@@ -57,6 +58,7 @@ function setup(options?: {
       },
     }),
     indexLifecycle,
+    linkedDays: createTestLinkedDayService(),
     logger,
   })
   return { noteDocuments, noteFile, session, externalWrites, indexNote, logger }
