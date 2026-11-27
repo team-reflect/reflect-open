@@ -171,6 +171,7 @@ class NoteSessionServiceImpl implements NoteSessionService {
     }
     const { noteCreation, createCoordinator } = this.#deps
     const policy = deferredCreationPolicy(path)
+    const root = this.#deps.graphSession.get().session?.root
     const coordinator = policy.trackRenames ? createCoordinator(path) : null
     const session = createNoteSession(this.#deps, {
       path,
@@ -180,7 +181,7 @@ class NoteSessionServiceImpl implements NoteSessionService {
       missingSeed: policy.seedsUntitled ? noteCreation.untitledNoteSeed() : undefined,
       onContent: (content, origin) => {
         coordinator?.content(content, origin)
-        this.#ensureLinkedDailyNotes(session, content, origin)
+        this.#ensureLinkedDailyNotes(session, root, content, origin)
       },
       onObservedChange: (observed) => {
         this.#observedChanged(entry, observed)
@@ -206,11 +207,18 @@ class NoteSessionServiceImpl implements NoteSessionService {
    * Create the daily notes that a saved note links to, and the daily note of
    * a loaded day that has no file and that notes link to.
    */
-  #ensureLinkedDailyNotes(session: NoteSession, content: string, origin: NoteContentOrigin): void {
-    const generation = this.#deps.graphSession.get().session?.generation
-    if (generation === undefined) {
+  #ensureLinkedDailyNotes(
+    session: NoteSession,
+    root: string | undefined,
+    content: string,
+    origin: NoteContentOrigin,
+  ): void {
+    const graph = this.#deps.graphSession.get().session
+    // A session of a graph that is no longer open creates no note.
+    if (graph === null || graph.root !== root) {
       return
     }
+    const { generation } = graph
     const { linkedDailyNotes } = this.#deps
     if (origin === 'saved') {
       void linkedDailyNotes.ensureDailyNotesLinkedFrom(session.path, content, generation)
