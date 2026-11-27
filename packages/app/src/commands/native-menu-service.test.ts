@@ -9,7 +9,11 @@ import { createTestNativeMenuService } from '../testing/commands.ts'
 import { createTestWindowService } from '../testing/window.ts'
 import type { AppCommandId } from './app-commands.ts'
 import { createCommandService } from './command-service.ts'
-import type { AppSubmenuLayout, NativeMenuItem } from './native-menu-service.ts'
+import type {
+  AppSubmenuLayout,
+  NativeContextMenuItem,
+  NativeMenuItem,
+} from './native-menu-service.ts'
 import { returnNull } from '@ocavue/utils'
 
 const LAYOUT: AppSubmenuLayout[] = [
@@ -242,24 +246,38 @@ describe('menu command dispatch', () => {
 })
 
 describe('openContextMenu', () => {
+  const items: NativeContextMenuItem[] = [
+    { type: 'action', id: 'complete', title: 'Complete', shortcut: 'Mod-Enter' },
+    { type: 'separator' },
+    {
+      type: 'submenu',
+      title: 'Schedule',
+      items: [
+        { type: 'action', id: 'today', title: 'Today', checked: true },
+        { type: 'action', id: 'clear', title: 'Clear date', disabled: true },
+      ],
+    },
+  ]
+
   it('does nothing outside a native shell', async () => {
     const { menu } = setup({ platform: { isNativeShell: false } })
     const onSelect = vi.fn()
 
-    await menu.openContextMenu({ items: [{ text: 'Unpin Note', action: onSelect }] })
+    await menu.openContextMenu({ items, onSelect })
 
     expect(menu.host.popups()).toEqual([])
     expect(onSelect).not.toHaveBeenCalled()
   })
 
-  it('opens a native menu whose items run their actions', async () => {
+  it('opens the items in a native menu and reports the picked action id', async () => {
     const { menu } = setup()
     const onSelect = vi.fn()
 
-    await menu.openContextMenu({ items: [{ text: 'Unpin Note', action: onSelect }] })
+    await menu.openContextMenu({ items, onSelect })
 
-    expect(menu.host.popups()).toEqual([[{ text: 'Unpin Note', action: onSelect }]])
-    menu.host.popups()[0]?.[0]?.action()
-    expect(onSelect).toHaveBeenCalled()
+    expect(menu.host.popups()).toEqual([items])
+    menu.host.select('today')
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith('today')
+    expect(() => menu.host.select('clear')).toThrow('no enabled context menu action: clear')
   })
 })

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { NativeSubmenu } from '@reflect/app'
+import type { NativeContextMenuItem, NativeSubmenu } from '@reflect/app'
 
 interface SubmenuOptionsForTest {
   readonly text: string
@@ -28,17 +28,42 @@ const submenuNew = vi.hoisted(() => {
     })
   })
 })
+// The `text` of every closed resource, or `menu` for a menu.
+const closed = vi.hoisted((): string[] => [])
 const menuNew = vi.hoisted(() => {
-  return vi.fn((_options: unknown) => Promise.resolve({ setAsAppMenu, popup }))
+  return vi.fn((_options: unknown) => {
+    return Promise.resolve({ setAsAppMenu, popup, close: () => void closed.push('menu') })
+  })
 })
-const menuItemNew = vi.hoisted(() => {
-  return vi.fn((options: object) => Promise.resolve({ ...options, built: true }))
+/**
+ * A fake `X.new` that echoes its options as the built resource.
+ */
+const resourceNew = vi.hoisted(() => {
+  return (kind: string) => {
+    return vi.fn((options: { text?: string; action?: () => void }) => {
+      return Promise.resolve({
+        ...options,
+        built: kind,
+        close: () => void closed.push(options.text ?? kind),
+      })
+    })
+  }
 })
+const menuItemNew = vi.hoisted(() => resourceNew('MenuItem'))
+const checkMenuItemNew = vi.hoisted(() => resourceNew('CheckMenuItem'))
+const predefinedMenuItemNew = vi.hoisted(() => resourceNew('PredefinedMenuItem'))
+const contextSubmenuNew = vi.hoisted(() => resourceNew('Submenu'))
 
 vi.mock('@tauri-apps/api/menu', () => ({
   Menu: { new: menuNew },
   MenuItem: { new: menuItemNew },
-  Submenu: { new: submenuNew },
+  CheckMenuItem: { new: checkMenuItemNew },
+  PredefinedMenuItem: { new: predefinedMenuItemNew },
+  Submenu: {
+    new: (options: SubmenuOptionsForTest) => {
+      return options.text === 'Schedule' ? contextSubmenuNew(options) : submenuNew(options)
+    },
+  },
 }))
 
 const { createTauriNativeMenuHost } = await import('./native-menu.ts')
@@ -46,6 +71,7 @@ const { createTauriNativeMenuHost } = await import('./native-menu.ts')
 beforeEach(() => {
   vi.clearAllMocks()
   calls.length = 0
+  closed.length = 0
 })
 
 describe('createTauriNativeMenuHost', () => {
@@ -88,9 +114,9 @@ describe('createTauriNativeMenuHost', () => {
     expect(view).toEqual({
       text: 'View',
       items: [
-        { ...sidebarToggle, built: true },
+        { ...sidebarToggle, built: 'MenuItem', close: expect.any(Function) as () => void },
         { item: 'Separator' },
-        { ...themeToggle, built: true },
+        { ...themeToggle, built: 'MenuItem', close: expect.any(Function) as () => void },
         { item: 'Quit', text: 'Quit Reflect' },
       ],
     })
@@ -109,15 +135,54 @@ describe('createTauriNativeMenuHost', () => {
     expect(calls).toEqual(['setAsAppMenu', 'windows:Window', 'help:Help'])
   })
 
-  it('pops up a context menu whose items run their actions', async () => {
+  it('builds each context menu item with the Tauri class for its type', async () => {
     const onSelect = vi.fn()
+    const items: NativeContextMenuItem[] = [
+      { type: 'action', id: 'complete', title: 'Complete', shortcut: 'Mod-Enter' },
+      { type: 'separator' },
+      {
+        type: 'submenu',
+        title: 'Schedule',
+        items: [
+          { type: 'action', id: 'today', title: 'Today', checked: true },
+          { type: 'action', id: 'clear', title: 'Clear date', disabled: true },
+        ],
+      },
+    ]
 
-    await createTauriNativeMenuHost().popup([{ text: 'Unpin Note', action: onSelect }])
+    await createTauriNativeMenuHost().popup({ items, onSelect })
 
-    expect(menuItemNew).toHaveBeenCalledWith({ text: 'Unpin Note', action: onSelect })
-    expect(menuNew).toHaveBeenCalledWith({
-      items: [{ text: 'Unpin Note', action: onSelect, built: true }],
+    const [menuOptions] = menuNew.mock.calls.at(-1) ?? []
+    expect(menuOptions).toMatchObject({
+      items: [
+        { built: 'MenuItem', text: 'Complete', enabled: true, accelerator: 'CmdOrCtrl+Enter' },
+        { built: 'PredefinedMenuItem', item: 'Separator' },
+        {
+          built: 'Submenu',
+          text: 'Schedule',
+          items: [
+            { built: 'CheckMenuItem', text: 'Today', enabled: true, checked: true },
+            { built: 'MenuItem', text: 'Clear date', enabled: false },
+          ],
+        },
+      ],
     })
+    expect(menuItemNew.mock.calls[0]?.[0]).not.toHaveProperty('id')
     expect(popup).toHaveBeenCalledTimes(1)
+
+    checkMenuItemNew.mock.calls[0]?.[0].action?.()
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith('today')
+  })
+
+  it('closes the previous context menu when the next one opens', async () => {
+    const host = createTauriNativeMenuHost()
+    const items: NativeContextMenuItem[] = [{ type: 'action', id: 'unpin', title: 'Unpin Note' }]
+
+    await host.popup({ items, onSelect: vi.fn() })
+    expect(closed).toEqual([])
+
+    await host.popup({ items, onSelect: vi.fn() })
+    expect(closed).toEqual(['Unpin Note', 'menu'])
+    expect(popup).toHaveBeenCalledTimes(2)
   })
 })

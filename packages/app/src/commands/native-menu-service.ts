@@ -78,22 +78,40 @@ export interface NativeAppMenu {
   assignNsAppRoles(): MaybePromise<void>
 }
 
-export interface NativeContextMenuItem {
-  /**
-   * Visible native menu item label.
-   */
-  text: string
-  /**
-   * Invoked when the native menu item is selected.
-   */
-  action: () => void
-}
+/**
+ * One item of a context menu. It is plain data, so a host can render it
+ * anywhere and report the picked action by its `id`.
+ */
+export type NativeContextMenuItem =
+  | {
+      type: 'action'
+      /**
+       * Passed to {@link NativeContextMenuOptions.onSelect} when the item is picked.
+       */
+      id: string
+      title: string
+      disabled?: boolean | undefined
+      /**
+       * Makes the item a check item, with or without its check mark.
+       */
+      checked?: boolean | undefined
+      /**
+       * A keybinding such as `Mod-Enter`, shown as a hint next to the title.
+       */
+      shortcut?: string | undefined
+    }
+  | { type: 'separator' }
+  | { type: 'submenu'; title: string; items: readonly NativeContextMenuItem[] }
 
 export interface NativeContextMenuOptions {
   /**
    * Menu items to render in order.
    */
   items: readonly NativeContextMenuItem[]
+  /**
+   * Runs with the action item id when the user picks an action.
+   */
+  onSelect: (id: string) => void
 }
 
 /**
@@ -104,7 +122,7 @@ export interface NativeMenuHost {
   /**
    * Open a context menu at the pointer.
    */
-  popup(items: readonly NativeContextMenuItem[]): MaybePromise<void>
+  popup(options: NativeContextMenuOptions): MaybePromise<void>
 }
 
 /**
@@ -255,7 +273,7 @@ class NativeMenuServiceImpl implements NativeMenuService {
     if (!this.#deps.platform.isNativeShell) {
       return
     }
-    await this.#deps.host.popup(options.items)
+    await this.#deps.host.popup(options)
   }
 
   async #dispatchToFocusedWindow(commandId: AppCommandId): Promise<void> {

@@ -1,5 +1,19 @@
-import type { NativeMenuHost, NativeMenuItem, NativeSubmenu } from '@reflect/app'
-import { Menu, MenuItem, Submenu, type PredefinedMenuItemOptions } from '@tauri-apps/api/menu'
+import {
+  bindingToAccelerator,
+  type NativeContextMenuItem,
+  type NativeMenuHost,
+  type NativeMenuItem,
+  type NativeSubmenu,
+} from '@reflect/app'
+import type { Resource } from '@tauri-apps/api/core'
+import {
+  CheckMenuItem,
+  Menu,
+  MenuItem,
+  PredefinedMenuItem,
+  Submenu,
+  type PredefinedMenuItemOptions,
+} from '@tauri-apps/api/menu'
 
 // Inline item options lose their click handler once the submenu is built.
 async function menuEntry(item: NativeMenuItem): Promise<MenuItem | PredefinedMenuItemOptions> {
@@ -11,6 +25,53 @@ async function menuEntry(item: NativeMenuItem): Promise<MenuItem | PredefinedMen
         action: item.action,
       })
     : { item: item.item, ...(item.text !== undefined ? { text: item.text } : {}) }
+}
+
+type ContextMenuEntry = MenuItem | CheckMenuItem | PredefinedMenuItem | Submenu
+
+/**
+ * Builds the context menu entries for `items` and adds every built entry to
+ * `built`, so the caller can close them all later.
+ */
+async function buildContextMenuEntries(
+  items: readonly NativeContextMenuItem[],
+  onSelect: (id: string) => void,
+  built: Resource[],
+): Promise<ContextMenuEntry[]> {
+  return await Promise.all(
+    items.map(async (item) => {
+      const entry = await buildContextMenuEntry(item, onSelect, built)
+      built.push(entry)
+      return entry
+    }),
+  )
+}
+
+async function buildContextMenuEntry(
+  item: NativeContextMenuItem,
+  onSelect: (id: string) => void,
+  built: Resource[],
+): Promise<ContextMenuEntry> {
+  if (item.type === 'separator') {
+    return await PredefinedMenuItem.new({ item: 'Separator' })
+  }
+  if (item.type === 'submenu') {
+    return await Submenu.new({
+      text: item.title,
+      items: await buildContextMenuEntries(item.items, onSelect, built),
+    })
+  }
+  // No Tauri item id: Tauri keys click channels by id, and a context menu id
+  // could replace the channel of an app menu item with the same id.
+  const options = {
+    text: item.title,
+    enabled: !(item.disabled ?? false),
+    ...(item.shortcut !== undefined ? { accelerator: bindingToAccelerator(item.shortcut) } : {}),
+    action: () => onSelect(item.id),
+  }
+  return item.checked === undefined
+    ? await MenuItem.new(options)
+    : await CheckMenuItem.new({ ...options, checked: item.checked })
 }
 
 type NativeAppMenu = Awaited<ReturnType<NativeMenuHost['buildAppMenu']>>
@@ -47,9 +108,13 @@ class TauriNativeAppMenu implements NativeAppMenu {
 
 /**
  * Native menus through Tauri's menu API. Use this adapter only in the native shell.
- * It holds no state and takes no dependencies, so it stays a function.
  */
 export function createTauriNativeMenuHost(): NativeMenuHost {
+  // The Rust-side resources of the latest context menu. `popup()` resolves
+  // when the menu shows, not when it closes, so they are closed at the start
+  // of the next popup: closing them earlier would drop the user's pick.
+  let contextMenuResources: Resource[] = []
+
   return {
     async buildAppMenu(layouts) {
       const submenus = await Promise.all(
@@ -63,11 +128,13 @@ export function createTauriNativeMenuHost(): NativeMenuHost {
       const menu = await Menu.new({ items: submenus })
       return new TauriNativeAppMenu(menu, layouts, submenus)
     },
-    async popup(items) {
-      const menuItems = await Promise.all(
-        items.map((item) => MenuItem.new({ text: item.text, action: item.action })),
-      )
-      const menu = await Menu.new({ items: menuItems })
+    async popup({ items, onSelect }) {
+      const stale = contextMenuResources
+      const built: Resource[] = []
+      contextMenuResources = built
+      await Promise.allSettled(stale.map((resource) => resource.close()))
+      const menu = await Menu.new({ items: await buildContextMenuEntries(items, onSelect, built) })
+      built.push(menu)
       await menu.popup()
     },
   }

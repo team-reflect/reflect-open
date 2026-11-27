@@ -134,12 +134,14 @@ export {
   copyNotePath,
   publishGistAndCopyLink,
 } from './commands/clipboard-actions.ts'
+export { bindingToAccelerator } from './commands/accelerator.ts'
 export { type CommandHandler, type CommandService } from './commands/command-service.ts'
 export { formatBinding } from './commands/keybindings.ts'
 export { type KeymapService } from './commands/keymap-service.ts'
 export {
   type AppMenuEntry,
   type AppSubmenuLayout,
+  type NativeContextMenuItem,
   type NativeContextMenuOptions,
   type NativeMenuHost,
   type NativeMenuItem,

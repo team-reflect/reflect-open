@@ -37,11 +37,33 @@ export interface TestNativeMenuHost extends NativeMenuHost {
    * The items of every context menu opened, in order.
    */
   popups(): readonly (readonly NativeContextMenuItem[])[]
+  /**
+   * Pick the enabled action `id` in the latest context menu, as the user would.
+   */
+  select(id: string): void
+}
+
+function findAction(
+  items: readonly NativeContextMenuItem[],
+  id: string,
+): Extract<NativeContextMenuItem, { type: 'action' }> | undefined {
+  for (const item of items) {
+    if (item.type === 'action' && item.id === id) {
+      return item
+    }
+    if (item.type === 'submenu') {
+      const found = findAction(item.items, id)
+      if (found) {
+        return found
+      }
+    }
+  }
+  return undefined
 }
 
 class TestNativeMenuHostImpl implements TestNativeMenuHost {
   readonly calls: TestNativeMenuHostCall[] = []
-  readonly #popups: (readonly NativeContextMenuItem[])[] = []
+  readonly #popups: NativeContextMenuOptions[] = []
   #appMenu: readonly NativeSubmenu[] | null = null
 
   buildAppMenu(submenus: readonly NativeSubmenu[]): NativeAppMenu {
@@ -57,9 +79,9 @@ class TestNativeMenuHostImpl implements TestNativeMenuHost {
     }
   }
 
-  popup(items: readonly NativeContextMenuItem[]): void {
+  popup(options: NativeContextMenuOptions): void {
     this.calls.push('popup')
-    this.#popups.push(items)
+    this.#popups.push(options)
   }
 
   appMenu(): readonly NativeSubmenu[] | null {
@@ -67,7 +89,16 @@ class TestNativeMenuHostImpl implements TestNativeMenuHost {
   }
 
   popups(): readonly (readonly NativeContextMenuItem[])[] {
-    return [...this.#popups]
+    return this.#popups.map((options) => options.items)
+  }
+
+  select(id: string): void {
+    const latest = this.#popups.at(-1)
+    const item = latest ? findAction(latest.items, id) : undefined
+    if (!latest || !item || (item.disabled ?? false)) {
+      throw new Error(`no enabled context menu action: ${id}`)
+    }
+    latest.onSelect(id)
   }
 }
 

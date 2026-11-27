@@ -39,7 +39,10 @@ import { Sidebar } from './sidebar.tsx'
 
 const openNativeContextMenu = vi.fn((options: NativeContextMenuOptions) => {
   return Promise.try(() => {
-    options.items[0]?.action()
+    const [first] = options.items
+    if (first?.type === 'action') {
+      options.onSelect(first.id)
+    }
   })
 })
 
@@ -325,13 +328,11 @@ describe('Sidebar', () => {
     await rust.click({ button: 'right' })
 
     await vi.waitFor(() => {
-      expect(openNativeContextMenu).toHaveBeenCalledWith({
-        items: [
-          expect.objectContaining({
-            text: 'Unpin Note',
-          }),
-        ],
-      })
+      expect(openNativeContextMenu).toHaveBeenCalledWith(
+        expect.objectContaining({
+          items: [expect.objectContaining({ type: 'action', title: 'Unpin Note' })],
+        }),
+      )
     })
     await expectLocatorToHaveCount(view.getByRole('button', { name: 'Rust' }), 0)
     expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/rust.md', { pinned: false }, 1)
