@@ -473,10 +473,12 @@ export interface TestSemanticSearchService extends SemanticSearchService {
 
 class TestSemanticSearchServiceImpl implements TestSemanticSearchService {
   readonly #inner: SemanticSearchService
+  readonly progress: Store<EmbeddingProgress | null>
   #running = 0
 
   constructor(inner: SemanticSearchService) {
     this.#inner = inner
+    this.progress = inner.progress
   }
 
   start(): Unlisten {
@@ -502,10 +504,6 @@ class TestSemanticSearchServiceImpl implements TestSemanticSearchService {
 
   similarNotes(path: string): Promise<RetrievalHit[]> {
     return this.#inner.similarNotes(path)
-  }
-
-  get progress(): Store<EmbeddingProgress | null> {
-    return this.#inner.progress
   }
 
   dispose(): void {
