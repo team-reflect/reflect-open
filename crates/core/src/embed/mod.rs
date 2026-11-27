@@ -42,6 +42,8 @@ struct ModelSpec {
 
 /// EmbeddingGemma 300M, Q8_0. The prompts and the Matryoshka truncation follow
 /// the model card: https://huggingface.co/google/embeddinggemma-300m
+/// EmbeddingGemma 2 is not used: it retrieves English text less well, in
+/// Google's results and in ours. See `docs/decisions/0006-llama-cpp-embeddings.md`.
 const MODEL: ModelSpec = ModelSpec {
     id: "embeddinggemma-300m-q8_0-d256",
     repo: "ggml-org/embeddinggemma-300M-GGUF",

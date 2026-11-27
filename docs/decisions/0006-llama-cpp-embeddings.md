@@ -9,7 +9,8 @@
 - **Decision driver:** One runtime that builds for every desktop target and for
   iOS, with a model that understands languages other than English.
 - **Alternatives evaluated:** keep `fastembed` (ONNX Runtime) and change only the
-  model; `candle`; a multilingual MiniLM.
+  model; `candle`; a multilingual MiniLM; EmbeddingGemma 2 (see
+  [Why not EmbeddingGemma 2](#why-not-embeddinggemma-2)).
 
 ---
 
@@ -60,6 +61,52 @@ vector table and re-embeds every note once.
 - The output is truncated to 256 dimensions (Matryoshka) and normalized.
 - After a load, the runtime deletes every other file in its models directory:
   the old MiniLM cache and the files of older model revisions.
+
+### Why not EmbeddingGemma 2
+
+Google released [EmbeddingGemma 2](https://huggingface.co/google/embeddinggemma-2)
+in September 2026. It is Apache 2.0, and its text model has 270M parameters. We
+keep EmbeddingGemma (the first version) because EmbeddingGemma 2 retrieves
+English text less well, in Google's results and in ours, and it is slower.
+
+**Google's results.** The
+[EmbeddingGemma 2 technical report](https://arxiv.org/html/2610.37364)
+(arXiv 2610.37364) says: "On English, the model sees a modest regression."
+Its gains are on multilingual bitext mining and classification, code and other
+media, not on text retrieval:
+
+| Source in the report | EmbeddingGemma | EmbeddingGemma 2 |
+|---|---|---|
+| Table 1, MTEB(Eng, v2) Mean (Task) | 69.67 | 68.46 |
+| Table 14, MTEB(Eng, v2) Retrieval, 768 dimensions | 55.7 | 51.7 |
+| Table 14, MTEB(Eng, v2) Retrieval, 256 dimensions | not reported | 49.4 |
+
+Google's [MTEB result files](https://github.com/embeddings-benchmark/results)
+show the same drop on single tasks, for example
+ArguAna (0.715 to 0.598) and FiQA2018 (0.477 to 0.323), nDCG@10.
+
+**Our results.** Both models ran through llama.cpp as Q8_0 GGUF, with the
+app's prompts, mean pooling and 256 dimensions. Scores are nDCG@10:
+
+| Dataset | Queries | Documents | EmbeddingGemma | EmbeddingGemma 2 |
+|---|---|---|---|---|
+| SciFact | 300 | 5,183 | 0.782 | 0.839 |
+| NFCorpus | 323 | 3,633 | 0.367 | 0.349 |
+| ArguAna | 1,401 | 8,674 | 0.667 | 0.574 |
+| FiQA2018 (sampled corpus) | 648 | 15,000 | 0.567 | 0.412 |
+| Quora (sampled corpus) | 800 | 10,000 | 0.990 | 0.990 |
+
+- Where the full test set was used, our scores are within about 0.01 of the
+  published MTEB scores once the task prompt matches, so the harness is sound.
+- llama.cpp's EmbeddingGemma 2 vectors match the reference
+  sentence-transformers output (cosine similarity 1.0), so the gap comes from
+  the model, not from the runtime.
+- EmbeddingGemma 2 takes 20 to 45 percent longer per text on Metal, and about
+  3.6 times longer on the CPU with two threads.
+- `llama-cpp-2` 0.1.161 cannot load it: llama.cpp added the
+  `gemma-embedding2` architecture after the revision that the crate vendors.
+
+Look again when a newer EmbeddingGemma scores higher on English retrieval.
 
 ### Index
 
