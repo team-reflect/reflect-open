@@ -19,26 +19,13 @@ interface Point {
 interface BrowserContextMenuProps {
   items: readonly NativeMenuItem[]
   point: Point
-  onClosed: () => void
 }
 
-export function BrowserContextMenu({
-  items,
-  point,
-  onClosed,
-}: BrowserContextMenuProps): ReactElement {
+export function BrowserContextMenu({ items, point }: BrowserContextMenuProps): ReactElement {
   const [open, setOpen] = useState(true)
   const anchor = { getBoundingClientRect: () => DOMRect.fromRect(point) }
   return (
-    <DropdownMenu
-      open={open}
-      onOpenChange={setOpen}
-      onOpenChangeComplete={(next) => {
-        if (!next) {
-          onClosed()
-        }
-      }}
-    >
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuContent anchor={anchor} sideOffset={0} className="w-auto">
         {renderItems(items, '')}
       </DropdownMenuContent>

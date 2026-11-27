@@ -1,9 +1,6 @@
 import { createUnsupportedNativeMenuHost, type NativeMenuHost } from '@reflect/app'
 import { createRoot, type Root } from 'react-dom/client'
 
-/**
- * Context menus drawn in the page. The menu code loads on the first popup.
- */
 export function createBrowserNativeMenuHost(): NativeMenuHost {
   let pointer = { x: 0, y: 0 }
   let root: Root | null = null
@@ -24,20 +21,8 @@ export function createBrowserNativeMenuHost(): NativeMenuHost {
       const { BrowserContextMenu } = await import('@/components/browser-context-menu.tsx')
       root ??= createRoot(document.body.appendChild(document.createElement('div')))
       opened += 1
-      const menu = opened
       // A new key replaces the open menu, even one that is still closing.
-      root.render(
-        <BrowserContextMenu
-          key={menu}
-          items={items}
-          point={at}
-          onClosed={() => {
-            if (menu === opened) {
-              root?.render(null)
-            }
-          }}
-        />,
-      )
+      root.render(<BrowserContextMenu key={opened} items={items} point={at} />)
     },
   }
 }

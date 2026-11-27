@@ -1,20 +1,14 @@
+import { mouse } from 'vitest-browser-commands/playwright'
 import { page, userEvent } from 'vitest/browser'
 import { describe, expect, it, vi } from 'vitest'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { createBrowserNativeMenuHost } from './browser-native-menu.tsx'
 
-async function rightClickAt(x: number, y: number): Promise<void> {
-  const target = document.body.appendChild(document.createElement('div'))
-  target.style.cssText = `position: fixed; left: ${x}px; top: ${y}px; width: 1px; height: 1px`
-  await page.elementLocator(target).click({ button: 'right' })
-  target.remove()
-}
-
 describe('createBrowserNativeMenuHost', () => {
   it('opens the menu at the right-click point and runs the picked action', async () => {
     const host = createBrowserNativeMenuHost()
     const action = vi.fn()
-    await rightClickAt(120, 80)
+    await mouse.click(120, 80, { button: 'right' })
 
     await host.popup([{ kind: 'command', id: 'unpin', text: 'Unpin Note', action }])
     const item = page.getByRole('menuitem', { name: 'Unpin Note' })
@@ -33,7 +27,7 @@ describe('createBrowserNativeMenuHost', () => {
     const host = createBrowserNativeMenuHost()
     const complete = vi.fn()
     const today = vi.fn()
-    await rightClickAt(40, 40)
+    await mouse.click(40, 40, { button: 'right' })
 
     await host.popup([
       { kind: 'command', id: 'complete', text: 'Complete', action: complete },
@@ -79,15 +73,16 @@ describe('createBrowserNativeMenuHost', () => {
 
     await page.getByRole('button', { name: 'Row A' }).click({ button: 'right' })
     await expect.element(page.getByRole('menuitem', { name: 'Open Row A' })).toBeVisible()
-    await page.getByRole('button', { name: 'Row B' }).click({ button: 'right', force: true })
+    const row = rows[1]?.getBoundingClientRect() ?? new DOMRect()
+    const rowCenter = { x: row.left + row.width / 2, y: row.top + row.height / 2 }
+    await mouse.click(rowCenter.x, rowCenter.y, { button: 'right' })
 
     await expect.element(page.getByRole('menuitem', { name: 'Open Row B' })).toBeVisible()
     await expectLocatorToHaveCount(page.getByRole('menuitem', { name: 'Open Row A' }), 0)
-    const row = rows[1]?.getBoundingClientRect()
     await vi.waitFor(() => {
       const menu = page.getByRole('menu').element().getBoundingClientRect()
-      expect(menu.left).toBeCloseTo((row?.left ?? 0) + (row?.width ?? 0) / 2, -1)
-      expect(menu.top).toBeCloseTo((row?.top ?? 0) + (row?.height ?? 0) / 2, -1)
+      expect(menu.left).toBeCloseTo(rowCenter.x, -1)
+      expect(menu.top).toBeCloseTo(rowCenter.y, -1)
     })
     await userEvent.keyboard('{Escape}')
     await expectLocatorToHaveCount(page.getByRole('menu'), 0)
@@ -97,7 +92,7 @@ describe('createBrowserNativeMenuHost', () => {
   it('closes on Escape without running an action', async () => {
     const host = createBrowserNativeMenuHost()
     const action = vi.fn()
-    await rightClickAt(40, 40)
+    await mouse.click(40, 40, { button: 'right' })
 
     await host.popup([{ kind: 'command', id: 'unpin', text: 'Unpin Note', action }])
     await expect.element(page.getByRole('menu')).toBeVisible()
@@ -105,5 +100,6 @@ describe('createBrowserNativeMenuHost', () => {
 
     await expectLocatorToHaveCount(page.getByRole('menu'), 0)
     expect(action).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(document.querySelector('[data-base-ui-portal]')).toBeNull())
   })
 })
