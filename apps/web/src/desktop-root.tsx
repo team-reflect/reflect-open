@@ -10,6 +10,7 @@ import { GraphProvider } from '@/providers/graph-provider.tsx'
 import { SidebarWidthEffect } from '@/providers/sidebar-width.tsx'
 import { UpdateProvider } from '@/providers/update-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
+import { useSuppressDefaultContextMenu } from '@/hooks/use-suppress-default-context-menu.ts'
 
 /**
  * The desktop surface tree: auto-update checks, the titlebar drag region, and
@@ -17,6 +18,7 @@ import { useCoreServices } from '@/services/services-provider.tsx'
  */
 export function DesktopRoot(): ReactElement {
   const { noteMove, platform, logger, deepLinkIntake } = useCoreServices()
+  useSuppressDefaultContextMenu()
   // Deep-link intake starts with the surface, not the workspace: a
   // `reflect://` URL that launched the app (or arrived on the graph chooser)
   // buffers in `intake.ts` until a graph opens. Browser dev has no plugin.
