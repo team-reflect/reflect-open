@@ -25,7 +25,9 @@ import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { createTestLoggerService } from './logger.ts'
 import { createTestIndexStoreService } from './index-store.ts'
 import { createTestIpcBridgeService } from './ipc.ts'
-import type { LinkedDailyNoteService } from '../documents/linked-daily-note-service.ts'
+import { createLinkedDailyNoteService } from '../documents/linked-daily-note-service.ts'
+import { createWikiResolverService } from '../indexing/wiki-resolver-service.ts'
+import { createTestDatabaseService } from './database.ts'
 import {
   createNoteDocumentService,
   type NoteDocumentService,
@@ -386,28 +388,26 @@ export function createTestNoteMoveService(
 }
 
 /**
- * A {@link LinkedDailyNoteService} that creates no note.
- */
-export function createTestLinkedDailyNoteService(): LinkedDailyNoteService {
-  return {
-    ensureDailyNotesLinkedFrom: async () => {},
-    ensureDailyNoteAt: async () => {},
-  }
-}
-
-/**
  * The real {@link NoteDocumentService} over test doubles. Without a
  * `graphSession` no graph is open, so commits write no index rows.
  */
 export function createTestNoteDocumentService(
   deps?: Partial<NoteDocumentServiceDeps>,
 ): NoteDocumentService {
+  const noteFile = deps?.noteFile ?? createTestNoteFileService()
+  const logger = deps?.logger ?? createTestLoggerService()
   return createNoteDocumentService({
     noteSessions: deps?.noteSessions ?? createTestNoteSessionService(),
-    noteFile: deps?.noteFile ?? createTestNoteFileService(),
+    noteFile,
     graphSession: deps?.graphSession ?? { get: () => ({ session: null }) },
     indexLifecycle: deps?.indexLifecycle ?? createTestIndexLifecycleService(),
-    linkedDailyNotes: deps?.linkedDailyNotes ?? createTestLinkedDailyNoteService(),
-    logger: deps?.logger ?? createTestLoggerService(),
+    linkedDailyNotes:
+      deps?.linkedDailyNotes ??
+      createLinkedDailyNoteService({
+        noteFile,
+        wikiResolver: createWikiResolverService({ database: createTestDatabaseService() }),
+        logger,
+      }),
+    logger,
   })
 }

@@ -12,7 +12,7 @@ import {
   createTestNoteSession,
   type TestNoteSessionOptions,
   createTestNoteSessionService,
-  createTestLinkedDailyNoteService,
+  createTestNoteDocumentService,
 } from '../testing/documents.ts'
 import {
   createTestGraphSessionService,
@@ -24,7 +24,6 @@ import { createTestNoteFileService, overrideNoteFileService } from '../testing/g
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createTestProgressPort } from '../testing/ports.ts'
 import { canTrashNote, createNoteActionsService } from './note-actions-service.ts'
-import { createNoteDocumentService } from './note-document-service.ts'
 import { createNoteRowService, type NoteRowService } from './note-row-service.ts'
 import { createNoteSession } from './note-session.ts'
 import type { ManagedNoteSession, NoteSession, NoteSessionSnapshot } from './note-session-types.ts'
@@ -81,13 +80,11 @@ function createNoteActions(deps: {
   }
   const indexLog: { path: string; generation: number }[] = []
   const service = createNoteActionsService({
-    noteDocuments: createNoteDocumentService({
+    noteDocuments: createTestNoteDocumentService({
       noteSessions,
       noteFile,
       graphSession: graph,
       indexLifecycle: deps.indexLifecycle ?? recordingIndexLifecycle(indexLog),
-      linkedDailyNotes: createTestLinkedDailyNoteService(),
-      logger: createTestLoggerService(),
     }),
     noteFile,
     noteSessions,

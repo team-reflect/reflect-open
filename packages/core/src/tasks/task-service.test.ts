@@ -5,12 +5,11 @@ import {
   type TestNoteSessionService,
   createTestNoteSession,
   type TestNoteSession,
-  createTestLinkedDailyNoteService,
+  createTestNoteDocumentService,
 } from '../testing/documents.ts'
 import { createGraphSession, type GraphSession } from '../graph/graph-session.ts'
 import type { NoteWriteResult } from '../graph/note-file-service.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
-import { createNoteDocumentService } from '../documents/note-document-service.ts'
 import {
   isSameTaskPath,
   parseNote,
@@ -27,7 +26,6 @@ import {
   seedNotes,
   type TestDatabaseService,
 } from '../testing/database.ts'
-import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
 import { createTestNoteFileService, type TestNoteFileService } from '../testing/graph.ts'
 import { createTestIpcBridgeService, type TestIpcBridgeService } from '../testing/ipc.ts'
 import { createTestLoggerService, type TestLoggerService } from '../testing/logger.ts'
@@ -111,13 +109,10 @@ const openGraph = createGraphSession({ root: '/g', name: 'g', generation: 7, ind
 function createTasks(graphSession: TaskServiceDeps['graphSession']): TaskService {
   return createTaskService({
     database,
-    noteDocuments: createNoteDocumentService({
+    noteDocuments: createTestNoteDocumentService({
       noteSessions,
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
-      indexLifecycle: createTestIndexLifecycleService(),
-      linkedDailyNotes: createTestLinkedDailyNoteService(),
-      logger: createTestLoggerService(),
     }),
     progress,
     clock,

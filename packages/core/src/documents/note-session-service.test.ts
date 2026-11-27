@@ -1,13 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestClockService, type TestClockService } from '../testing/clock.ts'
-import { createTestLinkedDailyNoteService } from '../testing/documents.ts'
+import { createWikiResolverService } from '../indexing/wiki-resolver-service.ts'
+import {
+  createTestDatabaseService,
+  seedNotes,
+  type TestDatabaseService,
+} from '../testing/database.ts'
+import { createLinkedDailyNoteService } from './linked-daily-note-service.ts'
 import { createTestFileChangeService, type TestFileChangeService } from '../testing/file-change.ts'
 import {
   createTestNoteCreationService,
   createTestNoteFileService,
   type TestNoteFileService,
 } from '../testing/graph.ts'
-import { createTestGraphSessionService } from '../testing/graph-session.ts'
+import {
+  createTestGraphSessionService,
+  type TestGraphSessionService,
+} from '../testing/graph-session.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createNoteSessionService, type SessionCoordinator } from './note-session-service.ts'
 import type { NoteSession, NoteSessionService } from './note-session-types.ts'
@@ -18,19 +27,27 @@ const PATH = 'notes/a.md'
 let clock: TestClockService
 let fileChanges: TestFileChangeService
 let noteFile: TestNoteFileService
+let database: TestDatabaseService
+let graphSession: TestGraphSessionService
 let coordinators: Array<{ path: string; log: string[] }>
 let noteSessions: NoteSessionService
 
 function setup(files: Record<string, string>): void {
   noteFile = createTestNoteFileService({ files })
+  database = createTestDatabaseService()
+  graphSession = createTestGraphSessionService({ graph: { generation: 1 } })
   noteSessions = createNoteSessionService({
     noteFile,
     clock,
     logger: createTestLoggerService(),
-    graphSession: createTestGraphSessionService({ graph: { generation: 1 } }),
+    graphSession,
     fileChanges,
     noteCreation: createTestNoteCreationService(),
-    linkedDailyNotes: createTestLinkedDailyNoteService(),
+    linkedDailyNotes: createLinkedDailyNoteService({
+      noteFile,
+      wikiResolver: createWikiResolverService({ database }),
+      logger: createTestLoggerService(),
+    }),
     createCoordinator: (path): SessionCoordinator => {
       const coordinator = { path, log: [] as string[] }
       coordinators.push(coordinator)
@@ -352,6 +369,41 @@ describe('an observed session', () => {
     await observe(session)
 
     expect(session.get().status).toBe('ready')
+  })
+})
+
+describe('linked daily notes', () => {
+  const DAY = 'daily/2026-12-01.md'
+  const linker = { path: 'notes/b.md', markdown: '# B\n\n[[2026-12-01]]\n' }
+
+  it('creates the daily note of a day that a saved note links to', async () => {
+    const session = noteSessions.sessionFor(PATH)
+    await observe(session)
+
+    session.editorChanged('# A\n\n[[2026-12-01]]\n')
+    await session.flush()
+    await vi.waitFor(() => {
+      expect(noteFile.files().get(DAY)).toBe('')
+    })
+  })
+
+  it('creates the daily note of an opened day that has no file and that a note links to', async () => {
+    seedNotes(database, [linker])
+    await observe(noteSessions.sessionFor(DAY))
+    await observe(noteSessions.sessionFor('daily/2026-12-02.md'))
+    await vi.waitFor(() => {
+      expect(noteFile.files().get(DAY)).toBe('')
+    })
+    expect(noteFile.files().has('daily/2026-12-02.md')).toBe(false)
+  })
+
+  it('creates no note for a session of a graph that is no longer open', async () => {
+    seedNotes(database, [linker])
+    const session = noteSessions.sessionFor(DAY)
+    graphSession.setGraph({ root: '/other', generation: 1 })
+    await observe(session)
+    expect(session.get().status).toBe('ready')
+    expect(noteFile.files().has(DAY)).toBe(false)
   })
 })
 
