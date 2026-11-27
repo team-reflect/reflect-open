@@ -8,10 +8,9 @@ inputs:
 runs:
   using: composite
   steps:
-    # Spotlight indexes every file that the build writes.
     - name: Turn off Spotlight
       shell: bash
-      run: sudo mdutil -a -i off
+      run: ./scripts/ci-spotlight-off.sh
 
     - name: List installed Xcode versions
       shell: bash
