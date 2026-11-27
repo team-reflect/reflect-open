@@ -40,6 +40,7 @@ export { type WhatsNewPhase, type WhatsNewService } from './whats-new/whats-new-
 export { type FeedbackChannel, type ReviewService } from './review/review-service.ts'
 export { type ClipboardService } from './app/clipboard-service.ts'
 export {
+  formatRevealLabel,
   type OpenerService,
   type OpenerTransport,
   type SystemSettingsPane,

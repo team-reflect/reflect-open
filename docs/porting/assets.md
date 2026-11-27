@@ -4,7 +4,7 @@
 graph's `assets/` folder and links it relatively. **File attachments**
 (PDFs, docs, archives) take the same path: paste or drop inserts a plain
 `[name](assets/…)` link (meowdown's `onFilePaste`, prosekit/meowdown#190),
-an **Attach file…** command (palette + File menu) is the keyboard path,
+an **Attach File…** command (palette + File menu) is the keyboard path,
 clicking an `assets/` link opens the file through the OS, and files over
 ~25 MB get a non-blocking status-line warning about git-history cost. One
 deviation from the plan below: dropped files stream over **chunked
@@ -78,7 +78,7 @@ the plain link, never a different serialization.
   `asset_upload_begin`/`_append`/`_commit`, staged under `.reflect/tmp/`
   (excluded from indexing/sync) and renamed into `assets/` on commit.
   Webview memory holds one chunk, never the file. `asset_import(sourcePath,
-  …)` serves sources with real paths (the **Attach file…** picker), copying
+  …)` serves sources with real paths (the **Attach File…** picker), copying
   file-to-file under the same guards. Collision suffixes are resolved in
   Rust at write time (`persist_noclobber`), so concurrent intakes never
   clobber.

@@ -396,7 +396,7 @@ describe('Sidebar', () => {
     const { view } = await renderSidebar()
 
     await view.getByRole('button', { name: /Notes/ }).click()
-    await page.getByRole('menuitem', { name: 'Get Reflect apps…' }).click()
+    await page.getByRole('menuitem', { name: 'Get Reflect Apps…' }).click()
 
     const dialog = page.getByRole('dialog', { name: 'Take Reflect with you' })
     await expect.element(dialog).toBeVisible()
@@ -419,8 +419,8 @@ describe('Sidebar', () => {
     const graphTrigger = view.getByRole('button', { name: /Notes/ })
     graphTrigger.element().focus()
     await userEvent.keyboard('{Enter}')
-    await userEvent.keyboard('Get Reflect apps')
-    await expect.element(page.getByRole('menuitem', { name: 'Get Reflect apps…' })).toHaveFocus()
+    await userEvent.keyboard('Get Reflect Apps')
+    await expect.element(page.getByRole('menuitem', { name: 'Get Reflect Apps…' })).toHaveFocus()
     await userEvent.keyboard('{Enter}')
 
     const dialog = page.getByRole('dialog', { name: 'Take Reflect with you' })
@@ -432,14 +432,14 @@ describe('Sidebar', () => {
     await expect.element(graphTrigger).toHaveFocus()
 
     await userEvent.keyboard('{Enter}')
-    await expect.element(page.getByRole('menuitem', { name: 'Get Reflect apps…' })).toBeVisible()
+    await expect.element(page.getByRole('menuitem', { name: 'Get Reflect Apps…' })).toBeVisible()
   })
 
   it('the graph footer opens the current graph in the system file manager', async () => {
     const { view } = await renderSidebar()
 
     await view.getByRole('button', { name: /Notes/ }).click()
-    await page.getByRole('menuitem', { name: /reveal graph in finder/i }).click()
+    await page.getByRole('menuitem', { name: 'Reveal Graph in Finder' }).click()
 
     await vi.waitFor(() => expect(opener.revealedPaths()).toEqual(['/notes']))
   })

@@ -14,11 +14,11 @@ import type { TaskFiltersControl } from '@/lib/tasks/task-filters.ts'
 import type { TaskFilters } from '@reflect/core'
 
 const BUCKET_FILTERS: ReadonlyArray<{ key: keyof TaskFilters; label: string }> = [
-  { key: 'pinned', label: 'Pinned tasks' },
-  { key: 'current', label: 'Current tasks' },
-  { key: 'overdue', label: 'Overdue tasks' },
-  { key: 'upcoming', label: 'Upcoming tasks' },
-  { key: 'other', label: 'Other tasks' },
+  { key: 'pinned', label: 'Pinned Tasks' },
+  { key: 'current', label: 'Current Tasks' },
+  { key: 'overdue', label: 'Overdue Tasks' },
+  { key: 'upcoming', label: 'Upcoming Tasks' },
+  { key: 'other', label: 'Other Tasks' },
 ]
 
 interface TaskFiltersMenuProps extends TaskFiltersControl {
@@ -29,7 +29,7 @@ interface TaskFiltersMenuProps extends TaskFiltersControl {
 
 /**
  * The Tasks view's "Task filters" dropdown (V1): per-bucket toggles plus
- * "Show archived tasks". Toggling keeps the menu open (`preventDefault` on
+ * "Show Archived Tasks". Toggling keeps the menu open (`preventDefault` on
  * select) so several filters can be flipped at once. Open state is controlled so
  * the ⌘⇧E shortcut can open and close it.
  */
@@ -70,7 +70,7 @@ export function TaskFiltersMenu({
           checked={filters.archived}
           onCheckedChange={() => toggle('archived')}
         >
-          Show archived tasks
+          Show Archived Tasks
         </DropdownMenuCheckboxItem>
       </DropdownMenuContent>
     </DropdownMenu>

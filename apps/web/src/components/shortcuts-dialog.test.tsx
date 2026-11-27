@@ -41,11 +41,11 @@ describe('ShortcutsDialog', () => {
     await renderDialog()
     await openDialog()
     // One row from each scope — derived data, so any registered binding works.
-    await expect.element(page.getByText('Go to today')).toBeInTheDocument()
+    await expect.element(page.getByText('Go to Today')).toBeInTheDocument()
     await expect.element(page.getByText('Bold')).toBeInTheDocument()
     // The cheat-sheet lists itself; a user who forgot ⌘/ can re-learn it here.
     await expect
-      .element(page.locate('li').filter({ hasText: 'Keyboard shortcuts' }))
+      .element(page.locate('li').filter({ hasText: 'Keyboard Shortcuts' }))
       .toBeInTheDocument()
   })
 

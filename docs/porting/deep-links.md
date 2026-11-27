@@ -4,7 +4,7 @@
 deep link" landed as designed below; [docs/deep-links.md](../deep-links.md)
 is the user-facing grammar reference. Decisions made at implementation:
 
-- **Id minting on first copy.** "Copy deep link" (`⌥⌘L`) writes a ULID `id:`
+- **Id minting on first copy.** "Copy Deep Link" (`⌥⌘L`) writes a ULID `id:`
   into the frontmatter of a note that has none (pre-Plan-17 notes, files
   made outside Reflect), through the same session-or-disk channel as pin and
   private, so the link survives renames.
@@ -71,7 +71,7 @@ reflect://tasks                     { kind: 'tasks' }
 first (stable across renames), then a calendar-valid date, a graph-relative
 path, a title, and an alias. Duplicate claims in a tier choose the first
 path alphabetically. This free-form resolver is separate from the wikilink
-`note_keys` mapping. "Copy deep link" prefers the id form so links outlive
+`note_keys` mapping. "Copy Deep Link" prefers the id form so links outlive
 renames; `reflect://note/Project%20X` still works by title. The command
 keeps v1's `alt+mod+l` shortcut.
 
@@ -106,7 +106,7 @@ links).
 | `reflect://?command=append-to-daily-note`       | `reflect://append?text=…` via the capture inbox       |
 | `reflect://?command=create-task`                | `reflect://task?text=…` via the capture inbox         |
 | Web URLs (`reflect.app/g/…`)                    | Not ported — no server; `reflect://` + file paths     |
-| "Copy link to note" (`alt+mod+l`)               | "Copy deep link" (palette + shortcut)                 |
+| "Copy link to note" (`alt+mod+l`)               | "Copy Deep Link" (palette + shortcut)                 |
 | Published `reflect.site` pages                  | Not ported here (a publishing story is separate)      |
 | REST API create/append                          | CLI + capture inbox + plain files                     |
 | `DDMMYYYY` daily ids                            | ISO `YYYY-MM-DD`, as everywhere in v2                 |

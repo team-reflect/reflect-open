@@ -5,21 +5,23 @@ import {
   useMemo,
   useRef,
   useState,
+  type MouseEvent,
   type ReactElement,
 } from 'react'
 import { Archive, CalendarClock, List, Search } from 'lucide-react'
-import type { InsertTaskTarget, OpenTask, TaskGroup } from '@reflect/core'
+import { errorMessage, type InsertTaskTarget, type OpenTask, type TaskGroup } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { useNoteLinkNavigation, type ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
 import { useTaskRowHandlers } from '@/lib/tasks/use-task-row-handlers.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
+import { getTaskMenuItems, type TaskMenuId } from '@/lib/tasks/task-menu.ts'
 import type { TaskListRow } from '@/lib/tasks/task-list-items.ts'
 import { useTaskKeyboard } from '@/lib/tasks/use-task-keyboard.ts'
 import { useTaskSelection } from '@/lib/tasks/use-task-selection.ts'
 import { useVisibleTaskGroups } from '@/lib/tasks/use-visible-task-groups.ts'
 import { useToday } from '@/lib/use-today.ts'
-import { useCoreServices } from '@/services/services-provider.tsx'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { routeForPath } from '@reflect/app'
 import { TaskFiltersMenu } from './task-filters-menu.tsx'
 import { TaskBreadcrumbs } from './task-breadcrumbs.tsx'
@@ -72,6 +74,7 @@ function focusedSelectedKey(
 export function TasksScreen(): ReactElement {
   const { tasks: taskService } = useCoreServices()
   const { commands } = taskService
+  const { contextMenu, operations } = useAppServices()
   const navigateNoteLink = useNoteLinkNavigation()
   const today = useToday()
   const { filters, toggle } = useTaskFilters()
@@ -183,6 +186,73 @@ export function TasksScreen(): ReactElement {
       })
     },
     [navigateNoteLink],
+  )
+  // A selected row targets the whole selection, any other row only itself without selecting it.
+  const onListContextMenu = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      const target = event.target as Element
+      if (target.closest('[data-task-editor]') !== null) {
+        return
+      }
+      const key = target.closest<HTMLElement>('[data-task-key]')?.dataset.taskKey
+      const task = key === undefined ? undefined : tasksByKey.get(key)
+      if (task === undefined) {
+        return
+      }
+      event.preventDefault()
+      const inSelection = getSelected().has(task.taskId)
+      const tasks = inSelection ? selectedTasks() : [task]
+      const clearSelection = (): void => {
+        if (inSelection) {
+          clear()
+        }
+      }
+      void contextMenu
+        .open({
+          items: getTaskMenuItems(tasks, today),
+          onSelect: (id) => {
+            const menuId = id as TaskMenuId
+            if (menuId === 'toggle') {
+              void commands.toggle(tasks)
+              // A sole selection would keep its inline editor on the struck row.
+              if (tasks.length === 1) {
+                clearSelection()
+              }
+            } else if (menuId === 'convert') {
+              void commands.convert(tasks)
+              clearSelection()
+            } else if (menuId === 'delete') {
+              void commands.remove(tasks)
+              clearSelection()
+            } else if (menuId === 'open-note' || menuId === 'open-note-in-new-window') {
+              navigateNoteLink({
+                target: routeForPath(task.notePath),
+                openInNewWindow: menuId === 'open-note-in-new-window',
+              })
+            } else if (menuId === 'clear-date') {
+              void commands.schedule(tasks, null)
+              clearSelection()
+            } else if (menuId.startsWith('schedule:')) {
+              void commands.schedule(tasks, menuId.slice('schedule:'.length))
+              clearSelection()
+            }
+          },
+        })
+        .catch((cause: unknown) => {
+          operations.start('Opening task menu').fail(errorMessage(cause))
+        })
+    },
+    [
+      tasksByKey,
+      getSelected,
+      selectedTasks,
+      clear,
+      contextMenu,
+      today,
+      commands,
+      navigateNoteLink,
+      operations,
+    ],
   )
   useTaskKeyboard({
     selection,
@@ -348,6 +418,7 @@ export function TasksScreen(): ReactElement {
           groupGap={GROUP_GAP}
           // The inline editor saves its draft and loses focus when it unmounts.
           keepMountedTaskId={editingTaskId}
+          onContextMenu={onListContextMenu}
           renderHeader={renderHeader}
           renderRow={renderRow}
         />

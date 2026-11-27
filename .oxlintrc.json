@@ -6,7 +6,18 @@
     "typescript/no-explicit-any": "error",
     "import/no-cycle": ["error", { "ignoreTypes": false }],
     "import/no-default-export": "error",
-    "import/no-namespace": "error"
+    "import/no-namespace": "error",
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "@icons-pack/react-simple-icons",
+            "message": "Import each icon from its subpath, e.g. `@icons-pack/react-simple-icons/icons/SiGithub`. The root entry loads every icon."
+          }
+        ]
+      }
+    ]
   },
   "overrides": [
     {

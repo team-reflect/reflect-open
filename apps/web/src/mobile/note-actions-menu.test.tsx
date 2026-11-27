@@ -138,29 +138,29 @@ async function openActions(): Promise<void> {
  * from a mutable store so the no-graph failure path can be exercised too.
  */
 describe('useNoteActions', () => {
-  it('offers Lock note for a public note, toggles canonically, and closes the drawer', async () => {
+  it('offers Lock Note for a public note, toggles canonically, and closes the drawer', async () => {
     const { view } = await mount()
 
     await openActions()
-    await expect.element(view.getByRole('button', { name: 'Lock note' })).toBeInTheDocument()
+    await expect.element(view.getByRole('button', { name: 'Lock Note' })).toBeInTheDocument()
 
-    await view.getByRole('button', { name: 'Lock note' }).click()
+    await view.getByRole('button', { name: 'Lock Note' }).click()
 
     await vi.waitFor(() => {
       expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/meeting.md', { private: true }, 7)
     })
-    await expect.element(view.getByRole('button', { name: 'Lock note' })).not.toBeInTheDocument()
+    await expect.element(view.getByRole('button', { name: 'Lock Note' })).not.toBeInTheDocument()
   })
 
-  it('offers Unlock note for a private daily note and toggles canonically', async () => {
+  it('offers Unlock Note for a private daily note and toggles canonically', async () => {
     currentNoteRow = noteRow('daily/2026-06-10.md', true, 'June 10th, 2026')
     noteSource.value = '---\nprivate: true\n---\n# A\n'
     const { view } = await mount('daily/2026-06-10.md')
 
     await openActions()
-    await expect.element(view.getByRole('button', { name: 'Unlock note' })).toBeInTheDocument()
+    await expect.element(view.getByRole('button', { name: 'Unlock Note' })).toBeInTheDocument()
 
-    await view.getByRole('button', { name: 'Unlock note' }).click()
+    await view.getByRole('button', { name: 'Unlock Note' }).click()
 
     await vi.waitFor(() => {
       expect(commitNoteFrontmatter).toHaveBeenCalledWith(
@@ -175,18 +175,18 @@ describe('useNoteActions', () => {
     const { view } = await mount()
 
     await openActions()
-    await view.getByRole('button', { name: 'Lock note' }).click()
+    await view.getByRole('button', { name: 'Lock Note' }).click()
     await vi.waitFor(() => expect(commitNoteFrontmatter).toHaveBeenCalledTimes(1))
 
     await openActions()
-    await expect.element(view.getByRole('button', { name: 'Unlock note' })).toBeInTheDocument()
+    await expect.element(view.getByRole('button', { name: 'Unlock Note' })).toBeInTheDocument()
 
     noteSource.value = '---\nprivate: true\n---\n# A\n'
-    await view.getByRole('button', { name: 'Unlock note' }).click()
+    await view.getByRole('button', { name: 'Unlock Note' }).click()
     await vi.waitFor(() => expect(commitNoteFrontmatter).toHaveBeenCalledTimes(2))
 
     await openActions()
-    await expect.element(view.getByRole('button', { name: 'Lock note' })).toBeInTheDocument()
+    await expect.element(view.getByRole('button', { name: 'Lock Note' })).toBeInTheDocument()
   })
 
   it('shows shared privacy on reopening while a menu write is still pending', async () => {
@@ -194,9 +194,9 @@ describe('useNoteActions', () => {
     commitNoteFrontmatter.mockReturnValueOnce(write.promise)
     const { view } = await mount()
     await openActions()
-    await view.getByRole('button', { name: 'Lock note' }).click()
+    await view.getByRole('button', { name: 'Lock Note' }).click()
     await openActions()
-    await expect.element(view.getByRole('button', { name: 'Unlock note' })).toBeInTheDocument()
+    await expect.element(view.getByRole('button', { name: 'Unlock Note' })).toBeInTheDocument()
     write.resolve()
     await write.promise
   })
@@ -206,7 +206,7 @@ describe('useNoteActions', () => {
     const { view } = await mount()
 
     await openActions()
-    await view.getByRole('button', { name: 'Lock note' }).click()
+    await view.getByRole('button', { name: 'Lock Note' }).click()
 
     await vi.waitFor(() => {
       expect(core.progress.findByLabel('Updating privacy')).toMatchObject({
@@ -214,10 +214,10 @@ describe('useNoteActions', () => {
         message: 'disk on fire',
       })
     })
-    await expect.element(view.getByRole('button', { name: 'Lock note' })).not.toBeInTheDocument()
+    await expect.element(view.getByRole('button', { name: 'Lock Note' })).not.toBeInTheDocument()
 
     await openActions()
-    await expect.element(view.getByRole('button', { name: 'Lock note' })).toBeInTheDocument()
+    await expect.element(view.getByRole('button', { name: 'Lock Note' })).toBeInTheDocument()
   })
 
   it('disables the privacy action until the note row query settles', async () => {
@@ -226,16 +226,16 @@ describe('useNoteActions', () => {
     const { view } = await mount()
 
     await openActions()
-    await expect.element(view.getByRole('button', { name: 'Loading privacy…' })).toBeDisabled()
+    await expect.element(view.getByRole('button', { name: 'Loading Privacy…' })).toBeDisabled()
     expect(commitNoteFrontmatter).not.toHaveBeenCalled()
   })
 
-  it('offers Lock note for a visible note with no indexed row yet', async () => {
+  it('offers Lock Note for a visible note with no indexed row yet', async () => {
     currentNoteRow = null
     const { view } = await mount()
 
     await openActions()
-    await view.getByRole('button', { name: 'Lock note' }).click()
+    await view.getByRole('button', { name: 'Lock Note' }).click()
 
     await vi.waitFor(() => {
       expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/meeting.md', { private: true }, 7)

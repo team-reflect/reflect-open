@@ -73,6 +73,12 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       body: 'Agents can now run `reflect tasks` to list your open tasks. Set it up in Settings → Agents.',
       platforms: ['darwin', 'windows', 'linux'],
     },
+    {
+      id: 'right-click-menus',
+      title: 'Right-click menus',
+      body: 'Right-click a task, a note in All Notes, or a pinned note to act on it quickly.',
+      platforms: ['darwin', 'windows', 'linux'],
+    },
   ],
   '0.19.0': [
     {

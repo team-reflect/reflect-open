@@ -210,7 +210,7 @@ class AppMenuServiceImpl implements AppMenuService {
         this.#deps.commands.trigger(id)
         return
       }
-      // App-wide commands (New note, Settings, ...) have their handlers in the
+      // App-wide commands (New Note, Settings, ...) have their handlers in the
       // main window only.
       void this.#handOffToMainWindow(id)
     })

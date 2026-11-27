@@ -50,7 +50,7 @@ pub fn run(graph: &Graph, json: bool, note_arg: &str, print: bool) -> Result<(),
 }
 
 /// The most durable `reflect://` address for a resolved note. Mirrors the
-/// desktop's "Copy deep link" preference order, minus the minting — the CLI
+/// desktop's "Copy Deep Link" preference order, minus the minting — the CLI
 /// never writes, so a note without an id gets the path form instead.
 fn deep_link_url(root: &Path, resolved: &ResolvedNote) -> String {
     if let Some(date) = date_from_daily_path(resolved.rel_path()).and_then(parse_calendar_date) {

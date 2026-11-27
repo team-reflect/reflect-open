@@ -265,6 +265,12 @@ export default defineESLintConfig(
     ignores: ['./design-system/', '**/.wxt/', '**/.output/', 'apps/ios/Extensions/'],
   },
   {
+    linterOptions: {
+      reportUnusedDisableDirectives: 'error',
+      reportUnusedInlineConfigs: 'error',
+    },
+  },
+  {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.mjs'],
     /// keep-sorted
     rules: {

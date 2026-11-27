@@ -100,7 +100,7 @@ export function useGraphMenu(): {
   const title = graph?.name ?? 'Graph'
   const items: ChromeMenuItem[] = [
     { type: 'action', id: 'graph', title, checked: true, disabled: true },
-    { type: 'action', id: 'graphs', title: 'Switch graph…' },
+    { type: 'action', id: 'graphs', title: 'Switch Graph…' },
     {
       type: 'section',
       items: [

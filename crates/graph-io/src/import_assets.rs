@@ -33,8 +33,6 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 /// a large video on a slow connection still finishes.
 const READ_TIMEOUT: Duration = Duration::from_secs(60);
 const CONCURRENT_DOWNLOADS: usize = 6;
-/// Collision probes before giving up, mirroring `persist_unique`'s cap.
-const MAX_NAME_PROBES: u32 = 1000;
 
 /// One remote-asset URL occurrence inside a markdown file.
 pub struct RemoteSpan {
@@ -520,7 +518,9 @@ pub fn plan_asset_name(
         Some(index) if index > 0 => desired.split_at(index),
         _ => (desired, ""),
     };
-    for attempt in 1..=MAX_NAME_PROBES {
+    let mut attempt = 0u64;
+    loop {
+        attempt += 1;
         let candidate = if attempt == 1 {
             desired.to_string()
         } else {
@@ -543,9 +543,6 @@ pub fn plan_asset_name(
             });
         }
     }
-    Err(AppError::io(format!(
-        "no free asset name after {MAX_NAME_PROBES} probes for {desired}"
-    )))
 }
 
 /// Whether two files hold identical bytes (length check first, so comparing
@@ -749,5 +746,23 @@ mod tests {
             plan_asset_name(&assets, "photo.webp", &dir.path().join("other"), &taken).unwrap();
         assert_eq!(planned.name, "photo-3.webp");
         assert!(!planned.reuse);
+    }
+
+    #[test]
+    fn plan_names_any_number_of_same_named_assets() {
+        let dir = tempdir().unwrap();
+        let assets = dir.path().join("assets");
+        fs::create_dir_all(&assets).unwrap();
+        fs::write(assets.join("image.png"), b"existing").unwrap();
+        fs::write(dir.path().join("staged"), b"new").unwrap();
+
+        let mut taken = HashSet::new();
+        for attempt in 2..=1500 {
+            let planned =
+                plan_asset_name(&assets, "image.png", &dir.path().join("staged"), &taken).unwrap();
+            assert_eq!(planned.name, format!("image-{attempt}.png"));
+            assert!(!planned.reuse);
+            taken.insert(planned.name);
+        }
     }
 }

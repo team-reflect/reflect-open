@@ -166,8 +166,38 @@ jobs:
       - name: Typecheck
         run: pnpm turbo run typecheck --filter=//
 
-      - name: Lint
-        run: pnpm turbo run lint --filter=//
+      - name: Lint (oxfmt)
+        run: pnpm lint:oxfmt
+
+      - name: Lint (oxlint)
+        run: pnpm lint:oxlint
+
+      - name: Pick the ESLint cache key
+        id: eslint-cache
+        env:
+          HASH: ${{ hashFiles('pnpm-lock.yaml', 'eslint.config.*') }}
+        run: echo "prefix=eslint-$HASH-" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the ESLint cache
+        if: github.event_name == 'pull_request'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .eslintcache
+          key: ${{ steps.eslint-cache.outputs.prefix }}${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: ${{ steps.eslint-cache.outputs.prefix }}
+
+      - name: Lint (ESLint)
+        run: pnpm lint:eslint
+
+      - name: Save the ESLint cache
+        if: ${{ !cancelled() && hashFiles('.eslintcache') != '' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .eslintcache
+          key: ${{ steps.eslint-cache.outputs.prefix }}${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Lint (knip)
+        run: pnpm lint:knip
 
       - name: Build
         run: pnpm run build

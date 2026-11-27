@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.21.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.20.0...v0.21.0-beta.1) (2026-11-27)
+
+
+### Features
+
+* draw context menus in a plain browser ([#2361](https://github.com/team-reflect/reflect-open/issues/2361)) ([36449bc](https://github.com/team-reflect/reflect-open/commit/36449bcf0f3bfced424f6e5f37c0d1faa7e5146d))
+
+
+### Bug Fixes
+
+* create linked daily notes only in the session graph ([#2358](https://github.com/team-reflect/reflect-open/issues/2358)) ([8746729](https://github.com/team-reflect/reflect-open/commit/8746729a13e361b6df551eb091f16f8027733a4f))
+* **desktop:** hide the webview context menu outside text ([#2353](https://github.com/team-reflect/reflect-open/issues/2353)) ([a58d258](https://github.com/team-reflect/reflect-open/commit/a58d258cd476023a75b1c5dbfc3685d2cd69fb3d))
+* **mobile:** draw the swipe row edge on both sides ([#2347](https://github.com/team-reflect/reflect-open/issues/2347)) ([a8e031b](https://github.com/team-reflect/reflect-open/commit/a8e031b2761d3c7e1bac3650030a9f11552d32d8))
+* **mobile:** keep a later swipe from reopening a swipe row ([#2348](https://github.com/team-reflect/reflect-open/issues/2348)) ([61bbc00](https://github.com/team-reflect/reflect-open/commit/61bbc00d558f55b4249d5db4f898c688d04bf690))
+* show backlinks on a linked day that has no note yet ([#2352](https://github.com/team-reflect/reflect-open/issues/2352)) ([6daa992](https://github.com/team-reflect/reflect-open/commit/6daa992198e367796ff64d3439a8b1c544762dfa))
+
 ## [0.20.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.20.0-beta.6...v0.20.0-beta.7) (2026-11-26)
 
 

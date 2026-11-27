@@ -102,7 +102,7 @@ export function useWorkspaceCommands(): void {
   useCommandHandler('history.back', back)
   useCommandHandler('history.forward', forward)
   useCommandHandler('palette.open', () => openPalette())
-  // The picker carries the empty state (a "New template" row), so the
+  // The picker carries the empty state (a "New Template" row), so the
   // command stays discoverable before any template exists.
   useCommandHandler('template.insert', notePath === null ? undefined : openTemplatePicker)
   useCommandHandler('template.new', openTemplateCreate)

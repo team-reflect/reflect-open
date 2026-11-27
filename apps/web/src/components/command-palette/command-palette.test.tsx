@@ -300,7 +300,7 @@ describe('CommandPalette', () => {
     suggestWikiTargets.mockResolvedValue([])
     searchWithFilters.mockResolvedValue([])
     const { view } = await renderPalette('> toggle theme')
-    await expect.element(view.getByText('Toggle theme')).toBeInTheDocument()
+    await expect.element(view.getByText('Toggle Theme')).toBeInTheDocument()
     expect(view.getByText('Notes', { exact: true }).query()).toBeNull()
   })
 
@@ -308,7 +308,7 @@ describe('CommandPalette', () => {
     suggestWikiTargets.mockResolvedValue([])
     searchWithFilters.mockResolvedValue([])
     const { view, core } = await renderPalette('> go to today')
-    const row = view.getByText('Go to today')
+    const row = view.getByText('Go to Today')
     await expect.element(row).toBeInTheDocument()
     const item = row.element().closest('[role="option"]')
     for (const key of formatBinding('Mod-d', core.platform.isApplePlatform)) {
@@ -416,7 +416,7 @@ describe('CommandPalette', () => {
     searchWithFilters.mockResolvedValue([])
     const toggleTheme = vi.fn()
     const { view } = await renderPalette('toggle theme', { 'theme.toggle': toggleTheme })
-    await expect.element(view.getByText('Toggle theme', { exact: true })).toBeInTheDocument()
+    await expect.element(view.getByText('Toggle Theme', { exact: true })).toBeInTheDocument()
 
     await userEvent.keyboard('{Enter}')
     await vi.waitFor(() => expect(toggleTheme).toHaveBeenCalled())
@@ -428,7 +428,7 @@ describe('CommandPalette', () => {
     searchWithFilters.mockResolvedValue([])
     files = { 'notes/theme.md': '# Theme ideas\n\ntheme body\n' }
     const { view } = await renderPalette('theme')
-    await expect.element(view.getByText('Toggle theme')).toBeInTheDocument()
+    await expect.element(view.getByText('Toggle Theme')).toBeInTheDocument()
 
     pending.resolve([
       {
@@ -449,7 +449,7 @@ describe('CommandPalette', () => {
     suggestWikiTargets.mockResolvedValue([])
     searchWithFilters.mockResolvedValue([])
     const { view } = await renderPalette('> toggle theme')
-    await expect.element(view.getByText('Toggle theme')).toBeInTheDocument()
+    await expect.element(view.getByText('Toggle Theme')).toBeInTheDocument()
     expect(view.getByTestId('palette-preview').query()).toBeNull()
     expect(view.getByText('No note selected').query()).toBeNull()
   })

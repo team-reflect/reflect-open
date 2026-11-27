@@ -862,6 +862,120 @@ describe('TasksScreen', () => {
     await view.unmount()
   })
 
+  it('right-click on an unselected row opens its menu and keeps the selection', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/p.md', astPath: [2], text: 'first', noteTitle: 'Project' }),
+      task({ notePath: 'notes/p.md', astPath: [3], text: 'second', noteTitle: 'Project' }),
+    ])
+    const view = await renderScreen()
+    const contextMenu = view.appServices.contextMenu
+
+    await userEvent.click(await view.findByRole('button', { name: 'first' }))
+    await view.getByRole('button', { name: 'second' }).click({ button: 'right' })
+
+    await waitFor(() => expect(contextMenu.popups()).toHaveLength(1))
+    expect(view.getByTestId('task-editor').element().textContent).toContain('first')
+    expect(
+      view.getByRole('button', { name: 'second' }).element().getAttribute('aria-pressed'),
+    ).toBe('false')
+
+    contextMenu.select('toggle')
+    await expect.element(view.getByRole('button', { name: 'Reopen: second' })).toBeInTheDocument()
+    expect(writesOf('toggle')).toHaveLength(1)
+    await view.unmount()
+  })
+
+  it('right-click on a selected row applies the menu action to the whole selection', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/a.md', astPath: [2], text: 'first', noteTitle: 'A' }),
+      task({ notePath: 'notes/b.md', astPath: [2], text: 'second', noteTitle: 'B' }),
+      task({ notePath: 'notes/b.md', astPath: [3], text: 'third', noteTitle: 'B' }),
+    ])
+    const view = await renderScreen()
+    const contextMenu = view.appServices.contextMenu
+
+    await userEvent.click(await view.findByRole('button', { name: 'first' }))
+    fireEvent.click(view.getByRole('button', { name: 'second' }), MOD_KEY)
+    await view.getByRole('button', { name: 'second' }).click({ button: 'right' })
+
+    await waitFor(() => expect(contextMenu.popups()).toHaveLength(1))
+    contextMenu.select('toggle')
+    await waitFor(() => expect(view.getAllByRole('button', { name: /^Reopen:/ })).toHaveLength(2))
+    expect(view.getByRole('button', { name: 'Complete: third' }).query()).not.toBeNull()
+    await view.unmount()
+  })
+
+  it('keeps the system menu for a right-click inside the inline editor', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/p.md', astPath: [2], text: 'first', noteTitle: 'Project' }),
+      task({ notePath: 'notes/p.md', astPath: [3], text: 'second', noteTitle: 'Project' }),
+    ])
+    const view = await renderScreen()
+    const contextMenu = view.appServices.contextMenu
+
+    await userEvent.click(await view.findByRole('button', { name: 'first' }))
+    await view.getByText('type-edit').click({ button: 'right' })
+    await view.getByRole('button', { name: 'second' }).click({ button: 'right' })
+
+    await waitFor(() => expect(contextMenu.popups()).toHaveLength(1))
+    await view.unmount()
+  })
+
+  it('menu Delete on an unselected row keeps the other selection', async () => {
+    getOpenTasks.mockResolvedValue(manyTasks(3))
+    const view = await renderScreen()
+    const contextMenu = view.appServices.contextMenu
+    const pressed = (name: string) => {
+      return view.getByRole('button', { name }).element().getAttribute('aria-pressed') === 'true'
+    }
+
+    await userEvent.click(await view.findByRole('button', { name: 'task 0' }))
+    fireEvent.click(view.getByRole('button', { name: 'task 1' }), MOD_KEY)
+    await view.getByRole('button', { name: 'task 2' }).click({ button: 'right' })
+    await waitFor(() => expect(contextMenu.popups()).toHaveLength(1))
+    contextMenu.select('delete')
+    await waitFor(() => expect(view.queryByText('task 2')).toBeNull())
+    expect([pressed('task 0'), pressed('task 1')]).toEqual([true, true])
+    await view.unmount()
+  })
+
+  it('menu Due Date on a selected row schedules and clears the selection', async () => {
+    getOpenTasks.mockResolvedValue(manyTasks(3))
+    const view = await renderScreen()
+    const contextMenu = view.appServices.contextMenu
+
+    await userEvent.click(await view.findByRole('button', { name: 'task 0' }))
+    fireEvent.click(view.getByRole('button', { name: 'task 1' }), MOD_KEY)
+    const selectedRows = () => document.querySelectorAll('[aria-pressed="true"]')
+    await waitFor(() => expect(selectedRows()).toHaveLength(2))
+    await view.getByRole('button', { name: 'task 1' }).click({ button: 'right' })
+    await waitFor(() => expect(contextMenu.popups()).toHaveLength(1))
+    contextMenu.select('schedule:2026-06-15')
+
+    await waitFor(() => expect(writesOf('setMarkdown')).toHaveLength(2))
+    expect(writeTask).toHaveBeenCalledWith(expect.objectContaining({ astPath: [1] }), [
+      { kind: 'setMarkdown', markdown: 'task 1 [[2026-06-15]]' },
+    ])
+    expect(selectedRows()).toHaveLength(0)
+    await view.unmount()
+  })
+
+  it('menu Complete on the sole selection closes its inline editor', async () => {
+    getOpenTasks.mockResolvedValue(manyTasks(2))
+    const view = await renderScreen()
+    const contextMenu = view.appServices.contextMenu
+
+    await userEvent.click(await view.findByRole('button', { name: 'task 0' }))
+    await view.findByTestId('task-editor')
+    await view.getByRole('button', { name: 'Complete: task 0' }).click({ button: 'right' })
+    await waitFor(() => expect(contextMenu.popups()).toHaveLength(1))
+    contextMenu.select('toggle')
+
+    await expect.element(view.getByRole('button', { name: 'Reopen: task 0' })).toBeInTheDocument()
+    expect(view.queryByTestId('task-editor')).toBeNull()
+    await view.unmount()
+  })
+
   it('a note group’s "+ Add" button opens the editor of a new row and writes nothing', async () => {
     getOpenTasks.mockResolvedValue([
       task({
