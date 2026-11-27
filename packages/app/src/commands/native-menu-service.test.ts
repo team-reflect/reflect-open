@@ -242,20 +242,6 @@ describe('menu command dispatch', () => {
 })
 
 describe('openContextMenu', () => {
-  it('does nothing outside a native shell', async () => {
-    const { menu } = setup({ platform: { isNativeShell: false } })
-    const onSelect = vi.fn()
-
-    await menu.openContextMenu({
-      items: [{ type: 'action', id: 'unpin', title: 'Unpin' }],
-      onSelect,
-    })
-
-    expect(menu.host.popups()).toEqual([])
-    expect(menu.popups()).toEqual([])
-    expect(onSelect).not.toHaveBeenCalled()
-  })
-
   it('opens the items as native menu items whose actions report the picked id', async () => {
     const { menu } = setup()
     const onSelect = vi.fn()

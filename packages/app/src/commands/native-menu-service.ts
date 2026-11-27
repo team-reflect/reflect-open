@@ -130,7 +130,7 @@ export function createUnsupportedNativeMenuHost(): NativeMenuHost {
 const MENU_COMMAND_EVENT = 'reflect://menu-command'
 
 /**
- * The native macOS application menu and native context menus. Command items
+ * The native macOS application menu and context menus. Command items
  * derive from the command registry — id, label, and accelerator come from the
  * one command definition — so the menu cannot drift from the bindings that
  * fire.
@@ -166,8 +166,7 @@ export interface NativeMenuService {
    */
   connect(): Unlisten
   /**
-   * Open a native context menu. Outside a native shell, this is a no-op so
-   * browser and test shells can call the same path without platform guards.
+   * Open a context menu at the pointer.
    */
   openContextMenu(options: ContextMenuOptions): Promise<void>
 }
@@ -283,9 +282,6 @@ class NativeMenuServiceImpl implements NativeMenuService {
   }
 
   async openContextMenu(options: ContextMenuOptions): Promise<void> {
-    if (!this.#deps.platform.isNativeShell) {
-      return
-    }
     await this.#deps.host.popup(
       options.items.map((item) => resolveContextMenuItem(item, options.onSelect)),
     )

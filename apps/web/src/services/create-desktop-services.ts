@@ -27,6 +27,7 @@ import { createNavigatorClipboardService } from '@/services/browser-clipboard.ts
 import { createBrowserDialogService } from '@/services/browser-dialog.ts'
 import { createBrowserOpenerTransport } from '@/services/browser-opener.ts'
 import { createBrowserImageCodec } from '@/services/browser-image-codec.ts'
+import { createBrowserNativeMenuHost } from '@/services/browser-native-menu.tsx'
 import { createDomLifecycleAdapter } from '@/services/dom-lifecycle.ts'
 import type { HostKind } from '@/services/detect-platform.ts'
 import { createTauriDeepLinkSource } from '@/services/tauri-deep-link.ts'
@@ -99,10 +100,7 @@ export function createDesktopAdapters(
 }
 
 /**
- * The desktop app's host for the app layer: the window service, the lifecycle
- * service and the operations list over the page, the Tauri dialogs, updater
- * and native menus inside the Tauri shell, and Sentry exception telemetry
- * everywhere.
+ * The desktop app's host for the app layer.
  */
 export function createDesktopHost(
   facts: PlatformFacts,
@@ -149,6 +147,7 @@ export function createDesktopHost(
         dialog: createBrowserDialogService(),
         opener: createBrowserOpenerTransport(),
         exceptionTelemetry,
+        nativeMenu: createBrowserNativeMenuHost(),
       }
   }
 }
