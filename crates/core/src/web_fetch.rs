@@ -72,16 +72,6 @@ enum LimitBehavior {
     Reject,
 }
 
-pub fn classify_fetch_error(error: reqwest::Error) -> AppError {
-    if error.is_timeout() || error.is_connect() || error.is_request() {
-        AppError::Network {
-            message: error.to_string(),
-        }
-    } else {
-        AppError::io(error.to_string())
-    }
-}
-
 pub fn classify_fetch_status(url: &str, status: StatusCode) -> Option<AppError> {
     if status.is_success() {
         return None;
@@ -317,11 +307,7 @@ async fn fetch(
         if profile.upgrade_insecure_requests {
             request = request.header("Upgrade-Insecure-Requests", "1");
         }
-        let response = request
-            .timeout(remaining_timeout(deadline)?)
-            .send()
-            .await
-            .map_err(classify_fetch_error)?;
+        let response = request.timeout(remaining_timeout(deadline)?).send().await?;
 
         if response.status().is_redirection() {
             if redirect_count == max_redirects {
@@ -349,7 +335,7 @@ async fn fetch(
         validate_content_type(&final_url, &content_type)?;
         let mut body = Vec::new();
         let mut response = response;
-        while let Some(chunk) = response.chunk().await.map_err(classify_fetch_error)? {
+        while let Some(chunk) = response.chunk().await? {
             if body.len() + chunk.len() > max_bytes {
                 match limit_behavior {
                     LimitBehavior::Reject => {
