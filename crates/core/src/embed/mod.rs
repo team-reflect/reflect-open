@@ -4,13 +4,13 @@
 //! recoverable contract as sqlite-vec): semantic search is strictly additive,
 //! so nothing here may ever take the app down.
 
+mod download;
+
 use std::ffi::{CStr, c_char, c_void};
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use hf_hub::api::tokio::{ApiBuilder, Progress};
-use hf_hub::{Cache, Repo, RepoType};
 use llama_cpp_2::context::LlamaContext;
 use llama_cpp_2::context::params::{LlamaContextParams, LlamaPoolingType};
 use llama_cpp_2::llama_backend::LlamaBackend;
@@ -30,6 +30,8 @@ struct ModelSpec {
     repo: &'static str,
     revision: &'static str,
     file: &'static str,
+    size: u64,
+    sha256: &'static str,
     /// Leading dimensions kept (Matryoshka truncation), then re-normalized.
     dims: usize,
     /// The context window. Longer inputs are truncated.
@@ -47,6 +49,8 @@ const MODEL: ModelSpec = ModelSpec {
     repo: "ggml-org/embeddinggemma-300M-GGUF",
     revision: "0f741b5a6585bd53aeb15cd1372c56f2a0f65e12",
     file: "embeddinggemma-300M-Q8_0.gguf",
+    size: 333_590_944,
+    sha256: "b5ce9d77a3fc4b3b39ccb5643c36777911cc4eb46a66962eadfa3f5f60490d63",
     dims: reflect_index_schema::EMBEDDING_DIMS,
     max_tokens: 2048,
     query_prompt: "task: search result | query: ",
@@ -234,7 +238,11 @@ fn emit_status(host: &dyn Host, status: &EmbedStatus) {
 /// Record download progress on the runtime state, so an `embed_status` poll
 /// (e.g. a UI surface mounted mid-download) reports the same bytes as the
 /// `embed:status` events, then emit it. Only an in-flight load is updated.
-fn report_progress(host: &dyn Host, state: &Mutex<Runtime>, progress: EmbedProgress) {
+fn report_progress(host: &dyn Host, state: &Mutex<Runtime>, downloaded: u64) {
+    let progress = EmbedProgress {
+        downloaded,
+        total: MODEL.size,
+    };
     if let Ok(mut runtime) = state.lock()
         && matches!(*runtime, Runtime::Loading { .. })
     {
@@ -250,93 +258,59 @@ fn report_progress(host: &dyn Host, state: &Mutex<Runtime>, progress: EmbedProgr
     );
 }
 
-fn model_repo() -> Repo {
-    Repo::with_revision(
-        MODEL.repo.to_string(),
-        RepoType::Model,
-        MODEL.revision.to_string(),
+/// The model's URL; `HF_ENDPOINT` points it at a mirror.
+fn model_url() -> String {
+    let endpoint =
+        std::env::var("HF_ENDPOINT").unwrap_or_else(|_| "https://huggingface.co".to_string());
+    format!(
+        "{}/{}/resolve/{}/{}",
+        endpoint.trim_end_matches('/'),
+        MODEL.repo,
+        MODEL.revision,
+        MODEL.file
     )
 }
 
-/// One hf-hub progress call, sent to `ensure_model_file`, which owns the host
-/// and the runtime state.
-enum DownloadEvent {
-    Start(u64),
-    Bytes(u64),
-}
-
-/// hf-hub clones the reporter for each chunk, so it sends events to one
-/// receiver.
-#[derive(Clone)]
-struct DownloadProgress(tokio::sync::mpsc::UnboundedSender<DownloadEvent>);
-
-impl Progress for DownloadProgress {
-    async fn init(&mut self, size: usize, _filename: &str) {
-        let _ = self.0.send(DownloadEvent::Start(size as u64));
-    }
-
-    async fn update(&mut self, size: usize) {
-        let _ = self.0.send(DownloadEvent::Bytes(size as u64));
-    }
-
-    async fn finish(&mut self) {}
-}
-
-/// The model file in the hf-hub cache in `models_dir`, downloaded first unless
-/// it is there. hf-hub resumes a partial download, and `HF_ENDPOINT` points it
-/// at a mirror.
+/// The model file in `models_dir`, downloaded first unless it is there.
 async fn ensure_model_file(
     host: &dyn Host,
     state: &Mutex<Runtime>,
     models_dir: &Path,
 ) -> Result<PathBuf, String> {
-    if let Some(path) = Cache::new(models_dir.to_path_buf())
-        .repo(model_repo())
-        .get(MODEL.file)
-    {
+    // The revision in the name keeps a new model spec from reusing an old file.
+    let path = models_dir.join(format!("{}-{}", &MODEL.revision[..12], MODEL.file));
+    // A file of another size is damaged: download it again.
+    let existing = tokio::fs::metadata(&path).await.map(|meta| meta.len());
+    if existing.is_ok_and(|len| len == MODEL.size) {
         return Ok(path);
     }
-    let mut builder = ApiBuilder::new()
-        .with_cache_dir(models_dir.to_path_buf())
-        .with_progress(false);
-    if let Ok(endpoint) = std::env::var("HF_ENDPOINT") {
-        builder = builder.with_endpoint(endpoint);
-    }
-    let api = builder.build().map_err(|err| format!("hf-hub: {err}"))?;
-    let (sender, mut events) = tokio::sync::mpsc::unbounded_channel();
-    let repo = api.repo(model_repo());
-    let download = repo.download_with_progress(MODEL.file, DownloadProgress(sender));
-    tokio::pin!(download);
-    let mut progress = EmbedProgress {
-        downloaded: 0,
-        total: 0,
-    };
+    let url = model_url();
     let mut emitted: Option<u64> = None;
-    loop {
-        tokio::select! {
-            result = &mut download => {
-                return result.map_err(|err| format!("downloading {}: {err}", MODEL.file));
+    download::fetch(
+        &download::Download {
+            url: &url,
+            size: MODEL.size,
+            sha256: MODEL.sha256,
+        },
+        &path,
+        |downloaded| {
+            // `abs_diff`: the count drops to zero when the server ignores the
+            // resume range and the download starts over.
+            let due = emitted.is_none_or(|last| {
+                downloaded.abs_diff(last) >= PROGRESS_EMIT_STEP || downloaded == MODEL.size
+            });
+            if due {
+                emitted = Some(downloaded);
+                report_progress(host, state, downloaded);
             }
-            Some(event) = events.recv() => {
-                match event {
-                    DownloadEvent::Start(total) => progress.total = total,
-                    DownloadEvent::Bytes(bytes) => progress.downloaded += bytes,
-                }
-                let due = emitted.is_none_or(|last| {
-                    progress.downloaded - last >= PROGRESS_EMIT_STEP
-                        || progress.downloaded >= progress.total
-                });
-                if due {
-                    emitted = Some(progress.downloaded);
-                    report_progress(host, state, progress);
-                }
-            }
-        }
-    }
+        },
+    )
+    .await?;
+    Ok(path)
 }
 
 /// Delete everything in `models_dir` except `keep`: the caches of the replaced
-/// ONNX runtime and of other model repos. The directory belongs to
+/// ONNX runtime and the files of older model specs. The directory belongs to
 /// this runtime. Failures only cost disk space.
 fn remove_other_models(models_dir: &Path, keep: &Path) {
     let Ok(entries) = std::fs::read_dir(models_dir) else {
@@ -402,7 +376,7 @@ impl Core {
             Ok(path) => self
                 .spawn_blocking(move || {
                     let model = Model::load(&path).map_err(AppError::io)?;
-                    remove_other_models(&models_dir, &models_dir.join(model_repo().folder_name()));
+                    remove_other_models(&models_dir, &path);
                     Ok(model)
                 })
                 .await

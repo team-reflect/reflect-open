@@ -50,18 +50,17 @@ vector table and re-embeds every note once.
 
 ### Model
 
-- `ggml-org/embeddinggemma-300M-GGUF`, `Q8_0`, pinned to one revision
-  (`MODEL` in `crates/core/src/embed/mod.rs`). The model id is
+- `ggml-org/embeddinggemma-300M-GGUF`, `Q8_0`, pinned to one revision, size and
+  SHA-256 (`MODEL` in `crates/core/src/embed/mod.rs`). The model id is
   `embeddinggemma-300m-q8_0-d256`.
-- `hf-hub` downloads the file into its cache in the models directory and
-  resumes a partial download. `HF_ENDPOINT` replaces the Hugging Face host.
-  hf-hub 1.0 is not used: it always builds the Xet storage client.
+- The download resumes a partial file with an HTTP `Range` request and checks
+  the SHA-256 before the file gets its final name. `HF_ENDPOINT` replaces the
+  Hugging Face host.
 - Queries and documents use the model's own prompts, so the runtime has two
   commands: `embed_query` and `embed_documents`.
 - The output is truncated to 256 dimensions (Matryoshka) and normalized.
-- After a load, the runtime deletes every other entry in its models directory,
-  such as the old MiniLM cache. Older revisions of the same repo stay in its
-  hf-hub cache.
+- After a load, the runtime deletes every other file in its models directory:
+  the old MiniLM cache and the files of older model revisions.
 
 ### Why not EmbeddingGemma 2
 
