@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { NativeContextMenuItem } from '@reflect/app'
+import type { ContextMenuItem } from '@reflect/app'
 import { getNoteMenuItems, type NoteMenuTarget } from './note-menu.ts'
 
 const PINNED: NoteMenuTarget = { path: 'notes/pinned.md', isPinned: true }
 const UNPINNED: NoteMenuTarget = { path: 'notes/unpinned.md', isPinned: false }
 const DAILY: NoteMenuTarget = { path: 'daily/2026-06-14.md', isPinned: false }
 
-function getIds(items: readonly NativeContextMenuItem[]): string[] {
+function getIds(items: readonly ContextMenuItem[]): string[] {
   return items.filter((item) => item.type === 'action').map((item) => item.id)
 }
 

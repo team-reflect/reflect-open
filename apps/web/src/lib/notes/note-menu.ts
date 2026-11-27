@@ -1,4 +1,4 @@
-import type { NativeContextMenuItem } from '@reflect/app'
+import type { ContextMenuItem } from '@reflect/app'
 import { canTrashNote } from '@reflect/core'
 
 export type NoteMenuId =
@@ -24,14 +24,14 @@ export interface NoteMenuOptions {
   isPrivate?: boolean | undefined
 }
 
-function action(id: NoteMenuId, title: string, shortcut?: string): NativeContextMenuItem {
+function action(id: NoteMenuId, title: string, shortcut?: string): ContextMenuItem {
   return { type: 'action', id, title, shortcut }
 }
 
 export function getNoteMenuItems(
   notes: readonly NoteMenuTarget[],
   options: NoteMenuOptions,
-): NativeContextMenuItem[] {
+): ContextMenuItem[] {
   const allNotes = options.surface === 'allNotes'
   const single = notes.length === 1
   const { isPrivate } = options
@@ -59,7 +59,7 @@ export function getNoteMenuItems(
     ],
   ]
   return groups
-    .map((group) => group.filter((item): item is NativeContextMenuItem => item !== false))
+    .map((group) => group.filter((item): item is ContextMenuItem => item !== false))
     .filter((group) => group.length > 0)
     .flatMap((group, index) => (index === 0 ? group : [{ type: 'separator' } as const, ...group]))
 }

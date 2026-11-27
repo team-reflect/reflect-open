@@ -525,7 +525,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
 
   it('right-click on an unselected row pins only that row and keeps the selection', async () => {
     const view = await renderScreen()
-    const nativeMenu = view.appServices.nativeMenuHost
+    const nativeMenu = view.appServices.nativeMenu
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
     await view.getByText('Shop your health goals.').click()
@@ -543,7 +543,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
 
   it('right-click inside a multi-selection asks to trash the whole selection', async () => {
     const view = await renderScreen()
-    const nativeMenu = view.appServices.nativeMenuHost
+    const nativeMenu = view.appServices.nativeMenu
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
     await view.getByText('Shop your health goals.').click()
