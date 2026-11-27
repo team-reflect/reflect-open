@@ -1,6 +1,7 @@
 import { mouse } from 'vitest-browser-commands/playwright'
 import { page, userEvent } from 'vitest/browser'
 import { describe, expect, it, vi } from 'vitest'
+import type { ContextMenuItem } from '@reflect/app'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { createBrowserContextMenuService } from './browser-context-menu-service.tsx'
 
@@ -8,9 +9,13 @@ describe('createBrowserContextMenuService', () => {
   it('opens the menu at the right-click point and runs the picked action', async () => {
     const service = createBrowserContextMenuService()
     const onSelect = vi.fn()
+    const items = Promise.withResolvers<ContextMenuItem[]>()
     await mouse.click(120, 80, { button: 'right' })
 
-    await service.open({ items: [{ type: 'action', id: 'unpin', title: 'Unpin Note' }], onSelect })
+    const opened = service.open({ items: items.promise, onSelect })
+    await mouse.click(300, 300, { button: 'right' })
+    items.resolve([{ type: 'action', id: 'unpin', title: 'Unpin Note' }])
+    await opened
     const item = page.getByRole('menuitem', { name: 'Unpin Note' })
     await expect.element(item).toBeVisible()
     await vi.waitFor(() => {

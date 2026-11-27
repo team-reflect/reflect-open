@@ -57,12 +57,13 @@ export function createTauriContextMenuService(): ContextMenuService {
   let latestPopup: Promise<void> = Promise.resolve()
 
   async function popupNow({ items, onSelect }: ContextMenuOptions): Promise<void> {
+    const entries = await items
     await Promise.allSettled(resources.map((resource) => resource.close()))
     const built: Resource[] = []
     resources = built
     const menu = await Menu.new({
       items: await buildContextMenuEntries(
-        items,
+        entries,
         onSelect,
         (resource) => void built.push(resource),
       ),
