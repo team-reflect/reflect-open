@@ -12,6 +12,8 @@ global-min-publish-age = "24 hours"
 # Rust toolchain: the macOS `ar` writes no symbol index for wasm objects.
 [env]
 AR_wasm32_unknown_unknown = { value = "scripts/llvm-ar", relative = true }
+# llama.cpp's CMake build on Windows ARM64 uses clang-cl through this toolchain file.
+CMAKE_TOOLCHAIN_FILE_aarch64_pc_windows_msvc = { value = "scripts/cmake/clangcl.cmake", relative = true }
 
 # `cargo xtask <command>` runs the repository automation in `xtask/`.
 [alias]
