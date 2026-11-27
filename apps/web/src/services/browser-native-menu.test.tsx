@@ -64,6 +64,36 @@ describe('createBrowserNativeMenuHost', () => {
     await expectLocatorToHaveCount(page.getByRole('menu'), 0)
   })
 
+  it('replaces the open menu when another row is right-clicked', async () => {
+    const host = createBrowserNativeMenuHost()
+    const rows = ['Row A', 'Row B'].map((name, index) => {
+      const row = document.body.appendChild(document.createElement('button'))
+      row.textContent = name
+      row.style.cssText = `position: fixed; left: ${100 + index * 400}px; top: ${100 + index * 300}px`
+      row.addEventListener('contextmenu', (event) => {
+        event.preventDefault()
+        void host.popup([{ kind: 'command', id: name, text: `Open ${name}`, action: vi.fn() }])
+      })
+      return row
+    })
+
+    await page.getByRole('button', { name: 'Row A' }).click({ button: 'right' })
+    await expect.element(page.getByRole('menuitem', { name: 'Open Row A' })).toBeVisible()
+    await page.getByRole('button', { name: 'Row B' }).click({ button: 'right', force: true })
+
+    await expect.element(page.getByRole('menuitem', { name: 'Open Row B' })).toBeVisible()
+    await expectLocatorToHaveCount(page.getByRole('menuitem', { name: 'Open Row A' }), 0)
+    const row = rows[1]?.getBoundingClientRect()
+    await vi.waitFor(() => {
+      const menu = page.getByRole('menu').element().getBoundingClientRect()
+      expect(menu.left).toBeCloseTo((row?.left ?? 0) + (row?.width ?? 0) / 2, -1)
+      expect(menu.top).toBeCloseTo((row?.top ?? 0) + (row?.height ?? 0) / 2, -1)
+    })
+    await userEvent.keyboard('{Escape}')
+    await expectLocatorToHaveCount(page.getByRole('menu'), 0)
+    for (const row of rows) row.remove()
+  })
+
   it('closes on Escape without running an action', async () => {
     const host = createBrowserNativeMenuHost()
     const action = vi.fn()
