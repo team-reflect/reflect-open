@@ -16,7 +16,6 @@ AR_wasm32_unknown_unknown = { value = "scripts/llvm-ar", relative = true }
 # the x86_64 targets have no AVX2. These turn on the AVX2 kernels for ggml only;
 # `embed::cpu_supported` checks the CPU before the runtime loads. ggml reads
 # them only on x86. https://github.com/utilityai/llama-cpp-rs/blob/0.1.161/llama-cpp-sys-2/build.rs#L785-L793
-GGML_AVX = "ON"
 GGML_AVX2 = "ON"
 GGML_FMA = "ON"
 GGML_F16C = "ON"

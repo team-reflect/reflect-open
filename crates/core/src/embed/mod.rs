@@ -55,13 +55,6 @@ const MODEL: ModelSpec = ModelSpec {
     document_prompt: "title: none | text: ",
 };
 
-/// Model caches of the ONNX runtime that this one replaced, inside the models
-/// directory. Deleted once the new model is ready.
-const LEGACY_CACHE_DIRS: [&str; 2] = [
-    "models--Qdrant--all-MiniLM-L6-v2-onnx",
-    ".locks/models--Qdrant--all-MiniLM-L6-v2-onnx",
-];
-
 /// CPU threads per embed. Embedding is background work, so it leaves most
 /// cores to the app.
 const THREADS: i32 = 2;
@@ -138,7 +131,8 @@ impl Model {
                     .with_n_ctx(NonZeroU32::new(max_tokens))
                     .with_n_batch(max_tokens)
                     .with_n_ubatch(max_tokens)
-                    .with_n_threads(THREADS)
+                    // An encode of more than one token runs on the batch
+                    // threads, and every input has at least BOS and EOS.
                     .with_n_threads_batch(THREADS),
             )
             .map_err(|err| err.to_string())?;
@@ -313,18 +307,27 @@ async fn ensure_model_file(
     Ok(path)
 }
 
-/// Delete the replaced runtime's caches. Failures only cost disk space.
-fn remove_legacy_caches(models_dir: &Path) {
-    for dir in LEGACY_CACHE_DIRS {
-        let path = models_dir.join(dir);
-        match std::fs::remove_dir_all(&path) {
-            Ok(()) => tracing::info!(path = %path.display(), "removed a legacy model cache"),
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-            Err(err) => tracing::warn!(?err, path = %path.display(), "legacy model cache"),
+/// Delete everything in `models_dir` except `keep`: the caches of the replaced
+/// ONNX runtime and the files of older model specs. The directory belongs to
+/// this runtime. Failures only cost disk space.
+fn remove_other_models(models_dir: &Path, keep: &Path) {
+    let Ok(entries) = std::fs::read_dir(models_dir) else {
+        return;
+    };
+    for path in entries.flatten().map(|entry| entry.path()) {
+        if path == keep {
+            continue;
+        }
+        let removed = if path.is_dir() {
+            std::fs::remove_dir_all(&path)
+        } else {
+            std::fs::remove_file(&path)
+        };
+        match removed {
+            Ok(()) => tracing::info!(path = %path.display(), "removed an old model file"),
+            Err(err) => tracing::warn!(?err, path = %path.display(), "old model file"),
         }
     }
-    // Removes the lock directory only when nothing else is in it.
-    let _ = std::fs::remove_dir(models_dir.join(".locks"));
 }
 
 impl Core {
@@ -371,7 +374,7 @@ impl Core {
             Ok(path) => self
                 .spawn_blocking(move || {
                     let model = Model::load(&path).map_err(AppError::io)?;
-                    remove_legacy_caches(&models_dir);
+                    remove_other_models(&models_dir, &path);
                     Ok(model)
                 })
                 .await
