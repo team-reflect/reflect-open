@@ -19,7 +19,7 @@ describe('getNoteMenuItems', () => {
 
   it('labels the private toggle from the private state of a single target', () => {
     const titleFor = (isPrivate: boolean) => {
-      return getNoteMenuItems([UNPINNED], { surface: 'sidebar', isPrivate }).find(
+      return getNoteMenuItems([PINNED], { surface: 'sidebar', isPrivate }).find(
         (item) => item.type === 'action' && item.id === 'toggle-private',
       )
     }
@@ -40,7 +40,7 @@ describe('getNoteMenuItems', () => {
   })
 
   it('offers neither Open nor Move to Trash in the sidebar', () => {
-    const ids = getIds(getNoteMenuItems([UNPINNED], { surface: 'sidebar' }))
+    const ids = getIds(getNoteMenuItems([PINNED], { surface: 'sidebar' }))
 
     expect(ids).not.toContain('open')
     expect(ids).not.toContain('trash')
@@ -49,7 +49,7 @@ describe('getNoteMenuItems', () => {
   it('separates groups without a leading, trailing or doubled separator', () => {
     const cases = [
       getNoteMenuItems([PINNED, UNPINNED], { surface: 'allNotes' }),
-      getNoteMenuItems([PINNED, DAILY], { surface: 'sidebar' }),
+      getNoteMenuItems([PINNED], { surface: 'sidebar', isPrivate: false }),
       getNoteMenuItems([UNPINNED], { surface: 'allNotes', isPrivate: true }),
     ]
     for (const items of cases) {

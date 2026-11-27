@@ -10,7 +10,7 @@ import {
   type NoteMenuTarget,
 } from './note-menu.ts'
 
-export interface NoteMenuRequest {
+interface NoteMenuRequest {
   surface: NoteMenuSurface
   notes: readonly NoteMenuTarget[]
   onTrash?: ((paths: readonly string[]) => void) | undefined
@@ -41,11 +41,14 @@ export function useOpenNoteMenu(): (request: NoteMenuRequest) => void {
             })
             break
           case 'pin':
-            for (const note of notes) {
-              if (!note.isPinned) {
-                void noteActions.togglePinned(note.path)
+            // Parallel pins could read the same shelf and pick the same next order.
+            void (async () => {
+              for (const note of notes) {
+                if (!note.isPinned) {
+                  await noteActions.togglePinned(note.path)
+                }
               }
-            }
+            })()
             break
           case 'unpin':
             for (const note of notes) {

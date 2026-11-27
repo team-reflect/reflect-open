@@ -28,8 +28,8 @@ interface NoteMenuOptions {
   isPrivate?: boolean | undefined
 }
 
-function action(id: NoteMenuId, title: string, shortcut?: string): NoteMenuAction {
-  return { type: 'action', id, title, shortcut }
+function action(id: NoteMenuId, title: string): NoteMenuAction {
+  return { type: 'action', id, title }
 }
 
 export function getNoteMenuItems(
@@ -41,9 +41,8 @@ export function getNoteMenuItems(
   const { isPrivate } = options
   const groups = [
     [
-      allNotes && single && action('open', 'Open', 'Enter'),
-      single &&
-        action('open-in-new-window', 'Open in new window', allNotes ? 'Mod-Enter' : undefined),
+      allNotes && single && action('open', 'Open'),
+      single && action('open-in-new-window', 'Open in new window'),
     ],
     [
       notes.some((note) => !note.isPinned) ? action('pin', 'Pin') : action('unpin', 'Unpin'),
@@ -56,11 +55,7 @@ export function getNoteMenuItems(
       single && action('copy-path', 'Copy note path'),
       single && action('reveal', 'Reveal in Finder'),
     ],
-    [
-      allNotes &&
-        notes.some((note) => canTrashNote(note.path)) &&
-        action('trash', 'Move to Trash', 'Mod-Backspace'),
-    ],
+    [allNotes && notes.some((note) => canTrashNote(note.path)) && action('trash', 'Move to Trash')],
   ]
   return groups
     .map((group) => group.filter((item): item is NoteMenuAction => item !== false))
