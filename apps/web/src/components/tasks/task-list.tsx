@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type MouseEventHandler,
   type ReactElement,
   type Ref,
   type RefObject,
@@ -58,6 +59,7 @@ interface TaskListProps {
    * Called when the list scrolls.
    */
   onScroll?: (() => void) | undefined
+  onContextMenu?: MouseEventHandler<HTMLDivElement> | undefined
   groups: readonly TaskGroup[]
   /**
    * Whether `groups` holds every task to show. The saved scroll position is
@@ -226,6 +228,7 @@ export function TaskList({
   ref,
   className,
   onScroll: onScrollProp,
+  onContextMenu,
   groups,
   ready,
   rowHeight,
@@ -287,7 +290,7 @@ export function TaskList({
   )
 
   return (
-    <div className={cn('overflow-y-auto', className)}>
+    <div className={cn('overflow-y-auto', className)} onContextMenu={onContextMenu}>
       <ItemsContext value={items}>
         <Virtualizer
           ref={virtualizerRef}
