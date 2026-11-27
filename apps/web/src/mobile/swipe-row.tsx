@@ -119,7 +119,11 @@ export function SwipeRow({
         }
         // A settle report can still be waiting from a scroll before the press.
         // When the press did not move the row, the held placement wins.
-        if (!placeHeld()) {
+        const held = placeHeld()
+        // The settle ends the press, so its held position never applies to a
+        // later scroll.
+        heldAtRef.current = null
+        if (!held) {
           reportSettled(scroller)
         }
       },

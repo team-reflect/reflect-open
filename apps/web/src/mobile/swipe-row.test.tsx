@@ -163,6 +163,22 @@ describe('SwipeRow', () => {
     await vi.waitFor(() => expect(scroller.scrollLeft).toBe(0))
   })
 
+  it('lets a later swipe close the row after a press moved it to a held placement', async () => {
+    const view = await mount(<Harness />)
+    const scroller = getScroller(view.getByText('Row').element())
+
+    // The row opens during a press, and the finger opens it too.
+    await touch(scroller, 'start')
+    await toggle(view)
+    await scrollElement({ element: scroller, left: ACTION_WIDTH, touch: true })
+    await expect.element(view.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+
+    // A later swipe closes it.
+    await scrollElement({ element: scroller, left: 0, touch: true })
+    await vi.waitFor(() => expect(view.getByRole('button', { name: 'Delete' }).query()).toBeNull())
+    expect(scroller.scrollLeft).toBe(0)
+  })
+
   it('snaps a scroll that stops past halfway to the open position', async () => {
     const view = await mount(<Harness />)
     const scroller = getScroller(view.getByText('Row').element())
