@@ -1,5 +1,5 @@
 /*
- * Prints one note, for the "Print note" command. Views tag each note's block
+ * Prints one note, for the "Print Note…" command. Views tag each note's block
  * with `data-print-path` (a day in the daily stream, the column of a single
  * note). This marks the block for `path` as the print target and opens the
  * print dialog; the print styles in `styles/print.css` hide everything else.

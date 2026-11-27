@@ -19,7 +19,7 @@ import { TemplatesSection } from './settings/templates-section.tsx'
 
 /**
  * The settings screen (a routed view, like notes — reached via ⌘, or the
- * palette's "Open settings"). Every control applies instantly through the
+ * palette's "Open Settings"). Every control applies instantly through the
  * settings provider; there is no save button.
  */
 export function SettingsScreen(): ReactElement {

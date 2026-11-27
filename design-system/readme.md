@@ -74,7 +74,7 @@ not a marketing department. Sentences are short and declarative. There's dry wit
   "Mirror the way *your* mind works"). The team is **"we / our"** ("We're everywhere",
   "Our mission is to improve the way people think").
 - **Casing:** **Sentence case** for headings, buttons, labels, tooltips and dialogs.
-  **Menu items use Title Case** (Apple's menu style) in every menu: the menu bar,
+  **Menu items use Title Case** (Apple's menu style): the menu bar,
   the command palette, context and dropdown menus, and mobile menus (`New Note`,
   `Open Note in New Window`, `Find in Note…`). Lowercase articles, `and`/`or`/`but`/`nor`,
   and prepositions of four letters or fewer, unless first or last. A label that

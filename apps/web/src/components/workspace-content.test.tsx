@@ -20,7 +20,7 @@ import { WorkspaceContent } from './workspace-content.tsx'
 const GRAPH: GraphInfo = { root: '/notes', name: 'Notes', generation: 1 }
 
 /**
- * Toggles the sidebar the way the "Toggle sidebar" command does.
+ * Toggles the sidebar the way the "Toggle Sidebar" command does.
  */
 function SidebarToggle(): ReactElement {
   const { toggleSidebar } = useSidebar()

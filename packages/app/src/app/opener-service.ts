@@ -37,9 +37,7 @@ export interface OpenerTransport {
 }
 
 /**
- * The menu label for {@link OpenerService.revealInFileManager}, in the
- * platform's own words: `Reveal in Finder`, or `Reveal Graph in Finder` with
- * `subject` set to `Graph`.
+ * The menu label for {@link OpenerService.revealInFileManager}, in the platform's file manager terms.
  */
 export function formatRevealLabel(platform: PlatformFacts, subject?: string): string {
   const target = subject === undefined ? '' : ` ${subject}`
