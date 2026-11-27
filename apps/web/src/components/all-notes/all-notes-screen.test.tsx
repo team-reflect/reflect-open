@@ -525,15 +525,15 @@ describe('AllNotesScreen — selection and bulk trash', () => {
 
   it('right-click on an unselected row pins only that row and keeps the selection', async () => {
     const view = await renderScreen()
-    const nativeMenu = view.appServices.nativeMenu
+    const contextMenu = view.appServices.contextMenu
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
     await view.getByText('Shop your health goals.').click()
     await view.getByText('Dandelion chocolate.').click({ button: 'right' })
 
-    await vi.waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
+    await vi.waitFor(() => expect(contextMenu.popups()).toHaveLength(1))
     expect(view.getByRole('button', { name: /Trash \(1\)/ }).query()).not.toBeNull()
-    nativeMenu.select('pin')
+    contextMenu.select('pin')
     await vi.waitFor(() => {
       expect(view.core.noteFile.files().get('notes/tokyo.md')).toMatch(/^pinned: /m)
     })
@@ -543,29 +543,29 @@ describe('AllNotesScreen — selection and bulk trash', () => {
 
   it('right-click inside a multi-selection asks to trash the whole selection', async () => {
     const view = await renderScreen()
-    const nativeMenu = view.appServices.nativeMenu
+    const contextMenu = view.appServices.contextMenu
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
     await view.getByText('Shop your health goals.').click()
     await view.getByText('Dandelion chocolate.').click({ modifiers: ['ControlOrMeta'] })
     await view.getByText('Dandelion chocolate.').click({ button: 'right' })
 
-    await vi.waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
-    nativeMenu.select('trash')
+    await vi.waitFor(() => expect(contextMenu.popups()).toHaveLength(1))
+    contextMenu.select('trash')
     await expect.element(page.getByText('Trash 2 notes?')).toBeInTheDocument()
     await view.unmount()
   })
 
   it('right-click on an unselected row trashes only that row and keeps the selection', async () => {
     const view = await renderScreen()
-    const nativeMenu = view.appServices.nativeMenu
+    const contextMenu = view.appServices.contextMenu
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
     await view.getByText('Shop your health goals.').click()
     await view.getByText('Dandelion chocolate.').click({ button: 'right' })
 
-    await vi.waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
-    nativeMenu.select('trash')
+    await vi.waitFor(() => expect(contextMenu.popups()).toHaveLength(1))
+    contextMenu.select('trash')
     await expect.element(page.getByText('Trash 1 note?')).toBeInTheDocument()
     await page.getByRole('button', { name: 'Trash', exact: true }).click()
 
@@ -577,14 +577,14 @@ describe('AllNotesScreen — selection and bulk trash', () => {
 
   it('opens the menu without the private toggle when the index read fails', async () => {
     const view = await renderScreen()
-    const nativeMenu = view.appServices.nativeMenu
+    const contextMenu = view.appServices.contextMenu
     vi.spyOn(view.core.indexQuery, 'getNote').mockRejectedValue(new Error('index closed'))
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
     await view.getByText('Dandelion chocolate.').click({ button: 'right' })
 
-    await vi.waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
-    const ids = nativeMenu
+    await vi.waitFor(() => expect(contextMenu.popups()).toHaveLength(1))
+    const ids = contextMenu
       .popups()[0]!
       .filter((item) => item.type === 'action')
       .map((item) => item.id)

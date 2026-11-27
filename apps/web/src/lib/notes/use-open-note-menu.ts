@@ -24,7 +24,7 @@ export function useOpenNoteMenu(): (request: NoteMenuRequest) => void {
   return useCallback(
     (request: NoteMenuRequest) => {
       const { noteActions, noteRows, indexQuery } = services
-      const { nativeMenu, opener, operations } = app
+      const { contextMenu, opener, operations } = app
       const { notes, surface } = request
       const [first] = notes
       if (first === undefined) {
@@ -94,7 +94,7 @@ export function useOpenNoteMenu(): (request: NoteMenuRequest) => void {
       }
       void readIsPrivate()
         .then((isPrivate) => {
-          return nativeMenu.openContextMenu({
+          return contextMenu.open({
             items: getNoteMenuItems(notes, { surface, isPrivate }),
             onSelect: (id) => select(id as NoteMenuId),
           })
