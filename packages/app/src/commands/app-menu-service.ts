@@ -8,7 +8,7 @@ import type { CommandService } from './command-service.ts'
 /**
  * A menu item whose behavior the operating system implements.
  */
-export type NativeMenuPredefinedItem =
+export type NativeMenuPredefinedKind =
   | 'Separator'
   | 'Copy'
   | 'Cut'
@@ -30,7 +30,7 @@ export type NativeMenuPredefinedItem =
 
 export type AppMenuEntry =
   | { kind: 'command'; commandId: AppCommandId; text?: string | undefined }
-  | { kind: 'predefined'; item: NativeMenuPredefinedItem; text?: string | undefined }
+  | { kind: 'predefined'; item: NativeMenuPredefinedKind; text?: string | undefined }
 
 export interface AppSubmenuLayout {
   text: string
@@ -42,27 +42,27 @@ export interface AppSubmenuLayout {
   entries: AppMenuEntry[]
 }
 
+export interface NativeMenuCommandItem {
+  kind: 'command'
+  id: string
+  text: string
+  accelerator?: string | undefined
+  /**
+   * Invoked on activation with `id`.
+   */
+  action: (id: string) => void
+}
+
+export interface NativeMenuPredefinedItem {
+  kind: 'predefined'
+  item: NativeMenuPredefinedKind
+  text?: string | undefined
+}
+
 /**
- * One item of a submenu, as a {@link NativeMenuHost} builds it.
+ * One item of a submenu, as an {@link AppMenuHost} builds it.
  */
-export type NativeMenuItem =
-  | {
-      kind: 'command'
-      id?: string | undefined
-      text: string
-      accelerator?: string | undefined
-      enabled?: boolean | undefined
-      /**
-       * Any boolean makes a check item, so `false` shows an unchecked check item.
-       */
-      checked?: boolean | undefined
-      /**
-       * Invoked on activation with `id`, or with a host-generated id when `id` is unset.
-       */
-      action: (id: string) => void
-    }
-  | { kind: 'predefined'; item: NativeMenuPredefinedItem; text?: string | undefined }
-  | { kind: 'submenu'; text: string; items: readonly NativeMenuItem[] }
+export type NativeMenuItem = NativeMenuCommandItem | NativeMenuPredefinedItem
 
 export interface NativeSubmenu {
   text: string
@@ -71,7 +71,7 @@ export interface NativeSubmenu {
 }
 
 /**
- * An application menu that a {@link NativeMenuHost} built but has not installed yet.
+ * An application menu that an {@link AppMenuHost} built but has not installed yet.
  */
 export interface NativeAppMenu {
   /**
@@ -84,44 +84,11 @@ export interface NativeAppMenu {
   assignNsAppRoles(): MaybePromise<void>
 }
 
-export type ContextMenuItem =
-  | {
-      type: 'action'
-      id: string
-      title: string
-      disabled?: boolean | undefined
-      checked?: boolean | undefined
-    }
-  | { type: 'separator' }
-  | { type: 'submenu'; title: string; items: readonly ContextMenuItem[] }
-
-export interface ContextMenuOptions {
-  /**
-   * Menu items to render in order.
-   */
-  items: readonly ContextMenuItem[]
-  onSelect: (id: string) => void
-}
-
 /**
- * The native menu operations behind a {@link NativeMenuService}.
+ * The native operations behind an {@link AppMenuService}.
  */
-export interface NativeMenuHost {
+export interface AppMenuHost {
   buildAppMenu(submenus: readonly NativeSubmenu[]): MaybePromise<NativeAppMenu>
-  /**
-   * Open a context menu at the pointer.
-   */
-  popup(items: readonly NativeMenuItem[]): MaybePromise<void>
-}
-
-/**
- * A host without native menus: every operation rejects.
- */
-export function createUnsupportedNativeMenuHost(): NativeMenuHost {
-  const unsupported = async (): Promise<never> => {
-    return await Promise.reject(new Error('native menus are not supported on this host'))
-  }
-  return { buildAppMenu: unsupported, popup: unsupported }
 }
 
 /**
@@ -130,17 +97,16 @@ export function createUnsupportedNativeMenuHost(): NativeMenuHost {
 const MENU_COMMAND_EVENT = 'reflect://menu-command'
 
 /**
- * The native macOS application menu and context menus. Command items
- * derive from the command registry — id, label, and accelerator come from the
- * one command definition — so the menu cannot drift from the bindings that
- * fire.
+ * The native macOS application menu. Command items derive from the command
+ * registry — id, label, and accelerator come from the one command definition —
+ * so the menu cannot drift from the bindings that fire.
  *
  * The menu is built once at startup, before the UI mounts. An item
  * activation runs its command in the focused webview; a note window hands a
  * command it has no handler for to the main window. A command with no
  * handler anywhere does nothing.
  */
-export interface NativeMenuService {
+export interface AppMenuService {
   /**
    * Build the application menu from `layout` and install it, replacing the
    * host's default. Call once at startup — the menu holds command ids, not
@@ -165,58 +131,33 @@ export interface NativeMenuService {
    * webview at startup.
    */
   connect(): Unlisten
-  /**
-   * Open a context menu at the pointer.
-   */
-  openContextMenu(options: ContextMenuOptions): Promise<void>
 }
 
-export interface NativeMenuServiceDeps {
+export interface AppMenuServiceDeps {
   readonly commands: CommandService
   readonly window: WindowService
   readonly platform: PlatformFacts
   readonly ipc: IpcBridgeService
   readonly logger: LoggerService
-  readonly host: NativeMenuHost
+  /**
+   * Without a host, the app has no application menu.
+   */
+  readonly host?: AppMenuHost | undefined
 }
 
-function resolveContextMenuItem(
-  item: ContextMenuItem,
-  onSelect: (id: string) => void,
-): NativeMenuItem {
-  if (item.type === 'separator') {
-    return { kind: 'predefined', item: 'Separator' }
-  }
-  if (item.type === 'submenu') {
-    return {
-      kind: 'submenu',
-      text: item.title,
-      items: item.items.map((child) => resolveContextMenuItem(child, onSelect)),
-    }
-  }
-  // No id: Tauri keys click channels by id, so a shared id would replace an app menu item's channel.
-  return {
-    kind: 'command',
-    text: item.title,
-    enabled: !(item.disabled ?? false),
-    checked: item.checked,
-    action: () => onSelect(item.id),
-  }
-}
-
-class NativeMenuServiceImpl implements NativeMenuService {
-  readonly #deps: NativeMenuServiceDeps
+class AppMenuServiceImpl implements AppMenuService {
+  readonly #deps: AppMenuServiceDeps
   #installed = false
   readonly #mainWindow: boolean
 
-  constructor(deps: NativeMenuServiceDeps) {
+  constructor(deps: AppMenuServiceDeps) {
     this.#deps = deps
     this.#mainWindow = deps.window.isMainWindow()
   }
 
   async install(layout: readonly AppSubmenuLayout[]): Promise<void> {
     const { platform, ipc, logger, host } = this.#deps
-    if (!platform.isMacosDesktop || !this.#mainWindow) {
+    if (!host || !platform.isMacosDesktop || !this.#mainWindow) {
       return
     }
     const menu = await host.buildAppMenu(
@@ -279,12 +220,6 @@ class NativeMenuServiceImpl implements NativeMenuService {
       // main window only.
       void this.#handOffToMainWindow(id)
     })
-  }
-
-  async openContextMenu(options: ContextMenuOptions): Promise<void> {
-    await this.#deps.host.popup(
-      options.items.map((item) => resolveContextMenuItem(item, options.onSelect)),
-    )
   }
 
   async #dispatchToFocusedWindow(commandId: AppCommandId): Promise<void> {
@@ -356,6 +291,6 @@ class NativeMenuServiceImpl implements NativeMenuService {
   }
 }
 
-export function createNativeMenuService(deps: NativeMenuServiceDeps): NativeMenuService {
-  return new NativeMenuServiceImpl(deps)
+export function createAppMenuService(deps: AppMenuServiceDeps): AppMenuService {
+  return new AppMenuServiceImpl(deps)
 }

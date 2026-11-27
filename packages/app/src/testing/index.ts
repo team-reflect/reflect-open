@@ -3,12 +3,11 @@
  * app layer built over `createTestCoreServices()`.
  */
 export {
-  createTestNativeMenuService,
-  type TestNativeMenuHost,
-  type TestNativeMenuHostCall,
-  type TestNativeMenuService,
-  type TestNativeMenuServiceOptions,
-} from './commands.ts'
+  createTestAppMenuHost,
+  type TestAppMenuHost,
+  type TestAppMenuHostCall,
+} from './app-menu.ts'
+export { createTestContextMenuService, type TestContextMenuService } from './context-menu.ts'
 export { createTestClipboardService, type TestClipboardService } from './clipboard.ts'
 export {
   createTestOperationsService,

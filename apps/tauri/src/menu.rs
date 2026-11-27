@@ -37,14 +37,14 @@
 //!
 //! # Why the webview triggers this, and only after the menu is installed
 //!
-//! The frontend replaces the whole app menu at startup: `installNativeMenu`
+//! The frontend replaces the whole app menu at startup: `installAppMenu`
 //! (`packages/app/src/commands/app-menu.ts`) builds its own menu and
 //! calls `Menu.setAsAppMenu` from `@tauri-apps/api/menu`
 //! (https://github.com/tauri-apps/tauri/blob/@tauri-apps/api-v2.11.1/packages/api/src/menu/menu.ts#L237),
 //! which installs it as the new `NSApp.mainMenu` on the Rust side
 //! (https://github.com/tauri-apps/tauri/blob/tauri-v2.11.3/crates/tauri/src/app.rs#L961).
 //! Any item added to the menu before that point is thrown away together with
-//! the old menu. So `installNativeMenu` invokes this command as its last
+//! the old menu. So `installAppMenu` invokes this command as its last
 //! step, and the item lands in the menu that is actually on screen, the same
 //! way that file assigns the NSApp windows/help roles only after install.
 
@@ -60,7 +60,7 @@ use objc2_app_kit::{NSApplication, NSEventModifierFlags, NSMenu, NSMenuItem};
 use objc2_foundation::ns_string;
 
 /// Adds "Paste and Match Style" under Edit > Paste in the current app menu.
-/// Called by the webview's `installNativeMenu` right after it installs the
+/// Called by the webview's `installAppMenu` right after it installs the
 /// menu (the module docs explain why the order matters). Safe to call more
 /// than once; when the Edit menu cannot be found it logs a warning and
 /// changes nothing. A no-op on non-macOS platforms.

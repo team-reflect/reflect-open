@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { NativeMenuItem, NativeSubmenu } from '@reflect/app'
+import type { ContextMenuItem, NativeSubmenu } from '@reflect/app'
 
 const calls = vi.hoisted((): string[] => [])
 const closed = vi.hoisted((): string[] => [])
@@ -68,7 +68,7 @@ vi.mock('@tauri-apps/api/menu', () => ({
   Submenu: { new: submenuNew },
 }))
 
-const { createTauriNativeMenuHost } = await import('./native-menu.ts')
+const { createTauriAppMenuHost, createTauriContextMenuService } = await import('./tauri-menu.ts')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -76,7 +76,7 @@ beforeEach(() => {
   closed.length = 0
 })
 
-describe('createTauriNativeMenuHost', () => {
+describe('createTauriAppMenuHost', () => {
   const action = vi.fn()
   const layout: NativeSubmenu[] = [
     {
@@ -99,7 +99,7 @@ describe('createTauriNativeMenuHost', () => {
   ]
 
   it('builds command items as menu items, so that they keep their click handler', async () => {
-    await createTauriNativeMenuHost().buildAppMenu(layout)
+    await createTauriAppMenuHost().buildAppMenu(layout)
 
     const sidebarToggle = {
       id: 'sidebar.toggle',
@@ -127,7 +127,7 @@ describe('createTauriNativeMenuHost', () => {
   })
 
   it('installs the menu and assigns the NSApp roles only when asked', async () => {
-    const menu = await createTauriNativeMenuHost().buildAppMenu(layout)
+    const menu = await createTauriAppMenuHost().buildAppMenu(layout)
     expect(calls).toEqual([])
 
     await menu.setAsAppMenu()
@@ -136,24 +136,27 @@ describe('createTauriNativeMenuHost', () => {
     await menu.assignNsAppRoles()
     expect(calls).toEqual(['setAsAppMenu', 'windows:Window', 'help:Help'])
   })
+})
 
-  it('builds nested submenus and check items for a context menu', async () => {
-    const action = vi.fn()
-    const items: NativeMenuItem[] = [
-      { kind: 'command', text: 'Complete', enabled: true, action },
-      { kind: 'predefined', item: 'Separator' },
+describe('createTauriContextMenuService', () => {
+  it('builds nested submenus and check items whose actions report the picked id', async () => {
+    const onSelect = vi.fn()
+    const items: ContextMenuItem[] = [
+      { type: 'action', id: 'complete', title: 'Complete' },
+      { type: 'separator' },
       {
-        kind: 'submenu',
-        text: 'Schedule',
+        type: 'submenu',
+        title: 'Schedule',
         items: [
-          { kind: 'command', text: 'Today', checked: true, action },
-          { kind: 'command', text: 'Clear date', enabled: false, action },
+          { type: 'action', id: 'today', title: 'Today', checked: true },
+          { type: 'action', id: 'clear', title: 'Clear date', disabled: true },
         ],
       },
     ]
 
-    await createTauriNativeMenuHost().popup(items)
+    await createTauriContextMenuService().open({ items, onSelect })
 
+    const action = expect.any(Function) as () => void
     expect(menuNew).toHaveBeenLastCalledWith({
       items: [
         { built: 'MenuItem', text: 'Complete', enabled: true, action },
@@ -162,33 +165,44 @@ describe('createTauriNativeMenuHost', () => {
           built: 'Submenu',
           text: 'Schedule',
           items: [
-            { built: 'CheckMenuItem', text: 'Today', checked: true, action },
+            { built: 'CheckMenuItem', text: 'Today', enabled: true, checked: true, action },
             { built: 'MenuItem', text: 'Clear date', enabled: false, action },
           ],
         },
       ],
     })
     expect(popup).toHaveBeenCalledTimes(1)
+
+    for (const [options] of [...menuItemNew.mock.calls, ...checkMenuItemNew.mock.calls]) {
+      options.action?.()
+    }
+    expect(onSelect.mock.calls).toEqual([['complete'], ['clear'], ['today']])
   })
 
   it('closes the previous context menu when the next one opens', async () => {
-    const host = createTauriNativeMenuHost()
-    const items: NativeMenuItem[] = [{ kind: 'command', text: 'Unpin Note', action: vi.fn() }]
+    const service = createTauriContextMenuService()
+    const options = {
+      items: [{ type: 'action', id: 'unpin', title: 'Unpin Note' }] satisfies ContextMenuItem[],
+      onSelect: vi.fn(),
+    }
 
-    await host.popup(items)
+    await service.open(options)
     expect(closed).toEqual([])
 
-    await host.popup(items)
+    await service.open(options)
     expect(closed).toEqual(['Unpin Note', 'Menu'])
     expect(popup).toHaveBeenCalledTimes(2)
   })
 
   it('closes a menu that was still building when the next one opened', async () => {
-    const host = createTauriNativeMenuHost()
+    const service = createTauriContextMenuService()
 
     await Promise.all([
-      host.popup([{ kind: 'command', text: 'First', action: vi.fn() }]),
-      host.popup([{ kind: 'command', text: 'Second', action: vi.fn() }]),
+      service.open({ items: [{ type: 'action', id: 'first', title: 'First' }], onSelect: vi.fn() }),
+      service.open({
+        items: [{ type: 'action', id: 'second', title: 'Second' }],
+        onSelect: vi.fn(),
+      }),
     ])
 
     expect(closed).toEqual(['First', 'Menu'])

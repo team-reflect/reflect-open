@@ -1,10 +1,10 @@
 import type { AppCommandId } from './app-commands.ts'
 import type {
   AppMenuEntry,
+  AppMenuService,
   AppSubmenuLayout,
-  NativeMenuPredefinedItem,
-  NativeMenuService,
-} from './native-menu-service.ts'
+  NativeMenuPredefinedKind,
+} from './app-menu-service.ts'
 
 /**
  * The native macOS application menu (the V1 Electron menu, ported). Command
@@ -22,7 +22,7 @@ function command(commandId: AppCommandId, text?: string): AppMenuEntry {
   return { kind: 'command', commandId, text }
 }
 
-function predefined(item: NativeMenuPredefinedItem, text?: string): AppMenuEntry {
+function predefined(item: NativeMenuPredefinedKind, text?: string): AppMenuEntry {
   return { kind: 'predefined', item, text }
 }
 
@@ -126,6 +126,6 @@ export const APP_MENU_LAYOUT: readonly AppSubmenuLayout[] = [
  * deliberately exempted there so its key equivalent belongs to this native
  * macOS application menu.
  */
-export async function installNativeMenu(nativeMenu: NativeMenuService): Promise<void> {
-  await nativeMenu.install(APP_MENU_LAYOUT)
+export async function installAppMenu(appMenu: AppMenuService): Promise<void> {
+  await appMenu.install(APP_MENU_LAYOUT)
 }

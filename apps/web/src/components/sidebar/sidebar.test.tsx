@@ -148,7 +148,7 @@ async function renderSidebar(initialRoute?: Route) {
       </div>
     ),
   })
-  return { view, ran, core, navigation: appLayer.navigation, nativeMenu: appLayer.nativeMenu }
+  return { view, ran, core, navigation: appLayer.navigation, contextMenu: appLayer.contextMenu }
 }
 
 describe('Sidebar', () => {
@@ -310,13 +310,13 @@ describe('Sidebar', () => {
     getPinnedNotes.mockResolvedValue([
       { path: 'notes/rust.md', title: 'Rust', dailyDate: null, pinnedOrder: null },
     ])
-    const { view, nativeMenu } = await renderSidebar()
+    const { view, contextMenu } = await renderSidebar()
     const rust = view.getByRole('button', { name: 'Rust' })
 
     await rust.click({ button: 'right' })
 
-    await vi.waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
-    nativeMenu.select('unpin')
+    await vi.waitFor(() => expect(contextMenu.popups()).toHaveLength(1))
+    contextMenu.select('unpin')
     await expectLocatorToHaveCount(view.getByRole('button', { name: 'Rust' }), 0)
     expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/rust.md', { pinned: false }, 1)
   })
@@ -326,12 +326,12 @@ describe('Sidebar', () => {
     getPinnedNotes.mockResolvedValue([
       { path: 'notes/rust.md', title: 'Rust', dailyDate: null, pinnedOrder: null },
     ])
-    const { view, nativeMenu } = await renderSidebar()
+    const { view, contextMenu } = await renderSidebar()
     const rust = view.getByRole('button', { name: 'Rust' })
 
     await rust.click({ button: 'right' })
-    await vi.waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
-    nativeMenu.select('unpin')
+    await vi.waitFor(() => expect(contextMenu.popups()).toHaveLength(1))
+    contextMenu.select('unpin')
 
     await vi.waitFor(() => {
       expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/rust.md', { pinned: false }, 1)
