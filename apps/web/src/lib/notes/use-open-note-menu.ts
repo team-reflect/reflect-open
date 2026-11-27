@@ -3,7 +3,7 @@ import { copyNoteDeepLink, copyNotePath, routeForPath } from '@reflect/app'
 import { errorMessage } from '@reflect/core'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
-import { getNoteMenuItems, type NoteMenuItemId, type NoteMenuTarget } from './note-menu.ts'
+import { getNoteMenuItems, type NoteMenuId, type NoteMenuTarget } from './note-menu.ts'
 
 export type NoteMenuRequest =
   | {
@@ -28,7 +28,7 @@ export function useOpenNoteMenu(): (request: NoteMenuRequest) => void {
         return
       }
       const { path } = first
-      const select = (id: NoteMenuItemId): void => {
+      const select = (id: NoteMenuId): void => {
         switch (id) {
           case 'open':
           case 'open-in-new-window':
@@ -49,8 +49,7 @@ export function useOpenNoteMenu(): (request: NoteMenuRequest) => void {
               void noteActions.unpin(note.path)
             }
             break
-          case 'lock':
-          case 'unlock':
+          case 'toggle-private':
             void noteActions.togglePrivate(path)
             break
           case 'copy-deep-link':
@@ -86,7 +85,7 @@ export function useOpenNoteMenu(): (request: NoteMenuRequest) => void {
         .then((isPrivate) => {
           return nativeMenu.openContextMenu({
             items: getNoteMenuItems(notes, { surface, isPrivate }),
-            onSelect: (id) => select(id as NoteMenuItemId),
+            onSelect: (id) => select(id as NoteMenuId),
           })
         })
         .catch((cause: unknown) => {

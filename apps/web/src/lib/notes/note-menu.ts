@@ -1,13 +1,12 @@
 import type { NativeContextMenuItem } from '@reflect/app'
 import { canTrashNote } from '@reflect/core'
 
-export type NoteMenuItemId =
+export type NoteMenuId =
   | 'open'
   | 'open-in-new-window'
   | 'pin'
   | 'unpin'
-  | 'lock'
-  | 'unlock'
+  | 'toggle-private'
   | 'copy-deep-link'
   | 'copy-path'
   | 'reveal'
@@ -25,7 +24,7 @@ export interface NoteMenuOptions {
   isPrivate?: boolean | undefined
 }
 
-function action(id: NoteMenuItemId, title: string, shortcut?: string): NativeContextMenuItem {
+function action(id: NoteMenuId, title: string, shortcut?: string): NativeContextMenuItem {
   return { type: 'action', id, title, shortcut }
 }
 
@@ -46,7 +45,7 @@ export function getNoteMenuItems(
       notes.some((note) => !note.isPinned) ? action('pin', 'Pin') : action('unpin', 'Unpin'),
       single &&
         isPrivate !== undefined &&
-        (isPrivate ? action('unlock', 'Unlock note') : action('lock', 'Lock note')),
+        action('toggle-private', isPrivate ? 'Unlock note' : 'Lock note'),
     ],
     [
       single && action('copy-deep-link', 'Copy deep link'),

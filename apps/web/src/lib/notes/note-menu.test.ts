@@ -17,13 +17,15 @@ describe('getNoteMenuItems', () => {
     expect(getIds(getNoteMenuItems([PINNED], { surface: 'allNotes' }))).toContain('unpin')
   })
 
-  it('labels the lock item from the private state of a single target', () => {
-    expect(
-      getIds(getNoteMenuItems([UNPINNED], { surface: 'sidebar', isPrivate: false })),
-    ).toContain('lock')
-    expect(getIds(getNoteMenuItems([UNPINNED], { surface: 'sidebar', isPrivate: true }))).toContain(
-      'unlock',
-    )
+  it('labels the private toggle from the private state of a single target', () => {
+    const titleFor = (isPrivate: boolean) => {
+      return getNoteMenuItems([UNPINNED], { surface: 'sidebar', isPrivate }).find(
+        (item) => item.type === 'action' && item.id === 'toggle-private',
+      )
+    }
+
+    expect(titleFor(false)).toMatchObject({ title: 'Lock note' })
+    expect(titleFor(true)).toMatchObject({ title: 'Unlock note' })
   })
 
   it('hides the single-target items for several targets', () => {
