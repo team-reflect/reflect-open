@@ -35,5 +35,5 @@ prose is the hero and chrome is quiet. Two surfaces share one purple soul: the *
 is a calm near-white (or deep-navy dark) canvas with **indigo `#4F46E5`** as the only
 saturated accent and cool grey everything-else; the **marketing site** is a near-black
 `#030014` "deep space" lit by **purple glows** and glassmorphic borders. One typeface:
-**Inter**. Sentence case everywhere, no emoji, benefit-led copy. Gentle 8px radii,
+**Inter**. Sentence case (Title Case for menu items), no emoji, benefit-led copy. Gentle 8px radii,
 mostly-flat surfaces with hairline borders, short calm motion (no bounce).

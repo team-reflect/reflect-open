@@ -76,7 +76,7 @@ describe('install', () => {
       {
         kind: 'command',
         id: 'sidebar.toggle',
-        text: 'Toggle sidebar',
+        text: 'Toggle Sidebar',
         accelerator: 'CmdOrCtrl+\\',
         action: menu.dispatchCommand,
       },

@@ -180,7 +180,7 @@ export function useEditorAiMenu({
         return [
           {
             id: 'configure-provider',
-            label: 'Add an AI provider in Settings…',
+            label: 'Add an AI Provider in Settings…',
             onSelect: () => navigate({ kind: 'settings', page: 'main' }),
           },
         ]

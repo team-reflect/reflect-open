@@ -37,7 +37,7 @@ async function openPicker(): Promise<void> {
   await expect.element(page.getByRole('option', { name: 'Journal' })).toBeInTheDocument()
 }
 
-it('filters templates and keeps the New template row for every query', async () => {
+it('filters templates and keeps the New Template row for every query', async () => {
   await renderPicker()
   await openPicker()
   await expect.element(page.getByRole('option', { name: 'Person' })).toBeInTheDocument()
@@ -46,11 +46,11 @@ it('filters templates and keeps the New template row for every query', async () 
   await input.fill('jour')
   await expect.element(page.getByRole('option', { name: 'Person' })).not.toBeInTheDocument()
   await expect.element(page.getByRole('option', { name: 'Journal' })).toBeInTheDocument()
-  await expect.element(page.getByRole('option', { name: 'New template' })).toBeInTheDocument()
+  await expect.element(page.getByRole('option', { name: 'New Template' })).toBeInTheDocument()
 
   await input.fill('nothing like this')
   await expect.element(page.getByText('No templates')).toBeInTheDocument()
-  await expect.element(page.getByRole('option', { name: 'New template' })).toBeInTheDocument()
+  await expect.element(page.getByRole('option', { name: 'New Template' })).toBeInTheDocument()
 })
 
 it('Enter on the only row left opens the New template dialog', async () => {
@@ -59,7 +59,7 @@ it('Enter on the only row left opens the New template dialog', async () => {
 
   await page.getByPlaceholder('Insert template…').fill('nothing like this')
   await expect
-    .element(page.getByRole('option', { name: 'New template' }))
+    .element(page.getByRole('option', { name: 'New Template' }))
     .toHaveAttribute('data-highlighted')
   await userEvent.keyboard('{Enter}')
 

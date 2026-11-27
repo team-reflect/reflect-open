@@ -15,8 +15,8 @@ function hit(
   return { path, title, snippet, dailyDate }
 }
 const COMMANDS: Command[] = [
-  { id: 'nav.today', title: 'Go to today', keywords: ['daily'] },
-  { id: 'theme.toggle', title: 'Toggle theme', keywords: ['dark'] },
+  { id: 'nav.today', title: 'Go to Today', keywords: ['daily'] },
+  { id: 'theme.toggle', title: 'Toggle Theme', keywords: ['dark'] },
 ]
 
 /** Defaults for the common case; tests override what they exercise. */

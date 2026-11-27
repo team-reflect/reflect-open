@@ -8,7 +8,7 @@ import { SettingsField } from './field.tsx'
 
 /**
  * The recovery lever for the local index: a one-click full rebuild from the
- * markdown files (the same action as the palette's "Rebuild search index").
+ * markdown files (the same action as the palette's "Rebuild Search Index").
  * Progress and failures surface through the operations status UI. The local
  * in-flight state only drives the label and disabled treatment —
  * `rebuildVisibly` itself coalesces overlapping requests, including races

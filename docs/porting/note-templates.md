@@ -40,7 +40,7 @@ history.
 
 ### Inserting a template
 
-- **Command palette** (`mod+k`): "Insert template…" lists the graph's
+- **Command palette** (`mod+k`): "Insert Template…" lists the graph's
   templates and inserts the body at the cursor.
 - **Editor slash/insert menu**: meowdown's insert affordances (slash menu,
   block-handle `+`) show host-provided template items beside built-in
@@ -52,7 +52,7 @@ Insertion is verbatim, like v1. Template frontmatter is not inserted.
 
 Files first: create, rename, and delete from any editor or file manager. In
 the app, **Settings → Note templates** lists them with open / rename /
-delete rows, and "New template" (also a palette command) creates
+delete rows, and "New Template" (also a palette command) creates
 `templates/<slug>.md` named via frontmatter `title:` (metadata, stripped on
 insert, like v1's name/body split). Rename moves the file to the new slug
 **and** rewrites the title, carrying any open session; delete sends the

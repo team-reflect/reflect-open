@@ -23,7 +23,7 @@ import { useCoreServices } from '@/services/services-provider.tsx'
  * The "Insert template…" picker (docs/porting/note-templates.md): the graph's
  * templates A→Z, chosen with the palette's keyboard model, inserted verbatim
  * (frontmatter stripped) at the cursor of the note the command targeted. The
- * ever-present "New template" row is also the feature's front door when the
+ * ever-present "New Template" row is also the feature's front door when the
  * graph has no templates yet.
  */
 
@@ -94,7 +94,7 @@ function TemplateList({ templates, onInsert, onCreate }: TemplateListProps): Rea
     <Autocomplete.Root
       inline
       open
-      // The list is filtered here, so the "New template" row survives every query.
+      // The list is filtered here, so the "New Template" row survives every query.
       mode="none"
       items={[...matches, NEW_TEMPLATE]}
       value={query}
@@ -126,7 +126,7 @@ function TemplateList({ templates, onInsert, onCreate }: TemplateListProps): Rea
                 className={ITEM_CLASS_NAME}
               >
                 <FilePlus2 aria-hidden strokeWidth={1.75} className="text-text-muted" />
-                New template
+                New Template
               </Autocomplete.Item>
             ) : (
               <Autocomplete.Item

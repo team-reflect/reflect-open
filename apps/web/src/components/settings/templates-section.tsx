@@ -31,7 +31,7 @@ const PALETTE_BINDING = APP_COMMANDS['palette.open'].keybinding
  * Note templates (docs/porting/note-templates.md): the `templates/` folder as
  * a settings card. Templates are plain markdown files — a row opens one in the
  * normal editor; rename moves the file to the new name's slug; delete sends it
- * to the trash. "New template" shares the palette command's dialog.
+ * to the trash. "New template" shares the "New Template" command's dialog.
  */
 export function TemplatesSection(): ReactElement {
   const graph = useGraphInfo()

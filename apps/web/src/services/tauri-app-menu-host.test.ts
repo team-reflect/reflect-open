@@ -24,12 +24,12 @@ describe('createTauriAppMenuHost', () => {
         {
           kind: 'command',
           id: 'sidebar.toggle',
-          text: 'Toggle sidebar',
+          text: 'Toggle Sidebar',
           accelerator: 'CmdOrCtrl+\\',
           action,
         },
         { kind: 'predefined', item: 'Separator' },
-        { kind: 'command', id: 'theme.toggle', text: 'Toggle theme', action },
+        { kind: 'command', id: 'theme.toggle', text: 'Toggle Theme', action },
         { kind: 'predefined', item: 'Quit', text: 'Quit Reflect' },
       ],
     },
@@ -42,11 +42,11 @@ describe('createTauriAppMenuHost', () => {
 
     const sidebarToggle = {
       id: 'sidebar.toggle',
-      text: 'Toggle sidebar',
+      text: 'Toggle Sidebar',
       accelerator: 'CmdOrCtrl+\\',
       action,
     }
-    const themeToggle = { id: 'theme.toggle', text: 'Toggle theme', action }
+    const themeToggle = { id: 'theme.toggle', text: 'Toggle Theme', action }
     expect(menuItemNew.mock.calls).toEqual([[sidebarToggle], [themeToggle]])
     // Submenus build concurrently, so the calls are in no fixed order.
     const view = submenuNew.mock.calls
