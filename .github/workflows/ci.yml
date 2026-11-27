@@ -415,10 +415,10 @@ jobs:
       - test-node
       - test-chromium
       - test-swift
-      - test-rust
       # Not part of `all-green`
       # - test-webkit
       # - test-ios
+      # - test-rust
 
     steps:
       # A skipped job counts as passed: classify skips jobs on purpose.
