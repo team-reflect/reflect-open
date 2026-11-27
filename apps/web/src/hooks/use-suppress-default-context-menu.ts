@@ -1,16 +1,11 @@
 import { useEffect } from 'react'
 
 /**
- * The regions where the user edits or selects text. `styles/index.css` restores
- * text selection on the same regions, and `select-text` opts in elsewhere.
+ * Mirrors the selectable regions in `styles/index.css`, plus `select-text`.
  */
 const TEXT_REGION_SELECTOR =
   'input, textarea, [contenteditable], .reflect-editor, .reflect-chat-message, .reflect-protected-note, .select-text'
 
-/**
- * Suppresses the webview's default context menu (Reload, Inspect Element)
- * outside text regions while `enabled` is true.
- */
 export function useSuppressDefaultContextMenu(enabled: boolean): void {
   useEffect(() => {
     if (!enabled) {
