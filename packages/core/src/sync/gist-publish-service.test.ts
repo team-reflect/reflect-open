@@ -1,12 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { overrideNoteFileService } from '../testing/graph.ts'
-import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
-import { createNoteDocumentService } from '../documents/note-document-service.ts'
 import { createNoteRowService } from '../documents/note-row-service.ts'
 import type { NoteSession } from '../documents/note-session-types.ts'
 import {
   createTestNoteSessionService,
-  createTestLinkedDailyNoteService,
+  createTestNoteDocumentService,
 } from '../testing/documents.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { gistBodyHash } from '../markdown/gist.ts'
@@ -22,7 +20,6 @@ import {
 } from '../testing/index.ts'
 import { createGistPublishService } from './gist-publish-service.ts'
 import { createGistService } from './gist-service.ts'
-import { createTestLoggerService } from '../testing/logger.ts'
 
 const GISTS_URL = 'https://api.github.com/gists'
 const PUBLISHED = { id: 'g1', htmlUrl: 'https://gist.github.com/alex/g1' }
@@ -94,13 +91,10 @@ function setup(options?: SetupOptions) {
   const service = createGistPublishService({
     gists: createGistService({ http }),
     githubAuth,
-    noteDocuments: createNoteDocumentService({
+    noteDocuments: createTestNoteDocumentService({
       noteSessions,
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
-      indexLifecycle: createTestIndexLifecycleService(),
-      linkedDailyNotes: createTestLinkedDailyNoteService(),
-      logger: createTestLoggerService(),
     }),
     noteRows,
     privacy: createPrivacyService({

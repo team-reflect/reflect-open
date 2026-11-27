@@ -10,12 +10,10 @@ import {
   type TestNoteFileService,
   type TestNoteSession,
 } from '../testing/index.ts'
-import { createTestIndexLifecycleService } from '../testing/index-lifecycle.ts'
-import { createNoteDocumentService } from '../documents/note-document-service.ts'
 import {
   createTestNoteSessionService,
   type TestNoteSessionService,
-  createTestLinkedDailyNoteService,
+  createTestNoteDocumentService,
 } from '../testing/documents.ts'
 import type { ContactMatch, ContactsAuthorization } from './commands.ts'
 import {
@@ -64,13 +62,10 @@ function contactSuggestionsOver(deps?: {
   const noteFile = deps?.noteFile ?? createTestNoteFileService()
   return createContactSuggestionService({
     contacts: deps?.contacts ?? createTestContactsService(),
-    noteDocuments: createNoteDocumentService({
+    noteDocuments: createTestNoteDocumentService({
       noteSessions,
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 3 } }),
-      indexLifecycle: createTestIndexLifecycleService(),
-      linkedDailyNotes: createTestLinkedDailyNoteService(),
-      logger: createTestLoggerService(),
     }),
     settings: deps?.settings ?? createTestSettingsService(),
     graphSession: deps?.graphSession ?? createTestGraphSessionService({ graph: { generation: 3 } }),
