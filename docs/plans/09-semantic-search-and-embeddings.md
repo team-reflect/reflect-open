@@ -14,6 +14,10 @@ chunking, the `retrieve()` API, and ranking live in `@reflect/core` (`actions/em
 **Libraries:** `fastembed` (Rust, local embeddings) + `sqlite-vec` (vectors). See
 [Libraries](libraries.md).
 
+> **Update (2026-11-27):** the runtime is now llama.cpp (`llama-cpp-2`) with
+> EmbeddingGemma 300M, 256-dim. See [TDR 0006](../decisions/0006-llama-cpp-embeddings.md).
+> The `fastembed` and all-MiniLM-L6-v2 notes below are history.
+
 ## Delivery (decided 2026-06-09)
 
 Both halves ship together on one branch, commits sequenced runtime-first so the
