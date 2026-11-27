@@ -6,11 +6,8 @@ import { useEffect } from 'react'
 const TEXT_REGION_SELECTOR =
   'input, textarea, [contenteditable], .reflect-editor, .reflect-chat-message, .reflect-protected-note, .select-text'
 
-export function useSuppressDefaultContextMenu(enabled: boolean): void {
+export function useSuppressDefaultContextMenu(): void {
   useEffect(() => {
-    if (!enabled) {
-      return
-    }
     const controller = new AbortController()
     document.addEventListener(
       'contextmenu',
@@ -22,5 +19,5 @@ export function useSuppressDefaultContextMenu(enabled: boolean): void {
       { signal: controller.signal },
     )
     return () => controller.abort()
-  }, [enabled])
+  }, [])
 }

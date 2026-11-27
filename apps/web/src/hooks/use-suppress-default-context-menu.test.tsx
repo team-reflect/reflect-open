@@ -13,12 +13,11 @@ import { noop } from '@ocavue/utils'
 import { useSuppressDefaultContextMenu } from './use-suppress-default-context-menu.ts'
 
 interface HostProps {
-  enabled: boolean
   children: ReactNode
 }
 
-function Host({ enabled, children }: HostProps): ReactElement {
-  useSuppressDefaultContextMenu(enabled)
+function Host({ children }: HostProps): ReactElement {
+  useSuppressDefaultContextMenu()
   return <>{children}</>
 }
 
@@ -27,9 +26,9 @@ const LICENSES: Licenses = {
   texts: { 'mit-alpha': 'MIT License\n\nCopyright (c) Alpha' },
 }
 
-async function renderLicenseRow(enabled: boolean): Promise<Locator> {
+async function renderLicenseRow(): Promise<Locator> {
   await renderInApp(
-    <Host enabled={enabled}>
+    <Host>
       <LicenseEntries licenses={LICENSES} />
     </Host>,
   )
@@ -40,15 +39,11 @@ async function renderLicenseRow(enabled: boolean): Promise<Locator> {
 
 describe('useSuppressDefaultContextMenu', () => {
   it('prevents the default menu on app chrome', async () => {
-    expect(fireEvent.contextMenu(await renderLicenseRow(true))).toBe(false)
-  })
-
-  it('keeps the default menu everywhere while disabled', async () => {
-    expect(fireEvent.contextMenu(await renderLicenseRow(false))).toBe(true)
+    expect(fireEvent.contextMenu(await renderLicenseRow())).toBe(false)
   })
 
   it('keeps the default menu on selectable license text', async () => {
-    await userEvent.click(await renderLicenseRow(true))
+    await userEvent.click(await renderLicenseRow())
     const text = page.getByText('Copyright (c) Alpha')
     await expect.element(text).toBeVisible()
     expect(fireEvent.contextMenu(text)).toBe(true)
@@ -56,7 +51,7 @@ describe('useSuppressDefaultContextMenu', () => {
 
   it('keeps the default menu in an input', async () => {
     await renderInApp(
-      <Host enabled>
+      <Host>
         <Input aria-label="Title" />
       </Host>,
     )
@@ -65,7 +60,7 @@ describe('useSuppressDefaultContextMenu', () => {
 
   it('keeps the default menu on rendered note text', async () => {
     await renderInApp(
-      <Host enabled>
+      <Host>
         <BacklinkSnippet
           text="Planning **kickoff** notes"
           notePath="notes/meeting.md"
@@ -81,7 +76,7 @@ describe('useSuppressDefaultContextMenu', () => {
 
   it('keeps the default menu on a chat message', async () => {
     await renderInApp(
-      <Host enabled>
+      <Host>
         <ChatTurn
           turn={{
             id: 'turn-1',
@@ -99,7 +94,7 @@ describe('useSuppressDefaultContextMenu', () => {
 
   it('keeps the default menu on a protected note', async () => {
     await renderInApp(
-      <Host enabled>
+      <Host>
         <ProtectedNoteView content={'Setext heading\n==============\n'} />
       </Host>,
     )
