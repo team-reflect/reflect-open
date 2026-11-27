@@ -22,7 +22,7 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
   const navigateNoteLink = useNoteLinkNavigation()
   const noteLabel = useNoteLabel()
   const { noteActions } = useCoreServices()
-  const { nativeMenu, operations } = useAppServices()
+  const { contextMenu, operations } = useAppServices()
   const target = routeForPath(note.path)
   const active = routesEqual(route, target)
   const label = noteLabel(note)
@@ -37,8 +37,8 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
     (event: MouseEvent<HTMLButtonElement>): void => {
       event.preventDefault()
       event.stopPropagation()
-      void nativeMenu
-        .openContextMenu({
+      void contextMenu
+        .open({
           items: [{ type: 'action', id: 'unpin', title: 'Unpin Note' }],
           onSelect: () => {
             void noteActions.unpin(note.path)
@@ -48,7 +48,7 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
           operations.start('Opening note menu').fail(errorMessage(cause))
         })
     },
-    [nativeMenu, note, noteActions, operations],
+    [contextMenu, note, noteActions, operations],
   )
 
   return (
