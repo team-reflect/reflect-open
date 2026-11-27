@@ -175,7 +175,7 @@ export function buildAllNotesSearch(
 /**
  * Free-text searches cap at the same row budget V1's list search used.
  */
-const SEARCH_LIMIT = 50
+export const ALL_NOTES_SEARCH_LIMIT = 50
 
 /**
  * How the All tab runs a composed query: free text is a ranked, capped
@@ -185,7 +185,7 @@ const SEARCH_LIMIT = 50
  */
 export function searchPlanFor(parsed: ParsedSearchQuery): FilteredSearchOptions {
   return parsed.text !== ''
-    ? { limit: SEARCH_LIMIT }
+    ? { limit: ALL_NOTES_SEARCH_LIMIT }
     : { limit: null, pinnedFirst: true, notesOnly: true }
 }
 

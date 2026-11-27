@@ -92,7 +92,7 @@ function SwipeHarness({ note = row() }: { note?: NoteRowModel }): ReactElement {
   )
 }
 
-const mobileKey = queryKeys.index.mobileAllNotesWithSearch('/g', { text: '' })
+const mobileKey = queryKeys.index.mobileAllNotesWithSearch('/g', 'lexical', { text: '' })
 
 function CachedNoteList(): ReactElement {
   const { data } = useQuery<FilteredSearchHit[]>({

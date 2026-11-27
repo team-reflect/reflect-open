@@ -13,11 +13,11 @@ import {
 import {
   buildAllNotesSearch,
   pendingTagToken,
-  searchPlanFor,
   type AllNotesFilters,
   routeForPath,
 } from '@reflect/app'
 import { queryKeys } from '@/lib/query-client.ts'
+import { useEmbedStatus } from '@/lib/use-embed-status.ts'
 import { MobileAskRow } from '@/mobile/ask-row.tsx'
 import { useChatButton } from '@/mobile/chat-button.tsx'
 import { FilterBar } from '@/mobile/search-filters/filter-bar.tsx'
@@ -28,8 +28,8 @@ import type { Focusable } from '@/mobile/chrome/screen-chrome.ts'
 import { MobileTopBarScrollableRow } from '@/mobile/top-bar.tsx'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
-import { useCoreServices } from '@/services/services-provider.tsx'
-import { useDateFormat } from '@/providers/settings-provider.tsx'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+import { useDateFormat, useSemanticSearchEnabled } from '@/providers/settings-provider.tsx'
 import { useNoteRows } from '@/hooks/note-row-overlay.ts'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
@@ -75,12 +75,12 @@ interface MobileAllNotesProps {
 /**
  * The All tab (Plan 19, V1 parity): a virtualized fixed-row note list with an
  * embedded search bar and AND-composed filter badges. Everything is one
- * search path ({@link buildAllNotesSearch} → `searchWithFilters`, run per
- * {@link searchPlanFor}): the plain list is the empty query's recall feed
- * (notes only, pinned first, uncapped), badges and typed tokens narrow it,
- * and free text switches to ranked FTS. A trailing `#…` token switches the bar into
- * tag matching (V1): suggestions replace the badge row until the tag is
- * picked or the token completed. The route's tag (a tag tap landed here)
+ * search path ({@link buildAllNotesSearch} → `searchAllNotes`): the plain
+ * list is the empty query's recall feed (notes only, pinned first, uncapped),
+ * badges and typed tokens narrow it, and free text switches to ranked FTS,
+ * blended with semantic hits like the ⌘K palette when the model is ready. A
+ * trailing `#…` token switches the bar into tag matching (V1): suggestions
+ * replace the badge row until the tag is picked or the token completed. The route's tag (a tag tap landed here)
  * rides along as a badge with a back affordance.
  *
  * All is also where Chat lives (there is no Chat tab): the search text can be
@@ -95,7 +95,10 @@ export function MobileAllNotes({
   onFiltersChange,
 }: MobileAllNotesProps): ReactElement {
   const graph = useGraphInfo()
-  const { noteList, search, noteCreation } = useCoreServices()
+  const { noteList, noteCreation } = useCoreServices()
+  const { paletteSearch } = useAppServices()
+  const semanticSearchEnabled = useSemanticSearchEnabled()
+  const embed = useEmbedStatus()
   const { arrivalSeq, arrivalFocusEditor, canBack } = useRouterState()
   const { navigate, back } = useRouterActions()
   const enabled = graph !== null
@@ -122,9 +125,15 @@ export function MobileAllNotes({
     queryFn: () => noteList.listNoteTags(),
     enabled,
   })
+  const hybrid =
+    semanticSearchEnabled && embed.status === 'ready' && !parsed.filtered && parsed.text !== ''
   const { data: indexedHits, isPlaceholderData } = useQuery({
-    queryKey: queryKeys.index.mobileAllNotesWithSearch(graph?.root, parsed),
-    queryFn: () => search.searchWithFilters(parsed, searchPlanFor(parsed)),
+    queryKey: queryKeys.index.mobileAllNotesWithSearch(
+      graph?.root,
+      hybrid ? 'hybrid' : 'lexical',
+      parsed,
+    ),
+    queryFn: () => paletteSearch.searchAllNotes(parsed, { hybrid }),
     enabled,
     // Typing re-keys the query as the deferred value settles; holding the
     // previous rows avoids a blank flash between keystrokes.

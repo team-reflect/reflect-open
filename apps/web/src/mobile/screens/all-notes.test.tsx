@@ -1,10 +1,18 @@
 import type { TagFacet } from '@reflect/types'
 import { page } from 'vitest/browser'
 import { noop } from '@ocavue/utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { EMPTY_ALL_NOTES_FILTERS, type Route } from '@reflect/app'
-import type { FilteredSearchHit } from '@reflect/core'
+import type { EmbedStatus, FilteredSearchHit, SearchService } from '@reflect/core'
+import {
+  TEST_EMBED_MODEL,
+  createTestCoreServices,
+  createTestDatabaseService,
+  createTestEmbeddingRuntimeService,
+  createTestRetrievalService,
+  seedNotes,
+} from '@reflect/core/testing'
 import { useRouterState } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { MobileAllNotes, matchingTagFacets, rowForHit } from './all-notes.tsx'
@@ -130,5 +138,78 @@ describe('MobileAllNotes', () => {
     await page.getByRole('button', { name: 'Back' }).click()
 
     expect(route).toEqual({ kind: 'allNotes', tag: null })
+  })
+})
+
+describe('MobileAllNotes search mode', () => {
+  async function renderSearch(query: string, embedStatus: EmbedStatus) {
+    const database = createTestDatabaseService()
+    seedNotes(database, [{ path: 'notes/rust.md', markdown: '# Rust Notes\n' }])
+    const searchWithFilters = vi
+      .fn<SearchService['searchWithFilters']>()
+      .mockResolvedValue([
+        hit({ path: 'notes/lexical.md', title: 'Lexical', highlightedTitle: 'Lexical' }),
+      ])
+    const retrieval = createTestRetrievalService({
+      retrieve: () => [
+        {
+          path: 'notes/rust.md',
+          title: 'Rust Notes',
+          score: 0.9,
+          snippet: 'borrow checker notes',
+          heading: null,
+          isPrivate: false,
+        },
+      ],
+    })
+    const core = createTestCoreServices({
+      database,
+      search: { searchWithFilters },
+      retrieval,
+      embeddingRuntime: createTestEmbeddingRuntimeService({ status: embedStatus }),
+    })
+    const view = await renderInApp(
+      <MobileAllNotes
+        query={query}
+        onQueryChange={noop}
+        tag={null}
+        filters={EMPTY_ALL_NOTES_FILTERS}
+        onFiltersChange={noop}
+      />,
+      { core, route: { kind: 'allNotes', tag: null }, settings: { semanticSearchEnabled: true } },
+    )
+    return { view, searchWithFilters, retrieval }
+  }
+
+  it('blends semantic hits into a plain query and shows the chunk text as the snippet', async () => {
+    const { view, retrieval } = await renderSearch('rust', {
+      status: 'ready',
+      model: TEST_EMBED_MODEL,
+    })
+
+    await expect.element(view.getByText('borrow checker notes')).toBeVisible()
+    await expect.element(view.getByText('Rust Notes')).toBeVisible()
+    expect(view.container.querySelector('mark')).toBeNull()
+    expect(retrieval.retrieveCalls()).toMatchObject([
+      { query: 'rust', options: { mode: 'hybrid' } },
+    ])
+  })
+
+  it('keeps a query with a filter token lexical', async () => {
+    const { view, searchWithFilters, retrieval } = await renderSearch('rust is:pinned', {
+      status: 'ready',
+      model: TEST_EMBED_MODEL,
+    })
+
+    await expect.element(view.getByText('Lexical')).toBeVisible()
+    expect(searchWithFilters.mock.calls.at(-1)?.[0]).toMatchObject({ text: 'rust', filtered: true })
+    expect(retrieval.retrieveCalls()).toEqual([])
+  })
+
+  it('stays lexical while the model is not ready', async () => {
+    const { view, retrieval } = await renderSearch('rust', { status: 'loading' })
+
+    await expect.element(view.getByText('Lexical')).toBeVisible()
+    expect(retrieval.retrieveCalls()).toEqual([])
   })
 })
