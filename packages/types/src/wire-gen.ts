@@ -667,7 +667,13 @@ export type Commands = {
     args: Record<string, never>
     result: EmbedStatus
   }
-  embed_texts: {
+  embed_query: {
+    args: {
+      text: string
+    }
+    result: number[]
+  }
+  embed_documents: {
     args: {
       texts: string[]
     }
@@ -1538,12 +1544,15 @@ export type EmbedStatus =
   /**  No model loaded yet; `embed_ensure` will download/load it. */
   | { status: 'uninitialized' }
   /**
-   *  Download/load in progress (first run downloads ~90MB). The runtime
+   *  Download/load in progress (first run downloads ~330 MB). The runtime
    *  keeps the latest byte counts, so polls and `embed:status` events
    *  report the same progress.
    */
   | { status: 'loading'; progress?: EmbedProgress | undefined }
-  /**  `embed_texts` is ready; `model` is recorded per vector (rebuild key). */
+  /**
+   *  `embed_query` and `embed_documents` are ready; `model` is recorded per
+   *  vector (rebuild key).
+   */
   | { status: 'ready'; model: string }
   /**  Load failed; semantic search is unavailable (lexical still works). */
   | { status: 'failed'; message: string }

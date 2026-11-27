@@ -23,7 +23,7 @@ pub struct EmbedProgress {
 pub enum EmbedStatus {
     /// No model loaded yet; `embed_ensure` will download/load it.
     Uninitialized,
-    /// Download/load in progress (first run downloads ~90MB). The runtime
+    /// Download/load in progress (first run downloads ~330 MB). The runtime
     /// keeps the latest byte counts, so polls and `embed:status` events
     /// report the same progress.
     Loading {
@@ -31,7 +31,8 @@ pub enum EmbedStatus {
         #[cfg_attr(feature = "codegen", specta(type = EmbedProgress))]
         progress: Option<EmbedProgress>,
     },
-    /// `embed_texts` is ready; `model` is recorded per vector (rebuild key).
+    /// `embed_query` and `embed_documents` are ready; `model` is recorded per
+    /// vector (rebuild key).
     Ready { model: String },
     /// Load failed; semantic search is unavailable (lexical still works).
     Failed { message: String },

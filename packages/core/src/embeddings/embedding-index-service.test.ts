@@ -30,7 +30,7 @@ function seedStoredRows(
       text: '',
       contentHash: row.content_hash,
       modelId: row.model_id,
-      vector: Array.from({ length: 384 }, () => 0),
+      vector: Array.from({ length: 256 }, () => 0),
     })),
     generation: database.generation(),
   })
@@ -135,7 +135,7 @@ describe('embedNote', () => {
       modelId: MODEL,
     })
     expect(count).toBe(2)
-    expect(embedded()).toHaveLength(1) // one batched embed_texts call
+    expect(embedded()).toHaveLength(1) // one batched embed_documents call
     expect(applied()[0]!.chunks.every((chunk) => chunk.vector !== null)).toBe(true)
   })
 
@@ -375,7 +375,7 @@ function setupGraph(options?: { unreadable?: string[] }) {
       if (unreadable.some((marker) => text.includes(marker))) {
         throw new Error(`cannot embed ${text.trim()}`)
       }
-      return Array.from({ length: 384 }, (_, i) => (i === 0 ? 1 : 0))
+      return Array.from({ length: 256 }, (_, i) => (i === 0 ? 1 : 0))
     },
   })
   const noteFile = createTestNoteFileService({

@@ -17,7 +17,7 @@ import { noop } from '@ocavue/utils'
  * The incremental embedding pass (Plan 09): chunk a note, diff chunk hashes
  * against the stored rows, embed only what changed, and apply as one
  * generation-pinned write. TS owns this orchestration (Rust supplies
- * `embed_texts` + the table writes), mirroring the indexing pipeline.
+ * `embed_documents` + the table writes), mirroring the indexing pipeline.
  *
  * A note's chunk set also carries its referenced assets' description bodies
  * (Plan 20 → semantic leg), mirroring the FTS fold — so a meaning-level query
@@ -206,7 +206,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
     const toEmbed = chunks.filter((_, i) => skip[i] !== true)
     const vectors =
       toEmbed.length > 0
-        ? await embeddingRuntime.embedTexts(toEmbed.map((chunk) => chunk.text))
+        ? await embeddingRuntime.embedDocuments(toEmbed.map((chunk) => chunk.text))
         : []
     let vectorAt = 0
 

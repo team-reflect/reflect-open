@@ -72,15 +72,16 @@ trash = { workspace = true }
 notify-debouncer-full = { workspace = true }
 walkdir = { workspace = true }
 
-# The embedding runtime. Intel macOS has none: ONNX Runtime 1.24+ ships no
-# macOS x86_64 binaries.
+# The embedding runtime (llama.cpp). Intel macOS and mobile use the stand-in in
+# `embed_unsupported.rs`.
 [target.'cfg(all(not(any(target_os = "android", target_os = "ios")), not(all(target_os = "macos", target_arch = "x86_64"))))'.dependencies]
-fastembed = { workspace = true }
-# Direct dependency on fastembed's own downloader, used to pre-fetch the
-# embedding model with byte-level progress (fastembed downloads silently).
-hf-hub = { workspace = true, features = ["ureq", "native-tls"] }
+llama-cpp-2 = { workspace = true }
+sha2 = { workspace = true }
+
+[target.'cfg(all(target_os = "macos", target_arch = "aarch64"))'.dependencies]
+llama-cpp-2 = { workspace = true, features = ["metal"] }
 
 [dev-dependencies]
 reflect-graph-io = { workspace = true, features = ["test-support"] }
 rusqlite = { workspace = true }
-tokio = { workspace = true, features = ["time"] }
+tokio = { workspace = true, features = ["macros", "net", "time"] }

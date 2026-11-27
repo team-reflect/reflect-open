@@ -112,7 +112,7 @@ export function useWorkspaceCommands(): void {
   useCommandHandler('settings.open', () => navigate({ kind: 'settings', page: 'main' }))
   useCommandHandler('whatsNew.show', () => app.whatsNew.setOverride(true))
   useCommandHandler('shortcuts.show', () => (shortcutsOpen ? closeShortcuts() : openShortcuts()))
-  // Downloading the local model (~90MB) is the user's call, never automatic:
+  // Downloading the local model (~330MB) is the user's call, never automatic:
   // EmbeddingsSync loads it when the flag flips on. A `failed` runtime
   // retries only on an explicit action like this one.
   useCommandHandler('semantic.enable', async () => {

@@ -44,11 +44,12 @@ import { createTestStorageService } from './storage.ts'
 
 export interface TestEmbeddingRuntimeServiceOptions {
   /**
-   * The runtime status. Defaults to `ready` with model `all-MiniLM-L6-v2`.
+   * The runtime status. Defaults to `ready` with model
+   * `embeddinggemma-300m-q8_0-d256`.
    */
   status?: EmbedStatus | undefined
   /**
-   * The vector for one text. Defaults to a 384-dim unit vector.
+   * The vector for one text. Defaults to a 256-dim unit vector.
    */
   vectors?: (text: string) => number[]
 }
@@ -59,7 +60,8 @@ export interface TestEmbeddingRuntimeService extends EmbeddingRuntimeService {
    */
   setStatus(status: EmbedStatus): void
   /**
-   * The `texts` of every `embedTexts` call, in order.
+   * The texts of every `embedQuery` (one text) and `embedDocuments` call, in
+   * order.
    */
   embedCalls(): readonly (readonly string[])[]
   /**
@@ -68,7 +70,7 @@ export interface TestEmbeddingRuntimeService extends EmbeddingRuntimeService {
   ensureCalls(): number
 }
 
-const DIMENSIONS = 384
+const DIMENSIONS = 256
 
 function unitVector(): number[] {
   const vector = Array.from({ length: DIMENSIONS }, () => 0)
@@ -80,12 +82,13 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
   readonly #inner: EmbeddingRuntimeService
   readonly #ipc: TestIpcBridgeService
   readonly #embedded: string[][] = []
+  readonly #vectors: (text: string) => number[]
   #status: EmbedStatus
   #ensures = 0
 
   constructor(options?: TestEmbeddingRuntimeServiceOptions) {
-    this.#status = options?.status ?? { status: 'ready', model: 'all-MiniLM-L6-v2' }
-    const vectors = options?.vectors ?? unitVector
+    this.#status = options?.status ?? { status: 'ready', model: 'embeddinggemma-300m-q8_0-d256' }
+    this.#vectors = options?.vectors ?? unitVector
     this.#ipc = createTestIpcBridgeService({
       commands: {
         embed_status: () => this.#status,
@@ -93,14 +96,9 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
           this.#ensures++
           return this.#status
         },
-        embed_texts: (args) => {
-          if (this.#status.status !== 'ready') {
-            throw new AppError('unknown', `embedding model is ${this.#status.status}`)
-          }
-          const texts = Array.isArray(args['texts']) ? args['texts'].map(String) : []
-          this.#embedded.push(texts)
-          return texts.map((text) => vectors(text))
-        },
+        embed_query: (args) => this.#embed([String(args['text'])])[0],
+        embed_documents: (args) =>
+          this.#embed(Array.isArray(args['texts']) ? args['texts'].map(String) : []),
       },
     })
     this.#inner = createEmbeddingRuntimeService({
@@ -125,8 +123,12 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
     return this.#inner.retry()
   }
 
-  embedTexts(texts: readonly string[]): Promise<number[][]> {
-    return this.#inner.embedTexts(texts)
+  embedQuery(text: string): Promise<number[]> {
+    return this.#inner.embedQuery(text)
+  }
+
+  embedDocuments(texts: readonly string[]): Promise<number[][]> {
+    return this.#inner.embedDocuments(texts)
   }
 
   readonly get = (): EmbedStatus => this.#inner.get()
@@ -145,13 +147,21 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
   ensureCalls(): number {
     return this.#ensures
   }
+
+  #embed(texts: string[]): number[][] {
+    if (this.#status.status !== 'ready') {
+      throw new AppError('unknown', `embedding model is ${this.#status.status}`)
+    }
+    this.#embedded.push(texts)
+    return texts.map((text) => this.#vectors(text))
+  }
 }
 
 /**
  * The real {@link EmbeddingRuntimeService} over a scripted runtime. `ensure`
  * answers the current status without loading anything: drive loads with
- * `setStatus`. `embedTexts` rejects unless the status is `ready`, like the
- * native runtime.
+ * `setStatus`. `embedQuery` and `embedDocuments` reject unless the status is
+ * `ready`, like the native runtime.
  */
 export function createTestEmbeddingRuntimeService(
   options?: TestEmbeddingRuntimeServiceOptions,

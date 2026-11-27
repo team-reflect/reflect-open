@@ -55,12 +55,6 @@ dbus-secret-service-keyring-store = "1.0.1"
 dirs = "7.0.0"
 dispatch2 = "0.3.1"
 expect-test = "1.5.1"
-# Text embeddings only. The default `image-models` feature turns on every
-# `image` format (AVIF encoder, EXR, TIFF, ...) through feature unification.
-fastembed = { version = "7.5.0", default-features = false, features = [
-  "hf-hub-native-tls",
-  "ort-download-binaries-native-tls",
-] }
 futures-util = { version = "0.3.34", default-features = false, features = ["std"] }
 # Everything is vendored/static: libssh2 and openssl must never link against
 # homebrew dylibs the distributed app won't have (libssh2-sys only consults
@@ -72,7 +66,6 @@ git2 = { version = "0.21.0", default-features = false, features = [
   "vendored-libgit2",
   "vendored-openssl",
 ] }
-hf-hub = { version = "0.5.0", default-features = false }
 http-range-header = "1.0.0"
 ignore = "0.4.34"
 image = { version = "0.25.10", default-features = false }
@@ -80,6 +73,9 @@ infer = "0.22.0"
 js-sys = "0.3.103"
 jiff = { version = "1.0.0", default-features = false, features = ["std"] }
 keyring-core = "1.0.1"
+# The default features add OpenMP and llama.cpp's `common` library, which the
+# embedding runtime does not use.
+llama-cpp-2 = { version = "0.1.161", default-features = false }
 log = "0.4.35"
 notify-debouncer-full = "0.8.0"
 objc2 = "0.6.5"

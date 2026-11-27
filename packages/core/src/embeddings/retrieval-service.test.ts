@@ -21,7 +21,7 @@ import {
 } from './retrieval-service.ts'
 
 const MODEL = 'all-MiniLM-L6-v2'
-const DIMENSIONS = 384
+const DIMENSIONS = 256
 
 /**
  * A unit vector at `degrees` in the plane of the first two axes.
