@@ -68,7 +68,16 @@ function setup({ indexed = [], files = {} }: Graph = {}) {
       [...noteFile.files()].filter(([path]) => path.startsWith('daily/')).toSorted(),
     )
   }
-  return { linkedDailyNotes, noteSessions, noteDocuments, noteFile, clock, logger, dailyFiles }
+  return {
+    linkedDailyNotes,
+    noteSessions,
+    noteDocuments,
+    noteFile,
+    graphSession,
+    clock,
+    logger,
+    dailyFiles,
+  }
 }
 
 describe('ensureDailyNotesLinkedFrom', () => {
@@ -184,5 +193,17 @@ describe('opening a day', () => {
     await vi.waitFor(() => {
       expect(dailyFiles()).toEqual({ [DAY]: '' })
     })
+  })
+
+  it('creates no note for a session of a graph that is no longer open', async () => {
+    const { noteSessions, graphSession, clock, dailyFiles } = setup({
+      indexed: [{ path: 'notes/a.md', markdown: '# A\n\n[[2026-12-01]]\n' }],
+    })
+    const session = noteSessions.sessionFor(DAY)
+    graphSession.setGraph({ root: '/other', generation: GENERATION })
+    session.subscribe(noop)
+    await clock.advance(50)
+    expect(session.get().status).toBe('ready')
+    expect(dailyFiles()).toEqual({})
   })
 })

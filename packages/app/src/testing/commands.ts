@@ -12,9 +12,10 @@ import {
   createNativeMenuService,
   type AppSubmenuLayout,
   type NativeAppMenu,
-  type NativeContextMenuItem,
-  type NativeContextMenuOptions,
+  type ContextMenuItem,
+  type ContextMenuOptions,
   type NativeMenuHost,
+  type NativeMenuItem,
   type NativeMenuService,
   type NativeSubmenu,
 } from '../commands/native-menu-service.ts'
@@ -36,12 +37,30 @@ export interface TestNativeMenuHost extends NativeMenuHost {
   /**
    * The items of every context menu opened, in order.
    */
-  popups(): readonly (readonly NativeContextMenuItem[])[]
+  popups(): readonly (readonly NativeMenuItem[])[]
+}
+
+function findAction(
+  items: readonly ContextMenuItem[],
+  id: string,
+): Extract<ContextMenuItem, { type: 'action' }> | undefined {
+  for (const item of items) {
+    if (item.type === 'action' && item.id === id) {
+      return item
+    }
+    if (item.type === 'submenu') {
+      const found = findAction(item.items, id)
+      if (found) {
+        return found
+      }
+    }
+  }
+  return undefined
 }
 
 class TestNativeMenuHostImpl implements TestNativeMenuHost {
   readonly calls: TestNativeMenuHostCall[] = []
-  readonly #popups: (readonly NativeContextMenuItem[])[] = []
+  readonly #popups: (readonly NativeMenuItem[])[] = []
   #appMenu: readonly NativeSubmenu[] | null = null
 
   buildAppMenu(submenus: readonly NativeSubmenu[]): NativeAppMenu {
@@ -57,7 +76,7 @@ class TestNativeMenuHostImpl implements TestNativeMenuHost {
     }
   }
 
-  popup(items: readonly NativeContextMenuItem[]): void {
+  popup(items: readonly NativeMenuItem[]): void {
     this.calls.push('popup')
     this.#popups.push(items)
   }
@@ -66,7 +85,7 @@ class TestNativeMenuHostImpl implements TestNativeMenuHost {
     return this.#appMenu
   }
 
-  popups(): readonly (readonly NativeContextMenuItem[])[] {
+  popups(): readonly (readonly NativeMenuItem[])[] {
     return [...this.#popups]
   }
 }
@@ -100,12 +119,21 @@ export interface TestNativeMenuService extends NativeMenuService {
    * The host the service builds its menus on.
    */
   readonly host: TestNativeMenuHost
+  /**
+   * The items of every context menu that reached the host, as the caller described them.
+   */
+  popups(): readonly (readonly ContextMenuItem[])[]
+  /**
+   * Picks the enabled action `id` in the latest popup, and throws when there is none.
+   */
+  select(id: string): void
 }
 
 class TestNativeMenuServiceImpl implements TestNativeMenuService {
   readonly host: TestNativeMenuHost
   readonly dispatchCommand: (commandId: string) => void
   readonly #inner: NativeMenuService
+  readonly #popups: ContextMenuOptions[] = []
 
   constructor(host: TestNativeMenuHost, inner: NativeMenuService) {
     this.host = host
@@ -125,8 +153,25 @@ class TestNativeMenuServiceImpl implements TestNativeMenuService {
     return this.#inner.connect()
   }
 
-  openContextMenu(options: NativeContextMenuOptions): Promise<void> {
-    return this.#inner.openContextMenu(options)
+  async openContextMenu(options: ContextMenuOptions): Promise<void> {
+    const popped = this.host.popups().length
+    await this.#inner.openContextMenu(options)
+    if (this.host.popups().length > popped) {
+      this.#popups.push(options)
+    }
+  }
+
+  popups(): readonly (readonly ContextMenuItem[])[] {
+    return this.#popups.map((options) => options.items)
+  }
+
+  select(id: string): void {
+    const latest = this.#popups.at(-1)
+    const item = latest ? findAction(latest.items, id) : undefined
+    if (!latest || !item || (item.disabled ?? false)) {
+      throw new Error(`no enabled context menu action: ${id}`)
+    }
+    latest.onSelect(id)
   }
 }
 
@@ -152,5 +197,15 @@ export function createTestNativeMenuService(
     logger,
     host,
   })
+  return wrapTestNativeMenuService(host, service)
+}
+
+/**
+ * A {@link TestNativeMenuService} over `service`, which must build its menus on `host`.
+ */
+export function wrapTestNativeMenuService(
+  host: TestNativeMenuHost,
+  service: NativeMenuService,
+): TestNativeMenuService {
   return new TestNativeMenuServiceImpl(host, service)
 }

@@ -1,16 +1,52 @@
+import { noop } from '@ocavue/utils'
 import type { NativeMenuHost, NativeMenuItem, NativeSubmenu } from '@reflect/app'
-import { Menu, MenuItem, Submenu, type PredefinedMenuItemOptions } from '@tauri-apps/api/menu'
+import type { Resource } from '@tauri-apps/api/core'
+import {
+  CheckMenuItem,
+  Menu,
+  MenuItem,
+  Submenu,
+  type PredefinedMenuItemOptions,
+} from '@tauri-apps/api/menu'
+
+type MenuEntry = MenuItem | CheckMenuItem | Submenu | PredefinedMenuItemOptions
+
+async function buildMenuEntries(
+  items: readonly NativeMenuItem[],
+  onBuilt: (resource: Resource) => void,
+): Promise<MenuEntry[]> {
+  return await Promise.all(items.map((item) => buildMenuEntry(item, onBuilt)))
+}
+
+async function buildMenuEntry(
+  item: NativeMenuItem,
+  onBuilt: (resource: Resource) => void,
+): Promise<MenuEntry> {
+  if (item.kind === 'predefined') {
+    return { item: item.item, ...(item.text !== undefined ? { text: item.text } : {}) }
+  }
+  const entry =
+    item.kind === 'submenu'
+      ? await Submenu.new({ text: item.text, items: await buildMenuEntries(item.items, onBuilt) })
+      : await buildCommandEntry(item)
+  onBuilt(entry)
+  return entry
+}
 
 // Inline item options lose their click handler once the submenu is built.
-async function menuEntry(item: NativeMenuItem): Promise<MenuItem | PredefinedMenuItemOptions> {
-  return item.kind === 'command'
-    ? await MenuItem.new({
-        id: item.id,
-        text: item.text,
-        ...(item.accelerator !== undefined ? { accelerator: item.accelerator } : {}),
-        action: item.action,
-      })
-    : { item: item.item, ...(item.text !== undefined ? { text: item.text } : {}) }
+async function buildCommandEntry(
+  item: Extract<NativeMenuItem, { kind: 'command' }>,
+): Promise<MenuItem | CheckMenuItem> {
+  const options = {
+    ...(item.id !== undefined ? { id: item.id } : {}),
+    text: item.text,
+    ...(item.accelerator !== undefined ? { accelerator: item.accelerator } : {}),
+    ...(item.enabled !== undefined ? { enabled: item.enabled } : {}),
+    action: item.action,
+  }
+  return item.checked === undefined
+    ? await MenuItem.new(options)
+    : await CheckMenuItem.new({ ...options, checked: item.checked })
 }
 
 type NativeAppMenu = Awaited<ReturnType<NativeMenuHost['buildAppMenu']>>
@@ -47,16 +83,30 @@ class TauriNativeAppMenu implements NativeAppMenu {
 
 /**
  * Native menus through Tauri's menu API. Use this adapter only in the native shell.
- * It holds no state and takes no dependencies, so it stays a function.
  */
 export function createTauriNativeMenuHost(): NativeMenuHost {
+  // The pick arrives after `popup()` resolves, so the previous menu is closed when the next one opens.
+  let contextMenuResources: Resource[] = []
+  let latestPopup: Promise<void> = Promise.resolve()
+
+  async function popupNow(items: readonly NativeMenuItem[]): Promise<void> {
+    await Promise.allSettled(contextMenuResources.map((resource) => resource.close()))
+    const built: Resource[] = []
+    contextMenuResources = built
+    const menu = await Menu.new({
+      items: await buildMenuEntries(items, (resource) => void built.push(resource)),
+    })
+    built.push(menu)
+    await menu.popup()
+  }
+
   return {
     async buildAppMenu(layouts) {
       const submenus = await Promise.all(
         layouts.map(async (layout) => {
           return await Submenu.new({
             text: layout.text,
-            items: await Promise.all(layout.items.map(menuEntry)),
+            items: await buildMenuEntries(layout.items, noop),
           })
         }),
       )
@@ -64,11 +114,9 @@ export function createTauriNativeMenuHost(): NativeMenuHost {
       return new TauriNativeAppMenu(menu, layouts, submenus)
     },
     async popup(items) {
-      const menuItems = await Promise.all(
-        items.map((item) => MenuItem.new({ text: item.text, action: item.action })),
-      )
-      const menu = await Menu.new({ items: menuItems })
-      await menu.popup()
+      const open = (): Promise<void> => popupNow(items)
+      latestPopup = latestPopup.then(open, open)
+      await latestPopup
     },
   }
 }
