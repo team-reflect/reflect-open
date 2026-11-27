@@ -36,9 +36,13 @@ vector table and re-embeds every note once.
   one token per two characters, so a 512-token window would cut the chunker's
   larger chunks.
 - llama.cpp warnings and errors go to the app log. Other levels are dropped.
+- The macOS app sets `GGML_METAL_NO_RESIDENCY` before any thread starts. The
+  model lives until the process exits, and ggml aborts at exit while a Metal
+  buffer is still in a residency set. An iOS host must do the same.
 - `llama-cpp-sys-2` turns on ggml CPU features only from the Rust target
   features, which leaves x86_64 on SSE. `.cargo/config.toml` sets
-  `GGML_AVX2`, `GGML_FMA`, `GGML_F16C` and `GGML_AVX`, which affect only ggml.
+  `GGML_AVX2`, `GGML_FMA` and `GGML_F16C`, which affect only ggml. AVX2
+  implies AVX.
   `cpu_supported()` reports `unsupported` on a CPU without them.
 - Windows ARM64 builds llama.cpp with the ClangCL toolset
   (`scripts/cmake/clangcl.cmake`), because MSVC on ARM needs `GGML_NATIVE`.
@@ -54,7 +58,8 @@ vector table and re-embeds every note once.
 - Queries and documents use the model's own prompts, so the runtime has two
   commands: `embed_query` and `embed_documents`.
 - The output is truncated to 256 dimensions (Matryoshka) and normalized.
-- After the first load, the runtime deletes the old MiniLM cache.
+- After a load, the runtime deletes every other file in its models directory:
+  the old MiniLM cache and the files of older model revisions.
 
 ### Index
 
