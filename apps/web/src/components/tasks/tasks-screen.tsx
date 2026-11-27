@@ -74,7 +74,7 @@ function focusedSelectedKey(
 export function TasksScreen(): ReactElement {
   const { tasks: taskService } = useCoreServices()
   const { commands } = taskService
-  const { nativeMenu, operations } = useAppServices()
+  const { contextMenu, operations } = useAppServices()
   const navigateNoteLink = useNoteLinkNavigation()
   const today = useToday()
   const { filters, toggle } = useTaskFilters()
@@ -207,8 +207,8 @@ export function TasksScreen(): ReactElement {
           clear()
         }
       }
-      void nativeMenu
-        .openContextMenu({
+      void contextMenu
+        .open({
           items: getTaskMenuItems(tasks, today),
           onSelect: (id) => {
             const menuId = id as TaskMenuId
@@ -247,7 +247,7 @@ export function TasksScreen(): ReactElement {
       getSelected,
       selectedTasks,
       clear,
-      nativeMenu,
+      contextMenu,
       today,
       commands,
       navigateNoteLink,

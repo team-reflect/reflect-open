@@ -27,11 +27,13 @@ import { createNavigatorClipboardService } from '@/services/browser-clipboard.ts
 import { createBrowserDialogService } from '@/services/browser-dialog.ts'
 import { createBrowserOpenerTransport } from '@/services/browser-opener.ts'
 import { createBrowserImageCodec } from '@/services/browser-image-codec.ts'
+import { createBrowserContextMenuService } from '@/services/browser-context-menu-service.tsx'
 import { createDomLifecycleAdapter } from '@/services/dom-lifecycle.ts'
 import type { HostKind } from '@/services/detect-platform.ts'
 import { createTauriDeepLinkSource } from '@/services/tauri-deep-link.ts'
 import { createTauriDialogService } from '@/services/tauri-dialog.ts'
-import { createTauriNativeMenuHost } from '@/services/native-menu.ts'
+import { createTauriAppMenuHost } from '@/services/tauri-app-menu-host.ts'
+import { createTauriContextMenuService } from '@/services/tauri-context-menu-service.ts'
 import { createTauriHttpService } from '@/services/tauri-http.ts'
 import { createTauriOpenerTransport } from '@/services/tauri-opener.ts'
 import { createTauriPathTransport } from '@/services/tauri-path.ts'
@@ -99,10 +101,7 @@ export function createDesktopAdapters(
 }
 
 /**
- * The desktop app's host for the app layer: the window service, the lifecycle
- * service and the operations list over the page, the Tauri dialogs, updater
- * and native menus inside the Tauri shell, and Sentry exception telemetry
- * everywhere.
+ * The desktop app's host for the app layer.
  */
 export function createDesktopHost(
   facts: PlatformFacts,
@@ -133,7 +132,8 @@ export function createDesktopHost(
         opener: createTauriOpenerTransport(),
         exceptionTelemetry,
         updater: createTauriUpdaterAdapter(),
-        nativeMenu: createTauriNativeMenuHost(),
+        appMenuHost: createTauriAppMenuHost(),
+        contextMenu: createTauriContextMenuService(),
       }
     case 'swift':
       return {
@@ -149,6 +149,7 @@ export function createDesktopHost(
         dialog: createBrowserDialogService(),
         opener: createBrowserOpenerTransport(),
         exceptionTelemetry,
+        contextMenu: createBrowserContextMenuService(),
       }
   }
 }

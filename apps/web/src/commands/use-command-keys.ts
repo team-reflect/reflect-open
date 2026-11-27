@@ -21,7 +21,7 @@ const NATIVE_MACOS_MENU_COMMAND_IDS = new Set<AppCommandId>([
  */
 export function useCommandKeys(): void {
   const { platform } = useCoreServices()
-  const { commands, nativeMenu } = useAppServices()
+  const { commands, appMenu } = useAppServices()
 
   useEffect(() => {
     // Runs the command of `event`, in the phase that `history` names.
@@ -35,7 +35,7 @@ export function useCommandKeys(): void {
       }
       if (
         platform.isMacosDesktop &&
-        nativeMenu.isInstalled() &&
+        appMenu.isInstalled() &&
         NATIVE_MACOS_MENU_COMMAND_IDS.has(id)
       ) {
         return
@@ -70,5 +70,5 @@ export function useCommandKeys(): void {
     })
     window.addEventListener('keydown', onKeyDown, { signal: controller.signal })
     return () => controller.abort()
-  }, [commands, nativeMenu, platform])
+  }, [commands, appMenu, platform])
 }

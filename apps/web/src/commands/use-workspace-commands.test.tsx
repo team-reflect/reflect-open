@@ -76,7 +76,7 @@ let core: TestCoreServices
 let appLayer: TestAppServices
 let openRecent: MockInstance<GraphSessionService['openRecent']>
 let openRouteInNewWindow: MockInstance<LinkNavigationService['openRouteInNewWindow']>
-let isNativeMenuInstalled: MockInstance<TestAppServices['nativeMenu']['isInstalled']>
+let isAppMenuInstalled: MockInstance<TestAppServices['appMenu']['isInstalled']>
 
 beforeEach(() => {
   platform = {
@@ -107,7 +107,7 @@ async function shortcutsHook() {
   openRouteInNewWindow = vi
     .spyOn(appLayer.linkNavigation, 'openRouteInNewWindow')
     .mockResolvedValue(true)
-  isNativeMenuInstalled = vi.spyOn(appLayer.nativeMenu, 'isInstalled').mockReturnValue(false)
+  isAppMenuInstalled = vi.spyOn(appLayer.appMenu, 'isInstalled').mockReturnValue(false)
   const createChatSession = services.chatSessions.create.bind(services.chatSessions)
   vi.spyOn(services.chatSessions, 'create').mockImplementation((options) => {
     const session = createChatSession(options)
@@ -583,7 +583,7 @@ describe('workspace commands on macOS', () => {
 
   it(String.raw`leaves ⌘\ to the native macOS menu accelerator`, async () => {
     const { result } = await shortcutsHook()
-    isNativeMenuInstalled.mockReturnValue(true)
+    isAppMenuInstalled.mockReturnValue(true)
     const event = new KeyboardEvent('keydown', {
       key: '\\',
       metaKey: true,
@@ -596,7 +596,7 @@ describe('workspace commands on macOS', () => {
     expect(event.defaultPrevented).toBe(false)
     expect(result.current.sidebar.collapsed).toBe(false)
 
-    await act(() => appLayer.nativeMenu.dispatchCommand('sidebar.toggle'))
+    await act(() => appLayer.appMenu.dispatchCommand('sidebar.toggle'))
     expect(result.current.sidebar.collapsed).toBe(true)
   })
 })

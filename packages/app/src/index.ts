@@ -127,7 +127,7 @@ export {
   type Command,
   type CommandDeclaration,
 } from './commands/app-commands.ts'
-export { installNativeMenu } from './commands/app-menu.ts'
+export { installAppMenu } from './commands/app-menu.ts'
 export { attachFilesToNote } from './commands/attach-files.ts'
 export {
   copyNoteDeepLink,
@@ -139,19 +139,22 @@ export { formatBinding } from './commands/keybindings.ts'
 export { type KeymapService } from './commands/keymap-service.ts'
 export {
   type AppMenuEntry,
+  type AppMenuHost,
+  type AppMenuService,
   type AppSubmenuLayout,
+  type NativeAppMenu,
+  type NativeMenuItem,
+  type NativeMenuPredefinedItem,
+  type NativeSubmenu,
+} from './commands/app-menu-service.ts'
+export {
   type ContextMenuAction,
   type ContextMenuItem,
   type ContextMenuOptions,
   type ContextMenuSeparator,
+  type ContextMenuService,
   type ContextMenuSubmenu,
-  type NativeMenuCommand,
-  type NativeMenuHost,
-  type NativeMenuItem,
-  type NativeMenuPredefinedItem,
-  type NativeMenuService,
-  type NativeSubmenu,
-} from './commands/native-menu-service.ts'
+} from './commands/context-menu-service.ts'
 export { type NoteEntry, type PaletteHit, type PaletteSections } from './search/palette-entries.ts'
 export { type PaletteSearchService } from './search/palette-search-service.ts'
 export { deepLinkForRoute } from './navigation/deep-link-format.ts'
