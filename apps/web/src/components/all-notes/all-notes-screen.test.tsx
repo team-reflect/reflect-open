@@ -523,6 +523,39 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     await view.unmount()
   })
 
+  it('right-click on an unselected row pins only that row and keeps the selection', async () => {
+    const view = await renderScreen()
+    const nativeMenu = view.appServices.nativeMenuHost
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
+
+    await view.getByText('Shop your health goals.').click()
+    await view.getByText('Dandelion chocolate.').click({ button: 'right' })
+
+    await vi.waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
+    expect(view.getByRole('button', { name: /Trash \(1\)/ }).query()).not.toBeNull()
+    nativeMenu.select('pin')
+    await vi.waitFor(() => {
+      expect(view.core.noteFile.files().get('notes/tokyo.md')).toMatch(/^pinned: /m)
+    })
+    expect(view.core.noteFile.files().get('notes/health.md')).not.toContain('pinned')
+    await view.unmount()
+  })
+
+  it('right-click inside a multi-selection asks to trash the whole selection', async () => {
+    const view = await renderScreen()
+    const nativeMenu = view.appServices.nativeMenuHost
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
+
+    await view.getByText('Shop your health goals.').click()
+    await view.getByText('Dandelion chocolate.').click({ modifiers: ['ControlOrMeta'] })
+    await view.getByText('Dandelion chocolate.').click({ button: 'right' })
+
+    await vi.waitFor(() => expect(nativeMenu.popups()).toHaveLength(1))
+    nativeMenu.select('trash')
+    await expect.element(page.getByText('Trash 2 notes?')).toBeInTheDocument()
+    await view.unmount()
+  })
+
   it('does not offer bulk trash for a tagged daily note', async () => {
     const view = await renderScreen()
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()

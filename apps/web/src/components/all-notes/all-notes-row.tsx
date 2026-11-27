@@ -48,6 +48,7 @@ export const AllNotesRow = memo(function AllNotesRow({
   const noteLabel = useNoteLabel()
   return (
     <div
+      data-note-path={note.path}
       onClick={(event) => {
         // Shift-click selects a range; stop the browser turning that into a text
         // selection across the rows.

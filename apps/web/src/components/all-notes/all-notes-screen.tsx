@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactElement,
+} from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { canTrashNote, foldTag } from '@reflect/core'
 import { Trash2 } from 'lucide-react'
@@ -6,6 +14,7 @@ import { Button } from '@/components/ui/button.tsx'
 import { useNoteLinkNavigation, type ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
 import { useNoteRows } from '@/hooks/note-row-overlay.ts'
 import { queryKeys } from '@/lib/query-client.ts'
+import { useOpenNoteMenu } from '@/lib/notes/use-open-note-menu.ts'
 import { useListSelection } from '@/lib/selection/use-list-selection.ts'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { useScrollToIndexBridge } from '@/lib/use-scroll-to-index-bridge.ts'
@@ -89,19 +98,57 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   // acts on (snapshotted at open time, since the delete prunes the live
   // selection); the dialog owns the delete and its error. Daily rows remain
   // selectable for keyboard navigation, but are never valid trash targets.
-  const [confirmingTrash, setConfirmingTrash] = useState(false)
-  const [pendingPaths, setPendingPaths] = useState<readonly string[]>([])
+  const [pendingTrash, setPendingTrash] = useState<{
+    paths: readonly string[]
+    fromSelection: boolean
+  } | null>(null)
   const trashableSelectedPaths = useMemo(
     () => [...selection.selected].filter((path) => canTrashNote(path)),
     [selection.selected],
   )
-  const openTrashConfirm = useCallback(() => {
-    if (trashableSelectedPaths.length === 0) {
-      return
+  const requestTrash = useCallback((paths: readonly string[], fromSelection: boolean) => {
+    const trashable = paths.filter((path) => canTrashNote(path))
+    if (trashable.length > 0) {
+      setPendingTrash({ paths: trashable, fromSelection })
     }
-    setPendingPaths(trashableSelectedPaths)
-    setConfirmingTrash(true)
-  }, [trashableSelectedPaths])
+  }, [])
+  const openTrashConfirm = useCallback(() => {
+    requestTrash(trashableSelectedPaths, true)
+  }, [requestTrash, trashableSelectedPaths])
+  const closeTrashConfirm = useCallback((open: boolean) => {
+    if (!open) {
+      setPendingTrash(null)
+    }
+  }, [])
+  const { clear: clearSelection, getSelected } = selection
+  const onTrashed = useCallback(() => {
+    if (pendingTrash?.fromSelection ?? false) {
+      clearSelection()
+    }
+  }, [pendingTrash, clearSelection])
+
+  const openNoteMenu = useOpenNoteMenu()
+  // A selected row targets the whole selection, any other row only itself without selecting it.
+  const onListContextMenu = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      const path = (event.target as Element).closest<HTMLElement>('[data-note-path]')?.dataset
+        .notePath
+      const rows = notes ?? []
+      const note = rows.find((candidate) => candidate.path === path)
+      if (note === undefined) {
+        return
+      }
+      event.preventDefault()
+      const selected = getSelected()
+      const fromSelection = selected.has(note.path)
+      openNoteMenu({
+        surface: 'allNotes',
+        notes: fromSelection ? rows.filter((row) => selected.has(row.path)) : [note],
+        onTrash: (paths) => requestTrash(paths, fromSelection),
+      })
+    },
+    [notes, getSelected, openNoteMenu, requestTrash],
+  )
 
   // The table owns the virtualizer; the bridge lets the keyboard nav pull an
   // off-screen (unmounted) row into view through the virtualizer's scrollToIndex.
@@ -158,6 +205,7 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
         ref={scrollRef}
         data-testid="all-notes-scroll"
         onScroll={onScroll}
+        onContextMenu={onListContextMenu}
         className="min-h-0 flex-1 overflow-auto"
       >
         <AllNotesTable
@@ -170,10 +218,10 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
       </div>
 
       <AllNotesTrashDialog
-        open={confirmingTrash}
-        onOpenChange={setConfirmingTrash}
-        paths={pendingPaths}
-        onTrashed={selection.clear}
+        open={pendingTrash !== null}
+        onOpenChange={closeTrashConfirm}
+        paths={pendingTrash?.paths ?? []}
+        onTrashed={onTrashed}
       />
     </div>
   )
