@@ -41,10 +41,20 @@
     },
 
     // TypeScript checks and tests (root scripts, whole repo).
-    "//#lint": {
+    "//#lint:oxfmt": {
+      "outputLogs": "new-only",
+    },
+    "//#lint:oxlint": {
+      "outputLogs": "new-only",
+    },
+    "//#lint:eslint": {
       "outputLogs": "new-only",
       "dependsOn": ["@reflect/index-wasm#build"],
       "outputs": [".eslintcache"],
+    },
+    "//#lint:knip": {
+      "outputLogs": "new-only",
+      "dependsOn": ["@reflect/index-wasm#build"],
     },
     "//#typecheck": {
       "outputLogs": "new-only",

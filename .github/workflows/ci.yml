@@ -166,8 +166,41 @@ jobs:
       - name: Typecheck
         run: pnpm turbo run typecheck --filter=//
 
-      - name: Lint
-        run: pnpm turbo run lint --filter=//
+      # The ESLint cache outlives a run: a PR lints only the files whose content
+      # changed since its last run or since master. Master lints every file, so
+      # it also checks results that depend on another file's types.
+      - name: Pick the ESLint cache key
+        id: eslint-cache
+        env:
+          HASH: ${{ hashFiles('pnpm-lock.yaml', 'eslint.config.*', '**/tsconfig*.json', '!**/node_modules/**') }}
+        run: echo "prefix=eslint-$HASH-" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the ESLint cache
+        if: github.event_name == 'pull_request'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .eslintcache
+          key: ${{ steps.eslint-cache.outputs.prefix }}${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: ${{ steps.eslint-cache.outputs.prefix }}
+
+      - name: Lint (oxfmt)
+        run: pnpm turbo run lint:oxfmt --filter=//
+
+      - name: Lint (oxlint)
+        run: pnpm turbo run lint:oxlint --filter=//
+
+      - name: Lint (ESLint)
+        run: pnpm turbo run lint:eslint --filter=//
+
+      - name: Save the ESLint cache
+        if: ${{ !cancelled() && hashFiles('.eslintcache') != '' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .eslintcache
+          key: ${{ steps.eslint-cache.outputs.prefix }}${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Lint (knip)
+        run: pnpm turbo run lint:knip --filter=//
 
       - name: Build
         run: pnpm run build
