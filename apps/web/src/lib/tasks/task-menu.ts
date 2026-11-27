@@ -32,7 +32,7 @@ export function getTaskMenuItems(tasks: readonly OpenTask[], today: string): Tas
           return {
             type: 'action',
             id: `schedule:${preset.date}`,
-            title: preset.menuTitle,
+            title: preset.title,
             checked: tasks.every((task) => task.dueDate === preset.date),
           }
         }),
