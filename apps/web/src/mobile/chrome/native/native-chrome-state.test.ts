@@ -66,7 +66,7 @@ describe('buildShellChromeState', () => {
         pinned: [{ path: 'reflect-v2.md', title: 'Reflect V2' }],
         graphName: 'My Graph',
         graphColor: '#3b82f6',
-        graphMenu: [{ type: 'action', id: 'graphs', title: 'Switch graph…' }],
+        graphMenu: [{ type: 'action', id: 'graphs', title: 'Switch Graph…' }],
       },
       history: { back: true, forward: false },
     })

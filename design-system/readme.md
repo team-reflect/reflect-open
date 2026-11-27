@@ -73,9 +73,14 @@ not a marketing department. Sentences are short and declarative. There's dry wit
 - **Person:** Speaks to **"you"** and **"your"** ("Give *your* brain superpowers",
   "Mirror the way *your* mind works"). The team is **"we / our"** ("We're everywhere",
   "Our mission is to improve the way people think").
-- **Casing:** **Sentence case everywhere** — headings, buttons, menu items, labels.
-  Never Title Case UI, never ALL CAPS (except tiny tracked section eyebrows like
-  "Reflect AI", "Encryption", "Meetings" that label a marketing section).
+- **Casing:** **Sentence case** for headings, buttons, labels, tooltips and dialogs.
+  **Menu items use Title Case** (Apple's menu style) in every menu: the menu bar,
+  the command palette, context and dropdown menus, and mobile menus (`New Note`,
+  `Open Note in New Window`, `Find in Note…`). Lowercase articles, `and`/`or`/`but`/`nor`,
+  and prepositions of four letters or fewer, unless first or last. A label that
+  names the file manager uses the platform's term (`formatRevealLabel`). Never ALL
+  CAPS (except tiny tracked section eyebrows like "Reflect AI", "Encryption",
+  "Meetings" that label a marketing section).
 - **Headlines** are aspirational and benefit-led, often imperative:
   *"Think better with Reflect."* · *"Give your brain superpowers."* ·
   *"Never lose information."* · *"Get more out of your meetings."*

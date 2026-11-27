@@ -79,57 +79,57 @@ const graphSwitchKeywords = ['graph', 'workspace', 'switch', 'recent'] as const
  */
 export const APP_COMMANDS = {
   'graph.switch1': {
-    title: 'Switch to graph 1',
+    title: 'Switch to Graph 1',
     keywords: graphSwitchKeywords,
     keybinding: 'Mod-1',
   },
   'graph.switch2': {
-    title: 'Switch to graph 2',
+    title: 'Switch to Graph 2',
     keywords: graphSwitchKeywords,
     keybinding: 'Mod-2',
   },
   'graph.switch3': {
-    title: 'Switch to graph 3',
+    title: 'Switch to Graph 3',
     keywords: graphSwitchKeywords,
     keybinding: 'Mod-3',
   },
   'graph.switch4': {
-    title: 'Switch to graph 4',
+    title: 'Switch to Graph 4',
     keywords: graphSwitchKeywords,
     keybinding: 'Mod-4',
   },
   'graph.switch5': {
-    title: 'Switch to graph 5',
+    title: 'Switch to Graph 5',
     keywords: graphSwitchKeywords,
     keybinding: 'Mod-5',
   },
   'graph.switch6': {
-    title: 'Switch to graph 6',
+    title: 'Switch to Graph 6',
     keywords: graphSwitchKeywords,
     keybinding: 'Mod-6',
   },
   'graph.switch7': {
-    title: 'Switch to graph 7',
+    title: 'Switch to Graph 7',
     keywords: graphSwitchKeywords,
     keybinding: 'Mod-7',
   },
   'graph.switch8': {
-    title: 'Switch to graph 8',
+    title: 'Switch to Graph 8',
     keywords: graphSwitchKeywords,
     keybinding: 'Mod-8',
   },
   'graph.switch9': {
-    title: 'Switch to graph 9',
+    title: 'Switch to Graph 9',
     keywords: graphSwitchKeywords,
     keybinding: 'Mod-9',
   },
   'nav.today': {
-    title: 'Go to today',
+    title: 'Go to Today',
     keywords: ['daily', 'now'],
     keybinding: 'Mod-d',
   },
   'nav.allNotes': {
-    title: 'All notes',
+    title: 'All Notes',
     keywords: ['notes', 'list', 'browse', 'library'],
     keybinding: 'Mod-Shift-a',
   },
@@ -139,27 +139,27 @@ export const APP_COMMANDS = {
     keybinding: 'Mod-t',
   },
   'note.new': {
-    title: 'New note',
+    title: 'New Note',
     keywords: ['create'],
     keybinding: 'Mod-n',
   },
   'note.openInNewWindow': {
-    title: 'Open note in new window',
+    title: 'Open Note in New Window',
     keywords: ['window', 'duplicate', 'pop out'],
     keybinding: 'Mod-Shift-o',
   },
   'note.find': {
-    title: 'Find in note…',
+    title: 'Find in Note…',
     keywords: ['search', 'text', 'page'],
     keybinding: 'Mod-f',
   },
   'note.findNext': {
-    title: 'Find next',
+    title: 'Find Next',
     keywords: ['search', 'match', 'forward'],
     keybinding: 'Mod-g',
   },
   'note.findPrevious': {
-    title: 'Find previous',
+    title: 'Find Previous',
     keywords: ['search', 'match', 'backward'],
     keybinding: 'Mod-Shift-g',
   },
@@ -169,7 +169,7 @@ export const APP_COMMANDS = {
     keybinding: 'Mod-j',
   },
   'chat.new': {
-    title: 'New chat',
+    title: 'New Chat',
     keywords: ['ai', 'assistant', 'copilot', 'conversation'],
     keybinding: 'Mod-Shift-n',
   },
@@ -187,7 +187,7 @@ export const APP_COMMANDS = {
     keybinding: 'Mod-k',
   },
   'note.togglePin': {
-    title: 'Pin or unpin note',
+    title: 'Pin or Unpin Note',
     keywords: ['pinned', 'favorite', 'bookmark', 'sidebar'],
     // The original app's pin shortcut.
     keybinding: 'Mod-o',
@@ -195,62 +195,62 @@ export const APP_COMMANDS = {
   // No default keybinding for the next three: the palette keeps them
   // keyboard-reachable without spending a shortcut.
   'note.togglePrivate': {
-    title: 'Mark or un-mark note as private',
+    title: 'Mark or Unmark Note as Private',
     keywords: ['privacy', 'lock', 'secret', 'hide', 'ai'],
   },
   'note.publishGist': {
-    title: 'Share with private link',
+    title: 'Share with Private Link',
     keywords: ['gist', 'github', 'share', 'publish', 'private link', 'export'],
   },
   'note.attachFile': {
-    title: 'Attach file…',
+    title: 'Attach File…',
     keywords: ['upload', 'attachment', 'import', 'pdf', 'document', 'insert'],
   },
   'note.copyDeepLink': {
-    title: 'Copy deep link',
+    title: 'Copy Deep Link',
     keywords: ['url', 'share', 'clipboard', 'reflect://', 'address'],
     // The original app's copy-link shortcut.
     keybinding: 'Alt-Mod-l',
   },
   'note.copyPath': {
-    title: 'Copy note path',
+    title: 'Copy Note Path',
     keywords: ['file', 'absolute', 'filesystem', 'clipboard', 'location'],
     // Finder's Copy-as-Pathname chord.
     keybinding: 'Alt-Mod-c',
   },
   'note.print': {
-    title: 'Print note…',
+    title: 'Print Note…',
     keywords: ['printer', 'paper', 'pdf', 'export'],
     keybinding: 'Mod-p',
   },
   'note.random': {
-    title: 'Open random note',
+    title: 'Open Random Note',
     keywords: ['shuffle', 'serendipity'],
   },
   'template.insert': {
-    title: 'Insert template…',
+    title: 'Insert Template…',
     keywords: ['snippet', 'boilerplate', 'stamp'],
   },
   'template.new': {
-    title: 'New template',
+    title: 'New Template',
     keywords: ['template', 'snippet', 'boilerplate', 'create'],
   },
   'audioMemo.toggle': {
-    title: 'Record audio memo',
+    title: 'Record Audio Memo',
     keywords: ['voice', 'mic', 'dictate', 'transcribe', 'speech', 'capture'],
     keybinding: 'Mod-Shift-r',
   },
   'theme.toggle': {
-    title: 'Toggle theme',
+    title: 'Toggle Theme',
     keywords: ['dark', 'light', 'appearance'],
   },
   'sidebar.toggle': {
-    title: 'Toggle sidebar',
+    title: 'Toggle Sidebar',
     keywords: ['collapse', 'expand', 'navigation', 'focus'],
     keybinding: 'Mod-\\',
   },
   'settings.open': {
-    title: 'Open settings',
+    title: 'Open Settings',
     keywords: ['preferences', 'config', 'options'],
     keybinding: 'Mod-,',
   },
@@ -259,20 +259,20 @@ export const APP_COMMANDS = {
     keywords: ['changelog', 'release notes', 'update', 'version'],
   },
   'shortcuts.show': {
-    title: 'Keyboard shortcuts',
+    title: 'Keyboard Shortcuts',
     keywords: ['cheat', 'sheet', 'keys', 'bindings', 'hotkeys', 'help'],
     keybinding: 'Mod-/',
   },
   'semantic.enable': {
-    title: 'Enable semantic search',
+    title: 'Enable Semantic Search',
     keywords: ['embeddings', 'ai', 'similar', 'model'],
   },
   'index.rebuild': {
-    title: 'Rebuild search index',
+    title: 'Rebuild Search Index',
     keywords: ['reindex', 'refresh'],
   },
   'dev.toggleDevtools': {
-    title: 'Developer tools',
+    title: 'Developer Tools',
     keywords: ['devtools', 'inspector', 'debug', 'console', 'inspect', 'web inspector'],
     keybinding: 'Mod-Shift-i',
   },

@@ -39,10 +39,10 @@ export function useNoteActions(path: string, onDeleted: () => void): NoteActions
   const { row: noteRow, settled: privacyReady } = useNoteRowState(path)
   const isPrivate = noteRow?.isPrivate ?? false
   const privacyActionLabel = !privacyReady
-    ? 'Loading privacy…'
+    ? 'Loading Privacy…'
     : isPrivate
-      ? 'Unlock note'
-      : 'Lock note'
+      ? 'Unlock Note'
+      : 'Lock Note'
   // Set while a delete runs, so a second confirm waits.
   const deletingRef = useRef(false)
 

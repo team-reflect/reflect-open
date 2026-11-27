@@ -1,4 +1,4 @@
-import { APP_COMMANDS } from '@reflect/app'
+import { APP_COMMANDS, formatRevealLabel } from '@reflect/app'
 import { useRef, useState, type ReactElement } from 'react'
 import type { GraphInfo, GitSyncState } from '@reflect/core'
 import { FolderOpen, GraduationCap, LocateFixed, PanelsTopLeft, Settings } from 'lucide-react'
@@ -90,7 +90,7 @@ interface GraphFooterProps {
 export function GraphFooter({ graph }: GraphFooterProps): ReactElement {
   const [appsOpen, setAppsOpen] = useState(false)
   const graphTriggerRef = useRef<HTMLButtonElement>(null)
-  const { logger } = useCoreServices()
+  const { logger, platform } = useCoreServices()
   const { opener, window: appWindow, commands } = useAppServices()
   const recents = useGraphRecents()
   const indexing = useGraphIndexing()
@@ -158,13 +158,13 @@ export function GraphFooter({ graph }: GraphFooterProps): ReactElement {
             className={MENU_ITEM_CLASS}
           >
             <LocateFixed aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
-            <span className="min-w-0 flex-1 truncate">Reveal graph in Finder</span>
+            <span className="min-w-0 flex-1 truncate">{formatRevealLabel(platform, 'Graph')}</span>
           </DropdownMenuItem>
           {/* Graph switching re-roots every window; note windows hide it. */}
           {appWindow.isMainWindow() ? (
             <DropdownMenuItem onClick={() => void chooseGraph()} className={MENU_ITEM_CLASS}>
               <FolderOpen aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">Open another graph…</span>
+              <span className="min-w-0 flex-1 truncate">Open Another Graph…</span>
             </DropdownMenuItem>
           ) : null}
           <DropdownMenuSeparator />
@@ -179,7 +179,7 @@ export function GraphFooter({ graph }: GraphFooterProps): ReactElement {
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setAppsOpen(true)} className={MENU_ITEM_CLASS}>
             <PanelsTopLeft aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
-            <span className="min-w-0 flex-1 truncate">Get Reflect apps…</span>
+            <span className="min-w-0 flex-1 truncate">Get Reflect Apps…</span>
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => opener.openUrlSync('https://reflect.academy')}
