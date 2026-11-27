@@ -84,6 +84,7 @@ export interface NativeAppMenu {
   assignNsAppRoles(): MaybePromise<void>
 }
 
+// FIXME: create separate types for "action" "separator" "submenu" and union them into ContextMenuItem. by doing this, you do not need to write Extract<ContextMenuItem, { type: 'action' }> anymore. Remove all Extract<ContextMenuItem, ...> from the codebase.
 export type ContextMenuItem =
   | {
       type: 'action'
