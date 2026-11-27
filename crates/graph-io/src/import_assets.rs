@@ -12,7 +12,7 @@
 //! transient, so the whole import aborts *before any graph write* and the user
 //! can simply retry.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -508,67 +508,40 @@ pub struct PlannedAssetName {
     pub reuse: bool,
 }
 
-/// Asset names the import has claimed, plus the first unclaimed collision
-/// suffix per desired name so repeated probes skip claimed names in O(1).
-#[derive(Default)]
-pub struct TakenAssetNames {
-    names: HashSet<String>,
-    first_unclaimed: HashMap<String, u64>,
-}
-
-impl TakenAssetNames {
-    pub fn new(names: HashSet<String>) -> Self {
-        Self {
-            names,
-            first_unclaimed: HashMap::new(),
-        }
-    }
-}
-
 pub fn plan_asset_name(
     assets_dir: &Path,
     desired: &str,
     staged: &Path,
-    taken: &mut TakenAssetNames,
+    taken: &std::collections::HashSet<String>,
 ) -> AppResult<PlannedAssetName> {
     let (stem, extension) = match desired.rfind('.') {
         Some(index) if index > 0 => desired.split_at(index),
         _ => (desired, ""),
     };
-    let candidate_for = |attempt: u64| {
-        if attempt == 1 {
+    let mut attempt = 0u64;
+    loop {
+        attempt += 1;
+        let candidate = if attempt == 1 {
             desired.to_string()
         } else {
             format!("{stem}-{attempt}{extension}")
-        }
-    };
-    let mut first_unclaimed = taken.first_unclaimed.get(desired).copied().unwrap_or(1);
-    while taken.names.contains(&candidate_for(first_unclaimed)) {
-        first_unclaimed += 1;
-    }
-    taken
-        .first_unclaimed
-        .insert(desired.to_string(), first_unclaimed);
-    let mut attempt = first_unclaimed;
-    loop {
-        let candidate = candidate_for(attempt);
-        attempt += 1;
-        if taken.names.contains(&candidate) {
+        };
+        if taken.contains(&candidate) {
             continue;
         }
         let target = assets_dir.join(&candidate);
-        let reuse = if !target.exists() && !super::io::file_occupied(&target) {
-            false
-        } else if target.is_file() && same_file_bytes(&target, staged)? {
-            true
-        } else {
-            continue;
-        };
-        taken.names.insert(candidate.clone());
-        return Ok(PlannedAssetName {
-            name: candidate,
-            reuse,
-        });
+        if !target.exists() && !super::io::file_occupied(&target) {
+            return Ok(PlannedAssetName {
+                name: candidate,
+                reuse: false,
+            });
+        }
+        if target.is_file() && same_file_bytes(&target, staged)? {
+            return Ok(PlannedAssetName {
+                name: candidate,
+                reuse: true,
+            });
+        }
     }
 }
 
@@ -598,6 +571,7 @@ pub fn persist_planned(fetched: FetchedAsset, assets_dir: &Path, name: &str) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
     use std::fs;
     use tempfile::tempdir;
 
@@ -751,7 +725,7 @@ mod tests {
             &assets,
             "photo.webp",
             &dir.path().join("staged"),
-            &mut TakenAssetNames::default(),
+            &HashSet::new(),
         )
         .unwrap();
         assert_eq!(planned.name, "photo.webp");
@@ -761,15 +735,15 @@ mod tests {
             &assets,
             "photo.webp",
             &dir.path().join("other"),
-            &mut TakenAssetNames::default(),
+            &HashSet::new(),
         )
         .unwrap();
         assert_eq!(planned.name, "photo-2.webp");
         assert!(!planned.reuse);
 
-        let mut taken = TakenAssetNames::new(HashSet::from(["photo-2.webp".to_string()]));
+        let taken = HashSet::from(["photo-2.webp".to_string()]);
         let planned =
-            plan_asset_name(&assets, "photo.webp", &dir.path().join("other"), &mut taken).unwrap();
+            plan_asset_name(&assets, "photo.webp", &dir.path().join("other"), &taken).unwrap();
         assert_eq!(planned.name, "photo-3.webp");
         assert!(!planned.reuse);
     }
@@ -782,13 +756,13 @@ mod tests {
         fs::write(assets.join("image.png"), b"existing").unwrap();
         fs::write(dir.path().join("staged"), b"new").unwrap();
 
-        let mut taken = TakenAssetNames::default();
+        let mut taken = HashSet::new();
         for attempt in 2..=1500 {
             let planned =
-                plan_asset_name(&assets, "image.png", &dir.path().join("staged"), &mut taken)
-                    .unwrap();
+                plan_asset_name(&assets, "image.png", &dir.path().join("staged"), &taken).unwrap();
             assert_eq!(planned.name, format!("image-{attempt}.png"));
             assert!(!planned.reuse);
+            taken.insert(planned.name);
         }
     }
 }
