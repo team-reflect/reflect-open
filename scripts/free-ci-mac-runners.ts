@@ -2,7 +2,7 @@
 // waits for one, so that the macOS runners go to master. GitHub cancels a whole
 // run, so re-run the pull request when master is done.
 //
-//   node scripts/free-ci-mac-runners.ts [--dry-run]
+//   pnpm free-ci-mac-runners [--dry-run]
 
 import { parseArgs } from 'node:util'
 import { exec } from 'tinyexec'
