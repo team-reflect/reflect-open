@@ -122,6 +122,37 @@ function collectInter(): Entry {
 }
 
 /**
+ * llama.cpp, which `llama-cpp-sys-2` compiles in. cargo-about reports only the
+ * crate's own license.
+ */
+function collectLlamaCpp(): Entry {
+  return {
+    name: 'llama.cpp',
+    ecosystem: 'other',
+    license: 'MIT',
+    url: 'https://github.com/ggml-org/llama.cpp',
+    texts: [readFileSync(join(import.meta.dirname, 'licenses', 'llama.cpp.txt'), 'utf8').trim()],
+  }
+}
+
+/**
+ * EmbeddingGemma, the semantic-search model the app downloads at runtime. The
+ * Gemma Terms of Use (Section 3.1) ask for its notice, the terms, and the use
+ * restrictions to reach every user.
+ */
+function collectEmbeddingGemma(): Entry {
+  return {
+    name: 'EmbeddingGemma',
+    ecosystem: 'other',
+    license: 'Gemma Terms of Use',
+    url: 'https://ai.google.dev/gemma/terms',
+    texts: [
+      readFileSync(join(import.meta.dirname, 'licenses', 'embeddinggemma.txt'), 'utf8').trim(),
+    ],
+  }
+}
+
+/**
  * One entry per package, without versions, so that upgrading a dependency
  * does not change the output unless its license changes. Several installed
  * versions merge into one entry, and so do the per-license entries
@@ -186,7 +217,13 @@ function countCommonPrefix(a: string, b: string): number {
 }
 
 async function main(): Promise<void> {
-  const collected = [...(await collectNpm()), ...(await collectCargo()), collectInter()]
+  const collected = [
+    ...(await collectNpm()),
+    ...(await collectCargo()),
+    collectInter(),
+    collectLlamaCpp(),
+    collectEmbeddingGemma(),
+  ]
   const entries = mergeEntries(collected).toSorted(compareEntries)
 
   // Each distinct text is stored once under its key, and entries refer to
