@@ -274,17 +274,27 @@ fn model_url() -> String {
     )
 }
 
+/// The model file in `models_dir`. The revision in the name keeps a new model
+/// spec from reusing an old file.
+fn model_path(models_dir: &Path) -> PathBuf {
+    models_dir.join(format!("{}-{}", &MODEL.revision[..12], MODEL.file))
+}
+
+/// Whether `path` holds the whole model. A file of another size is damaged.
+async fn model_file_complete(path: &Path) -> bool {
+    tokio::fs::metadata(path)
+        .await
+        .is_ok_and(|meta| meta.len() == MODEL.size)
+}
+
 /// The model file in `models_dir`, downloaded first unless it is there.
 async fn ensure_model_file(
     host: &dyn Host,
     state: &Mutex<Runtime>,
     models_dir: &Path,
 ) -> Result<PathBuf, String> {
-    // The revision in the name keeps a new model spec from reusing an old file.
-    let path = models_dir.join(format!("{}-{}", &MODEL.revision[..12], MODEL.file));
-    // A file of another size is damaged: download it again.
-    let existing = tokio::fs::metadata(&path).await.map(|meta| meta.len());
-    if existing.is_ok_and(|len| len == MODEL.size) {
+    let path = model_path(models_dir);
+    if model_file_complete(&path).await {
         return Ok(path);
     }
     let url = model_url();
@@ -354,12 +364,7 @@ impl Core {
         }
         // Resolve the directory BEFORE flipping to Loading: it's the only step
         // here that may fail without a guaranteed state transition afterwards.
-        let models_dir = self
-            .config
-            .app_data_dir
-            .as_ref()
-            .ok_or_else(|| AppError::io("no app data dir"))?
-            .join("models");
+        let models_dir = self.models_dir()?;
 
         {
             let mut runtime = lock_state(&self.embed)?;
@@ -400,6 +405,15 @@ impl Core {
         };
         emit_status(self.host(), &status);
         Ok(status)
+    }
+
+    /// Whether the model file is on disk, so `embed_ensure` loads it without a
+    /// download.
+    pub async fn embed_model_downloaded(&self) -> AppResult<bool> {
+        if !cpu_supported() {
+            return Ok(false);
+        }
+        Ok(model_file_complete(&model_path(&self.models_dir()?)).await)
     }
 
     /// Drops the context of a `Ready` model and reports `Uninitialized`. The
@@ -468,6 +482,15 @@ impl Core {
             self.index.apply_embeddings(generation, &path, &chunks),
         )?;
         Ok(embedded)
+    }
+
+    fn models_dir(&self) -> AppResult<PathBuf> {
+        Ok(self
+            .config
+            .app_data_dir
+            .as_ref()
+            .ok_or_else(|| AppError::io("no app data dir"))?
+            .join("models"))
     }
 
     fn ready_model(&self) -> AppResult<Arc<Mutex<Model>>> {

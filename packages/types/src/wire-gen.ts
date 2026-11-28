@@ -679,6 +679,10 @@ export type Commands = {
     args: Record<string, never>
     result: null
   }
+  embed_model_downloaded: {
+    args: Record<string, never>
+    result: boolean
+  }
   embed_query: {
     args: {
       text: string
@@ -1420,6 +1424,10 @@ export type Commands = {
     args: NoArgs
     result: null
   }
+  'plugin:network|status': {
+    args: NoArgs
+    result: NetworkStatus
+  }
   'plugin:app-store|get_environment': {
     args: NoArgs
     result: AppStoreEnvironmentReply
@@ -2089,6 +2097,15 @@ export type MovedNoteAddress = {
   basenameKey: string
   /**  Set only for a calendar-valid `daily/YYYY-MM-DD.md` destination. */
   dailyDate: string | null
+}
+
+/**  `plugin:network|status` result, and the `plugin:network:changed` payload. */
+export type NetworkStatus = {
+  /**
+   *  The connection costs the user money or data: cellular, a personal
+   *  hotspot, or Low Data Mode.
+   */
+  expensive: boolean
 }
 
 /**  The arguments of a command that takes none. */

@@ -153,6 +153,14 @@ pub struct WebAuthCallback {
     pub url: Option<String>,
 }
 
+/// `plugin:network|status` result, and the `plugin:network:changed` payload.
+#[derive(Serialize, Deserialize, specta::Type)]
+pub struct NetworkStatus {
+    /// The connection costs the user money or data: cellular, a personal
+    /// hotspot, or Low Data Mode.
+    pub expensive: bool,
+}
+
 /// `plugin:app-store|get_environment` result.
 #[derive(Serialize, Deserialize, specta::Type)]
 pub struct AppStoreEnvironmentReply {
