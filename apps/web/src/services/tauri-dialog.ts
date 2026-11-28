@@ -1,5 +1,5 @@
-import { open } from '@tauri-apps/plugin-dialog'
-import type { DialogService, PickFilesOptions } from '@reflect/app'
+import { ask, open } from '@tauri-apps/plugin-dialog'
+import type { ConfirmOptions, DialogService, PickFilesOptions } from '@reflect/app'
 
 class TauriDialogServiceImpl implements DialogService {
   async pickFiles({
@@ -38,10 +38,14 @@ class TauriDialogServiceImpl implements DialogService {
     })
     return typeof picked === 'string' ? picked : null
   }
+
+  confirm({ title, message, confirm, cancel }: ConfirmOptions): Promise<boolean> {
+    return ask(message, { title, okLabel: confirm, cancelLabel: cancel })
+  }
 }
 
 /**
- * Native open panels through `@tauri-apps/plugin-dialog`.
+ * Native open panels and alerts through `@tauri-apps/plugin-dialog`.
  */
 export function createTauriDialogService(): DialogService {
   return new TauriDialogServiceImpl()

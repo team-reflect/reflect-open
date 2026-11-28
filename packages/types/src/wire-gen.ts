@@ -1428,6 +1428,10 @@ export type Commands = {
     args: NoArgs
     result: NetworkStatus
   }
+  'plugin:mobile-dialog|confirm': {
+    args: DialogConfirmArgs
+    result: boolean
+  }
   'plugin:app-store|get_environment': {
     args: NoArgs
     result: AppStoreEnvironmentReply
@@ -1529,6 +1533,19 @@ export type DailyNoteRow = {
   /**  File modification time (epoch ms). */
   mtime: number
   isPrivate: boolean
+}
+
+/**
+ *  `plugin:mobile-dialog|confirm` arguments: an alert with a title, a
+ *  message, and two buttons. The result is whether the user chose `confirm`.
+ */
+export type DialogConfirmArgs = {
+  title: string
+  message: string
+  /**  The label of the default button. */
+  confirm: string
+  /**  The label of the cancel button. */
+  cancel: string
 }
 
 /**

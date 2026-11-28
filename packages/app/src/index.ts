@@ -198,6 +198,7 @@ export {
   type WindowService,
 } from './app/window-service.ts'
 export {
+  type ConfirmOptions,
   type DialogFilter,
   type DialogService,
   type PickFilesOptions,

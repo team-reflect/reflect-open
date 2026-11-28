@@ -47,12 +47,13 @@ final class AppHost {
     self.recording = recording
     let network = NetworkCapability(emit: emit)
     self.network = network
+    let dialog = DialogCapability { presenter?.window?.rootViewController }
 
     var shellCommands: [ShellCommandName: ShellCommand] = [:]
     for commands in [
       HostCommands.all { url in await UIApplication.shared.open(url) },
       HapticsCapability.commands, webAuth.commands, store.commands, recording.commands,
-      network.commands,
+      network.commands, dialog.commands,
     ] {
       shellCommands.merge(commands) { _, _ in
         preconditionFailure("two capabilities answer the same command")
