@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.21.0-beta.3...v0.21.0-beta.4) (2026-11-28)
+
+
+### Features
+
+* **mobile:** keep the screen on while semantic search indexes ([#2389](https://github.com/team-reflect/reflect-open/issues/2389)) ([c348dbb](https://github.com/team-reflect/reflect-open/commit/c348dbb91fbb5d5ca6866555023062bb557498db))
+
 ## [0.21.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.21.0-beta.2...v0.21.0-beta.3) (2026-11-28)
 
 
