@@ -13,6 +13,7 @@ import {
   type TestDatabaseService,
   type TestLoggerService,
   type TestNoteFileService,
+  typeIntoSession,
 } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import type { NoteEditorHandle } from './note-editor.tsx'
@@ -172,7 +173,7 @@ describe('useNoteSession', () => {
     await act(() => clock.advance(0))
     expect(hook.result.current.snapshot.status).toBe('ready')
 
-    await act(() => hook.result.current.session.editorChanged('# Hello edited\n'))
+    await act(() => typeIntoSession(hook.result.current.session, '# Hello edited\n'))
     expect(hook.result.current.snapshot.dirty).toBe(true)
     expect(writes()).toEqual([])
 
@@ -186,7 +187,7 @@ describe('useNoteSession', () => {
     await act(() => clock.advance(0))
     expect(hook.result.current.snapshot.status).toBe('ready')
 
-    await act(() => hook.result.current.session.editorChanged('# Hello\n\nQuitting\n'))
+    await act(() => typeIntoSession(hook.result.current.session, '# Hello\n\nQuitting\n'))
     expect(writes()).toEqual([]) // still inside the 800ms debounce window
 
     // The quit path: the registry flush settles only once the write has
@@ -200,7 +201,7 @@ describe('useNoteSession', () => {
     const hook = await readyHook()
     const editor = fakeEditor()
     const getMarkdown = vi.fn(() => {
-      hook.result.current.session.editorChanged('# Hello\n\n🧠 Business ideas\n')
+      hook.result.current.session.editorChanged()
       return '# Hello\n\n🧠 Business ideas\n'
     })
     editor.getMarkdown = getMarkdown
@@ -217,7 +218,7 @@ describe('useNoteSession', () => {
   it('unmounting flushes the edit and keeps the session for the next mount', async () => {
     const hook = await readyHook()
     const { session } = hook.result.current
-    await act(() => session.editorChanged('# Hello\n\nEdited\n'))
+    await act(() => typeIntoSession(session, '# Hello\n\nEdited\n'))
     await hook.unmount()
     await act(async () => {})
     expect(writes()).toEqual(['# Hello\n\nEdited\n'])
@@ -245,7 +246,7 @@ describe('useNoteSession', () => {
     await act(() => clock.advance(0))
     expect(hook.result.current.snapshot.status).toBe('ready')
 
-    await act(() => hook.result.current.session.editorChanged('# New Title\n'))
+    await act(() => typeIntoSession(hook.result.current.session, '# New Title\n'))
     await act(() => clock.advance(1000)) // the rename save lands
 
     // A settle point (window blur): the rewrite fires without waiting out the
@@ -274,7 +275,7 @@ describe('useNoteSession', () => {
     expect(hook.result.current.snapshot.status).toBe('ready')
     const sessionBefore = hook.result.current.session
 
-    await act(() => hook.result.current.session.editorChanged('# New Title\n'))
+    await act(() => typeIntoSession(hook.result.current.session, '# New Title\n'))
     await act(() => clock.advance(1000)) // save lands
     await act(() => runAllTimers()) // quiet period → rename + move
 
@@ -296,7 +297,7 @@ describe('useNoteSession', () => {
     expect(hook.result.current.snapshot.path).toBe('notes/new-title.md')
 
     // Subsequent edits land on the new path only — nothing resurrects a.md.
-    await act(() => hook.result.current.session.editorChanged('# New Title\n\nmore\n'))
+    await act(() => typeIntoSession(hook.result.current.session, '# New Title\n\nmore\n'))
     await act(() => clock.advance(1000))
     expect(file('notes/new-title.md')).toContain('# New Title\n\nmore\n')
     expect(file('notes/a.md')).toBeUndefined()
@@ -335,7 +336,7 @@ describe('useNoteSession', () => {
 
     // Dirty edit, then switch notes before the debounce fires: the unmount
     // flush must persist the OLD note's buffer to the OLD path.
-    await act(() => hook.result.current.session.editorChanged('# Unsaved on A\n'))
+    await act(() => typeIntoSession(hook.result.current.session, '# Unsaved on A\n'))
     await hook.rerender({ path: 'notes/b.md' })
     await act(() => clock.advance(2000))
 
@@ -395,7 +396,7 @@ describe('useNoteSession', () => {
     // pane. The dirty buffer must survive (no dispose/reload-from-disk) and
     // the pending save must carry the NEW generation — a stale one would be
     // rejected by Rust and the edit silently lost.
-    await act(() => hook.result.current.session.editorChanged('# Unsaved\n'))
+    await act(() => typeIntoSession(hook.result.current.session, '# Unsaved\n'))
     await act(() => core.graphSession.setGraph({ generation: 2 }))
     expect(hook.result.current.snapshot.dirty).toBe(true)
 

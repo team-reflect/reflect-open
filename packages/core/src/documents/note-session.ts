@@ -75,9 +75,18 @@ class NoteSessionImpl implements ManagedNoteSession {
 
   // Pipeline state.
   /**
-   * The **body** as of the last editor change (the editor never sees frontmatter).
+   * The **body** as of the last pull from the editor (the editor never sees frontmatter).
    */
   #buffer = ''
+  /**
+   * True when the editor document changed after `#buffer` was last pulled.
+   */
+  #bufferStale = false
+  /**
+   * True when the editor reported its serialization of content we pushed into
+   * it, and `#buffer` does not hold that serialization yet.
+   */
+  #appliedStale = false
   /**
    * The exact frontmatter bytes (with delimiters), `''` when none.
    */
@@ -170,6 +179,7 @@ class NoteSessionImpl implements ManagedNoteSession {
   }
 
   editorSeed(): string | null {
+    this.#pullBuffer(false)
     return this.#status === 'ready' && !this.#isProtected ? this.#buffer : null
   }
 
@@ -183,20 +193,23 @@ class NoteSessionImpl implements ManagedNoteSession {
   }
 
   attachEditor(editor: NoteSessionEditor): Unlisten {
+    this.#pullBuffer(false)
     this.#editor = editor
     return () => {
       if (this.#editor === editor) {
-        this.#reconcilePendingEditorInput()
+        this.#pullBuffer(true)
         this.#editor = null
       }
     }
   }
 
   liveContent(): string | null {
+    this.#pullBuffer(false)
     return this.#status === 'ready' ? this.#header + this.#buffer : null
   }
 
   isDirty(): boolean {
+    this.#pullBuffer(false)
     return this.#dirty
   }
 
@@ -246,6 +259,7 @@ class NoteSessionImpl implements ManagedNoteSession {
         // step can run behind a slow prior write, during which the user may
         // have reverted or kept typing, or the session may have been discarded
         // for a delete.
+        this.#pullBuffer(false)
         if (this.#discarded || this.#deleting || !this.#dirty || this.#isProtected) {
           return
         }
@@ -264,6 +278,7 @@ class NoteSessionImpl implements ManagedNoteSession {
             this.#disk = content
             this.#diskHash = result.hash
             this.#writeBase = content
+            this.#pullBuffer(false)
             this.#dirty = this.#header + this.#buffer !== content
             this.#emit()
             this.#onContent?.(content, 'saved')
@@ -298,6 +313,7 @@ class NoteSessionImpl implements ManagedNoteSession {
     // (it may still hold a pending rename); any other title comes from elsewhere.
     const keptTitle = this.#titleOf(merged) === this.#titleOf(sent)
     this.#onContent?.(merged, keptTitle ? 'saved' : 'external')
+    this.#pullBuffer(false)
     if (this.#header + this.#buffer !== sent) {
       // Keystrokes arrived during the write. They were typed on `sent`, so the
       // next save names it as the base and merges them with the file again.
@@ -337,7 +353,7 @@ class NoteSessionImpl implements ManagedNoteSession {
   }
 
   flush(): Promise<void> {
-    this.#reconcilePendingEditorInput()
+    this.#pullBuffer(true)
     this.#cancelScheduledSave()
     this.#save(true)
     return this.#settleSaves()
@@ -354,7 +370,7 @@ class NoteSessionImpl implements ManagedNoteSession {
     } while (chain !== this.#saveChain)
   }
 
-  editorChanged(markdown: string): void {
+  editorChanged(): void {
     if (this.#applyingContent) {
       // This change is our own `#applyToEditor` pushing disk content, not a user
       // edit. The editor's serialization may normalize (trailing newline, loose
@@ -362,10 +378,38 @@ class NoteSessionImpl implements ManagedNoteSession {
       // or schedule a save, or a reload would rewrite a file the user never
       // touched. Track the serialized form; dirtiness resumes with the next
       // real edit.
-      this.#buffer = markdown
+      this.#appliedStale = true
+      return
+    }
+    // The save pulls the Markdown; until then the note counts as dirty.
+    this.#bufferStale = true
+    this.#dirty = true
+    this.#emit()
+    this.#scheduleSave()
+  }
+
+  /**
+   * Read the editor's Markdown into `#buffer` when the editor changed since
+   * the last read, and settle `#dirty` against the disk after an edit. With `reconcile`, the
+   * editor first reports native input it has not reported yet.
+   */
+  #pullBuffer(reconcile: boolean): void {
+    if (!reconcile && !this.#bufferStale && !this.#appliedStale) {
+      return
+    }
+    // Pending native input arrives through `editorChanged` before this returns.
+    const markdown = this.#editor?.getMarkdown()
+    const edited = this.#bufferStale
+    const applied = this.#appliedStale
+    this.#bufferStale = false
+    this.#appliedStale = false
+    if (markdown === undefined || (!edited && !applied)) {
       return
     }
     this.#buffer = markdown
+    if (!edited) {
+      return
+    }
     this.#dirty = this.#header + markdown !== this.#disk
     if (!this.#dirty) {
       this.#writeBase = this.#disk
@@ -378,9 +422,6 @@ class NoteSessionImpl implements ManagedNoteSession {
       this.#dirty = false
     }
     this.#emit()
-    if (this.#dirty) {
-      this.#scheduleSave()
-    }
   }
 
   /**
@@ -398,14 +439,6 @@ class NoteSessionImpl implements ManagedNoteSession {
   }
 
   /**
-   * Let the editor report native input it has not reported yet. The returned
-   * Markdown is discarded: a normalized but unchanged document is not an edit.
-   */
-  #reconcilePendingEditorInput(): void {
-    this.#editor?.getMarkdown()
-  }
-
-  /**
    * Adopt `content`, the file text with hash `hash`, as the new clean
    * document state, re-gating protection.
    */
@@ -413,6 +446,8 @@ class NoteSessionImpl implements ManagedNoteSession {
     const doc = splitDoc(content)
     this.#header = doc.header
     this.#buffer = doc.body
+    this.#bufferStale = false
+    this.#appliedStale = false
     this.#disk = content
     this.#diskHash = hash
     this.#writeBase = content
@@ -444,6 +479,7 @@ class NoteSessionImpl implements ManagedNoteSession {
       ;({ content, hash } = await this.#read())
     } catch (cause) {
       if (isAppError(cause) && cause.kind === 'notFound') {
+        this.#pullBuffer(false)
         if (resetIfGone && !this.#dirty && !this.#missing && !this.#disposed) {
           this.#adoptGone(cause)
           return
@@ -453,6 +489,7 @@ class NoteSessionImpl implements ManagedNoteSession {
       }
       return // preserve the buffer if the file disappeared or cannot be read
     }
+    this.#pullBuffer(false)
     if (content === this.#disk || content === this.#inFlightWrite) {
       // Nothing to reconcile (stale, or an echo of our own possibly
       // still-settling save) — but a successful read of a previously-missing
@@ -615,6 +652,7 @@ class NoteSessionImpl implements ManagedNoteSession {
     if (this.#disposed || this.#isProtected || this.#status !== 'ready') {
       return false
     }
+    this.#pullBuffer(false)
     this.#header = splitDoc(
       upsertFrontmatter(this.#header + this.#buffer, frontmatterPatchToYaml(patch)),
     ).header
@@ -644,6 +682,7 @@ class NoteSessionImpl implements ManagedNoteSession {
       if (this.#header === attemptedHeader) {
         this.#header = previousHeader
       }
+      this.#pullBuffer(false)
       this.#dirty = this.#header + this.#buffer !== this.#disk
       this.#emit()
       throw cause
@@ -660,7 +699,7 @@ class NoteSessionImpl implements ManagedNoteSession {
     if (this.#disposed || this.#isProtected || this.#status !== 'ready') {
       return null
     }
-    this.#reconcilePendingEditorInput()
+    this.#pullBuffer(true)
     const previousHeader = this.#header
     const previousBuffer = this.#buffer
     const source = this.#header + this.#buffer
@@ -669,6 +708,7 @@ class NoteSessionImpl implements ManagedNoteSession {
     this.#header = doc.header
     this.#buffer = doc.body
     this.#applyToEditor(doc.body) // an already open editor shows the edited line
+    this.#pullBuffer(false)
     const applied = this.#buffer
     this.#dirty = this.#header + this.#buffer !== this.#disk
     // A no-op edit (transform changed nothing) writes nothing, so a *prior*
@@ -681,6 +721,7 @@ class NoteSessionImpl implements ManagedNoteSession {
     if (shouldPersist && this.#error !== null) {
       const message = this.#error
       if (this.#header === doc.header) this.#header = previousHeader
+      this.#pullBuffer(false)
       if (this.#buffer === applied) {
         this.#buffer = previousBuffer
         this.#applyToEditor(previousBuffer)
@@ -719,7 +760,7 @@ class NoteSessionImpl implements ManagedNoteSession {
       return
     }
     this.#deleting = false
-    if (!this.#disposed && this.#dirty) {
+    if (!this.#disposed && this.isDirty()) {
       this.#scheduleSave()
     }
   }

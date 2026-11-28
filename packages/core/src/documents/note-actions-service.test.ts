@@ -13,6 +13,7 @@ import {
   type TestNoteSessionOptions,
   createTestNoteSessionService,
   createTestNoteDocumentService,
+  typeIntoSession,
 } from '../testing/documents.ts'
 import {
   createTestGraphSessionService,
@@ -680,7 +681,7 @@ describe('trash', () => {
     const deleteFile = vi.spyOn(files, 'delete')
     void session.revalidate()
     await vi.waitFor(() => expect(snapshots.at(-1)?.status).toBe('ready'))
-    session.editorChanged('# Draft\n')
+    typeIntoSession(session, '# Draft\n')
     const flush = session.flush()
     await writeStarted.promise
 

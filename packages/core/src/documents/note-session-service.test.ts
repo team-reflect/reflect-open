@@ -17,6 +17,7 @@ import {
   createTestGraphSessionService,
   type TestGraphSessionService,
 } from '../testing/graph-session.ts'
+import { typeIntoSession } from '../testing/documents.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createNoteSessionService, type SessionCoordinator } from './note-session-service.ts'
 import type { NoteSession, NoteSessionService } from './note-session-types.ts'
@@ -136,7 +137,7 @@ describe('an unobserved session', () => {
   it('keeps its text when the last view leaves, and shows it to the next view at once', async () => {
     const session = noteSessions.sessionFor(PATH)
     const unlisten = await observe(session)
-    session.editorChanged('# A\n\ntyped\n')
+    typeIntoSession(session, '# A\n\ntyped\n')
     unlisten()
     await settled()
     expect(noteFile.files().get(PATH)).toBe('# A\n\ntyped\n')
@@ -265,7 +266,7 @@ describe('an unobserved session', () => {
     const session = noteSessions.sessionFor(PATH)
     const unlisten = await observe(session)
     const write = vi.spyOn(noteFile, 'write').mockRejectedValueOnce(new Error('disk full'))
-    session.editorChanged('# A\n\ntyped\n')
+    typeIntoSession(session, '# A\n\ntyped\n')
 
     unlisten()
     await settled()
@@ -292,7 +293,7 @@ describe('an unobserved session', () => {
     const dirty = noteSessions.sessionFor(PATH)
     const unlisten = await observe(dirty)
     vi.spyOn(noteFile, 'write').mockRejectedValue(new Error('disk full'))
-    dirty.editorChanged('# A\n\ntyped\n')
+    typeIntoSession(dirty, '# A\n\ntyped\n')
     unlisten()
     await settled()
 
@@ -380,7 +381,7 @@ describe('linked daily notes', () => {
     const session = noteSessions.sessionFor(PATH)
     await observe(session)
 
-    session.editorChanged('# A\n\n[[2026-12-01]]\n')
+    typeIntoSession(session, '# A\n\n[[2026-12-01]]\n')
     await session.flush()
     await vi.waitFor(() => {
       expect(noteFile.files().get(DAY)).toBe('')
@@ -428,7 +429,7 @@ describe('moveSession', () => {
     const occupant = noteSessions.sessionFor('notes/b.md')
     await observe(session)
     await observe(occupant)
-    occupant.editorChanged('# B\n\ntyped\n')
+    typeIntoSession(occupant, '# B\n\ntyped\n')
 
     noteSessions.moveSession(PATH, 'notes/b.md')
     await settled()
@@ -466,7 +467,7 @@ describe('teardown', () => {
   it('flushAll lands every buffer, then settles each coordinator', async () => {
     const session = noteSessions.sessionFor(PATH)
     await observe(session)
-    session.editorChanged('# A\n\ntyped\n')
+    typeIntoSession(session, '# A\n\ntyped\n')
 
     await noteSessions.flushAll()
 
@@ -477,7 +478,7 @@ describe('teardown', () => {
   it('releaseAll flushes and forgets every session', async () => {
     const session = noteSessions.sessionFor(PATH)
     await observe(session)
-    session.editorChanged('# A\n\ntyped\n')
+    typeIntoSession(session, '# A\n\ntyped\n')
 
     noteSessions.releaseAll()
     await settled()
