@@ -49,7 +49,7 @@ runs:
     # mbx replays a cached build-script run, OUT_DIR included. The OUT_DIR of
     # llama-cpp-sys-2 holds a CMake build directory with absolute paths, so a
     # replay in another checkout fails.
-    # https://github.com/jdx/mr-boxington/blob/v1.30.0/docs/limits.md#build-script-execution-follows-cargos-freshness-inputs
+    # https://github.com/jdx/mr-boxington/blob/v1.31.0/docs/limits.md#build-script-execution-follows-cargos-freshness-inputs
     - name: Run build scripts without the mbx cache
       shell: bash
       run: echo "MBX_BUILD_SCRIPT_EXECUTION=0" >> "$GITHUB_ENV"
@@ -57,7 +57,7 @@ runs:
     # mbx moves OUT_DIR to a directory that the clippy and test target
     # directories share. The CMake cache of llama-cpp-sys-2 records one target
     # directory, so the second build fails. This keeps Cargo's own OUT_DIR.
-    # https://github.com/jdx/mr-boxington/blob/v1.30.0/docs/limits.md#out-dir-sharing
+    # https://github.com/jdx/mr-boxington/blob/v1.31.0/docs/limits.md#out-dir-sharing
     - name: Keep OUT_DIR in each target directory
       shell: bash
       run: echo "MBX_SHARE_OUT_DIR=0" >> "$GITHUB_ENV"
@@ -71,7 +71,7 @@ runs:
         cache-links: ${{ inputs.cache-links }}
         github-cache-mode: objects
         cache-key: |
-          mbx-v3/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/${{ hashFiles('Cargo.lock') }}
+          mbx-v4/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/${{ hashFiles('Cargo.lock') }}
         restore-keys: |
-          mbx-v3/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/
+          mbx-v4/${{ runner.os }}/${{ runner.arch }}/${{ inputs.cache-scope }}/
         save-on-workflow-dispatch: true
