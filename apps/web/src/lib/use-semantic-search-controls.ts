@@ -4,7 +4,8 @@ import { useStore } from '@/lib/use-store.ts'
 import { useSemanticSearchEnabled, useSettingsService } from '@/providers/settings-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
-export const SEMANTIC_SEARCH_DESCRIPTION = 'Find notes by meaning, not just keywords.'
+export const SEMANTIC_SEARCH_DESCRIPTION =
+  'Find notes by meaning, not just keywords. Enabling it downloads a model of about 330 MB.'
 
 const DOWNLOAD_CONSENT = {
   title: 'Download over cellular?',
