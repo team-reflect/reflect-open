@@ -10,6 +10,7 @@ pub mod editor_link_preview;
 pub mod fs;
 mod git;
 pub mod icloud;
+mod json_store;
 mod link_preview;
 pub mod logging;
 pub mod recents;
