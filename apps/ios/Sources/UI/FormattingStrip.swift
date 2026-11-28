@@ -41,6 +41,9 @@ final class FormattingStrip: UIView {
       2 * contentInset + 2 * dividerSpacing + dividerWidth + dismissWidth
   }
 
+  /// The height of the strip, in points.
+  static let height = Metrics.height
+
   private static let items: [Item] = [
     Item(command: .slash, icon: "slash.circle", label: "Slash command"),
     Item(command: .list, icon: "list.bullet", label: "Cycle list style"),

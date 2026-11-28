@@ -24,6 +24,8 @@
     "@ocavue/utils": "^1.13.0",
     "@post-embed/schema": "^0.5.2",
     "@post-embed/types": "^0.5.0",
+    "@prosekit/core": "^0.13.5",
+    "@prosekit/pm": "^0.1.21",
     "@reflect/app": "workspace:*",
     "@reflect/core": "workspace:*",
     "@reflect/design-system": "workspace:*",

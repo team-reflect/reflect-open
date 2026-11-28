@@ -73,12 +73,14 @@ export function MobileShell(): ReactElement {
       {/* The shell yields to the software keyboard by height (Plan 19,
           decision 8): the root ends at the keyboard's top, so every screen's
           layout sees the true visible viewport. Only `position: fixed`
-          elements need `--keyboard-height` themselves. */}
+          elements need `--keyboard-height` themselves. The root extends
+          under the keyboard's accessory view, so the page shows through it. */}
       <div
         className="mobile-shell flex w-screen flex-col"
         style={{
           ...chromeRenderer.shellStyle(form),
-          height: 'calc(100dvh - var(--keyboard-height, 0px))',
+          height:
+            'calc(100dvh - var(--keyboard-height, 0px) + var(--keyboard-accessory-overlap, 0px))',
         }}
       >
         <div className="min-h-0 flex-1">
