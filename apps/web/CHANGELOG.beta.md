@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.21.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.21.0-beta.2...v0.21.0-beta.3) (2026-11-28)
+
+
+### Features
+
+* ask before cellular model downloads ([#2386](https://github.com/team-reflect/reflect-open/issues/2386)) ([8d372d2](https://github.com/team-reflect/reflect-open/commit/8d372d23c1c805ffccbc044061877cea9d4c53d7))
+* **desktop:** embed with llama.cpp and EmbeddingGemma ([#2370](https://github.com/team-reflect/reflect-open/issues/2370)) ([e6bb3a1](https://github.com/team-reflect/reflect-open/commit/e6bb3a1fd342bf20d195c2d4a11dcc977ac641ed))
+* **mobile:** semantic search on iOS ([#2381](https://github.com/team-reflect/reflect-open/issues/2381)) ([fcefe33](https://github.com/team-reflect/reflect-open/commit/fcefe33e9eb5c7f52a501b11f9c50fdacfd13c66))
+* **mobile:** use hybrid search in the All tab and chat ([#2383](https://github.com/team-reflect/reflect-open/issues/2383)) ([1636799](https://github.com/team-reflect/reflect-open/commit/16367998b75d9c08b7659a5c40793a09482ff757))
+
 ## [0.21.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.21.0-beta.1...v0.21.0-beta.2) (2026-11-27)
 
 
