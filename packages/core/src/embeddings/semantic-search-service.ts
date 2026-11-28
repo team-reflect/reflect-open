@@ -108,7 +108,7 @@ export interface SemanticSearchService {
   similarNotes(path: string): Promise<RetrievalHit[]>
   /**
    * The progress of the current follow's first backfill, `null` while no
-   * follow runs.
+   * follow runs and until that backfill embeds a note.
    */
   readonly progress: Store<EmbeddingProgress | null>
   /**
@@ -277,8 +277,9 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
                 generation: target.generation,
                 fileGeneration: target.fileGeneration,
                 modelId: target.modelId,
-                onProgress: (done, total) => {
-                  if (id === followId) {
+                // A pass that only re-checks embedded notes stays silent.
+                onProgress: (done, total, embedded) => {
+                  if (id === followId && embedded > 0) {
                     this.#progress.set({ done, total })
                   }
                 },

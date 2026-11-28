@@ -341,8 +341,8 @@ export interface TestEmbeddingIndexServiceOptions {
   clock?: ClockService
   /**
    * Write chunk sets into this database, so later passes and retrieval read
-   * them back. Every chunk gets a new vector: the native writer's reuse of
-   * stored vectors is not modeled. Without it, writes are only recorded.
+   * them back. Every chunk gets a new vector. Without it, writes are only
+   * recorded.
    */
   storeChunksIn?: TestDatabaseService
   /**
@@ -384,6 +384,7 @@ class TestEmbeddingIndexServiceImpl implements TestEmbeddingIndexService {
   readonly #removeLog: TestEmbeddingRemove[] = []
   readonly #backfillLog: { generation: number; modelId: string }[] = []
   readonly #followLog: { generation: number; modelId: string }[] = []
+  readonly #storedHashes = new Map<string, ReadonlySet<string>>()
 
   constructor(options?: TestEmbeddingIndexServiceOptions) {
     const store = options?.storeChunksIn ?? null
@@ -405,7 +406,10 @@ class TestEmbeddingIndexServiceImpl implements TestEmbeddingIndexService {
             this.#applyLog.push(apply)
           }
           store?.applyEmbeddings(apply.path, chunks)
-          return chunks.length
+          // Like the native writer, count only chunks whose hash the note did not have.
+          const stored = this.#storedHashes.get(apply.path)
+          this.#storedHashes.set(apply.path, new Set(apply.chunks.map((c) => c.contentHash)))
+          return apply.chunks.filter((chunk) => stored?.has(chunk.contentHash) !== true).length
         },
       },
     })

@@ -308,6 +308,35 @@ describe('start', () => {
     stop()
   })
 
+  it('reports no progress for a backfill that only re-checks embedded notes', async () => {
+    const { semanticSearch, settings, screen, logger } = await setup({
+      notes: [
+        { path: 'notes/a.md', markdown: '# A\n\nAlpha text.\n' },
+        { path: 'notes/b.md', markdown: '# B\n\nBeta text.\n' },
+      ],
+    })
+    const stop = semanticSearch.start()
+    await vi.waitFor(() => expect(semanticSearch.progress.get()).toEqual({ done: 2, total: 2 }))
+    settings.update({ semanticSearchEnabled: false })
+    const seen: unknown[] = []
+    let maxHolds = 0
+    const unsubscribe = semanticSearch.progress.subscribe(() => {
+      seen.push(semanticSearch.progress.get())
+      maxHolds = Math.max(maxHolds, screen.holds())
+    })
+
+    settings.update({ semanticSearchEnabled: true })
+    await vi.waitFor(() => {
+      return expect(
+        logger.getInfos().filter((entry) => entry.message === 'embedding backfill finished'),
+      ).toHaveLength(2)
+    })
+    expect(seen.filter((progress) => progress !== null)).toEqual([])
+    expect(maxHolds).toBe(0)
+    unsubscribe()
+    stop()
+  })
+
   it('keeps the screen on while the first backfill runs', async () => {
     const { semanticSearch, screen } = await setup({
       notes: [
