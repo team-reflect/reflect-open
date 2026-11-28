@@ -1,9 +1,8 @@
-import { useState, type ReactElement, type ReactNode } from 'react'
-import { Info, Sparkles } from 'lucide-react'
+import type { ReactElement, ReactNode } from 'react'
+import { Sparkles } from 'lucide-react'
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import {
   SEMANTIC_SEARCH_DESCRIPTION,
-  semanticSearchDetails,
   semanticSearchStatusLabel,
   useSemanticSearchControls,
   type SemanticSearchPhase,
@@ -55,11 +54,10 @@ function ProgressBar({ phase }: { phase: SemanticSearchPhase }): ReactElement {
  * The search settings: the semantic-search opt-in (Plan 09) and the index
  * rebuild action. The semantic search control follows the same phases as the
  * mobile settings: the model download and the first indexing pass show as a
- * progress bar, and the details sit behind the info button.
+ * progress bar.
  */
 export function SearchSection(): ReactElement {
   const { phase, enable, disable, retry, downloadNow } = useSemanticSearchControls()
-  const [detailsOpen, setDetailsOpen] = useState(false)
 
   let control: ReactNode
   switch (phase.kind) {
@@ -123,33 +121,9 @@ export function SearchSection(): ReactElement {
       )
   }
 
-  const description = (
-    <>
-      {SEMANTIC_SEARCH_DESCRIPTION}{' '}
-      {phase.kind === 'unsupported' ? null : (
-        <button
-          type="button"
-          aria-label="About semantic search"
-          aria-expanded={detailsOpen}
-          onClick={() => setDetailsOpen(!detailsOpen)}
-          className="inline-flex size-4 items-center justify-center rounded-sm align-text-bottom text-text-muted transition-colors duration-100 hover:text-text"
-        >
-          <Info aria-hidden strokeWidth={1.75} className="size-3.5" />
-        </button>
-      )}
-      {detailsOpen && phase.kind !== 'unsupported'
-        ? semanticSearchDetails(phase).map((line) => (
-            <span key={line} className="mt-1 block break-words">
-              {line}
-            </span>
-          ))
-        : null}
-    </>
-  )
-
   return (
     <SettingsSection id="search">
-      <SettingsField legend="Semantic search" description={description}>
+      <SettingsField legend="Semantic search" description={SEMANTIC_SEARCH_DESCRIPTION}>
         <div className="mt-3">{control}</div>
       </SettingsField>
       <DescribeAssetsField />

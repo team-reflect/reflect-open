@@ -275,17 +275,6 @@ describe('MobileSettings', () => {
     await expectSettings(view, { semanticSearchEnabled: true })
   })
 
-  it('shows the model behind the info button', async () => {
-    const embeddingRuntime = createTestEmbeddingRuntimeService({
-      status: { status: 'ready', model: 'embeddinggemma-test' },
-    })
-    await mount({ embeddingRuntime, settings: { semanticSearchEnabled: true } })
-
-    await expect.element(page.getByText('Model: embeddinggemma-test')).not.toBeInTheDocument()
-    await userEvent.click(page.getByRole('button', { name: 'About semantic search' }))
-    await expect.element(page.getByText('Model: embeddinggemma-test')).toBeVisible()
-  })
-
   it('offers to load the model again after a failed load', async () => {
     const embeddingRuntime = createTestEmbeddingRuntimeService({
       status: { status: 'failed', message: 'offline' },

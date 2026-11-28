@@ -23,7 +23,7 @@ export type SemanticSearchPhase =
   | { kind: 'preparing' }
   | { kind: 'downloading'; fraction: number }
   | { kind: 'indexing'; done: number; total: number }
-  | { kind: 'ready'; model: string }
+  | { kind: 'ready' }
   | { kind: 'failed'; message: string }
 
 export interface SemanticSearchControls {
@@ -67,7 +67,7 @@ function phaseOf(
     case 'ready':
       return progress !== null && progress.done < progress.total
         ? { kind: 'indexing', done: progress.done, total: progress.total }
-        : { kind: 'ready', model: status.model }
+        : { kind: 'ready' }
     case 'failed':
       return { kind: 'failed', message: status.message }
     default:
@@ -93,20 +93,6 @@ export function semanticSearchStatusLabel(phase: SemanticSearchPhase): string {
     default:
       return 'Preparing'
   }
-}
-
-/**
- * The text behind the info button: how semantic search works, and the model
- * once it is loaded.
- */
-export function semanticSearchDetails(phase: SemanticSearchPhase): string[] {
-  const details = [
-    'Semantic search runs on this device with a 330 MB model, so your notes stay private.',
-  ]
-  if (phase.kind === 'ready') {
-    details.push(`Model: ${phase.model}`)
-  }
-  return details
 }
 
 /**

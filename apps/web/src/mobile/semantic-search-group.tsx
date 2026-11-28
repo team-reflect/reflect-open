@@ -1,8 +1,6 @@
-import { useState, type ReactElement } from 'react'
-import { Info } from 'lucide-react'
+import type { ReactElement } from 'react'
 import {
   SEMANTIC_SEARCH_DESCRIPTION,
-  semanticSearchDetails,
   semanticSearchStatusLabel,
   useSemanticSearchControls,
 } from '@/lib/use-semantic-search-controls.ts'
@@ -17,12 +15,10 @@ const FOOTER_ID = 'semantic-search-footer'
 
 /**
  * The semantic search group of the mobile settings: the opt-in switch, the
- * status of the model download and the first indexing pass, and the details
- * behind the info button. Hidden where the runtime is `unsupported`.
+ * status of the model download and the first indexing pass. Hidden where the runtime is `unsupported`.
  */
 export function SemanticSearchGroup(): ReactElement | null {
   const { phase, enable, disable, retry, downloadNow } = useSemanticSearchControls()
-  const [detailsOpen, setDetailsOpen] = useState(false)
 
   if (phase.kind === 'unsupported') {
     return null
@@ -30,23 +26,7 @@ export function SemanticSearchGroup(): ReactElement | null {
 
   const footer = (
     <>
-      {SEMANTIC_SEARCH_DESCRIPTION}{' '}
-      <button
-        type="button"
-        aria-label="About semantic search"
-        aria-expanded={detailsOpen}
-        onClick={() => setDetailsOpen(!detailsOpen)}
-        className="inline-flex size-4 items-center justify-center align-text-bottom text-text-secondary"
-      >
-        <Info aria-hidden strokeWidth={2} className="size-3.5" />
-      </button>
-      {detailsOpen
-        ? semanticSearchDetails(phase).map((line) => (
-            <span key={line} className="mt-1 block break-words">
-              {line}
-            </span>
-          ))
-        : null}
+      {SEMANTIC_SEARCH_DESCRIPTION}
       {phase.kind === 'failed' ? (
         <span className="mt-1 block">Couldn’t load the model: {phase.message}</span>
       ) : null}

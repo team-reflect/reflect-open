@@ -637,15 +637,12 @@ describe('SettingsScreen', () => {
     await expect.element(page.getByText('Downloading 50%')).toBeInTheDocument()
   })
 
-  it('shows the downloaded model once ready and persists a disable', async () => {
+  it('shows the ready model and persists a disable', async () => {
     stored = { semanticSearchEnabled: true }
     embedRuntime.setStatus({ status: 'ready', model: TEST_EMBED_MODEL })
     await renderScreen()
 
     await expect.element(page.getByText('Ready', { exact: true })).toBeInTheDocument()
-    expect(page.getByText(`Model: ${TEST_EMBED_MODEL}`).query()).toBeNull()
-    await page.getByRole('button', { name: 'About semantic search' }).click()
-    await expect.element(page.getByText(`Model: ${TEST_EMBED_MODEL}`)).toBeInTheDocument()
 
     await page.getByRole('button', { name: /disable/i }).click()
 
