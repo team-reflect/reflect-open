@@ -2,7 +2,8 @@ import type { ChunkToEmbed } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { NetworkService } from '../ipc/network-service.ts'
-import { createTestNetworkService } from './plugins.ts'
+import type { ScreenService } from '../ipc/screen-service.ts'
+import { createTestNetworkService, createTestScreenService } from './plugins.ts'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
@@ -482,6 +483,7 @@ export interface TestSemanticSearchServiceOptions {
   graphSession?: SemanticSearchGraphSource
   activity?: ActivityPort
   network?: NetworkService
+  screen?: ScreenService
   unloadWhenHidden?: boolean
   logger?: LoggerService
 }
@@ -572,6 +574,7 @@ export function createTestSemanticSearchService(
         options?.graphSession ?? createTestGraphSessionService({ indexLifecycle, logger }),
       activity: options?.activity ?? createTestActivityPort(),
       network: options?.network ?? createTestNetworkService(),
+      screen: options?.screen ?? createTestScreenService(),
       unloadWhenHidden: options?.unloadWhenHidden ?? false,
       logger,
     }),

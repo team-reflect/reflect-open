@@ -117,6 +117,7 @@ public final class RecordingEngine: NSObject {
   #endif
   /// The staging directory the recorder writes into.
   private let stagingDirectory: () throws -> URL
+  private let keepScreenAwake: (Bool) -> Void
 
   /// Receives every event; set before `activate()`.
   public var onEvent: ((RecordingEvent) -> Void)?
@@ -124,8 +125,13 @@ public final class RecordingEngine: NSObject {
   public var log: ((String) -> Void)?
 
   /// `stagingDirectory` returns the directory to record into, creating it.
-  public init(stagingDirectory: @escaping () throws -> URL) {
+  /// `keepScreenAwake` holds the screen on (`true`) or lets it lock (`false`).
+  public init(
+    stagingDirectory: @escaping () throws -> URL,
+    keepScreenAwake: @escaping (Bool) -> Void
+  ) {
     self.stagingDirectory = stagingDirectory
+    self.keepScreenAwake = keepScreenAwake
   }
 
   /// Start observing the audio session, app lifecycle, and OS entry points,
@@ -300,7 +306,7 @@ public final class RecordingEngine: NSObject {
       throw error
     }
     // The screen must not sleep mid-memo (V1 parity).
-    UIApplication.shared.isIdleTimerDisabled = true
+    keepScreenAwake(true)
     self.meterTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) {
       [weak self] _ in
       self?.emitLevel()
@@ -435,7 +441,7 @@ public final class RecordingEngine: NSObject {
     }
     self.meterTimer?.invalidate()
     self.meterTimer = nil
-    UIApplication.shared.isIdleTimerDisabled = false
+    keepScreenAwake(false)
     deactivateAudioSession()
     endLiveActivity()
     clearReminder()

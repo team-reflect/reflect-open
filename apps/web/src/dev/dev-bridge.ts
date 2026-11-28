@@ -102,6 +102,7 @@ class DevBridgeImpl implements IpcBridge {
         // native finite-length assertion is honestly unavailable.
         return null
       case 'plugin:mobile-haptics|impact_light':
+      case 'plugin:screen|keep_awake':
         return null
       case 'plugin:app-store|get_environment':
         return { environment: 'Sandbox' }

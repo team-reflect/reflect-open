@@ -197,12 +197,14 @@ export {
   createTestHapticsService,
   createTestIapService,
   createTestNetworkService,
+  createTestScreenService,
   createTestWebAuthService,
   type AppStoreCall,
   type TestAppStoreService,
   type TestHapticsService,
   type TestIapService,
   type TestNetworkService,
+  type TestScreenService,
   type TestWebAuthService,
 } from './plugins.ts'
 export {

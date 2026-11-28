@@ -84,6 +84,7 @@ import {
   createTestHapticsService,
   createTestIapService,
   createTestNetworkService,
+  createTestScreenService,
   createTestWebAuthService,
 } from './plugins.ts'
 import { createTestSecretStoreService } from './secrets.ts'
@@ -221,6 +222,7 @@ function createTestServiceFactories(overrides: TestCoreServiceOverrides) {
     icloudNative: () => createTestICloudNativeService(),
     embeddingRuntime: () => createTestEmbeddingRuntimeService(),
     network: () => createTestNetworkService(),
+    screen: () => createTestScreenService(),
     retrieval: () => createTestRetrievalService(),
     embeddingIndex: (deps) => createTestEmbeddingIndexService(deps),
     transcription: () => createTestTranscriptionService(),

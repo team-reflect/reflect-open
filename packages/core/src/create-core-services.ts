@@ -220,6 +220,7 @@ import {
 } from './ipc/mobile-storage-service.ts'
 import { createHapticsService, type HapticsService } from './ipc/haptics-service.ts'
 import { createNetworkService, type NetworkService } from './ipc/network-service.ts'
+import { createScreenService } from './ipc/screen-service.ts'
 import { createWebAuthService, type WebAuthService } from './ipc/web-auth-service.ts'
 import {
   createSecretStoreService,
@@ -672,6 +673,7 @@ export const coreServiceFactories = {
   icloudNative: createICloudNativeService,
   embeddingRuntime: createEmbeddingRuntimeService,
   network: createNetworkService,
+  screen: createScreenService,
   retrieval: createRetrievalService,
   embeddingIndex: createEmbeddingIndexService,
   transcription: createTranscriptionService,
@@ -1086,6 +1088,7 @@ export function composeCoreServices(
   const syncEngines = create.syncEngines({ git: gitRepository, clock })
   const embeddingRuntime = create.embeddingRuntime({ ipc, logger })
   const network = create.network({ ipc })
+  const screen = create.screen({ ipc, platform, logger })
   const retrieval = create.retrieval({
     database,
     search,
@@ -1332,6 +1335,7 @@ export function composeCoreServices(
       graphSession,
       activity,
       network,
+      screen,
       unloadWhenHidden: isMobilePlatform(platform.appPlatform),
       logger,
     }),

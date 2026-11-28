@@ -22,6 +22,7 @@ final class AppHost {
   private let store: StoreCapability
   private let recording: RecordingCapability
   private let network: NetworkCapability
+  private let screen: ScreenCapability
   private var eventPump: Task<Void, Never>?
 
   init() throws {
@@ -43,7 +44,9 @@ final class AppHost {
     self.store = store
     // Apple asks an app to listen for transactions from its launch.
     store.start()
-    let recording = RecordingCapability(emit: emit)
+    let screen = ScreenCapability()
+    self.screen = screen
+    let recording = RecordingCapability(emit: emit, screen: screen)
     self.recording = recording
     let network = NetworkCapability(emit: emit)
     self.network = network
@@ -53,7 +56,7 @@ final class AppHost {
     for commands in [
       HostCommands.all { url in await UIApplication.shared.open(url) },
       HapticsCapability.commands, webAuth.commands, store.commands, recording.commands,
-      network.commands, dialog.commands,
+      network.commands, dialog.commands, screen.commands,
     ] {
       shellCommands.merge(commands) { _, _ in
         preconditionFailure("two capabilities answer the same command")
@@ -75,7 +78,11 @@ final class AppHost {
     }
     // The page's chrome messages share the `reflectHost` handler.
     bridge.onMessage = { [chrome] body in chrome.receive(body: body) }
-    bridge.onDocumentStart = { [chrome] in chrome.documentDidStart() }
+    bridge.onDocumentStart = { [chrome, screen] in
+      chrome.documentDidStart()
+      // A new document starts with no holds; one that needs the screen on asks again.
+      screen.setKeepAwake(false, for: .frontend)
+    }
     // An intent never waits in the queue: one sent while a new document
     // loads would reach that document.
     chrome.send = { [bridge] intent in

@@ -3,6 +3,7 @@ import type { AppStoreService } from '../ipc/app-store-service.ts'
 import type { IapProduct, IapService } from '../ipc/iap-service.ts'
 import type { HapticsService } from '../ipc/haptics-service.ts'
 import type { NetworkService } from '../ipc/network-service.ts'
+import type { ScreenService } from '../ipc/screen-service.ts'
 import { WritableStore, type Store } from '../store.ts'
 import type { WebAuthOptions, WebAuthService } from '../ipc/web-auth-service.ts'
 import { noop } from '@ocavue/utils'
@@ -71,6 +72,39 @@ export function createTestNetworkService(options?: {
   expensive?: boolean | null
 }): TestNetworkService {
   return new TestNetworkServiceImpl(options?.expensive === undefined ? false : options.expensive)
+}
+
+export interface TestScreenService extends ScreenService {
+  /**
+   * The number of `keepAwake` holds not released yet.
+   */
+  holds(): number
+}
+
+class TestScreenServiceImpl implements TestScreenService {
+  #holds = 0
+
+  keepAwake(): Unlisten {
+    this.#holds += 1
+    let released = false
+    return () => {
+      if (!released) {
+        released = true
+        this.#holds -= 1
+      }
+    }
+  }
+
+  holds(): number {
+    return this.#holds
+  }
+}
+
+/**
+ * A {@link ScreenService} that counts open holds.
+ */
+export function createTestScreenService(): TestScreenService {
+  return new TestScreenServiceImpl()
 }
 
 export interface TestIapService extends IapService {
