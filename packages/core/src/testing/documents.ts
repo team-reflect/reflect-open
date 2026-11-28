@@ -39,7 +39,10 @@ import { createTestIndexLifecycleService } from './index-lifecycle.ts'
 /**
  * Reports `markdown` to `session` as an edit, through a new attached editor that holds it.
  */
-export function typeIntoSession(session: NoteSession, markdown: string): void {
+export function typeIntoSession(
+  session: Pick<NoteSession, 'attachEditor' | 'editorChanged'>,
+  markdown: string,
+): void {
   session.attachEditor({ getMarkdown: () => markdown, setMarkdown: noop })
   session.editorChanged()
 }
