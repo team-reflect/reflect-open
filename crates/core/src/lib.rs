@@ -180,7 +180,21 @@ impl Core {
     /// Runs `command` with `args_json`, a JSON object of camelCase arguments.
     /// `headers_json` is a JSON object of the request's lowercase header names
     /// and values, and `body` the raw request body of a binary command.
-    pub async fn dispatch(
+    ///
+    /// The boxed future makes this crate codegen the whole command table. An
+    /// `async fn` body compiles in the crate that polls it, which would move
+    /// all commands into the shell crate's single release codegen unit.
+    pub fn dispatch<'a>(
+        self: &'a Arc<Self>,
+        command: &'a str,
+        args_json: &'a [u8],
+        headers_json: &'a [u8],
+        body: Option<&'a [u8]>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = AppResult<Reply>> + Send + 'a>> {
+        Box::pin(self.dispatch_inner(command, args_json, headers_json, body))
+    }
+
+    async fn dispatch_inner(
         self: &Arc<Self>,
         command: &str,
         args_json: &[u8],
