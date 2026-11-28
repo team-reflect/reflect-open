@@ -15,6 +15,7 @@ default = ["vec"]
 vec = ["dep:sqlite-vec", "dep:sqlite-wasm-vec"]
 
 [dependencies]
+reflect-types = { workspace = true }
 rusqlite = { workspace = true }
 rusqlite_migration = { workspace = true }
 tracing = { workspace = true }

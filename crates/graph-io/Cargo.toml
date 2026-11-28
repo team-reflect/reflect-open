@@ -28,7 +28,7 @@ zip = { workspace = true, features = ["deflate-flate2-zlib-rs"] }
 reqwest = { workspace = true }
 tokio = { workspace = true, features = ["rt", "sync", "fs", "io-util"] }
 reflect-graph-paths = { workspace = true }
-reflect-types = { workspace = true, features = ["git2"] }
+reflect-types = { workspace = true, features = ["git2", "reqwest"] }
 reflect-utils = { workspace = true }
 reflect-index-schema = { workspace = true }
 

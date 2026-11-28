@@ -4607,6 +4607,7 @@ dependencies = [
 name = "reflect-index-schema"
 version = "0.0.0"
 dependencies = [
+ "reflect-types",
  "rusqlite",
  "rusqlite_migration",
  "sqlite-vec",
@@ -4671,6 +4672,7 @@ name = "reflect-types"
 version = "0.0.0"
 dependencies = [
  "git2",
+ "reqwest 0.12.28",
  "rusqlite",
  "serde",
  "serde_json",
