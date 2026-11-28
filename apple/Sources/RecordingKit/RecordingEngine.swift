@@ -125,8 +125,7 @@ public final class RecordingEngine: NSObject {
   public var log: ((String) -> Void)?
 
   /// `stagingDirectory` returns the directory to record into, creating it.
-  /// `keepScreenAwake` holds the screen on for a session (`true`) and lets it
-  /// lock again (`false`), on the main queue.
+  /// `keepScreenAwake` holds the screen on (`true`) or lets it lock (`false`).
   public init(
     stagingDirectory: @escaping () throws -> URL,
     keepScreenAwake: @escaping (Bool) -> Void

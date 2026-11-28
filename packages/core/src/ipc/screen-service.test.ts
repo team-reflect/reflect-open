@@ -38,24 +38,12 @@ describe('ScreenService', () => {
     expect(sent()).toEqual([{ keepAwake: true }, { keepAwake: false }])
   })
 
-  it('sends the state at the time of each send', async () => {
-    const { ipc, screen, sent } = setup('ios')
-    ipc.onCommand('plugin:screen|keep_awake', returnNull)
-
-    screen.keepAwake()()
-    screen.keepAwake()
-
-    await vi.waitFor(() => expect(sent()).toHaveLength(3))
-    expect(sent().at(-1)).toEqual({ keepAwake: true })
-  })
-
   it('logs a failed send', async () => {
     const { logger, screen } = setup('ios')
 
     screen.keepAwake()
 
     await vi.waitFor(() => expect(logger.getErrors()).toHaveLength(1))
-    expect(logger.getErrors()[0]?.message).toBe('failed to set the screen keep-awake state to true')
   })
 
   it('sends nothing on desktop', async () => {

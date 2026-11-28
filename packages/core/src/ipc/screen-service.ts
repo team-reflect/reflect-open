@@ -26,7 +26,7 @@ export interface ScreenServiceDeps {
   readonly logger: LoggerService
 }
 
-class ShellScreenService implements ScreenService {
+class ScreenServiceImpl implements ScreenService {
   readonly #deps: ScreenServiceDeps
   #holds = 0
   // Sends run one after another, so the shell sees the last state last.
@@ -37,6 +37,9 @@ class ShellScreenService implements ScreenService {
   }
 
   keepAwake(): Unlisten {
+    if (!isMobilePlatform(this.#deps.platform.appPlatform)) {
+      return noop
+    }
     this.#holds += 1
     if (this.#holds === 1) {
       this.#send()
@@ -66,18 +69,6 @@ class ShellScreenService implements ScreenService {
   }
 }
 
-/**
- * The desktop screen: embedding work goes on while the display sleeps, so
- * holds change nothing.
- */
-class DesktopScreenService implements ScreenService {
-  keepAwake(): Unlisten {
-    return noop
-  }
-}
-
 export function createScreenService(deps: ScreenServiceDeps): ScreenService {
-  return isMobilePlatform(deps.platform.appPlatform)
-    ? new ShellScreenService(deps)
-    : new DesktopScreenService()
+  return new ScreenServiceImpl(deps)
 }

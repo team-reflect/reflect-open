@@ -218,7 +218,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
     // Holds the screen on while the first backfill of a follow runs.
     const holdScreen = (): void => {
       const progress = this.#progress.get()
-      const indexing = !stopped && progress !== null && progress.done < progress.total
+      const indexing = progress !== null && progress.done < progress.total
       if (indexing && releaseScreen === null) {
         releaseScreen = screen.keepAwake()
       } else if (!indexing && releaseScreen !== null) {
@@ -313,14 +313,14 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
 
     return () => {
       stopped = true
-      for (const unlisten of unlisteners) {
-        unlisten()
-      }
       stopFollowing?.()
       stopFollowing = null
       followId++
+      // Before the unlisten, so `holdScreen` sees the cleared progress.
       this.#progress.set(null)
-      holdScreen()
+      for (const unlisten of unlisteners) {
+        unlisten()
+      }
     }
   }
 
