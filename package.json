@@ -53,14 +53,14 @@
     "@types/node": "^24.0.0",
     "eslint": "^10.15.0",
     "eslint-plugin-react-google-translate": "^1.1.0",
-    "knip": "^6.46.0",
+    "knip": "^6.48.0",
     "nano-staged": "^1.0.2",
-    "oxfmt": "^0.76.0",
-    "oxlint": "^1.91.0",
+    "oxfmt": "^0.80.0",
+    "oxlint": "^1.95.0",
     "simple-git-hooks": "^2.14.0",
     "turbo": "^2.11.13",
     "typescript": "~6.0.3",
-    "vitest": "^5.1.1"
+    "vitest": "^5.1.2"
   },
   "simple-git-hooks": {
     "pre-commit": "./node_modules/.bin/nano-staged --allow-empty"

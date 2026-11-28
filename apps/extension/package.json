@@ -16,7 +16,7 @@
     "@post-embed/schema": "^0.5.2",
     "@reflect/core": "workspace:*",
     "@reflect/design-system": "workspace:*",
-    "defuddle": "^0.19.6",
+    "defuddle": "^0.19.13",
     "lucide-react": "^1.62.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
@@ -24,13 +24,13 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.5",
-    "@types/react": "^19.3.0",
+    "@types/react": "^19.3.3",
     "@types/react-dom": "^19.3.0",
     "@wxt-dev/module-react": "^1.2.2",
     "tailwindcss": "^4.3.5",
     "typescript": "~6.0.3",
-    "vite": "^8.3.8",
-    "vitest": "^5.1.1",
+    "vite": "^8.4.0",
+    "vitest": "^5.1.2",
     "vitest-fail-on-console": "^0.10.1",
     "wxt": "^0.21.5"
   }
