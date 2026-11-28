@@ -59,9 +59,10 @@ pub use graph::{
 pub use icloud::{IcloudStatus, IcloudSweepOutcome, MobileStorageInfo, SweepScope};
 pub use import::{GraphImportProgress, GraphImportStage, GraphImportSummary};
 pub use index::{
-    ChatConversation, ChatMessageRow, EmbeddedChunk, IndexCommit, IndexTouch, IndexedAlias,
-    IndexedClaim, IndexedEmail, IndexedLink, IndexedNote, IndexedTag, IndexedTask, LinkKind,
-    MovedNoteAddress, NoteKind, NoteMoveRequest, ReconcileScan, ScanCandidate, ScanOrphan,
+    ChatConversation, ChatMessageRow, ChunkToEmbed, EmbeddedChunk, IndexCommit, IndexTouch,
+    IndexedAlias, IndexedClaim, IndexedEmail, IndexedLink, IndexedNote, IndexedTag, IndexedTask,
+    LinkKind, MovedNoteAddress, NoteKind, NoteMoveRequest, ReconcileScan, ScanCandidate,
+    ScanOrphan,
 };
 pub use index_read::{
     Backlink, BacklinkPage, BacklinkSource, BacklinkSourceCursor, ChunkHash, ChunkHit,

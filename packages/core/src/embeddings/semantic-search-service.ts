@@ -159,7 +159,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
         }
       }
 
-      // embed_apply/embed_remove are gated on the INDEX session generation, not
+      // embed_note_chunks is gated on the INDEX session generation, not
       // the file-write generation in GraphInfo — the counters are independent.
       const { graph, indexGeneration: generation } = graphSession.get()
       const target =

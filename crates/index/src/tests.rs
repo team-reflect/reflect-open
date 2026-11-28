@@ -1608,7 +1608,7 @@ fn stored_vectors_round_trip_through_vec_to_json() {
 
 #[test]
 fn apply_chunks_for_an_unindexed_path_is_a_cleaning_no_op() {
-    // The embed pipeline can race index_remove: a late embed_apply for a
+    // The embed pipeline can race index_remove: a late embed_note_chunks for a
     // deleted note must not reinsert vectors for a dead path.
     let conn = migrated();
     let result = apply_chunks(&conn, "notes/gone.md", &[chunk("g1", Some(vector(0.1)))]);

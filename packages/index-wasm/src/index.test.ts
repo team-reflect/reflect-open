@@ -65,7 +65,7 @@ it('stores a vector and finds it with a nearest-neighbour query', () => {
     modelId: 'model',
     vector,
   }
-  index.invoke('embed_apply', { path: NOTE.path, chunks: [chunk], generation })
+  index.invoke('test_embed_apply', { path: NOTE.path, chunks: [chunk], generation })
 
   expect(
     query(

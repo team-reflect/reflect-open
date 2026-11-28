@@ -3,7 +3,7 @@
 //! the status reports `unsupported` so the frontend can turn semantic search
 //! off. Search stays lexical (FTS5).
 
-use reflect_types::{AppError, AppResult, EmbedStatus};
+use reflect_types::{AppError, AppResult, ChunkToEmbed, EmbedStatus};
 
 use crate::Core;
 
@@ -27,7 +27,12 @@ impl Core {
     }
 
     /// Fails loudly: the frontend never embeds on an `unsupported` runtime.
-    pub async fn embed_documents(&self, _texts: Vec<String>) -> AppResult<Vec<Vec<f32>>> {
+    pub async fn embed_note_chunks(
+        &self,
+        _path: String,
+        _chunks: Vec<ChunkToEmbed>,
+        _generation: u64,
+    ) -> AppResult<u32> {
         Err(unsupported())
     }
 }

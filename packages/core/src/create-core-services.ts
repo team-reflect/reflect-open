@@ -1087,7 +1087,6 @@ export function composeCoreServices(
   })
   const embeddingIndex = create.embeddingIndex({
     ipc,
-    embeddingRuntime,
     noteFile,
     database,
     indexLifecycle,

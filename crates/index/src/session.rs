@@ -8,8 +8,8 @@ use std::sync::{Mutex, MutexGuard};
 use rusqlite::{Connection, Transaction};
 
 use reflect_types::{
-    AppError, AppResult, ChatConversation, ChatMessageRow, EmbeddedChunk, FileMeta, IndexCommit,
-    IndexTouch, IndexedNote, MovedNoteAddress, NoteMoveRequest, ReconcileScan,
+    AppError, AppResult, ChatConversation, ChatMessageRow, ChunkHash, EmbeddedChunk, FileMeta,
+    IndexCommit, IndexTouch, IndexedNote, MovedNoteAddress, NoteMoveRequest, ReconcileScan,
 };
 
 use crate::chat_write;
@@ -452,7 +452,7 @@ impl IndexSession {
     }
 
     /// Replace a note's embedding chunk set (diff applied in one transaction).
-    /// Unchanged chunks keep their vectors.
+    /// Unchanged chunks keep their vectors. An empty set drops every chunk.
     pub fn apply_embeddings(
         &self,
         generation: u64,
@@ -467,15 +467,12 @@ impl IndexSession {
         }))
     }
 
-    /// Drop a deleted note's chunks and vectors.
-    pub fn remove_embeddings(&self, generation: u64, path: &str) -> AppResult<Applied> {
-        Self::applied(self.write(generation, |conn| {
-            // Two DELETEs (vectors, then rows): atomic, mirroring apply.
-            let tx = conn.transaction()?;
-            embed_write::remove_chunks(&tx, path)?;
-            tx.commit()?;
-            Ok(())
-        }))
+    /// The hash and model of each stored embedding chunk of the note at
+    /// `path`, read on the query connection at reader generation `requested`.
+    pub fn embedding_chunk_hashes(&self, requested: u64, path: &str) -> AppResult<Vec<ChunkHash>> {
+        self.read(requested, |conn| {
+            crate::read::embed::chunk_hashes(conn, path)
+        })
     }
 
     /// Run `body` on the query connection. `requested` is the reader

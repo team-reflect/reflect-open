@@ -79,7 +79,7 @@ impl Core {
     /// Resets the index file when `result` failed because the file of
     /// `generation` is corrupt (see [`reflect_index::IndexSession::repair`]),
     /// then emits `index:reconcile`.
-    fn repair_index<T>(&self, generation: u64, result: AppResult<T>) -> AppResult<T> {
+    pub(crate) fn repair_index<T>(&self, generation: u64, result: AppResult<T>) -> AppResult<T> {
         if let Err(err) = &result
             && self.index.repair(generation, err)
         {

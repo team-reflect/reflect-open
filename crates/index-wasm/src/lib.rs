@@ -11,7 +11,7 @@ use reflect_index::{
     IndexSession,
 };
 use reflect_types::events::{EventName, IndexCommitted};
-use reflect_types::{AppError, AppResult, FileMeta};
+use reflect_types::{AppError, AppResult, EmbeddedChunk, FileMeta};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
@@ -20,12 +20,14 @@ use serde::{Deserialize, Serialize};
 const ROOT: &str = "/wasm-index";
 
 /// The commands of this host alone. Three need the caller: the host has no
-/// graph root and no file system. `test_query` reads any table, for tests.
+/// graph root and no file system. `test_query` reads any table, and
+/// `test_embed_apply` writes a chunk set with its vectors, for tests.
 const HOST_COMMANDS: &[&str] = &[
     "index_open",
     "index_reconcile_scan",
     "note_move_indexed",
     "test_query",
+    "test_embed_apply",
 ];
 
 fn schema_error(err: reflect_index_schema::SchemaError) -> AppError {
@@ -106,6 +108,14 @@ struct TestQueryArgs {
     params: Vec<serde_json::Value>,
 }
 
+/// The arguments of `test_embed_apply`: a note's complete chunk set.
+#[derive(Deserialize)]
+struct TestEmbedApplyArgs {
+    path: String,
+    chunks: Vec<EmbeddedChunk>,
+    generation: u64,
+}
+
 fn parse_args<T: serde::de::DeserializeOwned>(command: &str, args_json: &str) -> AppResult<T> {
     serde_json::from_str(args_json)
         .map_err(|err| AppError::parse(format!("invalid arguments for {command}: {err}")))
@@ -147,6 +157,19 @@ impl Index {
                 json_reply(&self.session.read(read_generation, |conn| {
                     reflect_index::run_query(conn, &sql, &params)
                 })?)
+            }
+            "test_embed_apply" => {
+                let TestEmbedApplyArgs {
+                    path,
+                    chunks,
+                    generation,
+                } = parse_args(command, args_json)?;
+                json_reply(
+                    &self
+                        .session
+                        .apply_embeddings(generation, &path, &chunks)
+                        .map(drop)?,
+                )
             }
             _ => {
                 let read_generation = self.session.read_generation()?;

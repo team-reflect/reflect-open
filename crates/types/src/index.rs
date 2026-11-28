@@ -292,10 +292,25 @@ pub struct ChatMessageRow {
     pub created_ms: i64,
 }
 
-/// One chunk of a note, built in TS (`@reflect/core` chunker). `vector` is
-/// present only for new/changed chunks — `None` means "this chunk's hash
-/// already has a row; keep its vector, refresh its metadata" (positions and
-/// headings shift when text moves above an unchanged chunk).
+/// One chunk of a note for `embed_note_chunks`, built in TS (`@reflect/core`
+/// chunker). A chunk whose hash already has a row under the runtime's model
+/// keeps its vector and refreshes its metadata. The runtime embeds every other
+/// chunk.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct ChunkToEmbed {
+    pub heading: Option<String>,
+    pub pos_from: i64,
+    pub pos_to: i64,
+    pub text: String,
+    pub content_hash: String,
+}
+
+/// One chunk of a note's new chunk set. `vector` is present only for
+/// new/changed chunks — `None` means "this chunk's hash already has a row;
+/// keep its vector, refresh its metadata" (positions and headings shift when
+/// text moves above an unchanged chunk).
 #[derive(Debug, Deserialize)]
 #[cfg_attr(feature = "codegen", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]

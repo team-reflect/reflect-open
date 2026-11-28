@@ -6,11 +6,10 @@ use rusqlite::Connection;
 
 use reflect_types::{
     AppError, AppResult, Backlink, BacklinkPage, BacklinkSourceCursor, ChatConversation,
-    ChatMessageRow, ChunkHash, ChunkHit, DailyNoteRow, EmbeddedChunk, GraphStats, IndexCommit,
-    IndexTouch, IndexedNote, MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry, NotePrivacy,
-    NoteRow, PinnedNoteRow, RecentNoteRow, SearchHitRow, SearchRequest, TagFacet, TaskRead,
-    TemplateEntry, VisitedNote, WikiCandidates, WikiClaimMatch, WikiKeyWinner, WikiTitleCandidate,
-    WikiWinningAlias,
+    ChatMessageRow, ChunkHit, DailyNoteRow, GraphStats, IndexCommit, IndexTouch, IndexedNote,
+    MovedNoteAddress, NoteFileFacts, NoteId, NoteListEntry, NotePrivacy, NoteRow, PinnedNoteRow,
+    RecentNoteRow, SearchHitRow, SearchRequest, TagFacet, TaskRead, TemplateEntry, VisitedNote,
+    WikiCandidates, WikiClaimMatch, WikiKeyWinner, WikiTitleCandidate, WikiWinningAlias,
 };
 
 use reflect_types::events::IndexCommitted;
@@ -149,23 +148,6 @@ impl<'a> IndexCommands<'a> {
             .map(drop)
     }
 
-    /// Replaces a note's embedding chunk set.
-    fn embed_apply(
-        &self,
-        path: String,
-        chunks: Vec<EmbeddedChunk>,
-        generation: u64,
-    ) -> AppResult<()> {
-        self.session
-            .apply_embeddings(generation, &path, &chunks)
-            .map(drop)
-    }
-
-    /// Drops a note's chunks and vectors.
-    fn embed_remove(&self, path: String, generation: u64) -> AppResult<()> {
-        self.session.remove_embeddings(generation, &path).map(drop)
-    }
-
     /// The value of one `index_meta` key.
     fn index_meta_get(&self, key: String) -> AppResult<Option<String>> {
         self.read(|conn| read::meta::meta(conn, &key))
@@ -238,11 +220,6 @@ impl<'a> IndexCommands<'a> {
     /// The path of every note that gets embeddings, ascending.
     fn index_embeddable_paths(&self) -> AppResult<Vec<String>> {
         self.read(read::notes::embeddable_paths)
-    }
-
-    /// The hash and model of each stored chunk of the note at `path`.
-    fn embed_chunk_hashes(&self, path: String) -> AppResult<Vec<ChunkHash>> {
-        self.read(|conn| read::embed::chunk_hashes(conn, &path))
     }
 
     /// The All Notes list: every note, or the notes and dailies with a tag.

@@ -1,4 +1,4 @@
-import type { EmbeddedChunk } from '@reflect/types'
+import type { ChunkToEmbed } from '@reflect/types'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { LocalNoteRead, NoteFileService } from '../graph/note-file-service.ts'
@@ -10,14 +10,14 @@ import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 import type { Unlisten } from '../unlisten.ts'
 import { parseNote } from '../markdown/index.ts'
 import { chunkAssetDescriptions, chunkNote } from './chunk.ts'
-import type { EmbeddingRuntimeService } from './embedding-runtime-service.ts'
 import { noop } from '@ocavue/utils'
 
 /**
- * The incremental embedding pass (Plan 09): chunk a note, diff chunk hashes
- * against the stored rows, embed only what changed, and apply as one
- * generation-pinned write. TS owns this orchestration (Rust supplies
- * `embed_documents` + the table writes), mirroring the indexing pipeline.
+ * The incremental embedding pass (Plan 09): chunk a note and send the chunk
+ * set as one generation-pinned write. TS owns this orchestration, mirroring
+ * the indexing pipeline. Rust (`embed_note_chunks`) keeps the vectors of
+ * chunks whose hashes are stored under the runtime's model and embeds the
+ * rest.
  *
  * A note's chunk set also carries its referenced assets' description bodies
  * (Plan 20 → semantic leg), mirroring the FTS fold — so a meaning-level query
@@ -35,10 +35,6 @@ export interface EmbedNoteOptions {
    * The file generation the note and asset description reads carry.
    */
   fileGeneration: number
-  /**
-   * The model recorded per vector (from the runtime's `ready` status).
-   */
-  modelId: string
   /**
    * Pre-loaded content (the watcher path has it); read from disk if absent.
    */
@@ -92,7 +88,7 @@ export interface EmbeddingIndexService {
    * still queued when the follow stops is skipped.
    *
    * The trigger is the post-apply signal, not the raw watcher stream.
-   * Ordering: `embed_apply` drops chunks for paths without a `notes` row, so
+   * Ordering: `embed_note_chunks` drops chunks for paths without a `notes` row, so
    * embedding a brand-new note off the raw file event could race its index
    * apply and lose the chunks until the next backfill; post-apply, the row is
    * always there. Coverage: asset description writes re-index their
@@ -105,7 +101,6 @@ export interface EmbeddingIndexService {
 
 export interface EmbeddingIndexServiceDeps {
   readonly ipc: IpcBridgeService
-  readonly embeddingRuntime: EmbeddingRuntimeService
   readonly noteFile: NoteFileService
   readonly database: DatabaseService
   readonly indexLifecycle: IndexLifecycleService
@@ -135,8 +130,8 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
   }
 
   async embedNote(options: EmbedNoteOptions): Promise<number> {
-    const { embeddingRuntime, noteFile, database } = this.#deps
-    const { path, generation, fileGeneration, modelId } = options
+    const { noteFile } = this.#deps
+    const { path, generation, fileGeneration } = options
     if (isTemplatePath(path)) {
       return 0 // templates are boilerplate — never embedded, never retrieved
     }
@@ -165,7 +160,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
       fileGeneration,
     )
     if (gathered.evicted.length > 0) {
-      // A referenced sidecar is iCloud-evicted. `embed_apply` replaces the
+      // A referenced sidecar is iCloud-evicted. `embed_note_chunks` replaces the
       // note's *entire* chunk set, so applying without that sidecar's body
       // would silently drop its previously embedded chunks — and sidecars are
       // untracked by the watcher, so nothing would ever restore them. Skip the
@@ -177,56 +172,19 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
       ...(await chunkNote(path, content, parsed)),
       ...(await chunkAssetDescriptions(gathered.bodies, content.length + 1)),
     ]
-    if (chunks.length === 0) {
-      await this.removeNote(path, generation)
-      return 0
-    }
-
-    // Stored hash+model pairs, **counted**: duplicate identical sections mean
-    // several chunks can share one hash, and only as many may skip embedding as
-    // there are stored rows to pair with (apply_chunks pairs one row per
-    // skipped chunk — an unmatched skip is a loud error). A model change makes
-    // every chunk "new", so a model switch re-embeds with no extra bookkeeping.
-    const existing = await database.read('embed_chunk_hashes', { path })
-    const available = new Map<string, number>()
-    for (const row of existing) {
-      const key = `${row.modelId} ${row.contentHash}`
-      available.set(key, (available.get(key) ?? 0) + 1)
-    }
-
-    const skip = chunks.map((chunk) => {
-      const key = `${modelId} ${chunk.contentHash}`
-      const remaining = available.get(key) ?? 0
-      if (remaining > 0) {
-        available.set(key, remaining - 1)
-        return true
-      }
-      return false
-    })
-    const toEmbed = chunks.filter((_, i) => skip[i] !== true)
-    const vectors =
-      toEmbed.length > 0
-        ? await embeddingRuntime.embedDocuments(toEmbed.map((chunk) => chunk.text))
-        : []
-    let vectorAt = 0
-
-    const payload: EmbeddedChunk[] = chunks.map((chunk, i) => ({
+    const payload: ChunkToEmbed[] = chunks.map((chunk) => ({
       heading: chunk.heading,
       posFrom: chunk.posFrom,
       posTo: chunk.posTo,
       text: chunk.text,
       contentHash: chunk.contentHash,
-      modelId,
-      // A non-skipped chunk always has a freshly-embedded vector: `vectors` is
-      // exactly as long as the non-skipped chunks, consumed in order here.
-      vector: skip[i] === true ? null : vectors[vectorAt++]!,
     }))
-    await this.#applyChunks(path, payload, generation)
-    return toEmbed.length
+    // An empty set drops the note's chunks.
+    return await this.#deps.ipc.call('embed_note_chunks', { path, chunks: payload, generation })
   }
 
   async removeNote(path: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('embed_remove', { path, generation })
+    await this.#deps.ipc.call('embed_note_chunks', { path, chunks: [], generation })
   }
 
   backfill(options: EmbeddingBackfillOptions): Promise<EmbeddingBackfillResult> {
@@ -273,9 +231,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
             }
             return change.kind === 'remove'
               ? this.removeNote(change.path, generation)
-              : this.embedNote({ path: change.path, generation, fileGeneration, modelId }).then(
-                  noop,
-                )
+              : this.embedNote({ path: change.path, generation, fileGeneration }).then(noop)
           })
           .catch((cause: unknown) => {
             logger.error(`embedding sync failed for ${change.path}:`, cause)
@@ -287,13 +243,6 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
       stopped.abort()
       unlisten()
     }
-  }
-
-  /**
-   * Replace a note's chunk set (hash-diff applied in Rust; generation-pinned).
-   */
-  async #applyChunks(path: string, chunks: EmbeddedChunk[], generation: number): Promise<void> {
-    await this.#deps.ipc.call('embed_apply', { path, chunks, generation })
   }
 
   /**
@@ -330,7 +279,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
     counts: BackfillCounts,
   ): Promise<'completed' | 'aborted'> {
     const { clock, database, logger } = this.#deps
-    const { generation, fileGeneration, modelId, onProgress, signal } = options
+    const { generation, fileGeneration, onProgress, signal } = options
     const paths = await database.read('index_embeddable_paths', {})
     counts.notes = paths.length
     for (const path of paths) {
@@ -339,7 +288,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
       }
       try {
         const started = clock.monotonicNow()
-        const chunks = await this.embedNote({ path, generation, fileGeneration, modelId })
+        const chunks = await this.embedNote({ path, generation, fileGeneration })
         if (chunks > 0) {
           counts.notesEmbedded += 1
           counts.chunksEmbedded += chunks

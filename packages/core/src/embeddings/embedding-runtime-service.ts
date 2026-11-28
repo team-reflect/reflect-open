@@ -69,11 +69,6 @@ export interface EmbeddingRuntimeService extends Store<EmbedStatus> {
    * `ready`.
    */
   embedQuery(text: string): Promise<number[]>
-  /**
-   * Embed note chunks into unit vectors for storage, one per text. Rejects
-   * unless the status is `ready`.
-   */
-  embedDocuments(texts: readonly string[]): Promise<number[][]>
 }
 
 const STATUS_EVENT = 'embed:status'
@@ -159,10 +154,6 @@ class EmbeddingRuntimeServiceImpl implements EmbeddingRuntimeService {
 
   embedQuery(text: string): Promise<number[]> {
     return this.#deps.ipc.call('embed_query', { text })
-  }
-
-  embedDocuments(texts: readonly string[]): Promise<number[][]> {
-    return this.#deps.ipc.call('embed_documents', { texts: [...texts] })
   }
 
   readonly get = this.#status.get

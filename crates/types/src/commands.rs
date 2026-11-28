@@ -58,7 +58,7 @@ macro_rules! commands {
                 embed_status() -> EmbedStatus,
                 embed_ensure().await -> EmbedStatus,
                 embed_query(text: String).await -> Vec<f32>,
-                embed_documents(texts: Vec<String>).await -> Vec<Vec<f32>>,
+                embed_note_chunks(path: String, chunks: Vec<ChunkToEmbed>, generation: u64).await -> u32,
                 watch_start() -> (),
                 watch_stop() -> (),
                 index_open() -> u64,
@@ -118,8 +118,6 @@ macro_rules! commands {
                 chat_message_save(conversation: ChatConversation, message: ChatMessageRow, generation: u64) -> (),
                 chat_conversation_delete(id: String, generation: u64) -> (),
                 note_visit_record(path: String, visited_ms: i64, generation: u64) -> (),
-                embed_apply(path: String, chunks: Vec<EmbeddedChunk>, generation: u64) -> (),
-                embed_remove(path: String, generation: u64) -> (),
             }
             index_read {
                 index_meta_get(key: String) -> Option<String>,
@@ -135,7 +133,6 @@ macro_rules! commands {
                 index_asset_owners(asset_paths: Vec<String>) -> Vec<String>,
                 index_person_owners(email_keys: Vec<String>, tag_key: String) -> Vec<String>,
                 index_embeddable_paths() -> Vec<String>,
-                embed_chunk_hashes(path: String) -> Vec<ChunkHash>,
                 index_list_notes(tag_key: Option<String>) -> Vec<NoteListEntry>,
                 index_recent_notes(limit: u32, tag_key: Option<String>) -> Vec<RecentNoteRow>,
                 index_note_tags() -> Vec<TagFacet>,

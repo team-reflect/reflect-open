@@ -418,12 +418,6 @@ export type ChromeTitle =
    */
   | { kind: 'month'; text: string; month: string }
 
-/**  The content hash and model of one stored embedding chunk. */
-export type ChunkHash = {
-  contentHash: string
-  modelId: string
-}
-
 /**  One embedding chunk near a query vector. */
 export type ChunkHit = {
   /**  The path of the note that holds the chunk. */
@@ -434,6 +428,20 @@ export type ChunkHit = {
   isPrivate: boolean
   /**  The cosine distance to the query vector; 0 is identical. */
   distance: number
+}
+
+/**
+ *  One chunk of a note for `embed_note_chunks`, built in TS (`@reflect/core`
+ *  chunker). A chunk whose hash already has a row under the runtime's model
+ *  keeps its vector and refreshes its metadata. The runtime embeds every other
+ *  chunk.
+ */
+export type ChunkToEmbed = {
+  heading: string | null
+  posFrom: number
+  posTo: number
+  text: string
+  contentHash: string
 }
 
 /**
@@ -673,11 +681,13 @@ export type Commands = {
     }
     result: number[]
   }
-  embed_documents: {
+  embed_note_chunks: {
     args: {
-      texts: string[]
+      path: string
+      chunks: ChunkToEmbed[]
+      generation: number
     }
-    result: number[][]
+    result: number
   }
   watch_start: {
     args: Record<string, never>
@@ -1072,21 +1082,6 @@ export type Commands = {
     }
     result: null
   }
-  embed_apply: {
-    args: {
-      path: string
-      chunks: EmbeddedChunk[]
-      generation: number
-    }
-    result: null
-  }
-  embed_remove: {
-    args: {
-      path: string
-      generation: number
-    }
-    result: null
-  }
   index_meta_get: {
     args: {
       key: string
@@ -1159,12 +1154,6 @@ export type Commands = {
   index_embeddable_paths: {
     args: Record<string, never>
     result: string[]
-  }
-  embed_chunk_hashes: {
-    args: {
-      path: string
-    }
-    result: ChunkHash[]
   }
   index_list_notes: {
     args: {
@@ -1550,7 +1539,7 @@ export type EmbedStatus =
    */
   | { status: 'loading'; progress?: EmbedProgress | undefined }
   /**
-   *  `embed_query` and `embed_documents` are ready; `model` is recorded per
+   *  `embed_query` and `embed_note_chunks` are ready; `model` is recorded per
    *  vector (rebuild key).
    */
   | { status: 'ready'; model: string }
@@ -1558,22 +1547,6 @@ export type EmbedStatus =
   | { status: 'failed'; message: string }
   /**  This platform or CPU has no embedding runtime. */
   | { status: 'unsupported' }
-
-/**
- *  One chunk of a note, built in TS (`@reflect/core` chunker). `vector` is
- *  present only for new/changed chunks — `None` means "this chunk's hash
- *  already has a row; keep its vector, refresh its metadata" (positions and
- *  headings shift when text moves above an unchanged chunk).
- */
-export type EmbeddedChunk = {
-  heading: string | null
-  posFrom: number
-  posTo: number
-  text: string
-  contentHash: string
-  modelId: string
-  vector: number[] | null
-}
 
 /**
  *  An event the native side broadcasts. The serde name is the wire name, and
@@ -2831,8 +2804,6 @@ export type IndexWriteCommand =
   | 'chat_message_save'
   | 'chat_conversation_delete'
   | 'note_visit_record'
-  | 'embed_apply'
-  | 'embed_remove'
 
 /**
  * The name of every command that reads the index.
@@ -2851,7 +2822,6 @@ export type IndexReadCommand =
   | 'index_asset_owners'
   | 'index_person_owners'
   | 'index_embeddable_paths'
-  | 'embed_chunk_hashes'
   | 'index_list_notes'
   | 'index_recent_notes'
   | 'index_note_tags'
