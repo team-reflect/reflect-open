@@ -215,7 +215,6 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
     let followId = 0
     let releaseScreen: Unlisten | null = null
 
-    // Holds the screen on while the first backfill of a follow runs.
     const holdScreen = (): void => {
       const progress = this.#progress.get()
       const indexing = progress !== null && progress.done < progress.total

@@ -359,7 +359,26 @@ describe('start', () => {
     expect(semanticSearch.progress.get()).toBeNull()
     unsubscribe()
     stop()
-    expect(screen.holds()).toBe(0)
+  })
+
+  it('lets the screen lock when the service stops midway', async () => {
+    const { semanticSearch, screen } = await setup({
+      notes: [
+        { path: 'notes/a.md', markdown: '# A\n\nAlpha text.\n' },
+        { path: 'notes/b.md', markdown: '# B\n\nBeta text.\n' },
+      ],
+    })
+    const stop = semanticSearch.start()
+    let holdsAfterStop: number | null = null
+    const unsubscribe = semanticSearch.progress.subscribe(() => {
+      if (semanticSearch.progress.get()?.done === 1 && holdsAfterStop === null) {
+        stop()
+        holdsAfterStop = screen.holds()
+      }
+    })
+
+    await vi.waitFor(() => expect(holdsAfterStop).toBe(0))
+    unsubscribe()
   })
 
   it('keeps the model loaded while hidden without `unloadWhenHidden`', async () => {
