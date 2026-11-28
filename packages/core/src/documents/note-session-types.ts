@@ -151,8 +151,11 @@ export interface NoteSession extends Store<NoteSessionSnapshot> {
    * the note shows no editor (not `ready`, or `protected`).
    */
   editorSeed(): string | null
-  /** Every editor document change enters the pipeline here. */
-  editorChanged(markdown: string): void
+  /**
+   * Every editor document change enters the pipeline here. The session reads
+   * the Markdown from the attached editor when it needs it.
+   */
+  editorChanged(): void
   /**
    * Attach the editor that shows this session; returns the detach. One editor
    * at a time: a second attach replaces the first. The detach reconciles the

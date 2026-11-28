@@ -248,6 +248,7 @@ export {
   createTestNoteDocumentService,
   createTestNoteSessionService,
   type TestNoteSessionService,
+  typeIntoSession,
 } from './documents.ts'
 export {
   createTestAppStoreEnvironmentService,

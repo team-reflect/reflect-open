@@ -36,6 +36,17 @@ import {
 import { createTestNoteFileService } from './graph.ts'
 import { createTestIndexLifecycleService } from './index-lifecycle.ts'
 
+/**
+ * Reports `markdown` to `session` as an edit, through a new attached editor that holds it.
+ */
+export function typeIntoSession(
+  session: Pick<NoteSession, 'attachEditor' | 'editorChanged'>,
+  markdown: string,
+): void {
+  session.attachEditor({ getMarkdown: () => markdown, setMarkdown: noop })
+  session.editorChanged()
+}
+
 export interface TestNoteSessionOptions {
   /**
    * Graph-relative path of the note.
@@ -135,8 +146,8 @@ class TestNoteSessionImpl implements TestNoteSession {
     this.#store.set({ ...this.#store.get(), path: to })
   }
 
-  editorChanged(markdown: string): void {
-    this.#record('editorChanged', markdown)
+  editorChanged(): void {
+    this.#record('editorChanged')
   }
 
   attachEditor(editor: NoteSessionEditor): Unlisten {

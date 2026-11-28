@@ -115,8 +115,15 @@ export interface NoteEditorHandle {
 interface NoteEditorProps {
   /** Initial markdown, read only on first render (uncontrolled). */
   initialContent: string
-  /** Called with the current markdown whenever the user edits the document. */
+  /**
+   * Called with the current markdown whenever the user edits the document.
+   * It serializes the document on every edit: use it for small documents.
+   */
   onChange?: (markdown: string) => void
+  /**
+   * Called whenever the user edits the document.
+   */
+  onDocChange?: () => void
   /**
    * Edit one paragraph of inline Markdown (the task editors). A typed block
    * prefix (`+ [ ] `, `# `, `- `, a fence) stays text, pasted blocks flatten
@@ -259,6 +266,7 @@ export function NoteEditor({
   initialContent,
   singleParagraph = false,
   onChange,
+  onDocChange,
   markMode = 'hide',
   spellCheck = true,
   smoothCaretAnimation = true,
@@ -303,6 +311,7 @@ export function NoteEditor({
   // rebuilds meowdown's extensions (the uncontrolled-editor contract).
   // TODO: This violates "Rule of hooks". Refactor this later.
   const onChangeRef = useRef(onChange)
+  const onDocChangeRef = useRef(onDocChange)
   const onWikiLinkClickRef = useRef(onWikiLinkClick)
   const onTagClickRef = useRef(onTagClick)
   const resolveImageUrlRef = useRef(resolveImageUrl)
@@ -314,6 +323,7 @@ export function NoteEditor({
   const onExitBoundaryRef = useRef(onExitBoundary)
   useLayoutEffect(() => {
     onChangeRef.current = onChange
+    onDocChangeRef.current = onDocChange
     onWikiLinkClickRef.current = onWikiLinkClick
     onTagClickRef.current = onTagClick
     resolveImageUrlRef.current = resolveImageUrl
@@ -356,7 +366,11 @@ export function NoteEditor({
   )
 
   const handleDocChange = useCallback(() => {
-    onChangeRef.current?.(innerRef.current?.getMarkdown() ?? '')
+    onDocChangeRef.current?.()
+    const onChange = onChangeRef.current
+    if (onChange) {
+      onChange(innerRef.current?.getMarkdown() ?? '')
+    }
   }, [])
 
   const handleExitBoundary: ExitBoundaryHandler = useCallback(

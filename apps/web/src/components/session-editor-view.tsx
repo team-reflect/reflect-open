@@ -159,7 +159,7 @@ export function SessionEditorView({
     },
     [session, path, dailyDate, registerHandle, autoFocus, autoFocusSelection, onAutoFocused],
   )
-  const onChange = useCallback((markdown: string) => session.editorChanged(markdown), [session])
+  const onDocChange = useCallback(() => session.editorChanged(), [session])
 
   const handleExitBoundary: ExitBoundaryHandler | undefined = useMemo(() => {
     if (!dailyDate || !onExitBoundary) {
@@ -191,7 +191,7 @@ export function SessionEditorView({
 
       <NoteEditor
         initialContent={editorSeed}
-        onChange={onChange}
+        onDocChange={onDocChange}
         markMode={markModeFromSyntax(editorMarkdownSyntax)}
         spellCheck={editorSpellCheck}
         searchQuery={searchQuery}
