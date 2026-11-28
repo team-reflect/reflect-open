@@ -4733,6 +4733,7 @@ dependencies = [
 name = "reflect-index-schema"
 version = "0.0.0"
 dependencies = [
+ "reflect-types",
  "rusqlite",
  "rusqlite_migration",
  "sqlite-vec",

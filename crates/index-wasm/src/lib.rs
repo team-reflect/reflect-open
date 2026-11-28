@@ -28,20 +28,16 @@ const HOST_COMMANDS: &[&str] = &[
     "test_query",
 ];
 
-fn schema_error(err: reflect_index_schema::SchemaError) -> AppError {
-    AppError::io(err.to_string())
-}
-
 /// One in-memory connection: queries run on the writer.
 struct MemoryConnections;
 
 impl IndexConnections for MemoryConnections {
     fn open_writer(&self, _root: &Path) -> AppResult<Connection> {
-        let mut conn = reflect_index_schema::open_in_memory().map_err(schema_error)?;
+        let mut conn = reflect_index_schema::open_in_memory()?;
         // The wasm build of SQLite leaves foreign keys off, and the write path
         // relies on `ON DELETE CASCADE`.
         conn.execute_batch("PRAGMA foreign_keys=ON;")?;
-        reflect_index_schema::migrate(&mut conn).map_err(schema_error)?;
+        reflect_index_schema::migrate(&mut conn)?;
         let foreign_keys: bool = conn.query_row("PRAGMA foreign_keys", [], |row| row.get(0))?;
         if !foreign_keys {
             return Err(AppError::io("the index needs SQLite foreign keys"));
