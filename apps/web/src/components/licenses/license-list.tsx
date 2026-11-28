@@ -11,26 +11,47 @@ import {
 import { cn } from '@/lib/utils.ts'
 import { useAppServices } from '@/services/services-provider.tsx'
 
+interface LicenseListLayout {
+  /**
+   * Classes for the scroll container: its size and inline padding.
+   */
+  className?: string | undefined
+  /**
+   * Space (px) above the card.
+   */
+  startInset?: number | undefined
+  /**
+   * Classes for the space under the card, such as `pb-6`. virtua sizes its
+   * viewport by the content box, so this space is not padding on the container.
+   */
+  endClassName?: string | undefined
+}
+
+/**
+ * Height (px) of the card's top border.
+ */
+const CARD_BORDER = 1
+
 /**
  * Every bundled third-party component with its license. The parent must give
  * this element a bounded height.
  */
-export function LicenseList({ className }: { className?: string | undefined }): ReactElement {
+export function LicenseList(layout: LicenseListLayout): ReactElement {
   return (
     <Suspense
       fallback={
-        <div className={cn('flex items-center justify-center', className)}>
+        <div className={cn('flex items-center justify-center', layout.className)}>
           <Spinner />
         </div>
       }
     >
-      <LoadedLicenseList className={className} />
+      <LoadedLicenseList {...layout} />
     </Suspense>
   )
 }
 
-function LoadedLicenseList({ className }: { className?: string | undefined }): ReactElement {
-  return <LicenseEntries licenses={use(getLicenses())} className={className} />
+function LoadedLicenseList(layout: LicenseListLayout): ReactElement {
+  return <LicenseEntries licenses={use(getLicenses())} {...layout} />
 }
 
 /**
@@ -42,10 +63,9 @@ function LoadedLicenseList({ className }: { className?: string | undefined }): R
 export function LicenseEntries({
   licenses,
   className,
-}: {
-  licenses: Licenses
-  className?: string | undefined
-}): ReactElement {
+  startInset = 0,
+  endClassName,
+}: LicenseListLayout & { licenses: Licenses }): ReactElement {
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set())
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -61,9 +81,17 @@ export function LicenseEntries({
 
   return (
     <div ref={scrollRef} className={cn('min-h-0 scroll-fade overflow-y-auto', className)}>
-      <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+      <div
+        className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm"
+        style={{ marginTop: startInset }}
+      >
         {/* The card is the direct parent, so the scroll container is passed explicitly. */}
-        <Virtualizer data={licenses.entries} scrollRef={scrollRef} bufferSize={600}>
+        <Virtualizer
+          data={licenses.entries}
+          scrollRef={scrollRef}
+          bufferSize={600}
+          startMargin={startInset + CARD_BORDER}
+        >
           {(entry, index) => {
             const key = getEntryKey(entry)
             const expanded = open.has(key)
@@ -91,6 +119,7 @@ export function LicenseEntries({
           }}
         </Virtualizer>
       </div>
+      <div aria-hidden className={endClassName} />
     </div>
   )
 }

@@ -20,7 +20,7 @@ export function LicensesDialog({
               Reflect Open is built on these open source components.
             </DialogDescription>
           </div>
-          <LicenseList className="flex-1 px-6 pt-1 pb-6" />
+          <LicenseList className="flex-1 px-6" startInset={4} endClassName="pb-6" />
         </div>
       </DialogContent>
     </Dialog>

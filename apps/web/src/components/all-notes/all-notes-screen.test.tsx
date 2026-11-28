@@ -457,6 +457,35 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     await view.unmount()
   })
 
+  it('keeps the keyboard-selected row in full view below the sticky header', async () => {
+    const view = await renderScreen({ notes: manyNoteRows })
+    await expect.element(view.getByText('Note 0', { exact: true })).toBeInTheDocument()
+    const scroller = view.getByTestId('all-notes-scroll').element()
+    const header = view.getByText('Subject', { exact: true }).element().parentElement!
+    // Whether the selected row shows whole, between the header and the scroller bottom.
+    const isSelectedRowInView = (): boolean => {
+      const row = scroller.querySelector('[aria-pressed="true"]')?.closest('[data-note-path]')
+      if (row == null) {
+        return false
+      }
+      const { top, bottom } = row.getBoundingClientRect()
+      return (
+        top >= header.getBoundingClientRect().bottom - 1 &&
+        bottom <= scroller.getBoundingClientRect().bottom + 1
+      )
+    }
+
+    for (let step = 0; step < 30; step++) {
+      await userEvent.keyboard('{ArrowDown}')
+      await expect.poll(isSelectedRowInView).toBe(true)
+    }
+    for (let step = 0; step < 29; step++) {
+      await userEvent.keyboard('{ArrowUp}')
+      await expect.poll(isSelectedRowInView).toBe(true)
+    }
+    await view.unmount()
+  })
+
   it('opens the selected note in a new window with Mod+Return', async () => {
     const view = await renderScreen()
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()

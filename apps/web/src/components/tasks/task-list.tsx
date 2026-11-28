@@ -51,10 +51,15 @@ export interface TaskListHandle {
 interface TaskListProps {
   ref?: Ref<TaskListHandle> | undefined
   /**
-   * Classes for the scroll container: its size, and bottom or inline padding.
-   * The list starts at the top of the container.
+   * Classes for the scroll container: its size and inline padding. The list
+   * starts at the top of the container.
    */
   className?: string | undefined
+  /**
+   * Classes for the space under the list, such as `pb-8`. virtua sizes its
+   * viewport by the content box, so this space is not padding on the container.
+   */
+  endClassName?: string | undefined
   /**
    * Called when the list scrolls.
    */
@@ -227,6 +232,7 @@ function useScrollMemory(
 export function TaskList({
   ref,
   className,
+  endClassName,
   onScroll: onScrollProp,
   onContextMenu,
   groups,
@@ -337,6 +343,7 @@ export function TaskList({
           }}
         </Virtualizer>
       </ItemsContext>
+      <div aria-hidden className={endClassName} />
     </div>
   )
 }

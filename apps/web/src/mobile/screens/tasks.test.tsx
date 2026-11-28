@@ -1013,6 +1013,31 @@ describe('MobileTasks', () => {
     await view.unmount()
   })
 
+  it('fills the space above the tab bar with rows while the list scrolls up', async () => {
+    getOpenTasks.mockResolvedValue(
+      Array.from({ length: 200 }, (_, index) => task({ text: `task ${index}`, astPath: [index] })),
+    )
+    const view = await renderScreen()
+    view.container.style.height = '600px'
+    await view.findByRole('heading', { name: 'N' })
+    const scroller = getScroller(view)
+    // How far the bottom of the last shown row is above the bottom of the scroller.
+    const blankBelowRows = (): number => {
+      const bottoms = [...view.container.querySelectorAll('[data-task-key]')]
+        .filter((row) => getComputedStyle(row).visibility === 'visible')
+        .map((row) => row.getBoundingClientRect().bottom)
+      return Math.round(scroller.getBoundingClientRect().bottom - Math.max(...bottoms))
+    }
+
+    await scrollElement({ element: scroller, top: 6000 })
+    await expect.poll(blankBelowRows).toBeLessThanOrEqual(0)
+    for (let step = 0; step < 10; step++) {
+      await scrollElement({ element: scroller, top: scroller.scrollTop - 40 })
+      expect(blankBelowRows()).toBeLessThanOrEqual(0)
+    }
+    await view.unmount()
+  })
+
   it('restores the task at the top of the list after a remount', async () => {
     getOpenTasks.mockResolvedValue(
       Array.from({ length: 200 }, (_, index) => {
