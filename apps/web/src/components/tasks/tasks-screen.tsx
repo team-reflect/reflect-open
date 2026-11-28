@@ -411,7 +411,7 @@ export function TasksScreen(): ReactElement {
       ) : (
         <TaskList
           ref={listRef}
-          className="min-h-0 flex-1 pb-8"
+          className="min-h-0 flex-1"
           groups={groups}
           ready={ready}
           rowHeight={TASK_ROW_HEIGHT}

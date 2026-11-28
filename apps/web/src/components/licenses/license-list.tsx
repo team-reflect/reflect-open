@@ -12,6 +12,16 @@ import { cn } from '@/lib/utils.ts'
 import { useAppServices } from '@/services/services-provider.tsx'
 
 /**
+ * Space (px) above the card.
+ */
+const START_INSET = 12
+
+/**
+ * Height (px) of the card's top border.
+ */
+const CARD_BORDER = 1
+
+/**
  * Every bundled third-party component with its license. The parent must give
  * this element a bounded height.
  */
@@ -44,6 +54,9 @@ export function LicenseEntries({
   className,
 }: {
   licenses: Licenses
+  /**
+   * Classes for the scroll container: its size and inline padding.
+   */
   className?: string | undefined
 }): ReactElement {
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set())
@@ -61,9 +74,17 @@ export function LicenseEntries({
 
   return (
     <div ref={scrollRef} className={cn('min-h-0 scroll-fade overflow-y-auto', className)}>
-      <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+      <div
+        className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm"
+        style={{ marginTop: START_INSET }}
+      >
         {/* The card is the direct parent, so the scroll container is passed explicitly. */}
-        <Virtualizer data={licenses.entries} scrollRef={scrollRef} bufferSize={600}>
+        <Virtualizer
+          data={licenses.entries}
+          scrollRef={scrollRef}
+          bufferSize={600}
+          startMargin={START_INSET + CARD_BORDER}
+        >
           {(entry, index) => {
             const key = getEntryKey(entry)
             const expanded = open.has(key)
@@ -91,6 +112,9 @@ export function LicenseEntries({
           }}
         </Virtualizer>
       </div>
+      {/* Space under the card, clear of the mobile chrome. It is not padding on
+          the container: virtua sizes its viewport by the content box. */}
+      <div aria-hidden className="pb-chrome-safe-offset-3" />
     </div>
   )
 }

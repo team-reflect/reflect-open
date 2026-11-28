@@ -51,8 +51,8 @@ export interface TaskListHandle {
 interface TaskListProps {
   ref?: Ref<TaskListHandle> | undefined
   /**
-   * Classes for the scroll container: its size, and bottom or inline padding.
-   * The list starts at the top of the container.
+   * Classes for the scroll container: its size and inline padding. The list
+   * starts at the top of the container.
    */
   className?: string | undefined
   /**
@@ -337,6 +337,9 @@ export function TaskList({
           }}
         </Virtualizer>
       </ItemsContext>
+      {/* Space under the list, clear of the mobile chrome. It is not padding on
+          the container: virtua sizes its viewport by the content box. */}
+      <div aria-hidden className="pb-chrome-safe-offset-8" />
     </div>
   )
 }

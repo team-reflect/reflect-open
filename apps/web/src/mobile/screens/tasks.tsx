@@ -226,7 +226,7 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
           // `isolate` makes a stacking context, so WebKit composites the sticky
           // headers and row surfaces inside the scroller, below the iOS scroll
           // indicator.
-          className="isolate min-h-0 flex-1 px-safe pb-chrome-safe-offset-24"
+          className="isolate min-h-0 flex-1 px-safe"
           onScroll={closeRevealedRow}
           groups={groups}
           ready={ready}

@@ -47,11 +47,9 @@ export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
   return (
     <>
       <div
-        // Keyboard avoidance is the shell root's job (it ends at the keyboard's
-        // top); `pb-safe` only clears the home indicator when the keyboard is down.
         // `isolate` makes a stacking context, so WebKit composites the row surfaces
         // inside this scroller, below the iOS scroll indicator.
-        className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-safe"
+        className="isolate min-h-0 flex-1 overflow-y-auto px-safe"
         ref={scrollRef}
         onScroll={(event) => {
           revealedRow.set(null)
@@ -70,6 +68,9 @@ export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
             />
           )}
         </Virtualizer>
+        {/* Space under the list, clear of the chrome. It is not padding on the
+            container: virtua sizes its viewport by the content box. */}
+        <div aria-hidden className="pb-chrome-safe-offset-8" />
       </div>
       {deletePath !== null ? (
         <ConfirmDrawer

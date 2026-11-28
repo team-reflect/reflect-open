@@ -6,6 +6,11 @@ import { cn } from '@/lib/utils.ts'
 import type { ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
 import { ALL_NOTES_GRID, ALL_NOTES_ROW_HEIGHT, AllNotesRow } from './all-notes-row.tsx'
 
+/**
+ * Height (px) of the sticky header row, border included.
+ */
+const HEADER_HEIGHT = 38
+
 interface AllNotesTableProps {
   /** `undefined` while the index query settles (renders nothing, not "empty"). */
   notes: readonly NoteListEntry[] | undefined
@@ -28,8 +33,8 @@ interface AllNotesTableProps {
  * a ten-note one, so there is no silent "first N" truncation.
  *
  * Returns a fragment so the list virtualizes against the screen's scroll
- * container (its parent) directly. The header is a leading sibling; `bufferSize`
- * is wide enough to absorb its height so the windowed range never falls short.
+ * container (its parent) directly. The header is a leading sibling, so its
+ * height is the list's `startMargin`.
  */
 export function AllNotesTable({
   notes,
@@ -55,8 +60,18 @@ export function AllNotesTable({
 
   useEffect(() => {
     registerScrollToIndex((index) => {
-      if (index >= 0) {
-        virtualizerRef.current?.scrollToIndex(index, { align: 'nearest' })
+      const virtualizer = virtualizerRef.current
+      if (virtualizer === null || index < 0) {
+        return
+      }
+      // Item offsets exclude the header, and the sticky header covers the top
+      // of the viewport.
+      const top = virtualizer.getItemOffset(index)
+      const bottom = HEADER_HEIGHT + top + virtualizer.getItemSize(index)
+      if (top < virtualizer.scrollOffset) {
+        virtualizer.scrollToIndex(index, { align: 'start', offset: -HEADER_HEIGHT })
+      } else if (bottom > virtualizer.scrollOffset + virtualizer.viewportSize) {
+        virtualizer.scrollToIndex(index, { align: 'end' })
       }
     })
   }, [registerScrollToIndex])
@@ -69,8 +84,9 @@ export function AllNotesTable({
       <div
         className={cn(
           ALL_NOTES_GRID,
-          'sticky top-0 z-10 border-b border-border bg-surface-canvas py-3 text-[13px] font-medium leading-none text-text-secondary shadow-sm',
+          'sticky top-0 z-10 border-b border-border bg-surface-canvas text-[13px] font-medium leading-none text-text-secondary shadow-sm',
         )}
+        style={{ height: HEADER_HEIGHT }}
       >
         <span>Subject</span>
         <span>Snippet</span>
@@ -89,6 +105,7 @@ export function AllNotesTable({
           data={rows}
           itemSize={ALL_NOTES_ROW_HEIGHT}
           bufferSize={10 * ALL_NOTES_ROW_HEIGHT}
+          startMargin={HEADER_HEIGHT}
         >
           {(note) => (
             <AllNotesRow
