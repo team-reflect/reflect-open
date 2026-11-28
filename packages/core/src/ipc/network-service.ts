@@ -17,10 +17,10 @@ const changedEvent = definePluginEvent('network', 'changed', z.object({ expensiv
 export interface NetworkService {
   /**
    * Whether the connection costs the user money or data: cellular, a
-   * personal hotspot, or Low Data Mode. Always `false` where the shell has no
-   * network plugin (desktop, browser dev).
+   * personal hotspot, or Low Data Mode. `null` until the shell answers, and
+   * `false` where the shell has no network plugin (desktop, browser dev).
    */
-  readonly expensive: Store<boolean>
+  readonly expensive: Store<boolean | null>
   /**
    * Follow the shell's network status until the returned function is called.
    */
@@ -33,8 +33,8 @@ export interface NetworkServiceDeps {
 
 class NetworkServiceImpl implements NetworkService {
   readonly #deps: NetworkServiceDeps
-  readonly #expensive = new WritableStore(false)
-  readonly expensive: Store<boolean> = this.#expensive
+  readonly #expensive = new WritableStore<boolean | null>(null)
+  readonly expensive: Store<boolean | null> = this.#expensive
 
   constructor(deps: NetworkServiceDeps) {
     this.#deps = deps
@@ -55,7 +55,10 @@ class NetworkServiceImpl implements NetworkService {
       const { expensive } = await this.#deps.ipc.call('plugin:network|status', {})
       this.#expensive.set(expensive)
     } catch {
-      // A shell without the plugin rejects: the connection stays free.
+      // A shell without the plugin rejects: the connection is free.
+      if (this.#expensive.get() === null) {
+        this.#expensive.set(false)
+      }
     }
   }
 }

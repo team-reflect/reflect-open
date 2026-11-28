@@ -309,7 +309,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
       return false
     }
     const downloaded = await embeddingRuntime.modelDownloaded()
-    return !downloaded && network.expensive.get() && !this.#expensiveAllowed.get()
+    return !downloaded && network.expensive.get() !== false && !this.#expensiveAllowed.get()
   }
 
   allowExpensiveDownload(): void {
@@ -329,8 +329,13 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
   }
 
   // Loads the model, or waits when that downloads it over an expensive connection.
+  // An unknown connection loads nothing: the load runs again once the shell answers.
   #load(): void {
-    if (this.#deps.network.expensive.get() && !this.#expensiveAllowed.get()) {
+    const expensive = this.#deps.network.expensive.get()
+    if (expensive === null && !this.#expensiveAllowed.get()) {
+      return
+    }
+    if (expensive === true && !this.#expensiveAllowed.get()) {
       void this.#loadUnlessDownload()
     } else {
       this.#waitingForNetwork.set(false)

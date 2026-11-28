@@ -7,7 +7,7 @@ describe('NetworkService', () => {
     const ipc = createTestIpcBridgeService()
     ipc.onCommand('plugin:network|status', () => ({ expensive: true }))
     const network = createNetworkService({ ipc })
-    expect(network.expensive.get()).toBe(false)
+    expect(network.expensive.get()).toBe(null)
 
     const stop = network.watch()
     await vi.waitFor(() => expect(network.expensive.get()).toBe(true))
@@ -22,8 +22,7 @@ describe('NetworkService', () => {
     const network = createNetworkService({ ipc })
 
     const stop = network.watch()
-    await vi.waitFor(() => expect(ipc.calls()).toHaveLength(1))
-    expect(network.expensive.get()).toBe(false)
+    await vi.waitFor(() => expect(network.expensive.get()).toBe(false))
     stop()
   })
 })

@@ -43,15 +43,15 @@ export interface TestNetworkService extends NetworkService {
   /**
    * Change whether the connection is expensive.
    */
-  setExpensive(expensive: boolean): void
+  setExpensive(expensive: boolean | null): void
 }
 
 class TestNetworkServiceImpl implements TestNetworkService {
-  readonly #expensive: WritableStore<boolean>
-  readonly expensive: Store<boolean>
+  readonly #expensive: WritableStore<boolean | null>
+  readonly expensive: Store<boolean | null>
 
-  constructor(expensive: boolean) {
-    this.#expensive = new WritableStore(expensive)
+  constructor(expensive: boolean | null) {
+    this.#expensive = new WritableStore<boolean | null>(expensive)
     this.expensive = this.#expensive
   }
 
@@ -59,7 +59,7 @@ class TestNetworkServiceImpl implements TestNetworkService {
     return noop
   }
 
-  setExpensive(expensive: boolean): void {
+  setExpensive(expensive: boolean | null): void {
     this.#expensive.set(expensive)
   }
 }
@@ -67,8 +67,10 @@ class TestNetworkServiceImpl implements TestNetworkService {
 /**
  * A {@link NetworkService} whose connection the test sets; free by default.
  */
-export function createTestNetworkService(options?: { expensive?: boolean }): TestNetworkService {
-  return new TestNetworkServiceImpl(options?.expensive ?? false)
+export function createTestNetworkService(options?: {
+  expensive?: boolean | null
+}): TestNetworkService {
+  return new TestNetworkServiceImpl(options?.expensive === undefined ? false : options.expensive)
 }
 
 export interface TestIapService extends IapService {
