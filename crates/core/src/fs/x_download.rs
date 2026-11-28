@@ -35,12 +35,6 @@ async fn shared_download(
     result
 }
 
-fn network(error: reqwest::Error) -> AppError {
-    AppError::Network {
-        message: error.to_string(),
-    }
-}
-
 // Bound network transfers across every graph/post, while retaining per-URL sharing.
 const MAX_CONCURRENT_DOWNLOADS: usize = 4;
 static DOWNLOAD_SLOTS: tokio::sync::Semaphore =
@@ -60,7 +54,7 @@ fn client() -> Result<reqwest::Client> {
                     }
                 }))
                 .build()
-                .map_err(network)
+                .map_err(AppError::from)
         })
         .clone()
 }
@@ -98,13 +92,7 @@ async fn download_once(root: PathBuf, url: String, hash: String) -> Result<archi
         .await
         .expect("download semaphore stays open");
     let client = client()?;
-    let mut response = client
-        .get(remote)
-        .send()
-        .await
-        .map_err(network)?
-        .error_for_status()
-        .map_err(network)?;
+    let mut response = client.get(remote).send().await?.error_for_status()?;
     // Enforce the same limit with or without a trustworthy Content-Length.
     let limit = archive::MEDIA_MAX_BYTES;
     if response.content_length().is_some_and(|bytes| bytes > limit) {
@@ -118,7 +106,7 @@ async fn download_once(root: PathBuf, url: String, hash: String) -> Result<archi
         .tempfile_in(archive::temporary_directory(&root)?)?;
     let mut file = tokio::fs::File::from_std(temporary.reopen()?);
     let mut bytes = 0u64;
-    while let Some(chunk) = response.chunk().await.map_err(network)? {
+    while let Some(chunk) = response.chunk().await? {
         bytes += chunk.len() as u64;
         if bytes > limit {
             return Err(AppError::parse("media-too-large"));

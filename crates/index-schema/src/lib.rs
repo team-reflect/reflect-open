@@ -192,6 +192,17 @@ mod schema {
         }
     }
 
+    impl From<SchemaError> for reflect_types::AppError {
+        fn from(err: SchemaError) -> Self {
+            match err {
+                err @ SchemaError::TooNew { .. } => Self::IndexTooNew {
+                    message: err.to_string(),
+                },
+                err => Self::io(err.to_string()),
+            }
+        }
+    }
+
     impl From<rusqlite::Error> for SchemaError {
         fn from(err: rusqlite::Error) -> Self {
             SchemaError::Sqlite(err)

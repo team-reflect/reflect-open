@@ -1,7 +1,7 @@
 //! X's syndication API: the public JSON behind embedded posts.
 
 use crate::Core;
-use crate::web_fetch::{USER_AGENT, classify_fetch_error, classify_fetch_status};
+use crate::web_fetch::{USER_AGENT, classify_fetch_status};
 use reflect_graph_io::x_archive_store::valid_id;
 use reflect_types::{AppError, AppResult};
 use reqwest::StatusCode;
@@ -116,7 +116,7 @@ fn client() -> AppResult<reqwest::Client> {
                 // The endpoint answers 400 to a request without a user agent.
                 .user_agent(USER_AGENT)
                 .build()
-                .map_err(classify_fetch_error)
+                .map_err(AppError::from)
         })
         .clone()
 }
@@ -146,8 +146,7 @@ impl Core {
             ])
             .header("Accept", "application/json")
             .send()
-            .await
-            .map_err(classify_fetch_error)?;
+            .await?;
         if response.status() == StatusCode::NOT_FOUND {
             return Ok(None);
         }
@@ -155,7 +154,7 @@ impl Core {
             return Err(error);
         }
         let mut body = Vec::new();
-        while let Some(chunk) = response.chunk().await.map_err(classify_fetch_error)? {
+        while let Some(chunk) = response.chunk().await? {
             if body.len() + chunk.len() > MAX_BYTES {
                 return Err(AppError::parse("X post answer is too large"));
             }

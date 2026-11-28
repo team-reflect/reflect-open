@@ -180,6 +180,29 @@ impl From<rusqlite::Error> for AppError {
     }
 }
 
+/// Timeouts, connection failures and a body cut off mid-transfer are
+/// `Network`, so the caller may retry.
+#[cfg(feature = "reqwest")]
+impl From<reqwest::Error> for AppError {
+    fn from(err: reqwest::Error) -> Self {
+        // `Response::chunk` reports a cut-off body as a decode error whose
+        // source chain holds the transport's `io::Error`.
+        let mut source = std::error::Error::source(&err);
+        let mut transport = false;
+        while let Some(inner) = source {
+            transport |= inner.is::<std::io::Error>();
+            source = inner.source();
+        }
+        if err.is_timeout() || err.is_connect() || err.is_request() || err.is_body() || transport {
+            Self::Network {
+                message: err.to_string(),
+            }
+        } else {
+            Self::io(err.to_string())
+        }
+    }
+}
+
 /// Result alias for command and helper functions.
 pub type AppResult<T> = Result<T, AppError>;
 

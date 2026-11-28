@@ -7,59 +7,27 @@
 //! the schema, defaults, and validation are policy and live in
 //! `@reflect/core`'s zod layer.
 
-use std::fs;
-use std::io::Write;
-use std::path::{Path, PathBuf};
-
-use tempfile::NamedTempFile;
+use std::path::PathBuf;
 
 use reflect_types::{AppError, AppResult, SettingsDoc};
 
 use crate::Core;
+use crate::json_store::{load_json, save_json};
 
 fn store_path() -> AppResult<PathBuf> {
     let base = dirs::config_dir().ok_or_else(|| AppError::io("no OS config dir"))?;
     Ok(base.join("reflect-open").join("settings.json"))
 }
 
-/// Load the stored document. A missing store is an empty object, but a real IO
-/// error or malformed JSON is propagated — silently treating a corrupt store as
-/// empty would let the next save persist that emptiness and wipe every setting.
-fn load_from(path: &Path) -> AppResult<SettingsDoc> {
-    let raw = match fs::read_to_string(path) {
-        Ok(raw) => raw,
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(SettingsDoc::new()),
-        Err(err) => return Err(AppError::io(err.to_string())),
-    };
-    serde_json::from_str(&raw).map_err(|err| AppError::io(err.to_string()))
-}
-
-fn save_to(path: &Path, settings: &SettingsDoc) -> AppResult<()> {
-    let dir = path
-        .parent()
-        .ok_or_else(|| AppError::io("settings store path has no parent directory"))?;
-    fs::create_dir_all(dir)?;
-    let json =
-        serde_json::to_string_pretty(settings).map_err(|err| AppError::io(err.to_string()))?;
-    // Write to a temp file in the same dir, then atomically rename over the
-    // target so a crash mid-write can't truncate the existing store.
-    let mut tmp = NamedTempFile::new_in(dir)?;
-    tmp.write_all(json.as_bytes())?;
-    tmp.flush()?;
-    tmp.persist(path)
-        .map_err(|err| AppError::io(err.to_string()))?;
-    Ok(())
-}
-
 impl Core {
     /// Command: the persisted settings document (an empty object on first run).
     pub fn settings_load(&self) -> AppResult<SettingsDoc> {
-        load_from(&store_path()?)
+        load_json(&store_path()?)
     }
 
     /// Command: atomically replace the persisted settings document.
     pub fn settings_save(&self, settings: SettingsDoc) -> AppResult<()> {
-        save_to(&store_path()?, &settings)
+        save_json(&store_path()?, &settings)
     }
 }
 
@@ -69,6 +37,7 @@ mod tests {
     use crate::Reply;
     use crate::test_support::core;
     use serde_json::{Value, json};
+    use std::fs;
     use tempfile::tempdir;
 
     fn doc(entries: &[(&str, Value)]) -> SettingsDoc {
@@ -83,14 +52,18 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("settings.json");
         let settings = doc(&[("editorMarkdownSyntax", json!("show"))]);
-        save_to(&path, &settings).unwrap();
-        assert_eq!(load_from(&path).unwrap(), settings);
+        save_json(&path, &settings).unwrap();
+        assert_eq!(load_json::<SettingsDoc>(&path).unwrap(), settings);
     }
 
     #[test]
     fn missing_store_loads_empty() {
         let dir = tempdir().unwrap();
-        assert!(load_from(&dir.path().join("nope.json")).unwrap().is_empty());
+        assert!(
+            load_json::<SettingsDoc>(&dir.path().join("nope.json"))
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
@@ -100,7 +73,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("settings.json");
         fs::write(&path, b"{ this is not json").unwrap();
-        assert!(load_from(&path).is_err());
+        assert!(load_json::<SettingsDoc>(&path).is_err());
     }
 
     #[test]
@@ -110,7 +83,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("settings.json");
         fs::write(&path, b"[1, 2, 3]").unwrap();
-        assert!(load_from(&path).is_err());
+        assert!(load_json::<SettingsDoc>(&path).is_err());
     }
 
     #[test]
@@ -129,7 +102,10 @@ mod tests {
     fn save_creates_parent_directories() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("nested").join("settings.json");
-        save_to(&path, &doc(&[("theme", json!("dark"))])).unwrap();
-        assert_eq!(load_from(&path).unwrap(), doc(&[("theme", json!("dark"))]));
+        save_json(&path, &doc(&[("theme", json!("dark"))])).unwrap();
+        assert_eq!(
+            load_json::<SettingsDoc>(&path).unwrap(),
+            doc(&[("theme", json!("dark"))])
+        );
     }
 }

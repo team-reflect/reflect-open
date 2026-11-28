@@ -182,8 +182,7 @@ pub async fn download_remote_assets(
         .connect_timeout(CONNECT_TIMEOUT)
         .read_timeout(READ_TIMEOUT)
         .user_agent(user_agent)
-        .build()
-        .map_err(|err| AppError::io(err.to_string()))?;
+        .build()?;
 
     let queue = Arc::new(Mutex::new(urls));
     let results = Arc::new(Mutex::new(Ok(HashMap::new())));
@@ -255,22 +254,12 @@ fn next_url(
     queue.lock().ok()?.pop()
 }
 
-fn classify_fetch_error(err: reqwest::Error) -> AppError {
-    if err.is_timeout() || err.is_connect() || err.is_request() {
-        AppError::Network {
-            message: err.to_string(),
-        }
-    } else {
-        AppError::io(err.to_string())
-    }
-}
-
 async fn fetch_asset(
     client: &reqwest::Client,
     url: &str,
     staging: &Path,
 ) -> AppResult<DownloadOutcome> {
-    let response = client.get(url).send().await.map_err(classify_fetch_error)?;
+    let response = client.get(url).send().await?;
     let status = response.status();
     if status.is_server_error() || status == reqwest::StatusCode::TOO_MANY_REQUESTS {
         return Err(AppError::Network {
@@ -285,7 +274,7 @@ async fn fetch_asset(
     let desired_name = sanitize_asset_file_name(&original_name(&response, url));
     let mut file = tempfile::NamedTempFile::new_in(staging)?;
     let mut response = response;
-    while let Some(chunk) = response.chunk().await.map_err(classify_fetch_error)? {
+    while let Some(chunk) = response.chunk().await? {
         file.as_file_mut().write_all(&chunk)?;
     }
     file.as_file().sync_all()?;
