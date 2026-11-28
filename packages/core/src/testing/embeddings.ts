@@ -1,5 +1,6 @@
 import type { ChunkToEmbed } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
+import type { ActivityPort } from '../ports/activity-port.ts'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
@@ -10,6 +11,7 @@ import {
   type EmbedNoteOptions,
   type EmbeddingBackfillOptions,
   type EmbeddingBackfillResult,
+  type EmbeddingFollowOptions,
   type EmbeddingIndexService,
 } from '../embeddings/embedding-index-service.ts'
 import {
@@ -24,10 +26,12 @@ import type {
 } from '../embeddings/retrieval-service.ts'
 import {
   createSemanticSearchService,
+  type EmbeddingProgress,
   type SemanticSearchGraphSource,
   type SemanticSearchService,
 } from '../embeddings/semantic-search-service.ts'
 import { AppError } from '../errors.ts'
+import type { Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
@@ -42,6 +46,7 @@ import { createTestGraphSessionService } from './graph-session.ts'
 import { createTestIndexLifecycleService } from './index-lifecycle.ts'
 import { createTestIpcBridgeService, type TestIpcBridgeService } from './ipc.ts'
 import { createTestClockService } from './clock.ts'
+import { createTestActivityPort } from './shell.ts'
 import { createTestLoggerService } from './logger.ts'
 import { createTestSettingsService } from './settings.ts'
 import { createTestStorageService } from './storage.ts'
@@ -76,6 +81,10 @@ export interface TestEmbeddingRuntimeService extends EmbeddingRuntimeService {
    * How many times `ensure` ran.
    */
   ensureCalls(): number
+  /**
+   * How many times `unload` ran.
+   */
+  unloadCalls(): number
 }
 
 /**
@@ -101,6 +110,7 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
   readonly #vectors: (text: string) => number[]
   #status: EmbedStatus
   #ensures = 0
+  #unloads = 0
 
   constructor(options?: TestEmbeddingRuntimeServiceOptions) {
     this.#status = options?.status ?? { status: 'ready', model: TEST_EMBED_MODEL }
@@ -113,6 +123,13 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
           return this.#status
         },
         embed_query: (args) => this.#embed([String(args['text'])])[0],
+        embed_unload: () => {
+          this.#unloads++
+          if (this.#status.status === 'ready') {
+            this.setStatus({ status: 'uninitialized' })
+          }
+          return null
+        },
       },
     })
     this.#inner = createEmbeddingRuntimeService({
@@ -141,6 +158,10 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
     return this.#inner.embedQuery(text)
   }
 
+  unload(): Promise<void> {
+    return this.#inner.unload()
+  }
+
   embedChunks(chunks: readonly ChunkToEmbed[]): TestEmbeddedChunk[] {
     if (chunks.length === 0) {
       return []
@@ -165,6 +186,10 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
 
   ensureCalls(): number {
     return this.#ensures
+  }
+
+  unloadCalls(): number {
+    return this.#unloads
   }
 
   #embed(texts: string[]): number[][] {
@@ -388,7 +413,7 @@ class TestEmbeddingIndexServiceImpl implements TestEmbeddingIndexService {
     return this.#backfillOverride?.(backfillOptions) ?? this.#inner.backfill(backfillOptions)
   }
 
-  follow(followOptions: { generation: number; fileGeneration: number; modelId: string }): Unlisten {
+  follow(followOptions: EmbeddingFollowOptions): Unlisten {
     this.#followLog.push({ generation: followOptions.generation, modelId: followOptions.modelId })
     return this.#inner.follow(followOptions)
   }
@@ -434,6 +459,8 @@ export interface TestSemanticSearchServiceOptions {
   role?: GraphRole
   indexLifecycle?: IndexLifecycleService
   graphSession?: SemanticSearchGraphSource
+  activity?: ActivityPort
+  unloadWhenHidden?: boolean
   logger?: LoggerService
 }
 
@@ -446,10 +473,12 @@ export interface TestSemanticSearchService extends SemanticSearchService {
 
 class TestSemanticSearchServiceImpl implements TestSemanticSearchService {
   readonly #inner: SemanticSearchService
+  readonly progress: Store<EmbeddingProgress | null>
   #running = 0
 
   constructor(inner: SemanticSearchService) {
     this.#inner = inner
+    this.progress = inner.progress
   }
 
   start(): Unlisten {
@@ -509,6 +538,8 @@ export function createTestSemanticSearchService(
       indexLifecycle,
       graphSession:
         options?.graphSession ?? createTestGraphSessionService({ indexLifecycle, logger }),
+      activity: options?.activity ?? createTestActivityPort(),
+      unloadWhenHidden: options?.unloadWhenHidden ?? false,
       logger,
     }),
   )

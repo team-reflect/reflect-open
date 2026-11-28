@@ -4,7 +4,7 @@ import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 
 import { createEmbeddingRuntimeService, type EmbedStatus } from './embedding-runtime-service.ts'
-import { noop, sleep } from '@ocavue/utils'
+import { noop, returnNull, sleep } from '@ocavue/utils'
 
 const READY: EmbedStatus = { status: 'ready', model: TEST_EMBED_MODEL }
 const LOADING: EmbedStatus = { status: 'loading' }
@@ -22,11 +22,14 @@ describe('createEmbeddingRuntimeService', () => {
     ipc.onCommand('embed_status', () => ({ status: 'uninitialized' }))
     ipc.onCommand('embed_ensure', () => READY)
     ipc.onCommand('embed_query', () => [0.5, 0.5])
+    ipc.onCommand('embed_unload', returnNull)
 
     await expect(runtime.status()).resolves.toEqual({ status: 'uninitialized' })
     await expect(runtime.ensure()).resolves.toEqual(READY)
     await expect(runtime.embedQuery('hello')).resolves.toEqual([0.5, 0.5])
     expect(ipc.calls().at(-1)).toEqual({ command: 'embed_query', args: { text: 'hello' } })
+    await runtime.unload()
+    expect(ipc.calls().at(-1)).toEqual({ command: 'embed_unload', args: {} })
   })
 
   it('remembers the last observed status and notifies subscribers', async () => {

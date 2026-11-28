@@ -27,8 +27,14 @@ vector table and re-embeds every note once.
 ### Runtime
 
 - `llama-cpp-2` without default features (no OpenMP, no `common` library).
-  ggml builds Metal for every Apple target. Apple Silicon Macs run on Metal;
-  Windows and Linux run on the CPU.
+  ggml builds Metal for every Apple target. Apple Silicon Macs and iOS run on
+  Metal; Windows and Linux run on the CPU.
+- iOS does not let a background app use the GPU. While the app is hidden,
+  `SemanticSearchService` stops embedding and calls `embed_unload`, which
+  drops the context. It loads the model again when the app is visible.
+- The iOS app links Accelerate, Metal and Foundation itself
+  (`apps/ios/Config/App.xcconfig`), because the Rust core is a static library.
+  The models directory is excluded from iCloud backups.
 - Intel Macs keep the stand-in runtime until the llama.cpp runtime is tested
   on them. Their build includes Metal too, so a CPU-only run would need
   `with_n_gpu_layers(0)` and `with_op_offload(false)`.
@@ -39,7 +45,7 @@ vector table and re-embeds every note once.
 - llama.cpp warnings and errors go to the app log. Other levels are dropped.
 - The macOS app sets `GGML_METAL_NO_RESIDENCY` before any thread starts. The
   model lives until the process exits, and ggml aborts at exit while a Metal
-  buffer is still in a residency set. An iOS host must do the same.
+  buffer is still in a residency set. The iOS app does the same at launch.
 - `llama-cpp-sys-2` turns on ggml CPU features only from the Rust target
   features, which leaves x86_64 on SSE. `.cargo/config.toml` sets
   `GGML_AVX2`, `GGML_FMA` and `GGML_F16C`, which affect only ggml. AVX2
@@ -140,7 +146,6 @@ Look again when a newer EmbeddingGemma scores higher on English retrieval.
 - CI runs build scripts without the mbx replay
   (`MBX_BUILD_SCRIPT_EXECUTION=0`), because the CMake build directory in
   OUT_DIR holds absolute paths. Each job compiles llama.cpp again.
-- The same runtime builds for iOS. Turning semantic search on there is a
-  separate change.
+- The same runtime runs on iOS. The mobile settings have the opt-in.
 - An older app that opens a migrated index embeds every note on each backfill
   and fails each write. It keeps working, but spends CPU until it is updated.

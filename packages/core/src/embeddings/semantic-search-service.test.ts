@@ -2,17 +2,21 @@ import { describe, expect, it, vi } from 'vitest'
 import { createGraphSession, type GraphRole } from '../graph/graph-session.ts'
 import {
   TEST_EMBED_MODEL,
+  createTestActivityPort,
+  createTestDatabaseService,
   createTestEmbeddingIndexService,
   createTestEmbeddingRuntimeService,
   createTestGraphSessionService,
   createTestIndexLifecycleService,
   createTestIndexStoreService,
   createTestLoggerService,
+  createTestNoteFileService,
   createTestProgressPort,
   createTestRetrievalService,
   createTestSemanticSearchService,
   createTestSettingsService,
   createTestStorageService,
+  seedNotes,
 } from '../testing/index.ts'
 import { WritableStore } from '../store.ts'
 import type { EmbeddingBackfillResult } from './embedding-index-service.ts'
@@ -34,6 +38,11 @@ async function setup(options?: {
   failClear?: boolean
   backfill?: () => Promise<EmbeddingBackfillResult>
   relatedNotes?: (path: string, limit?: number) => RetrievalHit[]
+  unloadWhenHidden?: boolean
+  /**
+   * Notes in the index and on disk for the embedding pass.
+   */
+  notes?: { path: string; markdown: string }[]
 }) {
   const logger = createTestLoggerService()
   const progress = createTestProgressPort()
@@ -60,8 +69,15 @@ async function setup(options?: {
       },
     }),
   })
+  const notes = options?.notes ?? []
+  const database = createTestDatabaseService()
+  seedNotes(database, notes)
   const embeddingIndex = createTestEmbeddingIndexService({
     embeddingRuntime: runtime,
+    database,
+    noteFile: createTestNoteFileService({
+      files: Object.fromEntries(notes.map((note) => [note.path, note.markdown])),
+    }),
     indexLifecycle,
     logger,
     backfill: options?.backfill,
@@ -74,6 +90,7 @@ async function setup(options?: {
     logger,
     state: { graph: GRAPH, indexGeneration: 7 },
   })
+  const activity = createTestActivityPort()
   const semanticSearch = createTestSemanticSearchService({
     embeddingRuntime: runtime,
     embeddingIndex,
@@ -83,10 +100,13 @@ async function setup(options?: {
     role: options?.role ?? 'main',
     indexLifecycle,
     graphSession,
+    activity,
+    unloadWhenHidden: options?.unloadWhenHidden ?? false,
     logger,
   })
   return {
     semanticSearch,
+    activity,
     settings,
     storage,
     runtime,
@@ -215,6 +235,67 @@ describe('start', () => {
     // The one load an untouched runtime gets; `failed` starts no second one.
     expect(runtime.ensureCalls()).toBe(1)
     expect(embeddingIndex.follows()).toEqual([])
+    stop()
+  })
+
+  it('unloads the model while the app is hidden and loads it again when visible', async () => {
+    const { semanticSearch, runtime, embeddingIndex, activity } = await setup({
+      unloadWhenHidden: true,
+    })
+    const stop = semanticSearch.start()
+    await vi.waitFor(() => expect(embeddingIndex.follows()).toHaveLength(1))
+    const ensures = runtime.ensureCalls()
+
+    activity.emitHidden()
+    await vi.waitFor(() => expect(runtime.get().status).toBe('uninitialized'))
+    await flush()
+    expect(runtime.unloadCalls()).toBe(1)
+    expect(runtime.ensureCalls()).toBe(ensures)
+
+    runtime.setStatus(READY)
+    await flush()
+    expect(runtime.unloadCalls()).toBe(2) // a load that ends while hidden unloads too
+    expect(embeddingIndex.follows()).toHaveLength(1)
+
+    activity.emitVisible()
+    await vi.waitFor(() => expect(runtime.ensureCalls()).toBe(ensures + 1))
+    runtime.setStatus(READY)
+    await vi.waitFor(() => expect(embeddingIndex.follows()).toHaveLength(2))
+    stop()
+  })
+
+  it('reports the progress of the first backfill until the follow stops', async () => {
+    const { semanticSearch, settings } = await setup({
+      notes: [
+        { path: 'notes/a.md', markdown: '# A\n\nAlpha text.\n' },
+        { path: 'notes/b.md', markdown: '# B\n\nBeta text.\n' },
+      ],
+    })
+    expect(semanticSearch.progress.get()).toBeNull()
+    const seen: unknown[] = []
+    const unsubscribe = semanticSearch.progress.subscribe(() => {
+      seen.push(semanticSearch.progress.get())
+    })
+    const stop = semanticSearch.start()
+
+    await vi.waitFor(() => expect(semanticSearch.progress.get()).toEqual({ done: 2, total: 2 }))
+    expect(seen).toContainEqual({ done: 1, total: 2 })
+    unsubscribe()
+    settings.update({ semanticSearchEnabled: false })
+    expect(semanticSearch.progress.get()).toBeNull()
+    stop()
+  })
+
+  it('keeps the model loaded while hidden without `unloadWhenHidden`', async () => {
+    const { semanticSearch, runtime, embeddingIndex, activity } = await setup()
+    const stop = semanticSearch.start()
+    await vi.waitFor(() => expect(embeddingIndex.follows()).toHaveLength(1))
+
+    activity.emitHidden()
+    await flush()
+
+    expect(runtime.unloadCalls()).toBe(0)
+    expect(runtime.get()).toEqual(READY)
     stop()
   })
 

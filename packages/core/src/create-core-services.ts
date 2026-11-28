@@ -1322,6 +1322,8 @@ export function composeCoreServices(
       role: adapters.role,
       indexLifecycle,
       graphSession,
+      activity,
+      unloadWhenHidden: isMobilePlatform(platform.appPlatform),
       logger,
     }),
     aiPrompts: create.aiPrompts({ settings, id }),

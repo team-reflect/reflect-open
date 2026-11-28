@@ -5,6 +5,7 @@ import type { GitSyncState, Settings } from '@reflect/core'
 import {
   createTestDatabaseService,
   createTestAppStoreService,
+  createTestEmbeddingRuntimeService,
   createTestClassicAccessService,
   createTestCoreServices,
   createTestGitSyncService,
@@ -13,6 +14,7 @@ import {
   createTestSubscriptionService,
   seedNotes,
   type TestClassicAccessService,
+  type TestEmbeddingRuntimeService,
   type TestSubscriptionService,
 } from '@reflect/core/testing'
 import '@/test-utils/locator.ts'
@@ -69,6 +71,10 @@ interface MountOptions {
    * The Reflect Classic grant; none by default.
    */
   classicAccess?: TestClassicAccessService
+  /**
+   * The embedding runtime; `unsupported` by default.
+   */
+  embeddingRuntime?: TestEmbeddingRuntimeService
 }
 
 /**
@@ -93,6 +99,9 @@ async function mount(options?: MountOptions) {
     }),
     ...(options?.subscription === undefined ? {} : { subscription: options.subscription }),
     ...(options?.classicAccess === undefined ? {} : { classicAccess: options.classicAccess }),
+    embeddingRuntime:
+      options?.embeddingRuntime ??
+      createTestEmbeddingRuntimeService({ status: { status: 'unsupported' } }),
   })
   if (options?.githubSignedIn !== false) {
     await core.githubAuth.save({ kind: 'pat', token: 'ghp_test' })
@@ -220,6 +229,42 @@ describe('MobileSettings', () => {
 
     await user.click(page.getByRole('switch', { name: 'Bullet after a heading' }))
     await expectSettings(view, { editorBulletAfterHeading: false })
+  })
+
+  it('turns semantic search on and shows the model download', async () => {
+    const embeddingRuntime = createTestEmbeddingRuntimeService({
+      status: { status: 'uninitialized' },
+    })
+    const view = await mount({ embeddingRuntime })
+
+    await userEvent.click(page.getByRole('switch', { name: 'Semantic search' }))
+    await expectSettings(view, { semanticSearchEnabled: true })
+
+    await act(() => {
+      embeddingRuntime.setStatus({
+        status: 'loading',
+        progress: { downloaded: 100_000_000, total: 400_000_000 },
+      })
+    })
+    await expect.element(page.getByText('Downloading 25%')).toBeVisible()
+  })
+
+  it('offers to load the model again after a failed load', async () => {
+    const embeddingRuntime = createTestEmbeddingRuntimeService({
+      status: { status: 'failed', message: 'offline' },
+    })
+    await mount({ embeddingRuntime, settings: { semanticSearchEnabled: true } })
+
+    await expect.element(page.getByText('Couldn’t load the model: offline')).toBeVisible()
+    const ensures = embeddingRuntime.ensureCalls()
+    await userEvent.click(page.getByRole('button', { name: 'Try again' }))
+    await vi.waitFor(() => expect(embeddingRuntime.ensureCalls()).toBe(ensures + 1))
+  })
+
+  it('hides semantic search where the runtime is unsupported', async () => {
+    await mount()
+
+    await expect.element(page.getByText('Semantic search')).not.toBeInTheDocument()
   })
 
   it('toggles audio transcription formatting', async () => {

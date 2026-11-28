@@ -9,6 +9,9 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    // ggml registers every Metal buffer in a residency set and aborts at exit
+    // while one is left, but the embedding model lives for the whole process.
+    setenv("GGML_METAL_NO_RESIDENCY", "1", 1)
     #if !DEBUG
     NativeDiagnostics.start(runtime: "swift-native")
     #endif

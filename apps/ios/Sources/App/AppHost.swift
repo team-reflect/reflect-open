@@ -153,12 +153,18 @@ final class AppHost {
 extension CoreStartConfig {
   /// The config of this app: the Documents directory, `Application Support/<bundle id>`
   /// (created when missing) and `Reflect/<version>`, the same values as the Tauri shell.
+  /// The embedding model's `models` directory in it is excluded from backups,
+  /// because the core downloads the model again.
   static func current(
     _ directories: AppDirectories, fileManager: FileManager = .default, bundle: Bundle = .main
   ) throws -> CoreStartConfig {
     let data = directories.applicationSupport
       .appendingPathComponent(bundle.bundleIdentifier ?? "app.reflect.ios")
-    try fileManager.createDirectory(at: data, withIntermediateDirectories: true)
+    var models = data.appendingPathComponent("models", isDirectory: true)
+    try fileManager.createDirectory(at: models, withIntermediateDirectories: true)
+    var excluded = URLResourceValues()
+    excluded.isExcludedFromBackup = true
+    try models.setResourceValues(excluded)
     let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
     return CoreStartConfig(
       appDataDir: data.path, documentDir: directories.documents.path,

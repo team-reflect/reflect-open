@@ -205,7 +205,10 @@ export {
   type RetrievalService,
   type RetrieveOptions,
 } from './embeddings/retrieval-service.ts'
-export { type SemanticSearchService } from './embeddings/semantic-search-service.ts'
+export {
+  type EmbeddingProgress,
+  type SemanticSearchService,
+} from './embeddings/semantic-search-service.ts'
 export { errorMessage, isAppError, toAppError, AppError } from './errors.ts'
 export {
   dailyPath,

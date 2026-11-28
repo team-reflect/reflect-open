@@ -21,6 +21,10 @@ impl Core {
         Ok(EmbedStatus::Unsupported)
     }
 
+    pub fn embed_unload(&self) -> AppResult<()> {
+        Ok(())
+    }
+
     /// Fails loudly: the frontend never embeds on an `unsupported` runtime.
     pub async fn embed_query(&self, _text: String) -> AppResult<Vec<f32>> {
         Err(unsupported())

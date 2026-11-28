@@ -675,6 +675,10 @@ export type Commands = {
     args: Record<string, never>
     result: EmbedStatus
   }
+  embed_unload: {
+    args: Record<string, never>
+    result: null
+  }
   embed_query: {
     args: {
       text: string

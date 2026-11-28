@@ -3,6 +3,7 @@ import { MobileAudioMemoProvider } from '@/mobile/audio-memo-provider.tsx'
 import { AllSearchProvider } from '@/mobile/all-search.tsx'
 import { MobileDeepLinks } from '@/mobile/mobile-deep-links.tsx'
 import { AppErrorBoundary } from '@/components/app-error-boundary.tsx'
+import { EmbeddingsSync } from '@/components/embeddings-sync.tsx'
 import { MobileOnboardingScreen } from '@/mobile/onboarding-screen.tsx'
 import { PaywallDrawer } from '@/mobile/paywall-drawer.tsx'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
@@ -132,6 +133,7 @@ function MobileSurface(): ReactElement {
           <MobileAudioMemoProvider graph={graph}>
             <MobileShell />
             <MobileStatusLayer />
+            <EmbeddingsSync />
             {/* Mounted beside the shell (not inside the daily screen)
                 so a live recording's sheet survives tab switches. */}
             <RecordingDrawer />

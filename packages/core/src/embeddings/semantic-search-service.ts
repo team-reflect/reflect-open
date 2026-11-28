@@ -1,9 +1,10 @@
 import type { GraphRole } from '../graph/graph-session.ts'
+import type { ActivityPort } from '../ports/activity-port.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { StorageService } from '../ports/storage-service.ts'
 import type { GraphSessionState } from '../graph/graph-session-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
-import { deriveStore, type Store } from '../store.ts'
+import { deriveStore, WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { Settings } from '../settings/schema.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
@@ -25,6 +26,14 @@ const SIMILAR_NOTES_LIMIT = 6
  * The open graph as {@link SemanticSearchService} reads it; a `GraphSessionService` is one.
 
  */
+/**
+ * How far the first backfill of a follow got: notes visited of all notes.
+ */
+export interface EmbeddingProgress {
+  readonly done: number
+  readonly total: number
+}
+
 export type SemanticSearchGraphSource = Store<Pick<GraphSessionState, 'graph' | 'indexGeneration'>>
 
 /**
@@ -64,6 +73,10 @@ export interface SemanticSearchService {
    * window loading the model and re-embedding on the same watcher stream
    * would duplicate every write.
    *
+   * With `unloadWhenHidden`, a hidden app counts as disabled, and it unloads
+   * a `ready` model: iOS does not let a background app use the GPU, and a
+   * background app that holds less memory is killed later.
+   *
    * Starting also carries the opt-in over from where it lived before the
    * settings document (`localStorage`), once, so those users keep semantic
    * search across the move.
@@ -88,6 +101,11 @@ export interface SemanticSearchService {
    */
   similarNotes(path: string): Promise<RetrievalHit[]>
   /**
+   * The progress of the current follow's first backfill, `null` while no
+   * follow runs.
+   */
+  readonly progress: Store<EmbeddingProgress | null>
+  /**
    * Stop re-embedding after index rebuilds. The service is unusable afterwards.
    */
   dispose(): void
@@ -102,6 +120,11 @@ export interface SemanticSearchServiceDeps {
   readonly role: GraphRole
   readonly indexLifecycle: IndexLifecycleService
   readonly graphSession: SemanticSearchGraphSource
+  readonly activity: ActivityPort
+  /**
+   * Stop embedding and unload the model while the app is hidden.
+   */
+  readonly unloadWhenHidden: boolean
   readonly logger: LoggerService
 }
 
@@ -113,6 +136,8 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
   readonly #deps: SemanticSearchServiceDeps
   readonly #stopFollowingRebuilds: () => void
   readonly #mainWindow: boolean
+  readonly #progress = new WritableStore<EmbeddingProgress | null>(null)
+  readonly progress: Store<EmbeddingProgress | null> = this.#progress
 
   constructor(deps: SemanticSearchServiceDeps) {
     this.#deps = deps
@@ -121,6 +146,9 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
     this.#stopFollowingRebuilds = indexLifecycle.onReconciled(
       async ({ generation, fileGeneration, source }) => {
         if (source !== 'rebuild') {
+          return
+        }
+        if (deps.unloadWhenHidden && deps.activity.isHidden()) {
           return
         }
         const embed = await embeddingRuntime.status()
@@ -132,7 +160,8 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
   }
 
   start(): Unlisten {
-    const { embeddingRuntime, embeddingIndex, settings, graphSession, logger } = this.#deps
+    const { embeddingRuntime, embeddingIndex, settings, graphSession, activity, logger } =
+      this.#deps
     if (this.#consumeLegacyOptIn()) {
       settings.update({ semanticSearchEnabled: true })
     }
@@ -143,19 +172,26 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
     let loadGate: string | null = null
     let followed: string | null = null
     let stopFollowing: Unlisten | null = null
+    // Identifies the current follow, so a stopped follow's late progress is dropped.
+    let followId = 0
 
     const react = (): void => {
       if (stopped) {
         return
       }
-      const enabled = settings.get().semanticSearchEnabled && this.#mainWindow
+      const hidden = this.#deps.unloadWhenHidden && activity.isHidden()
+      const enabled = settings.get().semanticSearchEnabled && this.#mainWindow && !hidden
       const status = embeddingRuntime.get()
 
-      const nextLoadGate = `${enabled} ${status.status}`
+      const nextLoadGate = `${enabled} ${hidden} ${status.status}`
       if (nextLoadGate !== loadGate) {
         loadGate = nextLoadGate
         if (enabled && status.status === 'uninitialized') {
           void this.ensureModel()
+        } else if (hidden && status.status === 'ready') {
+          embeddingRuntime.unload().catch((cause: unknown) => {
+            logger.warn('failed to unload the embedding model', cause)
+          })
         }
       }
 
@@ -177,6 +213,8 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
         // follow down: its queued work skips and its subscription drops.
         followed = next
         stopFollowing?.()
+        this.#progress.set(null)
+        const id = ++followId
         stopFollowing =
           target === null
             ? null
@@ -184,6 +222,11 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
                 generation: target.generation,
                 fileGeneration: target.fileGeneration,
                 modelId: target.modelId,
+                onProgress: (done, total) => {
+                  if (id === followId) {
+                    this.#progress.set({ done, total })
+                  }
+                },
               })
       }
     }
@@ -192,6 +235,16 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
       deriveStore(settings, selectSemanticSearchEnabled).subscribe(react),
       embeddingRuntime.subscribe(react),
       graphSession.subscribe(react),
+      activity.subscribeHidden(react),
+      activity.subscribeVisible(() => {
+        react()
+        if (this.#deps.unloadWhenHidden) {
+          // Corrects a status that a missed event or a late IPC response left stale.
+          embeddingRuntime.status().catch((cause: unknown) => {
+            logger.warn('failed to poll the embedding runtime status', cause)
+          })
+        }
+      }),
     ]
     // A later start reads the last status the runtime observed; the first one polls.
     embeddingRuntime.status().catch((cause: unknown) => {
@@ -206,6 +259,8 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
       }
       stopFollowing?.()
       stopFollowing = null
+      followId++
+      this.#progress.set(null)
     }
   }
 
