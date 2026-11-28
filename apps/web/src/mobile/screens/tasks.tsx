@@ -227,7 +227,6 @@ export function MobileTasks({ query, onQueryChange }: MobileTasksProps): ReactEl
           // headers and row surfaces inside the scroller, below the iOS scroll
           // indicator.
           className="isolate min-h-0 flex-1 px-safe"
-          endClassName="pb-chrome-safe-offset-24"
           onScroll={closeRevealedRow}
           groups={groups}
           ready={ready}

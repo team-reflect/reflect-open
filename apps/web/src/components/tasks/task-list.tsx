@@ -56,11 +56,6 @@ interface TaskListProps {
    */
   className?: string | undefined
   /**
-   * Classes for the space under the list, such as `pb-8`. virtua sizes its
-   * viewport by the content box, so this space is not padding on the container.
-   */
-  endClassName?: string | undefined
-  /**
    * Called when the list scrolls.
    */
   onScroll?: (() => void) | undefined
@@ -232,7 +227,6 @@ function useScrollMemory(
 export function TaskList({
   ref,
   className,
-  endClassName,
   onScroll: onScrollProp,
   onContextMenu,
   groups,
@@ -343,7 +337,9 @@ export function TaskList({
           }}
         </Virtualizer>
       </ItemsContext>
-      <div aria-hidden className={endClassName} />
+      {/* Space under the list, clear of the mobile chrome. It is not padding on
+          the container: virtua sizes its viewport by the content box. */}
+      <div aria-hidden className="pb-chrome-safe-offset-8" />
     </div>
   )
 }

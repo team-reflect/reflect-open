@@ -68,11 +68,9 @@ export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
             />
           )}
         </Virtualizer>
-        {/* Keyboard avoidance is the shell root's job (it ends at the keyboard's
-            top); this space only clears the home indicator when the keyboard is
-            down. It is a sibling, not padding: virtua sizes its viewport by the
-            content box. */}
-        <div aria-hidden className="pb-safe" />
+        {/* Space under the list, clear of the chrome. It is not padding on the
+            container: virtua sizes its viewport by the content box. */}
+        <div aria-hidden className="pb-chrome-safe-offset-8" />
       </div>
       {deletePath !== null ? (
         <ConfirmDrawer

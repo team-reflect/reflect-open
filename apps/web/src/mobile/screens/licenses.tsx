@@ -15,11 +15,7 @@ export function MobileLicenses(): ReactElement {
         title="Licenses"
         hidesTabBar
       />
-      <LicenseList
-        className="flex-1 px-safe-offset-4"
-        startInset={12}
-        endClassName="pb-chrome-safe-offset-3"
-      />
+      <LicenseList className="flex-1 px-safe-offset-4" />
     </div>
   )
 }
