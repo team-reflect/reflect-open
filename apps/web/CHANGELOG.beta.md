@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.21.0-beta.5...v0.21.0-beta.6) (2026-11-28)
+
+
+### Bug Fixes
+
+* **mobile:** adjust swipe action animation ([#2397](https://github.com/team-reflect/reflect-open/issues/2397)) ([8451113](https://github.com/team-reflect/reflect-open/commit/84511131e478e6d8924cf6d633646f330b25f353))
+* **mobile:** hide swipe pills until their animation starts ([#2395](https://github.com/team-reflect/reflect-open/issues/2395)) ([773f44a](https://github.com/team-reflect/reflect-open/commit/773f44aa33ba0f09047106e981b51034cbf56228))
+
 ## [0.21.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.21.0-beta.4...v0.21.0-beta.5) (2026-11-28)
 
 
