@@ -326,10 +326,11 @@ describe('start', () => {
     })
 
     settings.update({ semanticSearchEnabled: true })
-    await vi.waitFor(() => { return expect(
+    await vi.waitFor(() => {
+      return expect(
         logger.getInfos().filter((entry) => entry.message === 'embedding backfill finished'),
-      ).toHaveLength(2) },
-    )
+      ).toHaveLength(2)
+    })
     expect(seen.filter((progress) => progress !== null)).toEqual([])
     expect(maxHolds).toBe(0)
     unsubscribe()
