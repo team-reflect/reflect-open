@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { returnNull, sleep } from '@ocavue/utils'
+import { noop, returnNull } from '@ocavue/utils'
 import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createTestPlatformService } from '../testing/platform.ts'
@@ -46,13 +46,10 @@ describe('ScreenService', () => {
     await vi.waitFor(() => expect(logger.getErrors()).toHaveLength(1))
   })
 
-  it('sends nothing on desktop', async () => {
-    const { logger, screen, sent } = setup('desktop')
+  it('sends nothing on desktop', () => {
+    const { screen, sent } = setup('desktop')
 
-    screen.keepAwake()()
-    await sleep(0)
-
+    expect(screen.keepAwake()).toBe(noop)
     expect(sent()).toEqual([])
-    expect(logger.getErrors()).toEqual([])
   })
 })

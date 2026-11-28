@@ -50,7 +50,8 @@ export type SemanticSearchGraphSource = Store<Pick<GraphSessionState, 'graph' | 
  * rebuild (`IndexLifecycleService.onReconciled` with `source: 'rebuild'`):
  * `index_clear` wiped the embedding tables with everything else, and semantic
  * search would otherwise stay silently empty until some other trigger
- * re-embedded. The rebuild request stays in flight until that backfill ends.
+ * re-embedded. The rebuild request stays in flight, with the screen kept on,
+ * until that backfill ends.
  */
 export interface SemanticSearchService {
   /**
@@ -215,7 +216,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
     let followId = 0
     let releaseScreen: Unlisten | null = null
 
-    const holdScreen = (): void => {
+    const syncScreenHold = (): void => {
       const progress = this.#progress.get()
       const indexing = progress !== null && progress.done < progress.total
       if (indexing && releaseScreen === null) {
@@ -292,7 +293,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
       activity.subscribeHidden(react),
       network.expensive.subscribe(react),
       this.#expensiveAllowed.subscribe(react),
-      this.#progress.subscribe(holdScreen),
+      this.#progress.subscribe(syncScreenHold),
       network.watch(),
       activity.subscribeVisible(() => {
         react()
@@ -315,7 +316,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
       stopFollowing?.()
       stopFollowing = null
       followId++
-      // Before the unlisten, so `holdScreen` sees the cleared progress.
+      // Before the unlisten, so `syncScreenHold` sees the cleared progress.
       this.#progress.set(null)
       for (const unlisten of unlisteners) {
         unlisten()
