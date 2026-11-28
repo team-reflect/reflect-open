@@ -1,12 +1,17 @@
 import { page, userEvent } from 'vitest/browser'
 import { describe, expect, it } from 'vitest'
 import type { EmbedStatus } from '@reflect/core'
-import { createTestCoreServices, createTestEmbeddingRuntimeService } from '@reflect/core/testing'
+import {
+  createTestCoreServices,
+  createTestDatabaseService,
+  createTestEmbeddingRuntimeService,
+} from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { SearchSection } from './search-section.tsx'
 
 async function renderSection(status: EmbedStatus) {
   const core = createTestCoreServices({
+    database: createTestDatabaseService(),
     embeddingRuntime: createTestEmbeddingRuntimeService({ status }),
   })
   await renderInApp(<SearchSection />, { core, settings: { semanticSearchEnabled: true } })

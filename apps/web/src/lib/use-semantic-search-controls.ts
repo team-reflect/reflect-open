@@ -1,18 +1,17 @@
-import { useState } from 'react'
 import type { EmbeddingProgress, EmbedStatus } from '@reflect/core'
 import { useEmbedStatus } from '@/lib/use-embed-status.ts'
 import { useStore } from '@/lib/use-store.ts'
 import { useSemanticSearchEnabled, useSettingsService } from '@/providers/settings-provider.tsx'
-import { useCoreServices } from '@/services/services-provider.tsx'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 export const SEMANTIC_SEARCH_DESCRIPTION = 'Find notes by meaning, not just keywords.'
 
-export const SEMANTIC_SEARCH_DOWNLOAD_CONSENT = {
+const DOWNLOAD_CONSENT = {
   title: 'Download over cellular?',
   message: 'Semantic search downloads a 330 MB model',
   confirm: 'Download',
-  dismiss: 'Not Now',
-} as const
+  cancel: 'Not Now',
+}
 
 /**
  * Where semantic search is, as both settings screens show it.
@@ -30,8 +29,9 @@ export type SemanticSearchPhase =
 export interface SemanticSearchControls {
   phase: SemanticSearchPhase
   /**
-   * Turn semantic search on, or ask first when that downloads the model over
-   * an expensive connection. It also retries a `failed` load.
+   * Turn semantic search on. It asks first in a system alert when that
+   * downloads the model over an expensive connection, and it also retries a
+   * `failed` load.
    */
   enable: () => void
   disable: () => void
@@ -43,10 +43,6 @@ export interface SemanticSearchControls {
    * Download the model over the expensive connection that the load waits on.
    */
   downloadNow: () => void
-  /**
-   * The question before a download over an expensive connection.
-   */
-  consent: { open: boolean; confirm: () => void; dismiss: () => void }
 }
 
 function phaseOf(
@@ -123,9 +119,9 @@ export function useSemanticSearchControls(): SemanticSearchControls {
   const settingsService = useSettingsService()
   const status = useEmbedStatus()
   const { semanticSearch } = useCoreServices()
+  const { dialog } = useAppServices()
   const waiting = useStore(semanticSearch.waitingForNetwork)
   const progress = useStore(semanticSearch.progress)
-  const [pending, setPending] = useState<(() => void) | null>(null)
 
   const turnOn = (): void => {
     settingsService.update({ semanticSearchEnabled: true })
@@ -136,10 +132,12 @@ export function useSemanticSearchControls(): SemanticSearchControls {
   }
   const askFirst = async (load: () => void): Promise<void> => {
     if (await semanticSearch.needsDownloadConsent()) {
-      setPending(() => load)
-    } else {
-      load()
+      if (!(await dialog.confirm(DOWNLOAD_CONSENT))) {
+        return
+      }
+      semanticSearch.allowExpensiveDownload()
     }
+    load()
   }
 
   return {
@@ -148,14 +146,5 @@ export function useSemanticSearchControls(): SemanticSearchControls {
     disable: () => settingsService.update({ semanticSearchEnabled: false }),
     retry: () => void askFirst(reload),
     downloadNow: () => semanticSearch.allowExpensiveDownload(),
-    consent: {
-      open: pending !== null,
-      confirm: () => {
-        semanticSearch.allowExpensiveDownload()
-        pending?.()
-        setPending(null)
-      },
-      dismiss: () => setPending(null),
-    },
   }
 }
