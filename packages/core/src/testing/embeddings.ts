@@ -1,6 +1,8 @@
 import type { ChunkToEmbed } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import type { ActivityPort } from '../ports/activity-port.ts'
+import type { NetworkService } from '../ipc/network-service.ts'
+import { createTestNetworkService } from './plugins.ts'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
@@ -60,6 +62,10 @@ export interface TestEmbeddingRuntimeServiceOptions {
    * The vector for one text. Defaults to a unit vector.
    */
   vectors?: (text: string) => number[]
+  /**
+   * Whether the model file is on disk. Defaults to `true`.
+   */
+  downloaded?: boolean | undefined
 }
 
 export interface TestEmbeddingRuntimeService extends EmbeddingRuntimeService {
@@ -85,6 +91,10 @@ export interface TestEmbeddingRuntimeService extends EmbeddingRuntimeService {
    * How many times `unload` ran.
    */
   unloadCalls(): number
+  /**
+   * Set whether the model file is on disk.
+   */
+  setDownloaded(downloaded: boolean): void
 }
 
 /**
@@ -111,10 +121,12 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
   #status: EmbedStatus
   #ensures = 0
   #unloads = 0
+  #downloaded: boolean
 
   constructor(options?: TestEmbeddingRuntimeServiceOptions) {
     this.#status = options?.status ?? { status: 'ready', model: TEST_EMBED_MODEL }
     this.#vectors = options?.vectors ?? unitVector
+    this.#downloaded = options?.downloaded ?? true
     this.#ipc = createTestIpcBridgeService({
       commands: {
         embed_status: () => this.#status,
@@ -122,6 +134,7 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
           this.#ensures++
           return this.#status
         },
+        embed_model_downloaded: () => this.#downloaded,
         embed_query: (args) => this.#embed([String(args['text'])])[0],
         embed_unload: () => {
           this.#unloads++
@@ -144,6 +157,10 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
 
   ensure(): Promise<EmbedStatus> {
     return this.#inner.ensure()
+  }
+
+  modelDownloaded(): Promise<boolean> {
+    return this.#inner.modelDownloaded()
   }
 
   awaitTerminalStatus(initial: EmbedStatus): Promise<EmbedStatus> {
@@ -190,6 +207,10 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
 
   unloadCalls(): number {
     return this.#unloads
+  }
+
+  setDownloaded(downloaded: boolean): void {
+    this.#downloaded = downloaded
   }
 
   #embed(texts: string[]): number[][] {
@@ -460,6 +481,7 @@ export interface TestSemanticSearchServiceOptions {
   indexLifecycle?: IndexLifecycleService
   graphSession?: SemanticSearchGraphSource
   activity?: ActivityPort
+  network?: NetworkService
   unloadWhenHidden?: boolean
   logger?: LoggerService
 }
@@ -474,11 +496,13 @@ export interface TestSemanticSearchService extends SemanticSearchService {
 class TestSemanticSearchServiceImpl implements TestSemanticSearchService {
   readonly #inner: SemanticSearchService
   readonly progress: Store<EmbeddingProgress | null>
+  readonly waitingForNetwork: Store<boolean>
   #running = 0
 
   constructor(inner: SemanticSearchService) {
     this.#inner = inner
     this.progress = inner.progress
+    this.waitingForNetwork = inner.waitingForNetwork
   }
 
   start(): Unlisten {
@@ -500,6 +524,14 @@ class TestSemanticSearchServiceImpl implements TestSemanticSearchService {
 
   retryFailedModel(): Promise<void> {
     return this.#inner.retryFailedModel()
+  }
+
+  needsDownloadConsent(): Promise<boolean> {
+    return this.#inner.needsDownloadConsent()
+  }
+
+  allowExpensiveDownload(): void {
+    this.#inner.allowExpensiveDownload()
   }
 
   similarNotes(path: string): Promise<RetrievalHit[]> {
@@ -539,6 +571,7 @@ export function createTestSemanticSearchService(
       graphSession:
         options?.graphSession ?? createTestGraphSessionService({ indexLifecycle, logger }),
       activity: options?.activity ?? createTestActivityPort(),
+      network: options?.network ?? createTestNetworkService(),
       unloadWhenHidden: options?.unloadWhenHidden ?? false,
       logger,
     }),

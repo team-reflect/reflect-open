@@ -10,6 +10,7 @@ import {
   createTestIndexLifecycleService,
   createTestIndexStoreService,
   createTestLoggerService,
+  createTestNetworkService,
   createTestNoteFileService,
   createTestProgressPort,
   createTestRetrievalService,
@@ -40,6 +41,14 @@ async function setup(options?: {
   relatedNotes?: (path: string, limit?: number) => RetrievalHit[]
   unloadWhenHidden?: boolean
   /**
+   * Whether the connection is expensive. Defaults to `false`.
+   */
+  expensive?: boolean
+  /**
+   * Whether the model file is on disk. Defaults to `true`.
+   */
+  downloaded?: boolean
+  /**
    * Notes in the index and on disk for the embedding pass.
    */
   notes?: { path: string; markdown: string }[]
@@ -55,7 +64,11 @@ async function setup(options?: {
       ? {}
       : { local: { 'reflect.semantic.enabled': options.legacyOptIn } },
   )
-  const runtime = createTestEmbeddingRuntimeService({ status: options?.status ?? READY })
+  const runtime = createTestEmbeddingRuntimeService({
+    status: options?.status ?? READY,
+    downloaded: options?.downloaded,
+  })
+  const network = createTestNetworkService({ expensive: options?.expensive ?? false })
   const session = createGraphSession({ ...GRAPH, indexGeneration: 7 })
   const indexLifecycle = createTestIndexLifecycleService({
     logger,
@@ -101,12 +114,14 @@ async function setup(options?: {
     indexLifecycle,
     graphSession,
     activity,
+    network,
     unloadWhenHidden: options?.unloadWhenHidden ?? false,
     logger,
   })
   return {
     semanticSearch,
     activity,
+    network,
     settings,
     storage,
     runtime,
@@ -353,6 +368,68 @@ describe('start', () => {
     expect(runtime.ensureCalls()).toBe(0)
     expect(embeddingIndex.follows()).toEqual([])
     expect(semanticSearch.running()).toBe(0)
+  })
+})
+
+describe('on an expensive connection', () => {
+  it('waits for a free connection before it downloads the model', async () => {
+    const { semanticSearch, runtime, network } = await setup({
+      status: { status: 'uninitialized' },
+      expensive: true,
+      downloaded: false,
+    })
+    const stop = semanticSearch.start()
+    await vi.waitFor(() => expect(semanticSearch.waitingForNetwork.get()).toBe(true))
+    expect(runtime.ensureCalls()).toBe(0)
+
+    network.setExpensive(false)
+    await vi.waitFor(() => expect(runtime.ensureCalls()).toBe(1))
+    expect(semanticSearch.waitingForNetwork.get()).toBe(false)
+    stop()
+  })
+
+  it('downloads the model once the user allows it', async () => {
+    const { semanticSearch, runtime } = await setup({
+      status: { status: 'uninitialized' },
+      expensive: true,
+      downloaded: false,
+    })
+    const stop = semanticSearch.start()
+    await vi.waitFor(() => expect(semanticSearch.waitingForNetwork.get()).toBe(true))
+    await expect(semanticSearch.needsDownloadConsent()).resolves.toBe(true)
+
+    semanticSearch.allowExpensiveDownload()
+    await vi.waitFor(() => expect(runtime.ensureCalls()).toBe(1))
+    expect(semanticSearch.waitingForNetwork.get()).toBe(false)
+    await expect(semanticSearch.needsDownloadConsent()).resolves.toBe(false)
+    stop()
+  })
+
+  it('loads a downloaded model without asking', async () => {
+    const { semanticSearch, runtime } = await setup({
+      status: { status: 'uninitialized' },
+      expensive: true,
+    })
+    await expect(semanticSearch.needsDownloadConsent()).resolves.toBe(false)
+
+    const stop = semanticSearch.start()
+    await vi.waitFor(() => expect(runtime.ensureCalls()).toBe(1))
+    expect(semanticSearch.waitingForNetwork.get()).toBe(false)
+    stop()
+  })
+
+  it('stops waiting when semantic search is turned off', async () => {
+    const { semanticSearch, settings } = await setup({
+      status: { status: 'uninitialized' },
+      expensive: true,
+      downloaded: false,
+    })
+    const stop = semanticSearch.start()
+    await vi.waitFor(() => expect(semanticSearch.waitingForNetwork.get()).toBe(true))
+
+    settings.update({ semanticSearchEnabled: false })
+    expect(semanticSearch.waitingForNetwork.get()).toBe(false)
+    stop()
   })
 })
 

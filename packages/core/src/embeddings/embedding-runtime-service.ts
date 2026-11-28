@@ -55,6 +55,11 @@ export interface EmbeddingRuntimeService extends Store<EmbedStatus> {
    */
   ensure(): Promise<EmbedStatus>
   /**
+   * Whether the model file is on disk, so {@link ensure} loads it without a
+   * download.
+   */
+  modelDownloaded(): Promise<boolean>
+  /**
    * Resolve once the runtime leaves `uninitialized` / `loading`, starting
    * from `initial` (usually what {@link ensure} returned).
    */
@@ -115,6 +120,10 @@ class EmbeddingRuntimeServiceImpl implements EmbeddingRuntimeService {
 
   async ensure(): Promise<EmbedStatus> {
     return this.#observe(await this.#deps.ipc.call('embed_ensure', {}))
+  }
+
+  modelDownloaded(): Promise<boolean> {
+    return this.#deps.ipc.call('embed_model_downloaded', {})
   }
 
   async awaitTerminalStatus(initial: EmbedStatus): Promise<EmbedStatus> {

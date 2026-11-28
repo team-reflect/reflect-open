@@ -21,6 +21,7 @@ export type { Unlisten } from './unlisten.ts'
 export { combineStores, deriveStore, type Store, WritableStore } from './store.ts'
 
 export { type HapticsService } from './ipc/haptics-service.ts'
+export { type NetworkService } from './ipc/network-service.ts'
 export { type AudioRecorderFinalSegment } from './audio/audio-recorder-service.ts'
 export { type IcloudStatus } from './ipc/icloud-native-service.ts'
 export {

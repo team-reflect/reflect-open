@@ -2,7 +2,10 @@ import type { Unlisten } from '../unlisten.ts'
 import type { AppStoreService } from '../ipc/app-store-service.ts'
 import type { IapProduct, IapService } from '../ipc/iap-service.ts'
 import type { HapticsService } from '../ipc/haptics-service.ts'
+import type { NetworkService } from '../ipc/network-service.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { WebAuthOptions, WebAuthService } from '../ipc/web-auth-service.ts'
+import { noop } from '@ocavue/utils'
 
 export interface TestHapticsService extends HapticsService {
   /**
@@ -34,6 +37,38 @@ class TestHapticsServiceImpl implements TestHapticsService {
  */
 export function createTestHapticsService(): TestHapticsService {
   return new TestHapticsServiceImpl()
+}
+
+export interface TestNetworkService extends NetworkService {
+  /**
+   * Change whether the connection is expensive.
+   */
+  setExpensive(expensive: boolean): void
+}
+
+class TestNetworkServiceImpl implements TestNetworkService {
+  readonly #expensive: WritableStore<boolean>
+  readonly expensive: Store<boolean>
+
+  constructor(expensive: boolean) {
+    this.#expensive = new WritableStore(expensive)
+    this.expensive = this.#expensive
+  }
+
+  watch(): Unlisten {
+    return noop
+  }
+
+  setExpensive(expensive: boolean): void {
+    this.#expensive.set(expensive)
+  }
+}
+
+/**
+ * A {@link NetworkService} whose connection the test sets; free by default.
+ */
+export function createTestNetworkService(options?: { expensive?: boolean }): TestNetworkService {
+  return new TestNetworkServiceImpl(options?.expensive ?? false)
 }
 
 export interface TestIapService extends IapService {
