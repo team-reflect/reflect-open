@@ -279,14 +279,14 @@ describe('removeNote', () => {
 describe('backfill', () => {
   it('embeds every indexed note but the templates, in path order, with progress', async () => {
     const { index, storedPaths } = setupGraph()
-    const progress: Array<[number, number]> = []
+    const progress: Array<[number, number, number]> = []
 
     const result = await index.backfill({
       generation: 3,
       fileGeneration: 1,
       modelId: TEST_EMBED_MODEL,
-      onProgress: (done, total) => {
-        progress.push([done, total])
+      onProgress: (done, total, embedded) => {
+        progress.push([done, total, embedded])
       },
     })
 
@@ -296,10 +296,30 @@ describe('backfill', () => {
       ['notes/b.md', 3],
     ])
     expect(progress).toEqual([
-      [1, 2],
-      [2, 2],
+      [1, 2, 1],
+      [2, 2, 2],
     ])
     expect(storedPaths()).toEqual(['notes/a.md', 'notes/b.md'])
+  })
+
+  it('counts no embedded notes on a pass over unchanged notes', async () => {
+    const { index } = setupGraph()
+    await index.backfill({ generation: 3, fileGeneration: 1, modelId: TEST_EMBED_MODEL })
+    const progress: Array<[number, number, number]> = []
+
+    await index.backfill({
+      generation: 3,
+      fileGeneration: 1,
+      modelId: TEST_EMBED_MODEL,
+      onProgress: (done, total, embedded) => {
+        progress.push([done, total, embedded])
+      },
+    })
+
+    expect(progress).toEqual([
+      [1, 2, 0],
+      [2, 2, 0],
+    ])
   })
 
   it('logs one summary line per pass', async () => {
@@ -308,7 +328,7 @@ describe('backfill', () => {
     await index.backfill({ generation: 3, fileGeneration: 1, modelId: TEST_EMBED_MODEL })
     await index.backfill({ generation: 3, fileGeneration: 1, modelId: TEST_EMBED_MODEL })
 
-    const summary = {
+    const summary = (embedded: number) => ({
       message: 'embedding backfill finished',
       cause: {
         outcome: 'completed',
@@ -316,13 +336,13 @@ describe('backfill', () => {
         generation: 3,
         notes: 2,
         done: 2,
-        notesEmbedded: 2,
-        chunksEmbedded: 2,
+        notesEmbedded: embedded,
+        chunksEmbedded: embedded,
         failed: 0,
         elapsedMs: 0,
       },
-    }
-    expect(logger.getInfos()).toEqual([summary, summary])
+    })
+    expect(logger.getInfos()).toEqual([summary(2), summary(0)])
   })
 
   it('aborts between notes once the signal aborts', async () => {

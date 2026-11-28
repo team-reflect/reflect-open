@@ -42,6 +42,13 @@ export interface EmbedNoteOptions {
 }
 
 /**
+ * Called after each note of a backfill: notes visited, all notes, and notes
+ * that needed new vectors. A pass over an embedded graph visits every note
+ * and embeds none.
+ */
+export type EmbeddingProgressListener = (done: number, total: number, embedded: number) => void
+
+/**
 
  * How a backfill ended: every note visited, stopped by `signal`, or the note list unreadable.
 
@@ -52,7 +59,7 @@ export interface EmbeddingBackfillOptions {
   generation: number
   fileGeneration: number
   modelId: string
-  onProgress?: ((done: number, total: number) => void) | undefined
+  onProgress?: EmbeddingProgressListener | undefined
   /**
    * Abort between notes (e.g. graph switch).
    */
@@ -106,7 +113,7 @@ export interface EmbeddingFollowOptions {
   /**
    * Called after each note of the first backfill.
    */
-  onProgress?: (done: number, total: number) => void
+  onProgress?: EmbeddingProgressListener
 }
 
 export interface EmbeddingIndexServiceDeps {
@@ -315,7 +322,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
         logger.error(`embedding backfill failed for ${path}:`, cause)
       }
       counts.done += 1
-      onProgress?.(counts.done, paths.length)
+      onProgress?.(counts.done, paths.length, counts.notesEmbedded)
     }
     return 'completed'
   }
