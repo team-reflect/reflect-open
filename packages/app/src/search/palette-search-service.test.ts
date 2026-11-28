@@ -4,12 +4,14 @@ import {
   createSearchService,
   createSuggestionService,
   createWikiResolverService,
+  parseSearchQuery,
   type FilteredSearchHit,
   type ParsedSearchQuery,
   type RetrieveOptions,
 } from '@reflect/core'
 import {
   createTestClockService,
+  createTestCoreServices,
   createTestDatabaseService,
   createTestLoggerService,
   createTestPlatformService,
@@ -17,6 +19,7 @@ import {
   seedNotes,
 } from '@reflect/core/testing'
 import { createCommandService } from '../commands/command-service.ts'
+import { ALL_NOTES_SEARCH_LIMIT } from './all-notes-filters.ts'
 import { createPaletteSearchService } from './palette-search-service.ts'
 import { noop } from '@ocavue/utils'
 
@@ -61,8 +64,9 @@ function setup() {
     platform: createTestPlatformService(),
     logger: createTestLoggerService(),
   })
+  const database = createTestDatabaseService()
   const service = createPaletteSearchService({
-    suggestions: createSuggestionService({ database: createTestDatabaseService() }),
+    suggestions: createSuggestionService({ database }),
     search: {
       searchWithFilters: (parsed) => {
         searches.push(parsed)
@@ -70,6 +74,7 @@ function setup() {
       },
     },
     retrieval,
+    indexQuery: createTestCoreServices({ database }).indexQuery,
     commands,
     clock: createTestClockService({ now: NOON_JUNE_9 }),
     noteList: { listVisitedNotes: () => Promise.resolve([]) },
@@ -94,6 +99,7 @@ describe('PaletteSearchService', () => {
         wikiResolver: createWikiResolverService({ database }),
       }),
       retrieval: createTestRetrievalService(),
+      indexQuery: createTestCoreServices({ database }).indexQuery,
       commands: createCommandService({
         platform: createTestPlatformService(),
         logger: createTestLoggerService(),
@@ -129,6 +135,7 @@ describe('PaletteSearchService', () => {
         wikiResolver: createWikiResolverService({ database }),
       }),
       retrieval: createTestRetrievalService(),
+      indexQuery: createTestCoreServices({ database }).indexQuery,
       commands: createCommandService({
         platform: createTestPlatformService(),
         logger: createTestLoggerService(),
@@ -183,6 +190,96 @@ describe('PaletteSearchService', () => {
     await service.search('#work is:daily', { hybrid: true })
     expect(searches).toMatchObject([
       { filtered: true, filters: { tags: ['work'], dailyOnly: true } },
+    ])
+    expect(retrieval.retrieveCalls()).toEqual([])
+  })
+
+  it('adapts hybrid hits to All tab rows with their file time and pin', async () => {
+    const database = createTestDatabaseService()
+    seedNotes(database, [
+      { path: 'notes/rust.md', markdown: '---\npinned: true\n---\n# Rust Notes\n', mtime: 5 },
+      { path: 'daily/2026-06-08.md', markdown: 'Ferris\n', mtime: 7 },
+    ])
+    const retrieval = createTestRetrievalService({
+      retrieve: () => [
+        {
+          path: 'notes/rust.md',
+          title: 'Rust Notes',
+          score: 0.9,
+          snippet: 'borrow checker notes',
+          heading: null,
+          isPrivate: false,
+        },
+        {
+          path: 'daily/2026-06-08.md',
+          title: '2026-06-08',
+          score: 0.5,
+          snippet: '',
+          heading: null,
+          isPrivate: false,
+        },
+        {
+          path: 'notes/gone.md',
+          title: 'Gone',
+          score: 0.4,
+          snippet: 'removed since',
+          heading: null,
+          isPrivate: false,
+        },
+      ],
+    })
+    const service = createPaletteSearchService({
+      suggestions: createSuggestionService({ database }),
+      search: createSearchService({
+        database,
+        wikiResolver: createWikiResolverService({ database }),
+      }),
+      retrieval,
+      indexQuery: createTestCoreServices({ database }).indexQuery,
+      commands: createCommandService({
+        platform: createTestPlatformService(),
+        logger: createTestLoggerService(),
+      }),
+      clock: createTestClockService(),
+      noteList: { listVisitedNotes: () => Promise.resolve([]) },
+    })
+
+    await expect(
+      service.searchAllNotes(parseSearchQuery('rust'), { hybrid: true }),
+    ).resolves.toEqual([
+      {
+        path: 'notes/rust.md',
+        title: 'Rust Notes',
+        highlightedTitle: 'Rust Notes',
+        dailyDate: null,
+        snippet: 'borrow checker notes',
+        preview: '',
+        mtime: 5,
+        isPinned: true,
+      },
+      {
+        path: 'daily/2026-06-08.md',
+        title: '2026-06-08',
+        highlightedTitle: '2026-06-08',
+        dailyDate: '2026-06-08',
+        snippet: null,
+        preview: '',
+        mtime: 7,
+        isPinned: false,
+      },
+    ])
+    const options: RetrieveOptions = { mode: 'hybrid', limit: ALL_NOTES_SEARCH_LIMIT }
+    expect(retrieval.retrieveCalls()).toEqual([{ query: 'rust', options }])
+    database.close()
+  })
+
+  it('keeps the All tab list and filtered queries on the filtered search', async () => {
+    const { service, searches, retrieval } = setup()
+    await service.searchAllNotes(parseSearchQuery(''), { hybrid: true })
+    await service.searchAllNotes(parseSearchQuery('rust is:pinned'), { hybrid: true })
+    expect(searches).toMatchObject([
+      { text: '', filtered: false },
+      { text: 'rust', filtered: true },
     ])
     expect(retrieval.retrieveCalls()).toEqual([])
   })

@@ -287,6 +287,7 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
     suggestions: core.suggestions,
     search: core.search,
     retrieval: core.retrieval,
+    indexQuery: core.indexQuery,
     commands,
     clock: core.clock,
     noteList: core.noteList,

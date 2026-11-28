@@ -1,11 +1,16 @@
 import {
   dateFromDailyPath,
+  displayNoteTitle,
   parseSearchQuery,
   updatedPresetFilter,
   wikiLinkTargetForTitle,
   type ClockService,
   type DateSuggestionContext,
+  type FilteredSearchHit,
+  type IndexQueryService,
   type NoteListService,
+  type ParsedSearchQuery,
+  type RetrievalHit,
   type RetrievalService,
   type SearchService,
   type SuggestionService,
@@ -15,6 +20,7 @@ import {
 } from '@reflect/core'
 import type { Command } from '../commands/app-commands.ts'
 import type { CommandService } from '../commands/command-service.ts'
+import { ALL_NOTES_SEARCH_LIMIT, searchPlanFor } from './all-notes-filters.ts'
 import { buildPaletteSections, type PaletteHit, type PaletteSections } from './palette-entries.ts'
 
 /**
@@ -68,6 +74,15 @@ export interface PaletteSearchService {
    */
   search(text: string, options: { hybrid: boolean }): Promise<PaletteHit[]>
   /**
+   * The mobile All tab's rows for a composed query, run per `searchPlanFor`.
+   * With `hybrid`, plain text blends semantic hits like {@link search}; a
+   * filtered query and the no-text list stay on the filtered search.
+   */
+  searchAllNotes(
+    parsed: ParsedSearchQuery,
+    options: { hybrid: boolean },
+  ): Promise<FilteredSearchHit[]>
+  /**
    * Merge the data with every registered command into the palette's sections.
    */
   sections(input: PaletteSectionsInput): PaletteSections<Command>
@@ -81,6 +96,7 @@ export interface PaletteSearchServiceDeps {
   readonly suggestions: SuggestionService
   readonly search: SearchService
   readonly retrieval: RetrievalService
+  readonly indexQuery: IndexQueryService
   readonly commands: CommandService
   readonly clock: ClockService
   readonly noteList: Pick<NoteListService, 'listVisitedNotes'>
@@ -134,16 +150,43 @@ class PaletteSearchServiceImpl implements PaletteSearchService {
     if (!options.hybrid || parsed.filtered) {
       return await search.searchWithFilters(parsed)
     }
-    // Adapt RetrievalHit → PaletteHit: semantic chunk text rides in
-    // the snippet slot, and the path stands in for the dailyDate the
-    // retrieval contract doesn't carry.
     const hits = await retrieval.retrieve(text, { mode: 'hybrid' })
-    return hits.map((hit) => ({
-      path: hit.path,
-      title: hit.title,
-      dailyDate: dateFromDailyPath(hit.path),
-      snippet: hit.snippet === '' ? null : hit.snippet,
-    }))
+    return hits.map(paletteHitFor)
+  }
+
+  async searchAllNotes(
+    parsed: ParsedSearchQuery,
+    options: { hybrid: boolean },
+  ): Promise<FilteredSearchHit[]> {
+    const { search, retrieval, indexQuery } = this.#deps
+    if (!options.hybrid || parsed.filtered || parsed.text === '') {
+      return await search.searchWithFilters(parsed, searchPlanFor(parsed))
+    }
+    const hits = await retrieval.retrieve(parsed.text, {
+      mode: 'hybrid',
+      limit: ALL_NOTES_SEARCH_LIMIT,
+    })
+    const [facts, pinned] = await Promise.all([
+      indexQuery.getIndexedFileFactsByPath(hits.map((hit) => hit.path)),
+      indexQuery.getPinnedNotes(),
+    ])
+    const pinnedPaths = new Set(pinned.map((note) => note.path))
+    // A note that left the index between the two reads leaves the rows.
+    return hits.flatMap((hit): FilteredSearchHit[] => {
+      const fileFacts = facts.get(hit.path)
+      if (fileFacts === undefined) {
+        return []
+      }
+      return [
+        {
+          ...paletteHitFor(hit),
+          highlightedTitle: displayNoteTitle(hit.title),
+          preview: '',
+          mtime: fileFacts.mtime,
+          isPinned: pinnedPaths.has(hit.path),
+        },
+      ]
+    })
   }
 
   sections(input: PaletteSectionsInput): PaletteSections<Command> {
@@ -156,6 +199,20 @@ class PaletteSearchServiceImpl implements PaletteSearchService {
 
   updatedPresetFilter(preset: UpdatedPreset): UpdatedFilter {
     return updatedPresetFilter(preset, new Date(this.#deps.clock.now()))
+  }
+}
+
+/**
+ * A retrieval hit in the shape of a search hit. Semantic chunk text rides in
+ * the snippet slot, and the path gives the daily date that retrieval hits do
+ * not carry.
+ */
+function paletteHitFor(hit: RetrievalHit): PaletteHit {
+  return {
+    path: hit.path,
+    title: hit.title,
+    dailyDate: dateFromDailyPath(hit.path),
+    snippet: hit.snippet === '' ? null : hit.snippet,
   }
 }
 

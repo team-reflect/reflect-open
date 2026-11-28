@@ -159,12 +159,12 @@ search: the `embed_unsupported.rs` stand-in reports the `unsupported` status.
    > All from another tab returns to it, in place and with the list beneath
    > it so Back lands on All, and tapping All again, or double-tapping it
    > (search focused), goes back to the list.
-3. **Lexical-only, stated honestly.** Mobile passes
-   `semanticSearchEnabled: false` into `streamChat` unconditionally —
-   regardless of the (per-device) setting — so `search_notes` runs
-   `mode: 'lexical'` and the tool description tells the model it's keyword
-   search. Never rely on hybrid's degrade-on-error to absorb the missing
-   embed runtime.
+3. **Search mode follows the runtime, stated honestly.** Mobile chat takes
+   the desktop path: `search_notes` runs `mode: 'hybrid'` only when the
+   (per-device) setting is on and the embedding runtime is `ready`, else
+   `mode: 'lexical'`, and the tool description tells the model which one it
+   gets. Never rely on hybrid's degrade-on-error to absorb a missing embed
+   runtime.
 4. **Providers are configured per device.** The Chat screen with no configured
    provider renders a CTA to Settings → AI. Keys are validated on entry
    (`validate-key.ts`, over `providerFetch`), stored only under
@@ -284,9 +284,9 @@ search: the `embed_unsupported.rs` stand-in reports the `unsupported` status.
   afterward), asks a question about their notes from the All tab, and
   watches the answer stream in with tool chips and tappable `[[wiki link]]`
   citations.
-- `search_notes` on mobile is lexical: tool description says keyword search,
-  and a payload assertion shows `mode: 'lexical'` even when the settings
-  document has `semanticSearchEnabled: true`.
+- `search_notes` on mobile follows contract 3: hybrid with the setting on
+  and the runtime `ready`, lexical (keyword search in the tool description)
+  otherwise.
 - A `private: true` note never appears in results and `read_notes` returns
   the structured refusal — existing core tests stay green, one mobile-mount
   integration test proves the wiring.
