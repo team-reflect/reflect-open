@@ -1,7 +1,7 @@
 /* Each pill grows and fades in while the surface edge crosses its slot. */
 @keyframes swipe-action-grow {
   from {
-    scale: 0.3;
+    scale: 0;
     opacity: 0;
   }
   to {
@@ -14,7 +14,7 @@
    before the compositor picks up the animation paints nothing. */
 @supports (animation-timeline: scroll()) {
   .swipe-action {
-    scale: 0.3;
+    scale: 0;
     opacity: 0;
   }
 }
@@ -33,10 +33,10 @@
 
 /* Only a swiped or open row animates, so a long list holds no idle animations.
    Each action has an equal share of the scroll range, counted from the trailing
-   edge, and it grows over the second half of that share. */
+   edge, and it grows over its whole share. */
 .swipe-row[data-active] .swipe-action {
   animation: swipe-action-grow linear both;
   animation-timeline: scroll(nearest inline);
-  animation-range: calc((sibling-count() - sibling-index() + 0.5) / sibling-count() * 100%)
+  animation-range: calc((sibling-count() - sibling-index()) / sibling-count() * 100%)
     calc((sibling-count() - sibling-index() + 1) / sibling-count() * 100%);
 }
