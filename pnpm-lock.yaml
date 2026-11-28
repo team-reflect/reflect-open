@@ -268,8 +268,8 @@ importers:
         specifier: ^1.4.0
         version: 1.4.0
       virtua:
-        specifier: ^0.54.0
-        version: 0.54.2(react-dom@19.3.1)(react@19.3.1)
+        specifier: ^0.56.0
+        version: 0.56.0(react-dom@19.3.1)(react@19.3.1)
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -5929,20 +5929,23 @@ packages:
   vfile@6.0.3:
     resolution: {integrity: sha512-KzIbH/9tXat2u30jf+smMwFCsno4wHVdNmzFyL+T/L3UGqqk6JKfVqOFOZEpZSHADH1k40ab6NUIXZq422ov3Q==}
 
-  virtua@0.54.2:
-    resolution: {integrity: sha512-lYCAxyXCGkhXVvuKv8a+LklZquy0E9dIObYcOUyo6nP4VSvLeiIsiz94mA3ZKYuM5egkke5RIi2nXi5OIATc7A==}
+  virtua@0.56.0:
+    resolution: {integrity: sha512-KwXPzgT98ZsBn6qhv+OQDnsp7D/UvGmfkaa1dsOF7RGXef7LdlAHdYo0SxOMPQhHlZQBZnOZxjE1uvvBVKLF6Q==}
     peerDependencies:
       '@angular/common': '>=20.0.0'
       '@angular/core': '>=20.0.0'
+      '@solidjs/web': '>=2.0'
       react: '>=16.14.0'
       react-dom: '>=16.14.0'
-      solid-js: '>=1.0'
+      solid-js: '>=2.0'
       svelte: '>=5.0'
       vue: '>=3.2'
     peerDependenciesMeta:
       '@angular/common':
         optional: true
       '@angular/core':
+        optional: true
+      '@solidjs/web':
         optional: true
       react:
         optional: true
@@ -12159,7 +12162,7 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.4
 
-  virtua@0.54.2(react-dom@19.3.1)(react@19.3.1):
+  virtua@0.56.0(react-dom@19.3.1)(react@19.3.1):
     optionalDependencies:
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
