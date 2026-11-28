@@ -17,7 +17,7 @@
   "devDependencies": {
     "@ocavue/tsconfig": "^0.7.1",
     "typescript": "~6.0.3",
-    "vitest": "^5.1.1",
+    "vitest": "^5.1.2",
     "vitest-fail-on-console": "^0.10.1"
   }
 }
