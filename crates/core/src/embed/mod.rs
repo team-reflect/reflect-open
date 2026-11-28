@@ -6,6 +6,7 @@
 
 mod download;
 
+use std::collections::HashMap;
 use std::ffi::{CStr, c_char, c_void};
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
@@ -18,7 +19,9 @@ use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_sys_2::{GGML_LOG_LEVEL_ERROR, GGML_LOG_LEVEL_WARN, ggml_log_level};
-use reflect_types::{AppError, AppResult, ChunkToEmbed, EmbedProgress, EmbedStatus, EmbeddedChunk};
+use reflect_types::{
+    AppError, AppResult, ChunkHash, ChunkToEmbed, EmbedProgress, EmbedStatus, EmbeddedChunk,
+};
 
 use crate::{Core, Host, background_task};
 
@@ -407,23 +410,30 @@ impl Core {
     }
 
     /// Embeds a note's changed chunks and replaces its chunk set in the index
-    /// at `generation`. Returns how many chunks it embedded. Each chunk takes
-    /// the model lock on its own, so a query can run between two chunks of a
-    /// long note.
+    /// at `generation`. Returns how many chunks it embedded. A chunk whose hash
+    /// has a stored row under the runtime's model keeps its vector, so an
+    /// empty set or a set of unchanged chunks needs no loaded model. Each
+    /// chunk takes the model lock on its own, so a query can run between two
+    /// chunks of a long note.
     pub async fn embed_note_chunks(
         &self,
         path: String,
         chunks: Vec<ChunkToEmbed>,
         generation: u64,
     ) -> AppResult<u32> {
-        let model = self.ready_model()?;
-        let (chunks, embedded) = self
-            .spawn_blocking(move || {
-                embed_chunks(chunks, |text| {
+        let stored = self.index.embedding_chunk_hashes(&path)?;
+        let reused = reused_chunks(&chunks, &stored, MODEL.id);
+        let (chunks, embedded) = if reused.contains(&false) {
+            let model = self.ready_model()?;
+            self.spawn_blocking(move || {
+                embed_chunks(chunks, &reused, |text| {
                     embed_one(&model, MODEL.document_prompt, text)
                 })
             })
-            .await?;
+            .await?
+        } else {
+            embed_chunks(chunks, &reused, |_| unreachable!("every chunk is reused"))?
+        };
         let _background_task = background_task::scoped(&self.background_tasks, "embed_note_chunks");
         let current = self.index.current_generation()?.unwrap_or(0);
         self.repair_index(
@@ -441,17 +451,41 @@ impl Core {
     }
 }
 
+/// Marks each chunk that can keep a stored vector: its hash has a stored row
+/// under `model_id`. Each stored row pairs with one chunk, so duplicate chunks
+/// reuse only as many rows as exist.
+fn reused_chunks(chunks: &[ChunkToEmbed], stored: &[ChunkHash], model_id: &str) -> Vec<bool> {
+    let mut available: HashMap<&str, usize> = HashMap::new();
+    for row in stored.iter().filter(|row| row.model_id == model_id) {
+        *available.entry(row.content_hash.as_str()).or_default() += 1;
+    }
+    chunks
+        .iter()
+        .map(
+            |chunk| match available.get_mut(chunk.content_hash.as_str()) {
+                Some(count) if *count > 0 => {
+                    *count -= 1;
+                    true
+                }
+                _ => false,
+            },
+        )
+        .collect()
+}
+
 /// Gives each chunk that is not reused a vector from `embed`, in order, and
 /// counts them. Every chunk carries the runtime's model id.
 fn embed_chunks(
     chunks: Vec<ChunkToEmbed>,
+    reused: &[bool],
     mut embed: impl FnMut(&str) -> AppResult<Vec<f32>>,
 ) -> AppResult<(Vec<EmbeddedChunk>, u32)> {
     let mut embedded = 0;
     let chunks = chunks
         .into_iter()
-        .map(|chunk| {
-            let vector = if chunk.reuse {
+        .zip(reused)
+        .map(|(chunk, &reused)| {
+            let vector = if reused {
                 None
             } else {
                 embedded += 1;
@@ -483,22 +517,43 @@ fn embed_one(model: &Mutex<Model>, prompt: &str, text: &str) -> AppResult<Vec<f3
 mod tests {
     use super::*;
 
-    fn chunk(text: &str, reuse: bool) -> ChunkToEmbed {
+    fn chunk(text: &str) -> ChunkToEmbed {
         ChunkToEmbed {
             heading: None,
             pos_from: 0,
             pos_to: text.len() as i64,
             text: text.to_string(),
             content_hash: format!("hash-{text}"),
-            reuse,
         }
+    }
+
+    fn stored(text: &str, model_id: &str) -> ChunkHash {
+        ChunkHash {
+            content_hash: format!("hash-{text}"),
+            model_id: model_id.to_string(),
+        }
+    }
+
+    #[test]
+    fn reuses_the_chunks_with_a_stored_row_under_the_model() {
+        let chunks = [chunk("a"), chunk("b"), chunk("c")];
+        let rows = [stored("b", "model"), stored("c", "old-model")];
+        assert_eq!(reused_chunks(&chunks, &rows, "model"), [false, true, false]);
+    }
+
+    #[test]
+    fn duplicate_chunks_reuse_only_as_many_rows_as_exist() {
+        let chunks = [chunk("a"), chunk("a")];
+        let rows = [stored("a", "model")];
+        assert_eq!(reused_chunks(&chunks, &rows, "model"), [true, false]);
     }
 
     #[test]
     fn embeds_only_the_chunks_that_are_not_reused() {
         let mut texts = Vec::new();
         let (chunks, embedded) = embed_chunks(
-            vec![chunk("a", false), chunk("b", true), chunk("c", false)],
+            vec![chunk("a"), chunk("b"), chunk("c")],
+            &[false, true, false],
             |text| {
                 texts.push(text.to_string());
                 Ok(vec![texts.len() as f32])
@@ -514,7 +569,7 @@ mod tests {
 
     #[test]
     fn a_failed_embed_fails_the_whole_note() {
-        let result = embed_chunks(vec![chunk("a", false)], |_| Err(AppError::io("boom")));
+        let result = embed_chunks(vec![chunk("a")], &[false], |_| Err(AppError::io("boom")));
         assert!(result.is_err());
     }
 

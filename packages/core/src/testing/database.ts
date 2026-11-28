@@ -1,4 +1,4 @@
-import type { IndexReadCommand, IndexWriteCommand } from '@reflect/types'
+import type { ChunkToEmbed, IndexReadCommand, IndexWriteCommand } from '@reflect/types'
 import { sha256HexSync } from '@reflect/utils'
 import { createWasmIndexBackend, type WasmIndexBackend } from '@reflect/index-wasm'
 import { toAppError } from '../errors.ts'
@@ -6,6 +6,14 @@ import type { DatabaseService } from '../indexing/database-service.ts'
 import { buildIndexedNote, type IndexedNote } from '../indexing/indexed-note.ts'
 import type { CommandArgs, CommandResult } from '../ipc/ipc-service.ts'
 import { parseNote } from '../markdown/extract.ts'
+
+/**
+ * One chunk of a `test_embed_apply` write, with its vector.
+ */
+export interface TestEmbeddedChunk extends ChunkToEmbed {
+  readonly modelId: string
+  readonly vector: readonly number[]
+}
 
 /**
  * One read command the database ran.
@@ -25,6 +33,11 @@ export interface TestDatabaseService extends DatabaseService {
    * Replace every projected row of `note.path` with `note`, like `index_apply`.
    */
   applyProjection(note: IndexedNote): void
+  /**
+   * Replace the embedding chunk set of `path` with `chunks`, vectors
+   * included, like the native `embed_note_chunks` write.
+   */
+  applyEmbeddings(path: string, chunks: readonly TestEmbeddedChunk[]): void
   /**
    * Run one read-only SQL statement and return its rows, with the column
    * names of the schema. For assertions on rows that no read command returns.
@@ -67,6 +80,10 @@ class TestDatabaseServiceImpl implements TestDatabaseService {
 
   applyProjection(note: IndexedNote): void {
     this.invoke('index_apply', { note, generation: this.generation() })
+  }
+
+  applyEmbeddings(path: string, chunks: readonly TestEmbeddedChunk[]): void {
+    this.#invoke('test_embed_apply', { path, chunks, generation: this.generation() })
   }
 
   invoke<C extends IndexCommand>(command: C, args: CommandArgs<C>): CommandResult<C> {

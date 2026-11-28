@@ -13,11 +13,11 @@ import { chunkAssetDescriptions, chunkNote } from './chunk.ts'
 import { noop } from '@ocavue/utils'
 
 /**
- * The incremental embedding pass (Plan 09): chunk a note, diff chunk hashes
- * against the stored rows, embed only what changed, and apply as one
- * generation-pinned write. TS owns this orchestration (Rust embeds the changed
- * chunks and writes them in `embed_note_chunks`), mirroring the indexing
- * pipeline.
+ * The incremental embedding pass (Plan 09): chunk a note and send the chunk
+ * set as one generation-pinned write. TS owns this orchestration, mirroring
+ * the indexing pipeline. Rust (`embed_note_chunks`) keeps the vectors of
+ * chunks whose hashes are stored under the runtime's model and embeds the
+ * rest.
  *
  * A note's chunk set also carries its referenced assets' description bodies
  * (Plan 20 → semantic leg), mirroring the FTS fold — so a meaning-level query
@@ -35,11 +35,6 @@ export interface EmbedNoteOptions {
    * The file generation the note and asset description reads carry.
    */
   fileGeneration: number
-  /**
-   * The model of the runtime's `ready` status. Stored rows of another model
-   * are embedded again.
-   */
-  modelId: string
   /**
    * Pre-loaded content (the watcher path has it); read from disk if absent.
    */
@@ -135,8 +130,8 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
   }
 
   async embedNote(options: EmbedNoteOptions): Promise<number> {
-    const { noteFile, database } = this.#deps
-    const { path, generation, fileGeneration, modelId } = options
+    const { noteFile } = this.#deps
+    const { path, generation, fileGeneration } = options
     if (isTemplatePath(path)) {
       return 0 // templates are boilerplate — never embedded, never retrieved
     }
@@ -177,43 +172,19 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
       ...(await chunkNote(path, content, parsed)),
       ...(await chunkAssetDescriptions(gathered.bodies, content.length + 1)),
     ]
-    if (chunks.length === 0) {
-      await this.removeNote(path, generation)
-      return 0
-    }
-
-    // Stored hash+model pairs, **counted**: duplicate identical sections mean
-    // several chunks can share one hash, and only as many may skip embedding as
-    // there are stored rows to pair with (apply_chunks pairs one row per
-    // skipped chunk — an unmatched skip is a loud error). A model change makes
-    // every chunk "new", so a model switch re-embeds with no extra bookkeeping.
-    const existing = await database.read('embed_chunk_hashes', { path })
-    const available = new Map<string, number>()
-    for (const row of existing) {
-      const key = `${row.modelId} ${row.contentHash}`
-      available.set(key, (available.get(key) ?? 0) + 1)
-    }
-
-    const payload: ChunkToEmbed[] = chunks.map((chunk) => {
-      const key = `${modelId} ${chunk.contentHash}`
-      const remaining = available.get(key) ?? 0
-      if (remaining > 0) {
-        available.set(key, remaining - 1)
-      }
-      return {
-        heading: chunk.heading,
-        posFrom: chunk.posFrom,
-        posTo: chunk.posTo,
-        text: chunk.text,
-        contentHash: chunk.contentHash,
-        reuse: remaining > 0,
-      }
-    })
+    const payload: ChunkToEmbed[] = chunks.map((chunk) => ({
+      heading: chunk.heading,
+      posFrom: chunk.posFrom,
+      posTo: chunk.posTo,
+      text: chunk.text,
+      contentHash: chunk.contentHash,
+    }))
+    // An empty set drops the note's chunks.
     return await this.#deps.ipc.call('embed_note_chunks', { path, chunks: payload, generation })
   }
 
   async removeNote(path: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('embed_remove', { path, generation })
+    await this.#deps.ipc.call('embed_note_chunks', { path, chunks: [], generation })
   }
 
   backfill(options: EmbeddingBackfillOptions): Promise<EmbeddingBackfillResult> {
@@ -260,9 +231,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
             }
             return change.kind === 'remove'
               ? this.removeNote(change.path, generation)
-              : this.embedNote({ path: change.path, generation, fileGeneration, modelId }).then(
-                  noop,
-                )
+              : this.embedNote({ path: change.path, generation, fileGeneration }).then(noop)
           })
           .catch((cause: unknown) => {
             logger.error(`embedding sync failed for ${change.path}:`, cause)
@@ -310,7 +279,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
     counts: BackfillCounts,
   ): Promise<'completed' | 'aborted'> {
     const { clock, database, logger } = this.#deps
-    const { generation, fileGeneration, modelId, onProgress, signal } = options
+    const { generation, fileGeneration, onProgress, signal } = options
     const paths = await database.read('index_embeddable_paths', {})
     counts.notes = paths.length
     for (const path of paths) {
@@ -319,7 +288,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
       }
       try {
         const started = clock.monotonicNow()
-        const chunks = await this.embedNote({ path, generation, fileGeneration, modelId })
+        const chunks = await this.embedNote({ path, generation, fileGeneration })
         if (chunks > 0) {
           counts.notesEmbedded += 1
           counts.chunksEmbedded += chunks

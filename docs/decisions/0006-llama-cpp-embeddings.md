@@ -58,8 +58,9 @@ vector table and re-embeds every note once.
   Hugging Face host.
 - Queries and documents use the model's own prompts, so the runtime has two
   commands: `embed_query` and `embed_note_chunks`. `embed_note_chunks`
-  embeds a note's changed chunks and writes them to the index, so vectors do
-  not pass through JS.
+  writes a note's chunk set to the index, so vectors do not pass through JS.
+  A chunk whose hash is stored under the same model keeps its vector; the
+  runtime embeds the rest. An empty set drops the note's chunks.
 - The output is truncated to 256 dimensions (Matryoshka) and normalized.
 - After a load, the runtime deletes every other file in its models directory:
   the old MiniLM cache and the files of older model revisions.

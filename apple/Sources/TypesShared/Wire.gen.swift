@@ -1483,34 +1483,6 @@ extension ChromeTitle: Codable {
 }
 
 
-/// The content hash and model of one stored embedding chunk.
-public struct ChunkHash: Codable, Sendable, Equatable {
-    public let contentHash: String
-    public let modelId: String
-
-    private enum CodingKeys: String, CodingKey {
-        case contentHash = "contentHash"
-        case modelId = "modelId"
-    }
-
-    public init(contentHash: String, modelId: String) {
-        self.contentHash = contentHash
-        self.modelId = modelId
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.contentHash = try container.decode(String.self, forKey: .contentHash)
-        self.modelId = try container.decode(String.self, forKey: .modelId)
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(contentHash, forKey: .contentHash)
-        try container.encode(modelId, forKey: .modelId)
-    }
-}
-
 /// One embedding chunk near a query vector.
 public struct ChunkHit: Codable, Sendable, Equatable {
     public let path: String
@@ -1560,16 +1532,15 @@ public struct ChunkHit: Codable, Sendable, Equatable {
 }
 
 /// One chunk of a note for `embed_note_chunks`, built in TS (`@reflect/core`
-/// chunker). `reuse` marks a chunk whose hash already has a row under the
-/// runtime's model: it keeps its vector and refreshes its metadata. The
-/// runtime embeds every other chunk.
+/// chunker). A chunk whose hash already has a row under the runtime's model
+/// keeps its vector and refreshes its metadata. The runtime embeds every other
+/// chunk.
 public struct ChunkToEmbed: Codable, Sendable, Equatable {
     public let heading: String?
     public let posFrom: Int64
     public let posTo: Int64
     public let text: String
     public let contentHash: String
-    public let reuse: Bool
 
     private enum CodingKeys: String, CodingKey {
         case heading = "heading"
@@ -1577,16 +1548,14 @@ public struct ChunkToEmbed: Codable, Sendable, Equatable {
         case posTo = "posTo"
         case text = "text"
         case contentHash = "contentHash"
-        case reuse = "reuse"
     }
 
-    public init(heading: String?, posFrom: Int64, posTo: Int64, text: String, contentHash: String, reuse: Bool) {
+    public init(heading: String?, posFrom: Int64, posTo: Int64, text: String, contentHash: String) {
         self.heading = heading
         self.posFrom = posFrom
         self.posTo = posTo
         self.text = text
         self.contentHash = contentHash
-        self.reuse = reuse
     }
 
     public init(from decoder: Decoder) throws {
@@ -1596,7 +1565,6 @@ public struct ChunkToEmbed: Codable, Sendable, Equatable {
         self.posTo = try container.decode(Int64.self, forKey: .posTo)
         self.text = try container.decode(String.self, forKey: .text)
         self.contentHash = try container.decode(String.self, forKey: .contentHash)
-        self.reuse = try container.decode(Bool.self, forKey: .reuse)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -1606,7 +1574,6 @@ public struct ChunkToEmbed: Codable, Sendable, Equatable {
         try container.encode(posTo, forKey: .posTo)
         try container.encode(text, forKey: .text)
         try container.encode(contentHash, forKey: .contentHash)
-        try container.encode(reuse, forKey: .reuse)
     }
 }
 
@@ -1896,62 +1863,6 @@ extension EmbedStatus: Codable {
     }
 }
 
-
-/// One chunk of a note, built in TS (`@reflect/core` chunker). `vector` is
-/// present only for new/changed chunks — `None` means "this chunk's hash
-/// already has a row; keep its vector, refresh its metadata" (positions and
-/// headings shift when text moves above an unchanged chunk).
-public struct EmbeddedChunk: Codable, Sendable, Equatable {
-    public let heading: String?
-    public let posFrom: Int64
-    public let posTo: Int64
-    public let text: String
-    public let contentHash: String
-    public let modelId: String
-    public let vector: [Float]?
-
-    private enum CodingKeys: String, CodingKey {
-        case heading = "heading"
-        case posFrom = "posFrom"
-        case posTo = "posTo"
-        case text = "text"
-        case contentHash = "contentHash"
-        case modelId = "modelId"
-        case vector = "vector"
-    }
-
-    public init(heading: String?, posFrom: Int64, posTo: Int64, text: String, contentHash: String, modelId: String, vector: [Float]?) {
-        self.heading = heading
-        self.posFrom = posFrom
-        self.posTo = posTo
-        self.text = text
-        self.contentHash = contentHash
-        self.modelId = modelId
-        self.vector = vector
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.heading = try container.decodeIfPresent(String.self, forKey: .heading)
-        self.posFrom = try container.decode(Int64.self, forKey: .posFrom)
-        self.posTo = try container.decode(Int64.self, forKey: .posTo)
-        self.text = try container.decode(String.self, forKey: .text)
-        self.contentHash = try container.decode(String.self, forKey: .contentHash)
-        self.modelId = try container.decode(String.self, forKey: .modelId)
-        self.vector = try container.decodeIfPresent([Float].self, forKey: .vector)
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(heading, forKey: .heading)
-        try container.encode(posFrom, forKey: .posFrom)
-        try container.encode(posTo, forKey: .posTo)
-        try container.encode(text, forKey: .text)
-        try container.encode(contentHash, forKey: .contentHash)
-        try container.encode(modelId, forKey: .modelId)
-        try container.encode(vector, forKey: .vector)
-    }
-}
 
 /// An event the native side broadcasts. The serde name is the wire name, and
 /// `pnpm gen:types` exports it to TypeScript and Swift.

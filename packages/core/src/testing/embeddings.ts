@@ -1,4 +1,4 @@
-import type { ChunkToEmbed, EmbeddedChunk } from '@reflect/types'
+import type { ChunkToEmbed } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
@@ -32,7 +32,11 @@ import type { Unlisten } from '../unlisten.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
-import { createTestDatabaseService, type TestDatabaseService } from './database.ts'
+import {
+  createTestDatabaseService,
+  type TestDatabaseService,
+  type TestEmbeddedChunk,
+} from './database.ts'
 import { createTestNoteFileService } from './graph.ts'
 import { createTestGraphSessionService } from './graph-session.ts'
 import { createTestIndexLifecycleService } from './index-lifecycle.ts'
@@ -59,10 +63,10 @@ export interface TestEmbeddingRuntimeService extends EmbeddingRuntimeService {
    */
   setStatus(status: EmbedStatus): void
   /**
-   * Gives each chunk that is not reused a vector and the model id, like the
-   * native `embed_note_chunks`. Throws unless the status is `ready`.
+   * Gives each chunk a vector and the model id. Throws unless the status is
+   * `ready` or there are no chunks.
    */
-  embedChunks(chunks: readonly ChunkToEmbed[]): EmbeddedChunk[]
+  embedChunks(chunks: readonly ChunkToEmbed[]): TestEmbeddedChunk[]
   /**
    * The texts of every `embedQuery` (one text) and `embedChunks` call, in
    * order.
@@ -137,15 +141,13 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
     return this.#inner.embedQuery(text)
   }
 
-  embedChunks(chunks: readonly ChunkToEmbed[]): EmbeddedChunk[] {
-    const vectors = this.#embed(chunks.filter((chunk) => !chunk.reuse).map((chunk) => chunk.text))
+  embedChunks(chunks: readonly ChunkToEmbed[]): TestEmbeddedChunk[] {
+    if (chunks.length === 0) {
+      return []
+    }
+    const vectors = this.#embed(chunks.map((chunk) => chunk.text))
     const modelId = this.#status.status === 'ready' ? this.#status.model : ''
-    let vectorAt = 0
-    return chunks.map(({ reuse, ...chunk }) => ({
-      ...chunk,
-      modelId,
-      vector: reuse ? null : vectors[vectorAt++]!,
-    }))
+    return chunks.map((chunk, i) => ({ ...chunk, modelId, vector: vectors[i]! }))
   }
 
   readonly get = (): EmbedStatus => this.#inner.get()
@@ -263,7 +265,7 @@ export interface TestEmbeddingApply {
 
 /**
 
- * One recorded `embed_remove`.
+ * One recorded `embed_note_chunks` with an empty chunk set.
 
  */
 export interface TestEmbeddingRemove {
@@ -291,9 +293,9 @@ export interface TestEmbeddingIndexServiceOptions {
   logger?: LoggerService
   clock?: ClockService
   /**
-   * Write applied and removed chunk sets into this database as the native
-   * writer does, so later passes and retrieval read them back. Without it,
-   * writes are only recorded.
+   * Write chunk sets into this database, so later passes and retrieval read
+   * them back. Every chunk gets a new vector: the native writer's reuse of
+   * stored vectors is not modeled. Without it, writes are only recorded.
    */
   storeChunksIn?: TestDatabaseService
   /**
@@ -309,11 +311,12 @@ export interface TestEmbeddingIndexServiceOptions {
 
 export interface TestEmbeddingIndexService extends EmbeddingIndexService {
   /**
-   * Every chunk set that `embed_note_chunks` wrote, in order.
+   * Every non-empty chunk set that `embed_note_chunks` wrote, in order.
    */
   applied(): readonly TestEmbeddingApply[]
   /**
-   * Every `embed_remove`, in order, including the one an emptied note causes.
+   * Every empty chunk set that `embed_note_chunks` wrote, in order, including
+   * the one an emptied note causes.
    */
   removed(): readonly TestEmbeddingRemove[]
   /**
@@ -349,15 +352,13 @@ class TestEmbeddingIndexServiceImpl implements TestEmbeddingIndexService {
           if (failure !== undefined) {
             throw failure
           }
-          this.#applyLog.push(apply)
-          store?.invoke('embed_apply', { path: apply.path, chunks, generation: store.generation() })
-          return chunks.filter((chunk) => chunk.vector !== null).length
-        },
-        embed_remove: (args) => {
-          const remove = args as unknown as TestEmbeddingRemove
-          this.#removeLog.push(remove)
-          store?.invoke('embed_remove', { path: remove.path, generation: store.generation() })
-          return null
+          if (chunks.length === 0) {
+            this.#removeLog.push({ path: apply.path, generation: apply.generation })
+          } else {
+            this.#applyLog.push(apply)
+          }
+          store?.applyEmbeddings(apply.path, chunks)
+          return chunks.length
         },
       },
     })
