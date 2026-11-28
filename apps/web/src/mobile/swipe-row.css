@@ -4,6 +4,19 @@
     scale: 0.3;
     opacity: 0;
   }
+  to {
+    scale: 1;
+    opacity: 1;
+  }
+}
+
+/* Until the animation runs, a pill rests in its hidden state, so the frame
+   before the compositor picks up the animation paints nothing. */
+@supports (animation-timeline: scroll()) {
+  .swipe-action {
+    scale: 0.3;
+    opacity: 0;
+  }
 }
 
 /* An idle row paints no actions, so the surface needs no layer of its own. */
