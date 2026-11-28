@@ -180,11 +180,12 @@ impl From<rusqlite::Error> for AppError {
     }
 }
 
-/// Timeouts and connection failures are `Network`, so the caller may retry.
+/// Timeouts, connection failures and a body cut off mid-transfer are
+/// `Network`, so the caller may retry.
 #[cfg(feature = "reqwest")]
 impl From<reqwest::Error> for AppError {
     fn from(err: reqwest::Error) -> Self {
-        if err.is_timeout() || err.is_connect() || err.is_request() {
+        if err.is_timeout() || err.is_connect() || err.is_request() || err.is_body() {
             Self::Network {
                 message: err.to_string(),
             }

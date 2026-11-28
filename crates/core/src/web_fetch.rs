@@ -253,9 +253,7 @@ fn client_for(scope: NetworkScope) -> AppResult<&'static Client> {
         // bypassing the public-address resolver and its SSRF validation.
         builder = builder.no_proxy().dns_resolver(Arc::new(PublicDnsResolver));
     }
-    let client = builder
-        .build()
-        .map_err(|error| AppError::io(error.to_string()))?;
+    let client = builder.build()?;
     Ok(slot.get_or_init(|| client))
 }
 

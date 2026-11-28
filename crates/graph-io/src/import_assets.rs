@@ -182,8 +182,7 @@ pub async fn download_remote_assets(
         .connect_timeout(CONNECT_TIMEOUT)
         .read_timeout(READ_TIMEOUT)
         .user_agent(user_agent)
-        .build()
-        .map_err(|err| AppError::io(err.to_string()))?;
+        .build()?;
 
     let queue = Arc::new(Mutex::new(urls));
     let results = Arc::new(Mutex::new(Ok(HashMap::new())));
