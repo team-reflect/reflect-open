@@ -1,8 +1,7 @@
 import { act } from '@/test-utils/act.ts'
 import { page, userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { noop } from '@ocavue/utils'
-import type { EmbeddingIndexService, GitSyncState, Settings } from '@reflect/core'
+import type { GitSyncState, Settings } from '@reflect/core'
 import {
   createTestDatabaseService,
   createTestAppStoreService,
@@ -83,7 +82,6 @@ interface MountOptions {
    */
   expensive?: boolean
   dialog?: TestDialogService
-  embeddingIndex?: EmbeddingIndexService
 }
 
 /**
@@ -112,7 +110,6 @@ async function mount(options?: MountOptions) {
       options?.embeddingRuntime ??
       createTestEmbeddingRuntimeService({ status: { status: 'unsupported' } }),
     network: createTestNetworkService({ expensive: options?.expensive ?? false }),
-    ...(options?.embeddingIndex === undefined ? {} : { embeddingIndex: options.embeddingIndex }),
   })
   if (options?.githubSignedIn !== false) {
     await core.githubAuth.save({ kind: 'pat', token: 'ghp_test' })
@@ -288,31 +285,6 @@ describe('MobileSettings', () => {
     const ensures = embeddingRuntime.ensureCalls()
     await userEvent.click(page.getByRole('button', { name: 'Try again' }))
     await vi.waitFor(() => expect(embeddingRuntime.ensureCalls()).toBe(ensures + 1))
-  })
-
-  it('asks to keep Reflect open while it indexes', async () => {
-    // The first backfill visits one of three notes and stays there.
-    const embeddingIndex: EmbeddingIndexService = {
-      embedNote: () => Promise.resolve(0),
-      removeNote: () => Promise.resolve(),
-      backfill: () => Promise.resolve('completed'),
-      follow: ({ onProgress }) => {
-        onProgress?.(1, 3)
-        return noop
-      },
-    }
-    const view = await mount({
-      embeddingRuntime: createTestEmbeddingRuntimeService(),
-      embeddingIndex,
-      settings: { semanticSearchEnabled: true },
-    })
-    const stop = await act(() => view.core.semanticSearch.start())
-
-    await expect.element(page.getByText('Indexing 1 of 3 notes')).toBeVisible()
-    await expect
-      .element(page.getByText('Keep Reflect open to finish indexing.', { exact: false }))
-      .toBeVisible()
-    stop()
   })
 
   it('hides semantic search where the runtime is unsupported', async () => {

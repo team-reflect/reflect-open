@@ -5,7 +5,7 @@ import { useSemanticSearchEnabled, useSettingsService } from '@/providers/settin
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 export const SEMANTIC_SEARCH_DESCRIPTION =
-  'Find notes by meaning, not just keywords. Enabling it downloads a model of about 330 MB.'
+  'Find notes by meaning, not just keywords. A 330 MB model will be downloaded to this device.'
 
 const DOWNLOAD_CONSENT = {
   title: 'Download over cellular?',

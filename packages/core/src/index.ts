@@ -200,7 +200,6 @@ export {
   type AiProviderConfigService,
   type NewAiProvider,
 } from './ai/ai-provider-config-service.ts'
-export { type EmbeddingIndexService } from './embeddings/embedding-index-service.ts'
 export { type EmbedStatus, type EmbedProgress } from './embeddings/embedding-runtime-service.ts'
 export {
   type RetrievalHit,

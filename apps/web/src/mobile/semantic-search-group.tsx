@@ -27,11 +27,6 @@ export function SemanticSearchGroup(): ReactElement | null {
   const footer = (
     <>
       {SEMANTIC_SEARCH_DESCRIPTION}
-      {phase.kind === 'indexing' ? (
-        <span className="mt-1 block">
-          Keep Reflect open to finish indexing. The screen stays on until then.
-        </span>
-      ) : null}
       {phase.kind === 'failed' ? (
         <span className="mt-1 block">Couldn’t load the model: {phase.message}</span>
       ) : null}
