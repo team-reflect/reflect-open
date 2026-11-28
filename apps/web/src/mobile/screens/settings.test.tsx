@@ -10,6 +10,7 @@ import {
   createTestCoreServices,
   createTestGitSyncService,
   createTestGitHostConnector,
+  createTestNetworkService,
   createTestPlatformService,
   createTestSubscriptionService,
   seedNotes,
@@ -75,6 +76,10 @@ interface MountOptions {
    * The embedding runtime; `unsupported` by default.
    */
   embeddingRuntime?: TestEmbeddingRuntimeService
+  /**
+   * Whether the connection is expensive; free by default.
+   */
+  expensive?: boolean
 }
 
 /**
@@ -102,6 +107,7 @@ async function mount(options?: MountOptions) {
     embeddingRuntime:
       options?.embeddingRuntime ??
       createTestEmbeddingRuntimeService({ status: { status: 'unsupported' } }),
+    network: createTestNetworkService({ expensive: options?.expensive ?? false }),
   })
   if (options?.githubSignedIn !== false) {
     await core.githubAuth.save({ kind: 'pat', token: 'ghp_test' })
@@ -247,6 +253,35 @@ describe('MobileSettings', () => {
       })
     })
     await expect.element(page.getByText('Downloading 25%')).toBeVisible()
+  })
+
+  it('asks before it downloads the model over cellular', async () => {
+    const embeddingRuntime = createTestEmbeddingRuntimeService({
+      status: { status: 'uninitialized' },
+      downloaded: false,
+    })
+    const view = await mount({ embeddingRuntime, expensive: true })
+
+    await userEvent.click(page.getByRole('switch', { name: 'Semantic search' }))
+    await expect.element(page.getByText('Download over cellular?')).toBeVisible()
+    await userEvent.click(page.getByRole('button', { name: 'Not Now' }))
+    await expect.element(page.getByText('Download over cellular?')).not.toBeInTheDocument()
+    expect(view.core.settings.get().semanticSearchEnabled).toBe(false)
+
+    await userEvent.click(page.getByRole('switch', { name: 'Semantic search' }))
+    await userEvent.click(page.getByRole('button', { name: 'Download' }))
+    await expectSettings(view, { semanticSearchEnabled: true })
+  })
+
+  it('shows the model behind the info button', async () => {
+    const embeddingRuntime = createTestEmbeddingRuntimeService({
+      status: { status: 'ready', model: 'embeddinggemma-test' },
+    })
+    await mount({ embeddingRuntime, settings: { semanticSearchEnabled: true } })
+
+    await expect.element(page.getByText('Model: embeddinggemma-test')).not.toBeInTheDocument()
+    await userEvent.click(page.getByRole('button', { name: 'About semantic search' }))
+    await expect.element(page.getByText('Model: embeddinggemma-test')).toBeVisible()
   })
 
   it('offers to load the model again after a failed load', async () => {

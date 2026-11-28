@@ -4,7 +4,7 @@ interface SettingsFieldProps {
   /** The control's name, rendered as the fieldset legend. */
   legend: string
   /** One-line explanation under the legend. */
-  description: string
+  description: ReactNode
   /** The control itself (option cards, inputs). */
   children: ReactNode
 }
