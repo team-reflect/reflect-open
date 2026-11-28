@@ -123,6 +123,7 @@ reflect-open/
 ├── packages/app/          # App layer: windows, routes, commands, menus
 ├── packages/index-wasm/   # The Rust index compiled to wasm, for dev and tests
 ├── crates/core/           # Rust commands shared by both shells
+├── crates/embed/          # The local embedding model and its llama.cpp runtime
 ├── crates/ffi/            # C ABI over the Rust core for the iOS app
 ├── crates/git/            # Git backup and sync
 ├── crates/graph-io/       # Graph file IO

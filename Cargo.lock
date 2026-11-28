@@ -4497,8 +4497,6 @@ dependencies = [
  "infer",
  "jiff 1.0.2",
  "keyring-core",
- "llama-cpp-2",
- "llama-cpp-sys-2",
  "log",
  "notify-debouncer-full",
  "objc2",
@@ -4506,6 +4504,7 @@ dependencies = [
  "objc2-foundation",
  "objc2-link-presentation",
  "objc2-ui-kit",
+ "reflect-embed",
  "reflect-git",
  "reflect-graph-io",
  "reflect-graph-paths",
@@ -4517,13 +4516,26 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
- "sha2 0.11.1",
  "tempfile",
  "tokio",
  "tracing",
  "trash",
  "walkdir",
  "windows-native-keyring-store",
+]
+
+[[package]]
+name = "reflect-embed"
+version = "0.0.0"
+dependencies = [
+ "llama-cpp-2",
+ "llama-cpp-sys-2",
+ "reflect-utils",
+ "reqwest 0.12.28",
+ "sha2 0.11.1",
+ "tempfile",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

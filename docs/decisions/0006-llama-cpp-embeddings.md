@@ -3,7 +3,8 @@
 - **Status:** Accepted
 - **Date:** 2026-11-27
 - **Scope:** The semantic-search embedding runtime in `reflect-core`
-  (`crates/core/src/embed/`) and the vector table in the index. It replaces the
+  (`crates/core/src/embed/`), the model and its llama.cpp runtime in
+  `reflect-embed` (`crates/embed/`), and the vector table in the index. It replaces the
   `fastembed` and all-MiniLM-L6-v2 runtime from [Plan 09](../plans/09-semantic-search-and-embeddings.md).
   Chunking, retrieval and the `embed_*` status flow do not change.
 - **Decision driver:** One runtime that builds for every desktop target and for
@@ -54,14 +55,14 @@ vector table and re-embeds every note once.
   features, which leaves x86_64 on SSE. `.cargo/config.toml` sets
   `GGML_AVX2`, `GGML_FMA` and `GGML_F16C`, which affect only ggml. AVX2
   implies AVX.
-  `cpu_supported()` reports `unsupported` on a CPU without them.
+  `reflect_embed::supported()` reports `unsupported` on a CPU without them.
 - Windows ARM64 builds llama.cpp with the ClangCL toolset
   (`scripts/cmake/clangcl.cmake`), because MSVC on ARM needs `GGML_NATIVE`.
 
 ### Model
 
 - `ggml-org/embeddinggemma-300M-GGUF`, `Q8_0`, pinned to one revision, size and
-  SHA-256 (`MODEL` in `crates/core/src/embed/mod.rs`). The model id is
+  SHA-256 (`MODEL` in `crates/embed/src/lib.rs`). The model id is
   `embeddinggemma-300m-q8_0-d256`.
 - The download resumes a partial file with an HTTP `Range` request and checks
   the SHA-256 before the file gets its final name. `HF_ENDPOINT` replaces the

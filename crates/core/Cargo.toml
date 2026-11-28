@@ -19,6 +19,7 @@ jiff = { workspace = true }
 log = { workspace = true, features = ["std"] }
 dirs = { workspace = true }
 keyring-core = { workspace = true }
+reflect-embed = { workspace = true }
 reflect-git = { workspace = true }
 reflect-graph-io = { workspace = true }
 reflect-index = { workspace = true, features = ["native"] }
@@ -72,14 +73,6 @@ dbus-secret-service-keyring-store = { workspace = true, features = ["crypto-rust
 trash = { workspace = true }
 notify-debouncer-full = { workspace = true }
 walkdir = { workspace = true }
-
-# The embedding runtime (llama.cpp). Intel macOS and Android use the stand-in in
-# `embed_unsupported.rs`. ggml builds Metal for every Apple target, without a
-# feature flag.
-[target.'cfg(not(any(target_os = "android", all(target_os = "macos", target_arch = "x86_64"))))'.dependencies]
-llama-cpp-2 = { workspace = true }
-llama-cpp-sys-2 = { workspace = true }
-sha2 = { workspace = true }
 
 [dev-dependencies]
 reflect-graph-io = { workspace = true, features = ["test-support"] }
