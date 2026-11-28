@@ -173,6 +173,14 @@ pub struct NetworkStatus {
     pub expensive: bool,
 }
 
+/// `plugin:screen|keep_awake` arguments: whether the web app needs the screen
+/// to stay on.
+#[derive(Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ScreenKeepAwakeArgs {
+    pub keep_awake: bool,
+}
+
 /// `plugin:app-store|get_environment` result.
 #[derive(Serialize, Deserialize, specta::Type)]
 pub struct AppStoreEnvironmentReply {

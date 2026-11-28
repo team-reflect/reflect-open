@@ -189,6 +189,7 @@ macro_rules! commands {
                 "plugin:mobile-haptics|impact_light" => haptics_impact_light(NoArgs) -> (),
                 "plugin:network|status" => network_status(NoArgs) -> NetworkStatus,
                 "plugin:mobile-dialog|confirm" => dialog_confirm(DialogConfirmArgs) -> bool,
+                "plugin:screen|keep_awake" => screen_keep_awake(ScreenKeepAwakeArgs) -> (),
                 "plugin:app-store|get_environment" => app_store_get_environment(NoArgs) -> AppStoreEnvironmentReply,
                 "plugin:app-store|sync" => app_store_sync(NoArgs) -> (),
                 "plugin:app-store|present_offer_code_redeem_sheet" => app_store_present_offer_code_redeem_sheet(NoArgs) -> (),

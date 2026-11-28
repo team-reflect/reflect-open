@@ -8,16 +8,25 @@ import WebHostKit
 /// continues while the page reloads.
 @MainActor
 final class RecordingCapability {
-  private let engine = RecordingEngine(stagingDirectory: {
-    let base = try FileManager.default.url(
-      for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-    let directory = base.appendingPathComponent("audio-memo-staging", isDirectory: true)
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    return directory
-  })
+  private let engine: RecordingEngine
 
-  /// `emit` delivers each engine event as `plugin:recording:<event>`.
-  init(emit: @escaping @MainActor (String, Data) -> Void) {
+  /// `emit` delivers each engine event as `plugin:recording:<event>`; `screen`
+  /// keeps the screen on while a recording runs.
+  init(emit: @escaping @MainActor (String, Data) -> Void, screen: ScreenCapability) {
+    engine = RecordingEngine(
+      stagingDirectory: {
+        let base = try FileManager.default.url(
+          for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        let directory = base.appendingPathComponent("audio-memo-staging", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+      },
+      keepScreenAwake: { keepAwake in
+        // The engine runs on the main queue.
+        MainActor.assumeIsolated {
+          screen.setKeepAwake(keepAwake, for: .recording)
+        }
+      })
     engine.log = { ReflectCore.log(.error, $0) }
     engine.onEvent = { event in
       let name: String

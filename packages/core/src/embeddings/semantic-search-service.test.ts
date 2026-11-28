@@ -14,6 +14,7 @@ import {
   createTestNoteFileService,
   createTestProgressPort,
   createTestRetrievalService,
+  createTestScreenService,
   createTestSemanticSearchService,
   createTestSettingsService,
   createTestStorageService,
@@ -107,6 +108,7 @@ async function setup(options?: {
     state: { graph: GRAPH, indexGeneration: 7 },
   })
   const activity = createTestActivityPort()
+  const screen = createTestScreenService()
   const semanticSearch = createTestSemanticSearchService({
     embeddingRuntime: runtime,
     embeddingIndex,
@@ -118,6 +120,7 @@ async function setup(options?: {
     graphSession,
     activity,
     network,
+    screen,
     unloadWhenHidden: options?.unloadWhenHidden ?? false,
     logger,
   })
@@ -125,6 +128,7 @@ async function setup(options?: {
     semanticSearch,
     activity,
     network,
+    screen,
     settings,
     storage,
     runtime,
@@ -302,6 +306,60 @@ describe('start', () => {
     settings.update({ semanticSearchEnabled: false })
     expect(semanticSearch.progress.get()).toBeNull()
     stop()
+  })
+
+  it('keeps the screen on while the first backfill runs', async () => {
+    const { semanticSearch, screen } = await setup({
+      notes: [
+        { path: 'notes/a.md', markdown: '# A\n\nAlpha text.\n' },
+        { path: 'notes/b.md', markdown: '# B\n\nBeta text.\n' },
+      ],
+    })
+    const stop = semanticSearch.start()
+    const holds = new Map<number, number>()
+    const unsubscribe = semanticSearch.progress.subscribe(() => {
+      const progress = semanticSearch.progress.get()
+      if (progress !== null) {
+        holds.set(progress.done, screen.holds())
+      }
+    })
+
+    await vi.waitFor(() => expect(semanticSearch.progress.get()).toEqual({ done: 2, total: 2 }))
+    expect(holds).toEqual(
+      new Map([
+        [1, 1],
+        [2, 0],
+      ]),
+    )
+    unsubscribe()
+    stop()
+  })
+
+  it('lets the screen lock when the follow stops midway', async () => {
+    const { semanticSearch, screen, settings } = await setup({
+      notes: [
+        { path: 'notes/a.md', markdown: '# A\n\nAlpha text.\n' },
+        { path: 'notes/b.md', markdown: '# B\n\nBeta text.\n' },
+      ],
+    })
+    const stop = semanticSearch.start()
+    let holdsBeforeDisable: number | null = null
+    let holdsAfterDisable: number | null = null
+    const unsubscribe = semanticSearch.progress.subscribe(() => {
+      const progress = semanticSearch.progress.get()
+      if (progress?.done === 1 && holdsAfterDisable === null) {
+        holdsBeforeDisable = screen.holds()
+        settings.update({ semanticSearchEnabled: false })
+        holdsAfterDisable = screen.holds()
+      }
+    })
+
+    await vi.waitFor(() => expect(holdsAfterDisable).toBe(0))
+    expect(holdsBeforeDisable).toBe(1)
+    expect(semanticSearch.progress.get()).toBeNull()
+    unsubscribe()
+    stop()
+    expect(screen.holds()).toBe(0)
   })
 
   it('keeps the model loaded while hidden without `unloadWhenHidden`', async () => {
@@ -557,6 +615,21 @@ describe('after an index rebuild', () => {
     backfill.resolve('completed')
     await Promise.all([first, second])
     expect(embeddingIndex.backfills()).toHaveLength(1)
+  })
+
+  it('keeps the screen on while a rebuild backfill runs', async () => {
+    const backfill = Promise.withResolvers<EmbeddingBackfillResult>()
+    const { indexLifecycle, embeddingIndex, screen } = await setup({
+      backfill: () => backfill.promise,
+    })
+
+    const rebuild = indexLifecycle.rebuildVisibly()
+    await vi.waitFor(() => expect(embeddingIndex.backfills()).toHaveLength(1))
+    expect(screen.holds()).toBe(1)
+
+    backfill.resolve('completed')
+    await rebuild
+    expect(screen.holds()).toBe(0)
   })
 
   it('re-embeds nothing after a failed rebuild', async () => {

@@ -1432,6 +1432,10 @@ export type Commands = {
     args: DialogConfirmArgs
     result: boolean
   }
+  'plugin:screen|keep_awake': {
+    args: ScreenKeepAwakeArgs
+    result: null
+  }
   'plugin:app-store|get_environment': {
     args: NoArgs
     result: AppStoreEnvironmentReply
@@ -2475,6 +2479,14 @@ export type ScanOrphan = {
   path: string
   storedMtime: number
   storedHash: string
+}
+
+/**
+ *  `plugin:screen|keep_awake` arguments: whether the web app needs the screen
+ *  to stay on.
+ */
+export type ScreenKeepAwakeArgs = {
+  keepAwake: boolean
 }
 
 /**  One search hit, before the frontend derives its display fields. */

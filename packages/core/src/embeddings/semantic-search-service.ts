@@ -1,6 +1,7 @@
 import type { GraphRole } from '../graph/graph-session.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { NetworkService } from '../ipc/network-service.ts'
+import type { ScreenService } from '../ipc/screen-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { StorageService } from '../ports/storage-service.ts'
 import type { GraphSessionState } from '../graph/graph-session-service.ts'
@@ -77,7 +78,9 @@ export interface SemanticSearchService {
    *
    * With `unloadWhenHidden`, a hidden app counts as disabled, and it unloads
    * a `ready` model: iOS does not let a background app use the GPU, and a
-   * background app that holds less memory is killed later.
+   * background app that holds less memory is killed later. While the first
+   * backfill of a follow runs, the screen stays on, so it does not lock
+   * itself and hide the app midway.
    *
    * Starting also carries the opt-in over from where it lived before the
    * settings document (`localStorage`), once, so those users keep semantic
@@ -140,6 +143,7 @@ export interface SemanticSearchServiceDeps {
   readonly graphSession: SemanticSearchGraphSource
   readonly activity: ActivityPort
   readonly network: NetworkService
+  readonly screen: ScreenService
   /**
    * Stop embedding and unload the model while the app is hidden.
    */
@@ -164,7 +168,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
   constructor(deps: SemanticSearchServiceDeps) {
     this.#deps = deps
     this.#mainWindow = deps.role === 'main'
-    const { embeddingRuntime, embeddingIndex, indexLifecycle } = deps
+    const { embeddingRuntime, embeddingIndex, indexLifecycle, screen } = deps
     this.#stopFollowingRebuilds = indexLifecycle.onReconciled(
       async ({ generation, fileGeneration, source }) => {
         if (source !== 'rebuild') {
@@ -175,15 +179,28 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
         }
         const embed = await embeddingRuntime.status()
         if (embed.status === 'ready') {
-          await embeddingIndex.backfill({ generation, fileGeneration, modelId: embed.model })
+          const releaseScreen = screen.keepAwake()
+          try {
+            await embeddingIndex.backfill({ generation, fileGeneration, modelId: embed.model })
+          } finally {
+            releaseScreen()
+          }
         }
       },
     )
   }
 
   start(): Unlisten {
-    const { embeddingRuntime, embeddingIndex, settings, graphSession, activity, network, logger } =
-      this.#deps
+    const {
+      embeddingRuntime,
+      embeddingIndex,
+      settings,
+      graphSession,
+      activity,
+      network,
+      screen,
+      logger,
+    } = this.#deps
     if (this.#consumeLegacyOptIn()) {
       settings.update({ semanticSearchEnabled: true })
     }
@@ -196,6 +213,19 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
     let stopFollowing: Unlisten | null = null
     // Identifies the current follow, so a stopped follow's late progress is dropped.
     let followId = 0
+    let releaseScreen: Unlisten | null = null
+
+    // Holds the screen on while the first backfill of a follow runs.
+    const holdScreen = (): void => {
+      const progress = this.#progress.get()
+      const indexing = !stopped && progress !== null && progress.done < progress.total
+      if (indexing && releaseScreen === null) {
+        releaseScreen = screen.keepAwake()
+      } else if (!indexing && releaseScreen !== null) {
+        releaseScreen()
+        releaseScreen = null
+      }
+    }
 
     const react = (): void => {
       if (stopped) {
@@ -263,6 +293,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
       activity.subscribeHidden(react),
       network.expensive.subscribe(react),
       this.#expensiveAllowed.subscribe(react),
+      this.#progress.subscribe(holdScreen),
       network.watch(),
       activity.subscribeVisible(() => {
         react()
@@ -289,6 +320,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
       stopFollowing = null
       followId++
       this.#progress.set(null)
+      holdScreen()
     }
   }
 

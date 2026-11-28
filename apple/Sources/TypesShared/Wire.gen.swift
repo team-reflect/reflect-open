@@ -4630,6 +4630,30 @@ public struct ScanOrphan: Codable, Sendable, Equatable {
     }
 }
 
+/// `plugin:screen|keep_awake` arguments: whether the web app needs the screen
+/// to stay on.
+public struct ScreenKeepAwakeArgs: Codable, Sendable, Equatable {
+    public let keepAwake: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case keepAwake = "keepAwake"
+    }
+
+    public init(keepAwake: Bool) {
+        self.keepAwake = keepAwake
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.keepAwake = try container.decode(Bool.self, forKey: .keepAwake)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(keepAwake, forKey: .keepAwake)
+    }
+}
+
 /// One search hit, before the frontend derives its display fields.
 public struct SearchHitRow: Codable, Sendable, Equatable {
     public let path: String
@@ -5788,6 +5812,7 @@ public enum ShellCommandName: String, Sendable {
     case hapticsImpactLight = "plugin:mobile-haptics|impact_light"
     case networkStatus = "plugin:network|status"
     case dialogConfirm = "plugin:mobile-dialog|confirm"
+    case screenKeepAwake = "plugin:screen|keep_awake"
     case appStoreGetEnvironment = "plugin:app-store|get_environment"
     case appStoreSync = "plugin:app-store|sync"
     case appStorePresentOfferCodeRedeemSheet = "plugin:app-store|present_offer_code_redeem_sheet"
