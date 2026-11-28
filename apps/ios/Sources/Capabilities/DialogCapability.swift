@@ -33,7 +33,9 @@ final class DialogCapability {
       title: args.title, message: args.message, preferredStyle: .alert)
     let confirmed = await withCheckedContinuation { continuation in
       alert.addAction(
-        UIAlertAction(title: args.cancel, style: .cancel) { _ in continuation.resume(returning: false) })
+        UIAlertAction(title: args.cancel, style: .cancel) { _ in
+          continuation.resume(returning: false)
+        })
       let confirm = UIAlertAction(title: args.confirm, style: .default) { _ in
         continuation.resume(returning: true)
       }
