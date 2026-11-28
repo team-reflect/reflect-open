@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.21.0-beta.4...v0.21.0-beta.5) (2026-11-28)
+
+
+### Bug Fixes
+
+* fill virtual lists to the viewport bottom ([#2393](https://github.com/team-reflect/reflect-open/issues/2393)) ([c2478ee](https://github.com/team-reflect/reflect-open/commit/c2478ee614895bcb553702bcf764e95aac4cfff5))
+
 ## [0.21.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.21.0-beta.3...v0.21.0-beta.4) (2026-11-28)
 
 
