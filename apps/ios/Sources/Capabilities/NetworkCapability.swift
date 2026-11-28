@@ -10,7 +10,9 @@ import WebHostKit
 final class NetworkCapability {
   private let monitor = NWPathMonitor()
   private let emit: @MainActor (String, Data) -> Void
-  private var status = NetworkStatus(expensive: false)
+  /// `nil` until the monitor reports the first path.
+  private var status: NetworkStatus?
+  private var waiters: [CheckedContinuation<NetworkStatus, Never>] = []
 
   /// `emit` delivers each change as `plugin:network:changed`.
   init(emit: @escaping @MainActor (String, Data) -> Void) {
@@ -25,10 +27,22 @@ final class NetworkCapability {
   private func update(_ next: NetworkStatus) {
     guard next != status, let json = try? JSONEncoder().encode(next) else { return }
     status = next
+    for waiter in waiters {
+      waiter.resume(returning: next)
+    }
+    waiters = []
     emit("plugin:network:changed", json)
   }
 
+  /// The current status, after the monitor reports the first path.
+  private func currentStatus() async -> NetworkStatus {
+    if let status {
+      return status
+    }
+    return await withCheckedContinuation { waiters.append($0) }
+  }
+
   var commands: [ShellCommandName: ShellCommand] {
-    [.networkStatus: { [weak self] _ in .value(self?.status ?? NetworkStatus(expensive: false)) }]
+    [.networkStatus: { [self] _ in .value(await currentStatus()) }]
   }
 }
