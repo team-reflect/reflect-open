@@ -32,6 +32,10 @@ vector table and re-embeds every note once.
 - iOS does not let a background app use the GPU. While the app is hidden,
   `SemanticSearchService` stops embedding and calls `embed_unload`, which
   drops the context. It loads the model again when the app is visible.
+- The model download waits on an expensive connection (cellular, a personal
+  hotspot, or Low Data Mode) until the connection is free or the user allows
+  it. `embed_model_downloaded` tells whether the file is on disk, and the iOS
+  shell reports the connection cost through `plugin:network`.
 - The iOS app links Accelerate, Metal and Foundation itself
   (`apps/ios/Config/App.xcconfig`), because the Rust core is a static library.
   The models directory is excluded from iCloud backups.

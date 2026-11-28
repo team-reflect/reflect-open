@@ -1,5 +1,6 @@
 import type { GraphRole } from '../graph/graph-session.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
+import type { NetworkService } from '../ipc/network-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { StorageService } from '../ports/storage-service.ts'
 import type { GraphSessionState } from '../graph/graph-session-service.ts'
@@ -56,7 +57,8 @@ export interface SemanticSearchService {
    * is called. Three jobs:
    *
    * - load the model whenever `semanticSearchEnabled` is on and the runtime is
-   *   untouched — at launch for users who opted in earlier (the cache makes
+   *   untouched. A model that needs a download on an expensive connection
+   *   waits (see {@link SemanticSearchService.waitingForNetwork}) — at launch for users who opted in earlier (the cache makes
    *   that instant) and the moment the setting flips on (the one place the
    *   first download starts). Deliberately not retried on `failed`: an
    *   automatic loop would hammer a broken download — recovery rides the
@@ -106,6 +108,22 @@ export interface SemanticSearchService {
    */
   readonly progress: Store<EmbeddingProgress | null>
   /**
+   * Semantic search is on, but the model needs a download and the connection
+   * is expensive. The load starts on a free connection, or after
+   * {@link allowExpensiveDownload}.
+   */
+  readonly waitingForNetwork: Store<boolean>
+  /**
+   * Whether a model load now downloads the model over an expensive connection
+   * that the user has not allowed.
+   */
+  needsDownloadConsent(): Promise<boolean>
+  /**
+   * Allow the model download over an expensive connection until the app
+   * quits.
+   */
+  allowExpensiveDownload(): void
+  /**
    * Stop re-embedding after index rebuilds. The service is unusable afterwards.
    */
   dispose(): void
@@ -121,6 +139,7 @@ export interface SemanticSearchServiceDeps {
   readonly indexLifecycle: IndexLifecycleService
   readonly graphSession: SemanticSearchGraphSource
   readonly activity: ActivityPort
+  readonly network: NetworkService
   /**
    * Stop embedding and unload the model while the app is hidden.
    */
@@ -138,6 +157,9 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
   readonly #mainWindow: boolean
   readonly #progress = new WritableStore<EmbeddingProgress | null>(null)
   readonly progress: Store<EmbeddingProgress | null> = this.#progress
+  readonly #waitingForNetwork = new WritableStore(false)
+  readonly waitingForNetwork: Store<boolean> = this.#waitingForNetwork
+  readonly #expensiveAllowed = new WritableStore(false)
 
   constructor(deps: SemanticSearchServiceDeps) {
     this.#deps = deps
@@ -160,7 +182,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
   }
 
   start(): Unlisten {
-    const { embeddingRuntime, embeddingIndex, settings, graphSession, activity, logger } =
+    const { embeddingRuntime, embeddingIndex, settings, graphSession, activity, network, logger } =
       this.#deps
     if (this.#consumeLegacyOptIn()) {
       settings.update({ semanticSearchEnabled: true })
@@ -183,11 +205,14 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
       const enabled = settings.get().semanticSearchEnabled && this.#mainWindow && !hidden
       const status = embeddingRuntime.get()
 
-      const nextLoadGate = `${enabled} ${hidden} ${status.status}`
+      const nextLoadGate = `${enabled} ${hidden} ${status.status} ${network.expensive.get()} ${this.#expensiveAllowed.get()}`
       if (nextLoadGate !== loadGate) {
         loadGate = nextLoadGate
+        if (!enabled || status.status !== 'uninitialized') {
+          this.#waitingForNetwork.set(false)
+        }
         if (enabled && status.status === 'uninitialized') {
-          void this.ensureModel()
+          this.#load()
         } else if (hidden && status.status === 'ready') {
           embeddingRuntime.unload().catch((cause: unknown) => {
             logger.warn('failed to unload the embedding model', cause)
@@ -236,6 +261,9 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
       embeddingRuntime.subscribe(react),
       graphSession.subscribe(react),
       activity.subscribeHidden(react),
+      network.expensive.subscribe(react),
+      this.#expensiveAllowed.subscribe(react),
+      network.watch(),
       activity.subscribeVisible(() => {
         react()
         if (this.#deps.unloadWhenHidden) {
@@ -274,6 +302,20 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
     }
   }
 
+  async needsDownloadConsent(): Promise<boolean> {
+    const { embeddingRuntime, network } = this.#deps
+    const status = embeddingRuntime.get().status
+    if (status === 'ready' || status === 'loading') {
+      return false
+    }
+    const downloaded = await embeddingRuntime.modelDownloaded()
+    return !downloaded && network.expensive.get() !== false && !this.#expensiveAllowed.get()
+  }
+
+  allowExpensiveDownload(): void {
+    this.#expensiveAllowed.set(true)
+  }
+
   async retryFailedModel(): Promise<void> {
     await this.#deps.embeddingRuntime.retry()
   }
@@ -284,6 +326,42 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
 
   dispose(): void {
     this.#stopFollowingRebuilds()
+  }
+
+  // Loads the model, or waits when that downloads it over an expensive connection.
+  // An unknown connection loads nothing: the load runs again once the shell answers.
+  #load(): void {
+    const expensive = this.#deps.network.expensive.get()
+    if (expensive === null && !this.#expensiveAllowed.get()) {
+      return
+    }
+    if (expensive === true && !this.#expensiveAllowed.get()) {
+      void this.#loadUnlessDownload()
+    } else {
+      this.#waitingForNetwork.set(false)
+      void this.ensureModel()
+    }
+  }
+
+  async #loadUnlessDownload(): Promise<void> {
+    const { embeddingRuntime, settings, logger } = this.#deps
+    let consent: boolean
+    try {
+      consent = await this.needsDownloadConsent()
+    } catch (cause) {
+      logger.warn('failed to check the embedding model file', cause)
+      consent = false
+    }
+    if (
+      !settings.get().semanticSearchEnabled ||
+      embeddingRuntime.get().status !== 'uninitialized'
+    ) {
+      return
+    }
+    this.#waitingForNetwork.set(consent)
+    if (!consent) {
+      await this.ensureModel()
+    }
   }
 
   /**

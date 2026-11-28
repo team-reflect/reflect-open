@@ -153,6 +153,26 @@ pub struct WebAuthCallback {
     pub url: Option<String>,
 }
 
+/// `plugin:mobile-dialog|confirm` arguments: an alert with a title, a
+/// message, and two buttons. The result is whether the user chose `confirm`.
+#[derive(Serialize, Deserialize, specta::Type)]
+pub struct DialogConfirmArgs {
+    pub title: String,
+    pub message: String,
+    /// The label of the default button.
+    pub confirm: String,
+    /// The label of the cancel button.
+    pub cancel: String,
+}
+
+/// `plugin:network|status` result, and the `plugin:network:changed` payload.
+#[derive(Serialize, Deserialize, specta::Type)]
+pub struct NetworkStatus {
+    /// The connection costs the user money or data: cellular, a personal
+    /// hotspot, or Low Data Mode.
+    pub expensive: bool,
+}
+
 /// `plugin:app-store|get_environment` result.
 #[derive(Serialize, Deserialize, specta::Type)]
 pub struct AppStoreEnvironmentReply {

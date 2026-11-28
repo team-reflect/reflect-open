@@ -219,6 +219,7 @@ import {
   type MobileStorageService,
 } from './ipc/mobile-storage-service.ts'
 import { createHapticsService, type HapticsService } from './ipc/haptics-service.ts'
+import { createNetworkService, type NetworkService } from './ipc/network-service.ts'
 import { createWebAuthService, type WebAuthService } from './ipc/web-auth-service.ts'
 import {
   createSecretStoreService,
@@ -323,6 +324,10 @@ export interface CoreServices {
    * The local embedding model: download, load, status, and text vectors.
    */
   readonly embeddingRuntime: EmbeddingRuntimeService
+  /**
+   * The cost of the current connection.
+   */
+  readonly network: NetworkService
   /**
    * The graph's persisted chat conversations.
    */
@@ -666,6 +671,7 @@ export const coreServiceFactories = {
   syncEngines: createSyncEngineFactory,
   icloudNative: createICloudNativeService,
   embeddingRuntime: createEmbeddingRuntimeService,
+  network: createNetworkService,
   retrieval: createRetrievalService,
   embeddingIndex: createEmbeddingIndexService,
   transcription: createTranscriptionService,
@@ -1079,6 +1085,7 @@ export function composeCoreServices(
   const gists = create.gists({ http: adapters.http })
   const syncEngines = create.syncEngines({ git: gitRepository, clock })
   const embeddingRuntime = create.embeddingRuntime({ ipc, logger })
+  const network = create.network({ ipc })
   const retrieval = create.retrieval({
     database,
     search,
@@ -1219,6 +1226,7 @@ export function composeCoreServices(
     settings,
     persistenceFlush,
     embeddingRuntime,
+    network,
     chatHistory,
     deepLinkIntake: create.deepLinkIntake({
       source: adapters.deepLink ?? createNoDeepLinkSource(),
@@ -1323,6 +1331,7 @@ export function composeCoreServices(
       indexLifecycle,
       graphSession,
       activity,
+      network,
       unloadWhenHidden: isMobilePlatform(platform.appPlatform),
       logger,
     }),

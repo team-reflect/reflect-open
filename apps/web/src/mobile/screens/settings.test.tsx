@@ -10,6 +10,7 @@ import {
   createTestCoreServices,
   createTestGitSyncService,
   createTestGitHostConnector,
+  createTestNetworkService,
   createTestPlatformService,
   createTestSubscriptionService,
   seedNotes,
@@ -17,6 +18,7 @@ import {
   type TestEmbeddingRuntimeService,
   type TestSubscriptionService,
 } from '@reflect/core/testing'
+import { createTestDialogService, type TestDialogService } from '@reflect/app/testing'
 import '@/test-utils/locator.ts'
 import { TERMS_OF_USE_URL } from '@/mobile/legal-urls.ts'
 import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -75,6 +77,11 @@ interface MountOptions {
    * The embedding runtime; `unsupported` by default.
    */
   embeddingRuntime?: TestEmbeddingRuntimeService
+  /**
+   * Whether the connection is expensive; free by default.
+   */
+  expensive?: boolean
+  dialog?: TestDialogService
 }
 
 /**
@@ -102,6 +109,7 @@ async function mount(options?: MountOptions) {
     embeddingRuntime:
       options?.embeddingRuntime ??
       createTestEmbeddingRuntimeService({ status: { status: 'unsupported' } }),
+    network: createTestNetworkService({ expensive: options?.expensive ?? false }),
   })
   if (options?.githubSignedIn !== false) {
     await core.githubAuth.save({ kind: 'pat', token: 'ghp_test' })
@@ -118,6 +126,7 @@ async function mount(options?: MountOptions) {
     mobile: { kind: options?.storageKind ?? 'icloud' },
     route: { kind: 'settings', page: 'main' },
     settings: options?.settings,
+    ...(options?.dialog === undefined ? {} : { appServices: { dialog: options.dialog } }),
   })
   return Object.assign(view, { gitSync, gitHostConnector, updateSettings, appStore })
 }
@@ -247,6 +256,23 @@ describe('MobileSettings', () => {
       })
     })
     await expect.element(page.getByText('Downloading 25%')).toBeVisible()
+  })
+
+  it('asks before it downloads the model over cellular', async () => {
+    const embeddingRuntime = createTestEmbeddingRuntimeService({
+      status: { status: 'uninitialized' },
+      downloaded: false,
+    })
+    const dialog = createTestDialogService({ confirmed: false })
+    const view = await mount({ embeddingRuntime, expensive: true, dialog })
+
+    await userEvent.click(page.getByRole('switch', { name: 'Semantic search' }))
+    await vi.waitFor(() => expect(dialog.calls().map((call) => call.kind)).toEqual(['confirm']))
+    expect(view.core.settings.get().semanticSearchEnabled).toBe(false)
+
+    dialog.setConfirm(true)
+    await userEvent.click(page.getByRole('switch', { name: 'Semantic search' }))
+    await expectSettings(view, { semanticSearchEnabled: true })
   })
 
   it('offers to load the model again after a failed load', async () => {

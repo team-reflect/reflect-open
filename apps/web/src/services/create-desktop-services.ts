@@ -31,6 +31,7 @@ import { createBrowserContextMenuService } from '@/services/browser-context-menu
 import { createDomLifecycleAdapter } from '@/services/dom-lifecycle.ts'
 import type { HostKind } from '@/services/detect-platform.ts'
 import { createTauriDeepLinkSource } from '@/services/tauri-deep-link.ts'
+import { createSwiftDialogService } from '@/services/swift-dialog.ts'
 import { createTauriDialogService } from '@/services/tauri-dialog.ts'
 import { createTauriAppMenuHost } from '@/services/tauri-app-menu-host.ts'
 import { createTauriContextMenuService } from '@/services/tauri-context-menu-service.ts'
@@ -138,7 +139,7 @@ export function createDesktopHost(
     case 'swift':
       return {
         ...common,
-        dialog: createBrowserDialogService(),
+        dialog: createSwiftDialogService(ipc),
         opener: createSwiftOpenerTransport(ipc),
         exceptionTelemetry,
         nativeChrome: createSwiftNativeChromeHost(window),

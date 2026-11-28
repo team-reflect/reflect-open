@@ -679,6 +679,10 @@ export type Commands = {
     args: Record<string, never>
     result: null
   }
+  embed_model_downloaded: {
+    args: Record<string, never>
+    result: boolean
+  }
   embed_query: {
     args: {
       text: string
@@ -1420,6 +1424,14 @@ export type Commands = {
     args: NoArgs
     result: null
   }
+  'plugin:network|status': {
+    args: NoArgs
+    result: NetworkStatus
+  }
+  'plugin:mobile-dialog|confirm': {
+    args: DialogConfirmArgs
+    result: boolean
+  }
   'plugin:app-store|get_environment': {
     args: NoArgs
     result: AppStoreEnvironmentReply
@@ -1521,6 +1533,19 @@ export type DailyNoteRow = {
   /**  File modification time (epoch ms). */
   mtime: number
   isPrivate: boolean
+}
+
+/**
+ *  `plugin:mobile-dialog|confirm` arguments: an alert with a title, a
+ *  message, and two buttons. The result is whether the user chose `confirm`.
+ */
+export type DialogConfirmArgs = {
+  title: string
+  message: string
+  /**  The label of the default button. */
+  confirm: string
+  /**  The label of the cancel button. */
+  cancel: string
 }
 
 /**
@@ -2089,6 +2114,15 @@ export type MovedNoteAddress = {
   basenameKey: string
   /**  Set only for a calendar-valid `daily/YYYY-MM-DD.md` destination. */
   dailyDate: string | null
+}
+
+/**  `plugin:network|status` result, and the `plugin:network:changed` payload. */
+export type NetworkStatus = {
+  /**
+   *  The connection costs the user money or data: cellular, a personal
+   *  hotspot, or Low Data Mode.
+   */
+  expensive: boolean
 }
 
 /**  The arguments of a command that takes none. */

@@ -21,8 +21,22 @@ export interface PickFolderOptions {
   defaultPath?: string
 }
 
+export interface ConfirmOptions {
+  title: string
+  message: string
+  /**
+   * The label of the default button.
+   */
+  confirm: string
+  /**
+   * The label of the cancel button.
+   */
+  cancel: string
+}
+
 /**
- * Native open panels. Every method resolves `null` when the user cancels.
+ * Native open panels and alerts. Every picker resolves `null` when the user
+ * cancels.
  */
 export interface DialogService {
   /**
@@ -33,4 +47,9 @@ export interface DialogService {
    * The absolute path of the picked folder.
    */
   pickFolder(options: PickFolderOptions): MaybePromise<string | null>
+  /**
+   * Ask a question with two buttons. Resolves whether the user chose
+   * `confirm`.
+   */
+  confirm(options: ConfirmOptions): Promise<boolean>
 }

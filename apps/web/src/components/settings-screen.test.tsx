@@ -620,7 +620,7 @@ describe('SettingsScreen', () => {
     // The control flips to the loading state (EmbeddingsSync owns the actual
     // download; the runtime here still reports `uninitialized`).
     await expect
-      .element(page.getByRole('progressbar', { name: /model download/i }))
+      .element(page.getByRole('progressbar', { name: /semantic search progress/i }))
       .toBeInTheDocument()
   })
 
@@ -632,21 +632,17 @@ describe('SettingsScreen', () => {
     })
     await renderScreen()
 
-    const bar = page.getByRole('progressbar', { name: /model download/i })
+    const bar = page.getByRole('progressbar', { name: /semantic search progress/i })
     await expect.element(bar).toHaveAttribute('aria-valuenow', '50')
-    await expect
-      .element(page.getByText('Downloading the model — 45 MB of 90 MB'))
-      .toBeInTheDocument()
+    await expect.element(page.getByText('Downloading 50%')).toBeInTheDocument()
   })
 
-  it('shows the downloaded model once ready and persists a disable', async () => {
+  it('shows the ready model and persists a disable', async () => {
     stored = { semanticSearchEnabled: true }
     embedRuntime.setStatus({ status: 'ready', model: TEST_EMBED_MODEL })
     await renderScreen()
 
-    await expect
-      .element(page.getByText(`Model downloaded (${TEST_EMBED_MODEL})`))
-      .toBeInTheDocument()
+    await expect.element(page.getByText('Ready', { exact: true })).toBeInTheDocument()
 
     await page.getByRole('button', { name: /disable/i }).click()
 
@@ -675,7 +671,7 @@ describe('SettingsScreen', () => {
       .element(page.getByText('Semantic search is not available on this device.'))
       .toBeInTheDocument()
     expect(page.getByRole('button', { name: /enable semantic search/i }).query()).toBeNull()
-    expect(page.getByRole('progressbar', { name: /model download/i }).query()).toBeNull()
+    expect(page.getByRole('progressbar', { name: /semantic search progress/i }).query()).toBeNull()
   })
 
   it('re-enabling after a failed load retries the download', async () => {

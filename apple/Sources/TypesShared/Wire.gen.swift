@@ -1750,6 +1750,45 @@ public struct DailyNoteRow: Codable, Sendable, Equatable {
     }
 }
 
+/// `plugin:mobile-dialog|confirm` arguments: an alert with a title, a
+/// message, and two buttons. The result is whether the user chose `confirm`.
+public struct DialogConfirmArgs: Codable, Sendable, Equatable {
+    public let title: String
+    public let message: String
+    public let confirm: String
+    public let cancel: String
+
+    private enum CodingKeys: String, CodingKey {
+        case title = "title"
+        case message = "message"
+        case confirm = "confirm"
+        case cancel = "cancel"
+    }
+
+    public init(title: String, message: String, confirm: String, cancel: String) {
+        self.title = title
+        self.message = message
+        self.confirm = confirm
+        self.cancel = cancel
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.message = try container.decode(String.self, forKey: .message)
+        self.confirm = try container.decode(String.self, forKey: .confirm)
+        self.cancel = try container.decode(String.self, forKey: .cancel)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(title, forKey: .title)
+        try container.encode(message, forKey: .message)
+        try container.encode(confirm, forKey: .confirm)
+        try container.encode(cancel, forKey: .cancel)
+    }
+}
+
 /// Byte counts for an active model download. Absent until the download
 /// starts (cache probing, or a cached model that skips downloading); after
 /// the last byte it stays at 100% through the model-load phase.
@@ -3391,6 +3430,29 @@ public struct MovedNoteAddress: Codable, Sendable, Equatable {
         try container.encode(pathKey, forKey: .pathKey)
         try container.encode(basenameKey, forKey: .basenameKey)
         try container.encode(dailyDate, forKey: .dailyDate)
+    }
+}
+
+/// `plugin:network|status` result, and the `plugin:network:changed` payload.
+public struct NetworkStatus: Codable, Sendable, Equatable {
+    public let expensive: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case expensive = "expensive"
+    }
+
+    public init(expensive: Bool) {
+        self.expensive = expensive
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.expensive = try container.decode(Bool.self, forKey: .expensive)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(expensive, forKey: .expensive)
     }
 }
 
@@ -5724,6 +5786,8 @@ public enum ShellCommandName: String, Sendable {
     case recordingActionPerformed = "plugin:recording|action_performed"
     case webAuthStart = "plugin:web-auth|start"
     case hapticsImpactLight = "plugin:mobile-haptics|impact_light"
+    case networkStatus = "plugin:network|status"
+    case dialogConfirm = "plugin:mobile-dialog|confirm"
     case appStoreGetEnvironment = "plugin:app-store|get_environment"
     case appStoreSync = "plugin:app-store|sync"
     case appStorePresentOfferCodeRedeemSheet = "plugin:app-store|present_offer_code_redeem_sheet"
