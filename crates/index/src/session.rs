@@ -468,9 +468,9 @@ impl IndexSession {
     }
 
     /// The hash and model of each stored embedding chunk of the note at
-    /// `path`, read on the query connection.
-    pub fn embedding_chunk_hashes(&self, path: &str) -> AppResult<Vec<ChunkHash>> {
-        self.read(self.read_generation()?, |conn| {
+    /// `path`, read on the query connection at reader generation `requested`.
+    pub fn embedding_chunk_hashes(&self, requested: u64, path: &str) -> AppResult<Vec<ChunkHash>> {
+        self.read(requested, |conn| {
             crate::read::embed::chunk_hashes(conn, path)
         })
     }

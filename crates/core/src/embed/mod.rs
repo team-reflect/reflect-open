@@ -421,7 +421,17 @@ impl Core {
         chunks: Vec<ChunkToEmbed>,
         generation: u64,
     ) -> AppResult<u32> {
-        let stored = self.index.embedding_chunk_hashes(&path)?;
+        // An empty set reuses nothing, and the generation-gated write drops a
+        // stale removal.
+        let stored = if chunks.is_empty() {
+            Vec::new()
+        } else {
+            let read_generation = self.index.read_generation()?;
+            self.repair_index(
+                read_generation,
+                self.index.embedding_chunk_hashes(read_generation, &path),
+            )?
+        };
         let reused = reused_chunks(&chunks, &stored, MODEL.id);
         let (chunks, embedded) = if reused.contains(&false) {
             let model = self.ready_model()?;
