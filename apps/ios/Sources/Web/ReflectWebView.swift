@@ -21,6 +21,14 @@ final class ReflectWebView: WKWebView {
     configuration.setURLSchemeHandler(assets, forURLScheme: AssetSchemeHandler.scheme)
     configuration.userContentController.addUserScript(HostBridge.userScript)
     configuration.userContentController.add(bridge, name: HostBridge.messageHandlerName)
+    #if DEBUG
+    if let fixture = UITestFixture.current {
+      configuration.userContentController.addUserScript(
+        WKUserScript(
+          source: fixture.localStorageScript, injectionTime: .atDocumentStart,
+          forMainFrameOnly: true))
+    }
+    #endif
     configuration.allowsInlineMediaPlayback = true
     configuration.allowsPictureInPictureMediaPlayback = true
     configuration.mediaTypesRequiringUserActionForPlayback = []

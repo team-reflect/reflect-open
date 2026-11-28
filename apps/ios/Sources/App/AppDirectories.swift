@@ -8,7 +8,8 @@ import WebKit
 /// It launches the app with the environment variable `REFLECT_UITEST_SESSION`
 /// set to a UUID. The app then starts as an install that finished onboarding
 /// with storage on this device, and keeps its graph, its settings and the
-/// data of the web view inside that session. Other data of the app, such as
+/// data of the web view inside that session. A new session starts with the files of
+/// `UITestFixture`, when the test gives one. Other data of the app, such as
 /// staged recordings and the keychain, stays in the app's own places.
 /// A second launch with the same UUID opens the same data.
 struct AppDirectories {
@@ -48,6 +49,9 @@ struct AppDirectories {
     let home = sessions.appendingPathComponent(session.uuidString)
     let documents = home.appendingPathComponent("Documents")
     let applicationSupport = home.appendingPathComponent("Library/Application Support")
+    if !fileManager.fileExists(atPath: home.path) {
+      try UITestFixture.current?.write(into: home, fileManager: fileManager)
+    }
     for directory in [documents, applicationSupport] {
       try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
     }

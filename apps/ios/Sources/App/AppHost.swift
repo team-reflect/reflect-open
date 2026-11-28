@@ -61,8 +61,20 @@ final class AppHost {
     }
 
     let callers = TrustedCallers(devOrigin: devURL?.webOrigin)
+    let httpConfiguration = HTTPProxy.makeConfiguration()
+    #if DEBUG
+    if let fixture = UITestFixture.current {
+      httpConfiguration.protocolClasses = [UITestURLProtocol.self]
+      Task { [core] in
+        for (name, value) in fixture.secrets {
+          guard let args = try? JSONEncoder().encode(["name": name, "value": value]) else { continue }
+          _ = await core.dispatch("secret_set", args: args)
+        }
+      }
+    }
+    #endif
     let routes: [any SchemeRoute] = [
-      HTTPProxy(callers: callers),
+      HTTPProxy(callers: callers, configuration: httpConfiguration),
       IPCRoute(
         dispatch: { [core] command, args, headers, body in
           await core.dispatch(command, args: args, headers: headers, body: body)

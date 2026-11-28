@@ -25,6 +25,7 @@
     "test:browser": "turbo run vitest:browser --",
     "test:node": "turbo run vitest:node --",
     "test:ios": "node scripts/test-ios.ts",
+    "store-screenshots": "node apps/ios/store-screenshots/main.ts",
     "test:swift": "turbo run test:swift --filter=@reflect/apple",
     "lint": "pnpm run lint:oxfmt && pnpm run lint:oxlint && pnpm run lint:eslint && pnpm run lint:knip",
     "lint:oxfmt": "oxfmt --check",

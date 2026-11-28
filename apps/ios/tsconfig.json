@@ -5,6 +5,9 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true
   },
-  "include": ["scripts"],
-  "references": [{ "path": "../../scripts/tsconfig.json" }]
+  "include": ["scripts", "store-screenshots"],
+  "references": [
+    { "path": "../../scripts/tsconfig.json" },
+    { "path": "../../packages/app/tsconfig.json" }
+  ]
 }
