@@ -1,0 +1,18 @@
+[package]
+name = "reflect-embed"
+version = "0.0.0"
+description = "The llama.cpp embedding backend that a shell passes to `reflect-core`."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+reflect-types = { workspace = true }
+
+# Intel macOS and Android have no backend: `backend()` returns `None` there.
+# ggml builds Metal for every Apple target, without a feature flag.
+[target.'cfg(not(any(target_os = "android", all(target_os = "macos", target_arch = "x86_64"))))'.dependencies]
+llama-cpp-2 = { workspace = true }
+llama-cpp-sys-2 = { workspace = true }
+tracing = { workspace = true }

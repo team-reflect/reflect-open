@@ -202,6 +202,7 @@ pub fn run() {
                 .inspect_err(|err| tracing::warn!(%err, "no documents directory"))
                 .ok(),
             user_agent: app_user_agent(app.handle()),
+            embed_backend: reflect_embed::backend(),
         };
         let core = Core::new(config, host).map_err(|err| err.message().to_string())?;
         app.manage(Arc::new(core));

@@ -39,3 +39,21 @@ pub enum EmbedStatus {
     /// This platform or CPU has no embedding runtime.
     Unsupported,
 }
+
+/// Loads embedding models. A shell passes one to the core, so the core does not
+/// depend on the inference runtime.
+pub trait EmbedBackend: Send + Sync + std::fmt::Debug {
+    /// Loads the weights at `weights` with a context window of `max_tokens`.
+    fn load(
+        &self,
+        weights: &std::path::Path,
+        max_tokens: u32,
+    ) -> Result<Box<dyn EmbedModel>, String>;
+}
+
+/// A loaded embedding model.
+pub trait EmbedModel: Send {
+    /// The pooled embedding of `prompt` followed by `text`. An input longer
+    /// than the context window is truncated.
+    fn embed(&mut self, prompt: &str, text: &str) -> Result<Vec<f32>, String>;
+}

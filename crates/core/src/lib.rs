@@ -7,6 +7,7 @@ pub mod capture;
 pub mod contacts;
 mod db;
 pub mod editor_link_preview;
+pub mod embed;
 pub mod fs;
 mod git;
 pub mod icloud;
@@ -18,21 +19,8 @@ mod secrets;
 pub mod settings;
 pub mod web_fetch;
 
-// The watcher is a desktop capability and the embedding runtime runs on desktop
-// and iOS: other platforms swap in stand-ins with the same `Core` methods.
-// Intel macOS has the embedding stand-in too: the llama.cpp runtime is not
-// tested on Intel Macs yet.
-#[cfg(not(any(
-    target_os = "android",
-    all(target_os = "macos", target_arch = "x86_64")
-)))]
-pub mod embed;
-#[cfg(any(
-    target_os = "android",
-    all(target_os = "macos", target_arch = "x86_64")
-))]
-#[path = "embed_unsupported.rs"]
-pub mod embed;
+// The watcher is a desktop capability: mobile swaps in a stand-in with the
+// same `Core` methods.
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub mod watcher;
 #[cfg(any(target_os = "android", target_os = "ios"))]
@@ -76,6 +64,9 @@ pub struct CoreConfig {
     pub app_data_dir: Option<PathBuf>,
     /// The HTTP User-Agent for the app's own requests.
     pub user_agent: String,
+    /// Loads embedding models, or `None` on a platform without one: the
+    /// `embed_*` commands then report `unsupported`.
+    pub embed_backend: Option<Arc<dyn reflect_types::EmbedBackend>>,
 }
 
 /// The result of [`Core::dispatch`].

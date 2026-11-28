@@ -5,7 +5,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use reflect_core::{Core, CoreConfig, Host, Reply};
-use reflect_types::AppResult;
+use reflect_types::{AppResult, EmbedBackend, EmbedModel};
 use serde_json::{Value, json};
 
 /// SHA-256 of `a\nb\n`, the value `sha256Hex` in `packages/utils` gives for
@@ -29,6 +29,17 @@ impl Host for NoopHost {
     #[cfg(not(target_os = "ios"))]
     fn reveal_path(&self, _path: &Path) -> AppResult<()> {
         Ok(())
+    }
+}
+
+/// A backend that loads no model, so the replies match a platform that has
+/// one.
+#[derive(Debug)]
+struct NoModelBackend;
+
+impl EmbedBackend for NoModelBackend {
+    fn load(&self, _: &Path, _: u32) -> Result<Box<dyn EmbedModel>, String> {
+        Err("no model".into())
     }
 }
 
@@ -117,7 +128,16 @@ fn commands_reply_their_pinned_json() {
     let graph = home.path().join("graph");
     let graph = graph.to_str().unwrap();
     let session = Session {
-        core: Arc::new(Core::new(CoreConfig::default(), Arc::new(NoopHost)).unwrap()),
+        core: Arc::new(
+            Core::new(
+                CoreConfig {
+                    embed_backend: Some(Arc::new(NoModelBackend)),
+                    ..CoreConfig::default()
+                },
+                Arc::new(NoopHost),
+            )
+            .unwrap(),
+        ),
         waiter: tokio::runtime::Builder::new_current_thread()
             .build()
             .unwrap(),

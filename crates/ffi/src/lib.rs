@@ -101,7 +101,8 @@ pub unsafe extern "C" fn reflect_core_new(
     error_out: *mut *mut c_char,
 ) -> *mut ReflectCore {
     let result = catch_unwind(AssertUnwindSafe(|| {
-        let config = unsafe { read_config(config_json) }?;
+        let mut config = unsafe { read_config(config_json) }?;
+        config.embed_backend = reflect_embed::backend();
         let log_dir = config.app_data_dir.as_deref().map(|dir| dir.join("logs"));
         let gate = Arc::new(Gate::new());
         let host = Arc::new(FfiHost {
@@ -539,6 +540,7 @@ unsafe fn read_config(config_json: *const c_char) -> AppResult<CoreConfig> {
         app_data_dir: config.app_data_dir.map(PathBuf::from),
         document_dir: config.document_dir.map(PathBuf::from),
         user_agent: config.user_agent.unwrap_or_default(),
+        embed_backend: None,
     })
 }
 

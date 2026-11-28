@@ -44,7 +44,7 @@ pub use change::{ChangeKind, FileChange};
 #[cfg(feature = "codegen")]
 pub use chrome::*;
 pub use contacts::{ContactMatch, ContactsAuthorization};
-pub use embed::{EmbedProgress, EmbedStatus};
+pub use embed::{EmbedBackend, EmbedModel, EmbedProgress, EmbedStatus};
 pub use error::{AppError, AppResult};
 pub use ffi::{AssetResolveReply, ByteRange, CoreStartConfig};
 pub use file_meta::FileMeta;

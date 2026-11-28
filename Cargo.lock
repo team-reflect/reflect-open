@@ -4497,8 +4497,6 @@ dependencies = [
  "infer",
  "jiff 1.0.2",
  "keyring-core",
- "llama-cpp-2",
- "llama-cpp-sys-2",
  "log",
  "notify-debouncer-full",
  "objc2",
@@ -4527,12 +4525,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "reflect-embed"
+version = "0.0.0"
+dependencies = [
+ "llama-cpp-2",
+ "llama-cpp-sys-2",
+ "reflect-types",
+ "tracing",
+]
+
+[[package]]
 name = "reflect-ffi"
 version = "0.0.0"
 dependencies = [
  "futures-util",
  "log",
  "reflect-core",
+ "reflect-embed",
  "reflect-graph-io",
  "reflect-types",
  "serde_json",
@@ -4644,6 +4653,7 @@ dependencies = [
  "objc2-foundation",
  "percent-encoding",
  "reflect-core",
+ "reflect-embed",
  "reflect-graph-io",
  "reflect-index",
  "reflect-types",

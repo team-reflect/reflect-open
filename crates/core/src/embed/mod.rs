@@ -1,5 +1,5 @@
-//! The local embedding runtime (Plan 09): llama.cpp in-process, off the UI
-//! thread. The model is downloaded on demand into app data, never bundled, and
+//! The local embedding runtime (Plan 09): the shell's [`EmbedBackend`]
+//! (llama.cpp in `reflect-embed`), off the UI thread. The model is downloaded on demand into app data, never bundled, and
 //! every failure degrades to a reported "unavailable" state (the same
 //! recoverable contract as sqlite-vec): semantic search is strictly additive,
 //! so nothing here may ever take the app down.
@@ -7,20 +7,12 @@
 mod download;
 
 use std::collections::HashMap;
-use std::ffi::{CStr, c_char, c_void};
-use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 
-use llama_cpp_2::context::LlamaContext;
-use llama_cpp_2::context::params::{LlamaContextParams, LlamaPoolingType};
-use llama_cpp_2::llama_backend::LlamaBackend;
-use llama_cpp_2::llama_batch::LlamaBatch;
-use llama_cpp_2::model::LlamaModel;
-use llama_cpp_2::model::params::LlamaModelParams;
-use llama_cpp_sys_2::{GGML_LOG_LEVEL_ERROR, GGML_LOG_LEVEL_WARN, ggml_log_level};
 use reflect_types::{
-    AppError, AppResult, ChunkHash, ChunkToEmbed, EmbedProgress, EmbedStatus, EmbeddedChunk,
+    AppError, AppResult, ChunkHash, ChunkToEmbed, EmbedModel, EmbedProgress, EmbedStatus,
+    EmbeddedChunk,
 };
 
 use crate::{Core, Host, background_task};
@@ -60,125 +52,9 @@ const MODEL: ModelSpec = ModelSpec {
     document_prompt: "title: none | text: ",
 };
 
-/// CPU threads per embed. Embedding is background work, so it leaves most
-/// cores to the app.
-const THREADS: i32 = 2;
-
 /// How many newly downloaded bytes accumulate between progress events, so the
 /// IPC channel carries few events and the progress bar still moves smoothly.
 const PROGRESS_EMIT_STEP: u64 = 1024 * 1024;
-
-/// The loaded model and its one context. Embed calls serialize on the Mutex
-/// around it.
-struct Model {
-    model: &'static LlamaModel,
-    context: LlamaContext<'static>,
-}
-
-/// Forwards llama.cpp's warnings and errors to the app log and drops the rest.
-/// A failed load or context creation returns no reason, so the log is the
-/// only place that has it.
-unsafe extern "C" fn log_warnings(level: ggml_log_level, text: *const c_char, _: *mut c_void) {
-    if level != GGML_LOG_LEVEL_WARN && level != GGML_LOG_LEVEL_ERROR {
-        return;
-    }
-    // SAFETY: llama.cpp passes a NUL-terminated string that lives for the call.
-    let text = unsafe { CStr::from_ptr(text) }.to_string_lossy();
-    let text = text.trim_end();
-    if level == GGML_LOG_LEVEL_ERROR {
-        tracing::error!(target: "llama.cpp", "{text}");
-    } else {
-        tracing::warn!(target: "llama.cpp", "{text}");
-    }
-}
-
-/// llama.cpp's backend, with its log routed to [`log_warnings`].
-/// `LlamaBackend::init` succeeds only on its first call, so the first result
-/// is kept.
-fn backend() -> Result<&'static LlamaBackend, String> {
-    static BACKEND: OnceLock<Result<LlamaBackend, String>> = OnceLock::new();
-    BACKEND
-        .get_or_init(|| {
-            // SAFETY: the callback is a plain function that reads only its
-            // arguments. llama.cpp also routes ggml's log through it.
-            unsafe { llama_cpp_sys_2::llama_log_set(Some(log_warnings), std::ptr::null_mut()) };
-            LlamaBackend::init().map_err(|err| err.to_string())
-        })
-        .as_ref()
-        .map_err(Clone::clone)
-}
-
-/// The model weights, loaded once and kept for the process, so the context can
-/// borrow them for `'static` and a retry after a failed context reuses them.
-fn load_weights(backend: &LlamaBackend, path: &Path) -> Result<&'static LlamaModel, String> {
-    static WEIGHTS: OnceLock<LlamaModel> = OnceLock::new();
-    if let Some(weights) = WEIGHTS.get() {
-        return Ok(weights);
-    }
-    // The default offloads every layer to the GPU backend, which only the
-    // Apple Silicon build has (Metal). Other builds run on the CPU.
-    let weights = LlamaModel::load_from_file(backend, path, &LlamaModelParams::default())
-        .map_err(|err| err.to_string())?;
-    Ok(WEIGHTS.get_or_init(|| weights))
-}
-
-impl Model {
-    fn load(path: &Path) -> Result<Self, String> {
-        let backend = backend()?;
-        let model = load_weights(backend, path)?;
-        let max_tokens = MODEL.max_tokens;
-        let context = model
-            .new_context(
-                backend,
-                LlamaContextParams::default()
-                    .with_embeddings(true)
-                    .with_pooling_type(LlamaPoolingType::Mean)
-                    .with_n_ctx(NonZeroU32::new(max_tokens))
-                    .with_n_batch(max_tokens)
-                    .with_n_ubatch(max_tokens)
-                    // An encode of more than one token runs on the batch
-                    // threads, and every input has at least BOS and EOS.
-                    .with_n_threads_batch(THREADS),
-            )
-            .map_err(|err| err.to_string())?;
-        Ok(Self { model, context })
-    }
-
-    /// One unit vector of `MODEL.dims` for `prompt` followed by `text`.
-    fn embed(&mut self, prompt: &str, text: &str) -> Result<Vec<f32>, String> {
-        let input = format!("{prompt}{text}");
-        let vocab = self.model.vocab();
-        let mut tokens = vocab.tokenize(input.as_bytes(), true, false);
-        // ggml aborts the process when a batch is larger than `n_ubatch`, so
-        // the input must fit the window. The cut keeps the closing EOS token.
-        let max = MODEL.max_tokens as usize;
-        if tokens.len() > max {
-            let eos = vocab.should_add_eos().then(|| vocab.eos());
-            tokens.truncate(max - usize::from(eos.is_some()));
-            tokens.extend(eos);
-        }
-        let mut batch = LlamaBatch::new(tokens.len(), 1);
-        batch
-            .add_sequence(&tokens, 0, false)
-            .map_err(|err| err.to_string())?;
-        self.context
-            .encode(&mut batch)
-            .map_err(|err| err.to_string())?;
-        let full = self
-            .context
-            .embeddings_seq_ith(0)
-            .map_err(|err| err.to_string())?;
-        let mut vector = full
-            .get(..MODEL.dims)
-            .ok_or_else(|| format!("the model returned {} dimensions", full.len()))?
-            .to_vec();
-        let norm = vector.iter().map(|value| value * value).sum::<f32>().sqrt();
-        if norm > 0.0 {
-            vector.iter_mut().for_each(|value| *value /= norm);
-        }
-        Ok(vector)
-    }
-}
 
 #[derive(Default)]
 enum Runtime {
@@ -187,28 +63,13 @@ enum Runtime {
     Loading {
         progress: Option<EmbedProgress>,
     },
-    Ready(Arc<Mutex<Model>>),
+    Ready(Arc<Mutex<Box<dyn EmbedModel>>>),
     Failed(String),
 }
 
 /// Process-wide embedding runtime state.
 #[derive(Default)]
 pub struct EmbedState(Mutex<Runtime>);
-
-/// ggml's x86_64 kernels are built for AVX2, FMA and F16C (`.cargo/config.toml`).
-/// Without them the first embed dies with SIGILL, which no error path can
-/// catch, so check before loading and report `unsupported` instead.
-#[cfg(target_arch = "x86_64")]
-fn cpu_supported() -> bool {
-    std::is_x86_feature_detected!("avx2")
-        && std::is_x86_feature_detected!("fma")
-        && std::is_x86_feature_detected!("f16c")
-}
-
-#[cfg(not(target_arch = "x86_64"))]
-fn cpu_supported() -> bool {
-    true
-}
 
 fn lock_state(state: &EmbedState) -> AppResult<std::sync::MutexGuard<'_, Runtime>> {
     state.0.lock().map_err(|err| {
@@ -349,7 +210,7 @@ impl Core {
     /// Current runtime status (poll on startup; live changes arrive on
     /// `embed:status` events).
     pub fn embed_status(&self) -> AppResult<EmbedStatus> {
-        if !cpu_supported() {
+        if self.config.embed_backend.is_none() {
             return Ok(EmbedStatus::Unsupported);
         }
         Ok(status_of(&*lock_state(&self.embed)?))
@@ -359,9 +220,9 @@ impl Core {
     /// concurrent call while loading returns immediately (the event stream
     /// carries the outcome). A failed download resumes on the next call.
     pub async fn embed_ensure(&self) -> AppResult<EmbedStatus> {
-        if !cpu_supported() {
+        let Some(backend) = self.config.embed_backend.clone() else {
             return Ok(EmbedStatus::Unsupported);
-        }
+        };
         // Resolve the directory BEFORE flipping to Loading: it's the only step
         // here that may fail without a guaranteed state transition afterwards.
         let models_dir = self.models_dir()?;
@@ -383,7 +244,9 @@ impl Core {
         let loaded = match ensure_model_file(self.host(), &self.embed.0, &models_dir).await {
             Ok(path) => self
                 .spawn_blocking(move || {
-                    let model = Model::load(&path).map_err(AppError::io)?;
+                    let model = backend
+                        .load(&path, MODEL.max_tokens)
+                        .map_err(AppError::io)?;
                     remove_other_models(&models_dir, &path);
                     Ok(model)
                 })
@@ -410,7 +273,7 @@ impl Core {
     /// Whether the model file is on disk, so `embed_ensure` loads it without a
     /// download.
     pub async fn embed_model_downloaded(&self) -> AppResult<bool> {
-        if !cpu_supported() {
+        if self.config.embed_backend.is_none() {
             return Ok(false);
         }
         Ok(model_file_complete(&model_path(&self.models_dir()?)).await)
@@ -435,6 +298,9 @@ impl Core {
 
     /// Embed a search query. Errors unless the model is `Ready`.
     pub async fn embed_query(&self, text: String) -> AppResult<Vec<f32>> {
+        if self.config.embed_backend.is_none() {
+            return Err(unsupported());
+        }
         let model = self.ready_model()?;
         self.spawn_blocking(move || embed_one(&model, MODEL.query_prompt, &text))
             .await
@@ -452,6 +318,9 @@ impl Core {
         chunks: Vec<ChunkToEmbed>,
         generation: u64,
     ) -> AppResult<u32> {
+        if self.config.embed_backend.is_none() {
+            return Err(unsupported());
+        }
         // An empty set reuses nothing, and the generation-gated write drops a
         // stale removal.
         let stored = if chunks.is_empty() {
@@ -493,7 +362,7 @@ impl Core {
             .join("models"))
     }
 
-    fn ready_model(&self) -> AppResult<Arc<Mutex<Model>>> {
+    fn ready_model(&self) -> AppResult<Arc<Mutex<Box<dyn EmbedModel>>>> {
         match &*lock_state(&self.embed)? {
             Runtime::Ready(model) => Ok(Arc::clone(model)),
             _ => Err(AppError::io("embedding model is not loaded")),
@@ -555,12 +424,40 @@ fn embed_chunks(
     Ok((chunks, embedded))
 }
 
-fn embed_one(model: &Mutex<Model>, prompt: &str, text: &str) -> AppResult<Vec<f32>> {
-    model
+fn embed_one(model: &Mutex<Box<dyn EmbedModel>>, prompt: &str, text: &str) -> AppResult<Vec<f32>> {
+    let full = model
         .lock()
         .map_err(|_| AppError::io("embedding model lock poisoned"))?
         .embed(prompt, text)
-        .map_err(|err| AppError::io(format!("embedding failed: {err}")))
+        .map_err(|err| AppError::io(format!("embedding failed: {err}")))?;
+    truncate_and_normalize(&full, MODEL.dims)
+}
+
+/// The leading `dims` of `full` (Matryoshka truncation), scaled to a unit
+/// vector.
+fn truncate_and_normalize(full: &[f32], dims: usize) -> AppResult<Vec<f32>> {
+    let mut vector = full
+        .get(..dims)
+        .ok_or_else(|| {
+            AppError::io(format!(
+                "embedding failed: the model returned {} dimensions",
+                full.len()
+            ))
+        })?
+        .to_vec();
+    let norm = vector.iter().map(|value| value * value).sum::<f32>().sqrt();
+    if norm > 0.0 {
+        vector.iter_mut().for_each(|value| *value /= norm);
+    }
+    Ok(vector)
+}
+
+/// The error of an embed command when the shell passed no backend. The
+/// frontend never embeds on an `unsupported` runtime.
+fn unsupported() -> AppError {
+    AppError::Unknown {
+        message: "the embedding runtime is not supported on this platform".into(),
+    }
 }
 
 #[cfg(test)]
@@ -623,32 +520,12 @@ mod tests {
         assert!(result.is_err());
     }
 
-    /// Needs the model file: `REFLECT_EMBED_MODEL=/path/to/model.gguf
-    /// GGML_METAL_NO_RESIDENCY=1 cargo test -p reflect-core -- --ignored
-    /// embeds_with_the_real_model`. On macOS the variable keeps ggml from
-    /// aborting at exit, as in the app's `main`.
     #[test]
-    #[ignore = "needs the model file"]
-    fn embeds_with_the_real_model() {
-        let path = std::env::var("REFLECT_EMBED_MODEL").expect("REFLECT_EMBED_MODEL");
-        let mut model = Model::load(Path::new(&path)).unwrap();
-        let first = model
-            .embed(MODEL.document_prompt, "Notes about gardening")
-            .unwrap();
-        let again = model
-            .embed(MODEL.document_prompt, "Notes about gardening")
-            .unwrap();
-        let query = model
-            .embed(MODEL.query_prompt, "Notes about gardening")
-            .unwrap();
-        assert_eq!(first.len(), MODEL.dims);
-        let norm = first.iter().map(|value| value * value).sum::<f32>().sqrt();
-        assert!((norm - 1.0).abs() < 1e-4, "norm {norm}");
-        assert_eq!(first, again);
-        assert_ne!(first, query);
-        let long = model
-            .embed(MODEL.document_prompt, &"word ".repeat(5000))
-            .unwrap();
-        assert_eq!(long.len(), MODEL.dims);
+    fn keeps_the_leading_dimensions_as_a_unit_vector() {
+        assert_eq!(
+            truncate_and_normalize(&[3.0, 4.0, 9.0], 2).unwrap(),
+            [0.6, 0.8]
+        );
+        assert!(truncate_and_normalize(&[1.0], 2).is_err());
     }
 }
