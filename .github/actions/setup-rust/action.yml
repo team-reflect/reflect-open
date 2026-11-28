@@ -33,9 +33,9 @@ runs:
     # Installs the Rust toolchain through rustup, mbx and the other tools, and
     # puts mise's `cargo` wrapper first on PATH, so `cargo` runs through mbx.
     - name: Install mise and tools
-      uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
       with:
-        version: 2026.11.12
+        version: 2026.11.14
         cache: ${{ inputs.cache }}
 
     - name: Print rustc version
